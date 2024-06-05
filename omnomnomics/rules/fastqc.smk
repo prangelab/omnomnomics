@@ -28,7 +28,7 @@ rule run_fastqc:
            log_it(logfile, "Input folder: trimmed_FASTQ")
            log_it(logfile, "Output folder: fastqc_reports")
 
-
+#test
            if fastq2:
                log_it(logfile, "Running FastQC in paired end mode...")
                fastqc_command = f"""
