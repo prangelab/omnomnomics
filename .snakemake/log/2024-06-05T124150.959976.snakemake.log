@@ -1,0 +1,5 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/omnomnomics.run.2024-06-05.config.yaml is extended by additional config specified via the command line.
+TypeError in file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/rules/rule1.smk, line 37:
+unsupported operand type(s) for -: 'list' and 'int'
+  File "/net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/Snakefile.smk", line 451, in <module>
+  File "/net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/rules/rule1.smk", line 37, in <module>

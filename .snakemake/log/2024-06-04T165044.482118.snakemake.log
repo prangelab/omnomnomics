@@ -1,0 +1,5 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/omnomnomics.run.2024-06-04.config.yaml is extended by additional config specified via the command line.
+NameError in file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/rules/rule1.smk, line 25:
+name 'threads' is not defined
+  File "/net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/Snakefile.smk", line 447, in <module>
+  File "/net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/rules/rule1.smk", line 25, in <module>

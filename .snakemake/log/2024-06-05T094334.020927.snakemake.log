@@ -1,0 +1,28 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/omnomnomics.run.2024-06-05.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job      count    min threads    max threads
+-----  -------  -------------  -------------
+all          1              1              1
+rule1        1             10             10
+total        2              1             10
+
+Select jobs to execute...
+
+[Wed Jun  5 09:43:35 2024]
+rule rule1:
+    input: FASTQ/test_test_test.fastq.gz
+    output: trimmed_FASTQ/rule1_output.test_test_test.fastq.gz
+    jobid: 1
+    reason: Missing output files: trimmed_FASTQ/rule1_output.test_test_test.fastq.gz
+    wildcards: sample=test_test_test
+    threads: 10
+    resources: mem_mb=1000, mem_mib=954, disk_mb=1000, disk_mib=954, tmpdir=<TBD>
+
+Error submitting jobscript (exit code 255):
+
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+Complete log: ../.snakemake/log/2024-06-05T094334.020927.snakemake.log

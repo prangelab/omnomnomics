@@ -1,0 +1,1022 @@
+#!/usr/bin/env python3
+import os
+import sys
+import subprocess
+import yaml
+import argparse
+import re
+import glob
+import random
+from datetime import date, datetime
+
+
+
+
+def parse_arguments(): #############add a feauture to make sure it specifies the cores/nodes etc?? or make a default.
+   """Parse command-line arguments."""
+   parser = argparse.ArgumentParser(description='Description of your script', allow_abbrev=False)
+
+
+   # Define command-line options
+   parser.add_argument('-i', '--experiment-dir', help='Path to the experiment directory')
+   parser.add_argument('-t', '--type', help='The type')
+   parser.add_argument('-g', '--genome', help='The genome')
+   parser.add_argument('-j', '--mode', help='The mode')
+   parser.add_argument('-T', '--trim-tool', help='The trim tool')
+   parser.add_argument('-M', '--map-tool', help='The map tool')
+   parser.add_argument('-f', '--formula', help='Your formula')
+   parser.add_argument('-I', '--input', help='The input file used for ChIP peak calling')
+   parser.add_argument('-m', '--metadata', help='Your metadata')
+   parser.add_argument('-b', '--broad', action='store_true', help='Enable broad option')
+   parser.add_argument('-S', '--style', help='The style')
+   parser.add_argument('-C', '--col-table', help='The col table')
+   parser.add_argument('-P', '--color-data-folder', help='The color data folder')
+   parser.add_argument('-o', '--overlay', help='The overlay')
+   parser.add_argument('-L', '--hub-mail', help='The hub mail')
+   parser.add_argument('-X', '--no-multiqc', action='store_true', help='Disable multiqc')
+   parser.add_argument('-n', '--name-fields', help='The name fields')
+   parser.add_argument('-e', '--type-field', help='The type field')
+   parser.add_argument('-c', '--col-field', help='The col field')
+   parser.add_argument('-s', '--separator', help='The separator')
+   parser.add_argument('-a', '--appendix', help='The appendix')
+   parser.add_argument('-d', '--homer-mindist', help='The homer mindist')
+   parser.add_argument('-z', '--homer-size', help='The homer size')
+   parser.add_argument('-k', '--keepunpaired', help='Keep Unpaired or not')
+   #parser.add_argument('-C', '--cores', help='The number of cores')
+
+
+   args, unknown = parser.parse_known_args()
+   # Check if any unknown arguments are provided
+   if unknown:
+       parser.error(f"Unrecognized arguments: {' '.join(unknown)}")
+
+
+   # Check if at least one argument is provided besides the script name
+   if len(sys.argv) < 2: #### change to 2 to force to have another argument besides script? is this necesarry? you already check if 3 required arguments are given so this is redundant then.
+       print("Not enough input arguments...")
+       parser.print_help()
+       sys.exit(1)
+
+
+   return args
+
+
+# Function to check if the configuration file contains the proper header
+def check_config_file_header(config_file_path, expected_header):
+   with open(config_file_path, 'r') as config_file:
+      
+       lines = config_file.readlines()
+       if len(lines) < 3 or expected_header not in lines[2]:
+           print("Config file does not contain right header. Aborting...")
+           sys.exit(1)
+
+
+# Function to load and validate the YAML configuration file
+def load_and_validate_yaml(config_file_path, expected_header):
+  
+   # Check for the expected header
+   check_config_file_header(config_file_path, expected_header)
+   # Load the YAML content
+   with open(config_file_path, 'r') as file:
+       try:
+           config_content = yaml.safe_load(file)
+       except yaml.YAMLError as exc:
+           print(f"Error parsing YAML file: {exc}")
+           sys.exit(1)
+  
+   return config_content
+
+
+
+
+##---------------------------------------------------------------------------------------------------------------
+## Set required vars or die
+##---------------------------------------------------------------------------------------------------------------
+def check_required_vars(the_type, experiment_dir, genome, config):
+   """Check if required variables are set and valid."""
+   print("Checking experiment dir...")
+   if not experiment_dir:
+       print("No EXPERIMENT DIR (-i) given! Aborting...", file=sys.stderr)
+       sys.exit(1)
+
+
+   if not os.path.isdir(experiment_dir):
+       print("EXPERIMENT DIR (-i) has to be a directory! Aborting...", file=sys.stderr)
+       sys.exit(1)
+
+
+   print("Checking experiment type...")
+   if not the_type:
+       print("No EXPERIMENT TYPE (-t) specified! Aborting...", file=sys.stderr)
+       sys.exit(1)
+   else:
+       if the_type not in config['TYPES']:
+           print(f"Experiment type (-t) should be one of: {', '.join(config['TYPES'])}. Aborting...", file=sys.stderr)
+           sys.exit(1)
+
+
+   print("Checking genome version...")
+   if not genome:
+       print("No GENOME VERSION (-g) specified! Aborting...", file=sys.stderr)
+       sys.exit(1)
+   else:
+       if genome not in config['GENOMES']:
+           print(f"Genome (-g) should be one of: {', '.join(config['GENOMES'])}. Aborting...", file=sys.stderr)
+           sys.exit(1)
+
+
+##---------------------------------------------------------------------------------------------------------------
+## Set user subroutine choices
+##---------------------------------------------------------------------------------------------------------------
+def set_user_subroutine_choices(trim_tool, map_tool, config):
+   """Set user subroutine choices."""
+   print("Applying tool selection...")
+   if trim_tool:
+       trim_tool = trim_tool.lower()
+       if trim_tool in config['TRIMMERS']:
+           selected_routine_trim = config['TRIMMERS'].index(trim_tool)
+           print(f"Trim tool: {trim_tool}")
+       else:
+           print(f"Trimming tool -T has to be one of: {', '.join(config['TRIMMERS'])}. Aborting...", file=sys.stderr)
+           sys.exit(1)
+   else:
+       selected_routine_trim = config['selected_routine_trim']
+
+
+   if map_tool:
+       map_tool = map_tool.lower()
+       if map_tool in config['MAPPERS']:
+           selected_routine_map = config['MAPPERS'].index(map_tool)
+           print(f"Map tool: {map_tool}")
+       else:
+           print(f"Mapping tool -M has to be one of: {', '.join(config['MAPPERS'])}. Aborting...", file=sys.stderr)
+           sys.exit(1)
+   else:
+       selected_routine_map = config['selected_routine_map']
+
+
+   return selected_routine_trim, selected_routine_map
+  
+
+
+##---------------------------------------------------------------------------------------------------------------
+## Validate user defined variables
+##---------------------------------------------------------------------------------------------------------------
+def validate_user_defined_vars(OMNOM_HOME, metadata, experiment_dir, INPUT, the_style, color_data_folder, col_table, overlay, the_type, map_tool, homer_size, homer_mindist, config):
+   """Validate user-defined variables."""
+   print("Validating options...")
+
+
+   # Check metadata file
+   if metadata != "NA":
+       if not os.path.isfile(metadata):
+           print("Metadata file (-m) does not exist! Aborting...", file=sys.stderr)
+           sys.exit(1)
+       elif not metadata.endswith(".txt"):
+           print("Metadata file (-m) is not a .txt file! Aborting...", file=sys.stderr)
+           sys.exit(1)
+       elif not metadata.startswith(experiment_dir):
+           print("Please place your metadata file in your experiment dir!", file=sys.stderr)
+           print(f"e.g., -m {os.path.join(f'{OMNOM_HOME}', 'data', 'me', 'my_fantastic_experiment', 'my_mindboggling_metadata.txt')}. Aborting...", file=sys.stderr)
+           sys.exit(1)
+
+
+   # Check input file
+   homer_input = os.path.join(os.path.dirname(INPUT), f"{os.path.basename(INPUT).replace('.bam', '')}.HOMER_tagDir")
+   if INPUT != "NA":
+       if not os.path.isfile(INPUT):
+           print("ChIP/ATAC Input .bam file (-I) does not exist! Aborting...", file=sys.stderr)
+           sys.exit(1)
+       elif not INPUT.endswith(".bam"):
+           print("ChIP/ATAC Input file (-I) is not a .bam file! Aborting....", file=sys.stderr)
+           sys.exit(1)
+       elif not os.path.isabs(INPUT):
+           print("Please provide the full (absolute) path to your input file!", file=sys.stderr)
+           print(f"e.g., -I {os.path.join(f'{OMNOM_HOME}', 'genomes', 'input_ChIP', 'my_awesome_input.bam')}. Aborting...", file=sys.stderr)
+           sys.exit(1)
+      
+       if not os.path.isdir(homer_input):
+           print(f"WARNING: No corresponding input HOMER tagDir found! ({homer_input}) does not exist...", file=sys.stderr)
+           print("WARNING: Will run HOMER findPeaks without input...", file=sys.stderr)
+           homer_input = "NA"
+
+
+   # Convert peak style to lowercase if given on command line, else take the default from config file
+   the_style = the_style.lower()
+
+
+   # Check peak style
+   if the_style not in ["factor", "histone"]:
+       print("ChIP peak calling style has to be factor or histone! Aborting...", file=sys.stderr)
+       sys.exit(1)
+
+
+   # Check color data folder
+   #necesarry, good code, uncomment when in ares server with good directory.
+   # if not os.path.isdir(color_data_folder):
+   #     print(f"Color table folder (-P) ({color_data_folder}) does not exist! Aborting...", file=sys.stderr)
+   #     sys.exit(1)
+
+
+   # Remove trailing slash from color data folder path if necessary
+   if color_data_folder.endswith('/'):
+       color_data_folder = color_data_folder.rstrip('/')
+
+
+   # Check if a full path to a color table (list) file was provided. If not, prepend the color folder path.
+   #necesarry, good code, uncomment when in ares server with good directory.
+   # if not os.path.isfile(col_table):
+   #     col_table = os.path.join(color_data_folder, col_table)
+   #     if not os.path.isfile(col_table):
+   #         print(f"Color table file: {col_table} not found! Aborting...", file=sys.stderr)
+   #         sys.exit(1)
+   # else:
+   #     # If it's a list file, parse the contents to see if we need to prepend the color folder path
+   #     if col_table.endswith(".txt"):
+   #         with open(col_table, 'r') as file:
+   #             for line in file:
+   #                 line = line.strip()
+   #                 if not os.path.isfile(line):
+   #                     # Check if we have an absolute path already
+   #                     if os.path.isabs(line):
+   #                         print(f"Malformed entry in color table list file: {line} is not a file!", file=sys.stderr)
+   #                         sys.exit(1)
+   #                     # Check if we have a valid entry if we prepend the color data folder
+   #                     elif not os.path.isfile(os.path.join(color_data_folder, line)):
+   #                         print(f"Malformed entry in color table list file: {line} does not exist here or in {color_data_folder}", file=sys.stderr)
+   #                         sys.exit(1)
+
+
+   #                     else:
+   #                     #If yes, prepend the color data folder path
+   #                         with open(col_table, 'r') as f:
+   #                             lines = f.readlines()
+   #                         with open(col_table, 'w') as f:
+   #                             for l in lines:
+   #                                 if l.strip() == line:
+   #                                     f.write(f"{color_data_folder}/{line}\n")
+   #                                 else:
+   #                                     f.write(l)
+
+
+   # Check overlay type
+   if overlay and overlay not in config["overlaytypes"]:
+       print(f"Overlay type -o has to be one of: {', '.join(config['overlaytypes'])}. Aborting...", file=sys.stderr)
+       sys.exit(1)
+
+
+   # Check valid mapper for the experiment type
+   if the_type and the_type != "RNA" and "star" and map_tool and "star" in map_tool :
+       print("STAR read aligner can only be used with RNA-seq data! Aborting...", file=sys.stderr)
+       sys.exit(1)
+
+
+   # Check if HOMER peak size and mindist are integers
+   if homer_size and not isinstance(homer_size, int):
+       print("HOMER peak size (-z) has to be an integer! Aborting...", file=sys.stderr)
+       sys.exit(1)
+   if homer_mindist and not isinstance(homer_mindist, int):
+       print("HOMER minimal distance (-d) has to be an integer! Aborting...", file=sys.stderr)
+       sys.exit(1)
+   return homer_input
+
+
+##---------------------------------------------------------------------------------------------------------------
+## Finetune some vars
+##---------------------------------------------------------------------------------------------------------------
+def setup_variables(experiment_dir,config):
+   """Setup variables."""
+   print("Setup variables...")
+
+
+   # Remove trailing slash from experiment directory path if necessary
+   if experiment_dir.endswith('/'):
+       experiment_dir = experiment_dir.rstrip('/')
+
+
+   # Set the number of cores per node (max=n-1) to keep a physical core free for system tasks)
+   node_cores = config['cores_per_node']
+   max_cores = node_cores - 1 ##########################################################################################correct?
+
+
+   # Set the date
+   run_date = date.today().isoformat()
+
+
+   return node_cores, max_cores, run_date
+
+
+
+
+##---------------------------------------------------------------------------------------------------------------
+## Set job mode
+##---------------------------------------------------------------------------------------------------------------
+
+
+def expand_range(mode):
+   range_list = []
+   ranges = mode.split(',')
+   for part in ranges:
+       if '-' in part:
+           start, end = map(int, part.split('-'))
+           range_list.extend(range(start, end + 1))
+       else:
+           range_list.append(int(part))
+   return range_list
+
+
+
+
+def set_job_mode(args, config, experiment_dir, mode):
+   """Set job mode."""
+   print("Setup job mode...")
+   experiment_dir = args.experiment_dir
+   max_step = config['max_step']
+
+
+   next_step = None
+   final_step = None
+
+
+   if mode == "auto":
+       print("Job mode is 'auto'")
+       print("Checking for aborted runs...")
+       semaphore_file = os.path.join(experiment_dir, "omnomnomics.semaphore")
+       if os.path.isfile(semaphore_file):
+           print("Aborted run found!")
+           ## Sanity check the semaphore file
+           # Check if number of lines is within range of job types
+           with open(semaphore_file, 'r') as f:
+               semaphore_lines = f.readlines()
+           sem_len = len(semaphore_lines)
+           print(f"Testing number of steps in semaphore file: {sem_len}")
+           if not (1 <= sem_len <= max_step):
+               print("Malformed semaphore file! (too many lines)")
+               print(f"{semaphore_file}")
+               # Set the malformed semaphore file flag
+               mal_sem = True
+           else:
+               mal_sem = False
+               print("Testing job ranges in semaphore file...")
+               for line in semaphore_lines:
+                   line = line.strip()
+                   print(f"Testing job range for line: {line}")
+                   # Check if this line is within range of job types
+                   if not (1 <= int(line) <= max_step):
+                       print("Malformed line found in aborted run log!")
+                       print(f"{semaphore_file}")
+                       # Set the malformed semaphore file flag
+                       mal_sem = True
+                       break
+           # Check if we have pre-flight aborted run
+           if sem_len == 1:
+               print("The aborted run log shows this run has never actually started, therefore we cannot resume this run!")
+               mal_sem = True
+           # Check if final step doesn't overflow the workflow
+           elif int(semaphore_lines[-1].strip()) >= max_step:
+               print("Final recorded step in aborted run log implies a finished run, so we cannot resume this run!")
+               mal_sem = True
+
+
+           # Check the malformed semaphore file flag and act accordingly
+           if mal_sem:
+               # Ask the user what to do
+               fresh = input("The old semaphore file is malformed. Start a fresh run with mode 'all' instead? (Y/n): ").strip()
+               # If user selected 'n', drop everything and die
+               if fresh.lower() == 'n':
+                   print("Exiting...")
+                   sys.exit(1)
+               # Else, user has selected 'Y', so set mode to 'all' and continue.
+               print("Starting a fresh run.")
+               print("Setting mode to 'all'...")
+               mode = "all"
+
+
+           # Semaphore file is ok: continue using it  
+           else:
+               # Check were we left off
+               final_step = int(semaphore_lines[0].strip())
+               last_step = int(semaphore_lines[-1].strip())
+               # Resume from the next step
+               next_step = last_step + 1
+               print(f"Resuming run from step: {next_step}")
+               print(f"Previously set end point: {final_step}")
+
+
+               ## If requested, use the parameters used in an existing run config file
+               print("attempting to parse previous run config file so we can use the same settings...")
+
+
+               # Check how many (if any) existing config files there are
+               config_files = [f for f in os.listdir(experiment_dir) if f.startswith("omnomnomics.run.") and f.endswith(".config")]
+               # If there are none, report that we are using newly supplied settings
+               if len(config_files) == 0:
+                   print("Previous run config file not found!")
+                   print("Starting run with parameters currently specified on the command line!")
+               else:
+                   # If there are more than one, let the user pick one
+                   if len(config_files) > 1:
+                       print("Multiple run config files found!")
+                       print("Please select one or abort:")
+                       ### ?lines 687-690 in github
+                       #Add abort option
+                       config_files.append("Abort")
+                       for i, f in enumerate(config_files, 1): #list all the options
+                           print(f"{i}. {f}")
+                       choice = int(input("Select a run config file (enter the index number): ").strip())
+                       if choice == len(config_files): #if abort was chosen, abort
+                           print("Aborting...")
+                           sys.exit(1)
+                       #Get the chosen config file
+                       the_run_conf = os.path.join(experiment_dir, config_files[choice - 1])
+                   else:
+                       #Get the only config file
+                       the_run_conf = os.path.join(experiment_dir, config_files[0])
+                   #Check the currently used config file
+                   if not os.path.isfile(the_run_conf):
+                       print("Previous run config file not found!")
+                       print("Starting run with parameters currently specified on the command line!")
+                   else:
+                       with open(the_run_conf, 'r') as f:
+                           #Check if config file contains proper header
+                           if "## Run configuration for omnomnomics run" not in f.readline():
+                               print("Run config file malformed!")
+                               print("Starting run with parameters currently specified on the command line!")
+                               os.rename(the_run_conf, f"{the_run_conf}.malformed")
+                           else:
+                           #correct header!
+                               reuse = input("Previous run config found. Do you wish to use it for the current run? (Y/n): ").strip()
+                               if reuse.lower() == 'y':
+                                   #load the config
+                                   with open(the_run_conf, 'r') as conf_file:
+                                       old_config = yaml.safe_load(conf_file)
+                                       #update the config
+                                       config.update(old_config)
+                                   print("Previous config restored!")
+                                   os.remove(the_run_conf) ####remove redundant config files
+                               else:
+                                   print("Using settings as currently supplied on the command line!")
+               mode = f"{next_step}-{final_step}"
+               print(f"Job mode set to: {mode}")
+       else:
+            print("No aborted run found. Starting a fresh run. Setting mode to 'all'...")
+            mode = "all"
+
+   if mode == "all":
+   # If we are running the whole pipeline, set the maximum range
+       mode_range_min = 1
+       mode_range_max = max_step
+       mode = f"1-{max_step}"
+       mode_steps = list(range(1, max_step + 1))
+   else:
+   # Handle different job mode patterns (single step, single range, complex patterns)
+       #single step pattern
+       if re.match(r'^[0-9]+$', mode):
+           mode_range_min = int(mode)
+           mode_range_max = int(mode)
+          
+           # Check if it's a valid range
+           if mode_range_min < 1 or mode_range_max > max_step:
+               print(f"Job mode range should lie between 1 and {max_step}! See help (-h) for job type usage info. Aborting...")
+               sys.exit(1)
+          
+           mode_steps = [mode_range_min]
+      
+       #single range pattern
+       elif re.match(r'^[0-9]+-[0-9]+$', mode):
+           mode_range_min, mode_range_max = map(int, mode.split('-'))
+          
+           # Check if it's a valid range
+           if mode_range_min > mode_range_max:
+               print("Job mode range has to increase from start to end! Aborting...")
+               sys.exit(1)
+          
+           if mode_range_min < 1 or mode_range_max > max_step:
+               print(f"Job mode range should lie between 1 and {max_step}! See help (-h) for job type usage info. Aborting...")
+               sys.exit(1)
+          
+           mode_steps = list(range(mode_range_min, mode_range_max + 1))
+      
+       #complex pattern
+       else:
+           # Expand the range for complex patterns
+           mode_steps = expand_range(mode)
+          
+           # Check if it's valid (i.e., only numbers separated by commas). If not, exit!
+           if not all(isinstance(step, int) for step in mode_steps):
+               print("Job mode should be 'all', 'auto', a single step number, a numeric range of steps separated by a dash (e.g., 1-12), or a number of ranges and steps separated by commas (e.g., 1-3,6,8,10-12,14).")
+               print("Aborting...")
+               sys.exit(1)
+          
+           mode_range_min = mode_steps[0]
+           mode_range_max = mode_steps[-1]
+          
+           # Check if it's a valid range
+           if mode_range_min < 1 or mode_range_max > max_step:
+               print(f"Job mode range should lie between 1 and {max_step}! See help (-h) for job type usage info. Aborting...")
+               sys.exit(1)
+          
+           # Check if the job mode range increases from start to end
+           if any(mode_steps[i] >= mode_steps[i+1] for i in range(len(mode_steps) - 1)):
+               print("Job mode range has to increase from start to end! Aborting...")
+               sys.exit(1)
+   # Initialise semaphore file with the desired end step to keep track of progress
+   semaphore_path = os.path.join(experiment_dir, "omnomnomics.semaphore")
+   with open(semaphore_path, 'w') as sem_file:
+       sem_file.write(f"{max(mode_steps)}\n")
+        
+   return mode_steps, config
+
+
+##---------------------------------------------------------------------------------------------------------------
+## Set some parameters: e.g., number of cores per sample and walltime
+##---------------------------------------------------------------------------------------------------------------
+
+
+def validate_input_files(the_type, config, mode_range_min, experiment_dir):
+   print("Validating input files...")
+
+
+   # Check permissions on experiment dir
+   if not (os.access(experiment_dir, os.R_OK) and os.access(experiment_dir, os.W_OK)):
+       print(f"Permission error! {experiment_dir} is not readable and/or writable! Aborting...", file=sys.stderr)
+       sys.exit(1)
+
+
+   # Check if we have a paired-end run (if we are dealing with FASTQs) and set the flag accordingly
+   paired = False
+   fastq_files = glob.glob(f"{experiment_dir}/FASTQ/*_R2*fastq.gz") + glob.glob(f"{experiment_dir}/trimmed_FASTQ/*_R2*fastq.gz")
+   if len(fastq_files) > 0:
+       paired = True
+
+
+   input_file_types = config['input_file_types']
+   input_folders = config['input_folders']
+   # Determine the starting file type based on the min range value of the job mode
+   if the_type != "RNA":
+       mergewig = config['mergewig']
+       input_file_types[mergewig - 1] = ".bw"
+
+
+   # Check if the input dir exists for the first step and count files with the correct extension
+   num_files = 0
+   input_folder_mod_range_min = input_folders[mode_range_min - 1]
+   input_file_type_mod_range_min = input_file_types[mode_range_min - 1]
+
+
+   if os.path.isdir(f"{experiment_dir}/{input_folder_mod_range_min}"):
+       num_files = len(glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}"))
+
+
+   # Sanity check file number
+   if num_files == 0:
+       print("No input files detected! Aborting...", file=sys.stderr)
+       sys.exit(1)
+
+
+   # Check if input files are readable
+   input_files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}")
+   if not os.access(input_files[0], os.R_OK): #################can check this for all files in here
+       print(f"Permission error! {input_file_type_mod_range_min} files in {experiment_dir}/{input_folder_mod_range_min} are not readable! Aborting...", file=sys.stderr)
+       sys.exit(1)
+
+
+   # Set the number of pairs (if dealing with FASTQs, else just keep it equal to file number)
+   num_pairs = num_files // 2 if paired and mode_range_min <= 4 else num_files
+
+   return num_files, num_pairs, paired, input_folder_mod_range_min, input_file_type_mod_range_min
+
+
+def check_name_field_settings(experiment_dir, separator, name_fields, type_field, col_field, config, input_folder_mod_range_min, input_file_type_mod_range_min):
+   def run_cut_command(filename, fields, separator):
+       try:
+           parts = filename.split(separator)
+           selected_parts = []
+           for field in fields.split('-'):
+               field_index = int(field) - 1
+               if field_index < 0 or field_index >= len(parts):
+                   return f"Error: Field index {field} out of range"
+               selected_parts.append(parts[field_index])
+           return ''.join(selected_parts)
+       except ValueError:
+           return "Error: Invalid field value"
+
+
+   try:
+       # Get a sample file
+       sample_files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}")
+       if not sample_files:
+           raise ValueError("No sample files found.")
+      
+       mock_cut = os.path.basename(sample_files[0])
+       print(f"Debug: Mock cut - {mock_cut}")  # Debugging line
+      
+       # Run the cut command simulations
+       cut_test = ""
+       cut_test += run_cut_command(mock_cut, name_fields, separator)
+       cut_test += run_cut_command(mock_cut, type_field, separator)
+       cut_test += run_cut_command(mock_cut, col_field, separator)
+      
+       print(f"Debug: Cut test - {cut_test}")  # Debugging line
+      
+   except (IndexError, ValueError) as e:
+       print("Oops, something is wrong with your field settings! Check your -n, -c, -e, and -s variables!", file=sys.stderr)
+       print(f"Error message: {e}")
+       print("Exiting...", file=sys.stderr)
+       sys.exit(1)
+  
+   # If cut_test contains "Error", there was an error
+   if "Error" in cut_test:
+       print("Oops, something is wrong with your field settings! Check your -n, -c, -e, and -s variables!", file=sys.stderr)
+       print("Exiting...", file=sys.stderr)
+       sys.exit(1)
+
+
+def check_unique_sample_names(experiment_dir, input_folder_mod_range_min, input_file_type_mod_range_min, name_fields, separator):
+   def parse_fields(field_string):
+       """Parse a string representing fields into a list of integers."""
+       fields = []
+       for part in field_string.split(','):
+           if '-' in part:
+               start, end = map(int, part.split('-'))
+               fields.extend(range(start, end + 1))
+           else:
+               fields.append(int(part))
+       return fields
+
+
+   def extract_fields(filename, fields, separator):
+       """Extract specified fields from a filename."""
+       parts = filename.split(separator)
+       try:
+           return separator.join([parts[i - 1] for i in fields])
+       except IndexError:
+           raise ValueError(f"Invalid field indices: {fields}")
+      
+   name_fields = parse_fields(name_fields)
+  
+   if input_file_type_mod_range_min != ".fastq.gz":
+       # Get all files with the specified type
+       files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}")
+   else:
+       # Only consider R1 files for FASTQs
+       files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*_R1*{input_file_type_mod_range_min}")
+  
+   # Extract names using the specified fields
+   sample_names = [extract_fields(os.path.basename(f), name_fields, separator) for f in files]
+  
+   # Check for uniqueness
+   if len(sample_names) != len(set(sample_names)):
+       print(f"Error: using name fields: {name_fields} does not yield unique sample names!", file=sys.stderr)
+       print("Please choose a different range of name fields.", file=sys.stderr)
+       print("Exiting...", file=sys.stderr)
+       sys.exit(1)
+
+
+
+
+def setup_runtime_parameters(num_pairs, max_cores):
+   print("Setup runtime parameters...")
+  
+   ##Commented out for now, since for now (and most likely later) not needed
+   # num_nodes = (num_pairs + max_cores - 1) // max_cores  # Get the ceiling
+
+
+   # # We are comfortable with running up to two samples per core
+   # num_nodes = num_nodes // 2
+
+
+   # # We don't want to overuse the cluster, so abort if we need more than one node.
+   # if num_nodes > 1:
+   #     print("We can only run up to 126 samples per node!", file=sys.stderr)
+   #     print("Please split your enormous run into chunks of max {max_cores} samples.", file=sys.stderr)
+   #     print("Aborting...", file=sys.stderr)
+   #     sys.exit(1)
+
+
+   # # Set the number of threads per node (no need to account for >1 node runs because we abort those)
+   # my_cores = max_cores // num_pairs  # Get the floor
+
+
+   # # Adjust to 1 thread per sample if we have more than max_cores samples
+   # if my_cores < 1:
+   #     my_cores = 1
+
+
+   # # Set the time allotment for sbatch based on the number of samples
+   # if num_pairs <= 10:
+   #     max_time = "06:00:00"
+   # elif num_pairs <= 30:
+   #     max_time = "10:00:00"
+   # elif num_pairs <= 60:
+   #     max_time = "15:00:00"
+   # elif num_pairs <= 90:
+   #     max_time = "20:00:00"
+   # else:
+   #     max_time = "24:00:00"
+
+
+   # Node has 512GiB memory. Keep some margin, use 500 GiB ~ 500 000 MiB. Set Java heap initial size (Xms) to half of the max heap (THEMEM) we calculate per file
+   the_mem = 500000 // num_pairs
+   the_heap_init = the_mem // 2
+   the_mem = f"{the_mem}M"
+   the_heap_init = f"{the_heap_init}M"
+
+
+   return  the_mem, the_heap_init #, my_cores, max_time
+
+
+def write_run_config(experiment_dir, run_date, config_data):
+   """Write the run configuration to a YAML file."""
+  
+   run_config_filename = os.path.join(experiment_dir, f"omnomnomics.run.{run_date}.config.yaml")
+  
+   # If the config file already exists, back it up with a random suffix
+   if os.path.isfile(run_config_filename):
+       backup_filename = f"{run_config_filename}.{random.randint(0, 9999)}.backup"
+       os.rename(run_config_filename, backup_filename)
+  
+   # Write the new config data to the YAML file
+   with open(run_config_filename, 'w') as yaml_file:
+       yaml.dump(config_data, yaml_file, default_flow_style=False)
+  
+   print(f"Run config file written to {run_config_filename}")
+
+
+##Commented out for now. Most likely not needed since will load modules in rule shell scripts.
+# def load_modules(config):
+#     """Load required modules."""
+#     print("Loading Modules...")
+#     modules = ["samtools", "bedtools", "bzip2", "GCC", "java", "fastqc"]
+#     for module in modules:
+#         print(f"\t{module}...")
+#         subprocess.run(["module", "load", module], check=True)
+  
+#     # Load STAR only if THETYPE is RNA and THEMAPTOOL is star
+#     if config['THETYPE'] == "RNA" and "star" in config['THEMAPTOOL'].lower():
+#         print("\tSTAR...")
+#         subprocess.run(["module", "load", "STAR"], check=True)
+
+
+##Commented out everything regarding omnomnomics.run_in_progress and omnomnomics.queued. Most likely not going to use this anymore.
+# def check_instance(experiment_dir):
+#     """Check for a running or queued instance of omnomnomics."""
+#     in_progress = os.path.join(experiment_dir, "omnomnomics.run_in_progress")
+#     queued = os.path.join(experiment_dir, "omnomnomics.run_queued")
+  
+#     if os.path.isfile(in_progress):
+#         print("Omnomnomics pipeline instance already running on this directory! Aborting...", file=sys.stderr)
+#         sys.exit(1)
+  
+#     if os.path.isfile(queued):
+#         print("Omnomnomics pipeline instance already queued on this directory! Aborting...", file=sys.stderr)
+#         sys.exit(1)
+
+
+def start_log(experiment_dir, run_date, config):
+   """Initialize the log file."""
+   log_file = os.path.join(experiment_dir, f"omnomnomics.run.{run_date}.log")
+   if os.path.isfile(log_file):
+       backup_log = f"{log_file}.{os.urandom(8).hex()}.backup"
+       os.rename(log_file, backup_log)
+       print(f"Existing log file backed up as: {backup_log}")
+
+
+   with open(log_file, 'w') as log:
+       log.write("#################################\n")
+       log.write("## Run log for omnomnomics run ##\n")
+       log.write("#################################\n\n")
+       log.write(f"Pipeline version: {config['omninomics']}\n\n")
+
+
+   return log_file 
+
+
+def main():
+  
+   # Define variables for paths
+   #OMNOM_HOME = "/net/beegfs/cfg/projects/dewintherlab/"
+   #OMNOM_HOME = os.path.join("/Users/kierancarroll/Documents/","Amsterdam UMC Klinische Genetica Internship","omnomnomics")
+   OMNOM_HOME = "/net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics"
+   #CONFIG_FILE = os.path.join(OMNOM_HOME,"", "config.yaml")
+   CONFIG_FILE = os.path.join(f"{OMNOM_HOME}","config.yaml")
+
+
+   #Check if OMNOM_HOME exists
+   if not os.path.isdir(OMNOM_HOME):
+       print(f"OMNOM_HOME directory '{OMNOM_HOME}' does not exist. Please set it correctly. Aborting...")
+       sys.exit(1)
+
+
+   # Check if CONFIG_FILE exists
+   if not os.path.isfile(CONFIG_FILE):
+       print(f"Master config file '{CONFIG_FILE}' does not exist. Please make sure it exists. Aborting...")
+       sys.exit(1)
+   #load and validate the config file
+   config = load_and_validate_yaml(CONFIG_FILE, "## Omnomnomics pipeline config ##")
+  
+   # Capture command line invocation
+   the_command = ' '.join(sys.argv)
+      
+   # Parse command-line arguments
+   args = parse_arguments()
+
+
+   # Access parsed arguments
+   ##### Hiermee forceer ik dus dat de config file helemaal ingevuld moet worden. hoeft niet dus.
+   #anders kan ik dit doen: homer_size = args.homer_size if args.homer_size else config.get('homer_size', '500'). update: did this.
+   experiment_dir = args.experiment_dir
+   the_type = args.type.upper()
+   genome = args.genome
+   trim_tool = args.trim_tool if args.trim_tool else config.get("trim_tool","skewer")
+   map_tool = args.map_tool if args.map_tool else config.get('map_tool', "hisat2")
+   mode = args.mode.lower() if args.mode else config.get('mode', "auto")
+   formula = args.formula if args.formula else config.get('formula', "1")
+   broad = args.broad if args.broad else config.get('broad', "NA")
+   INPUT = args.input if args.input else config.get('input',"NA")
+   metadata = args.metadata if args.metadata else config.get('metadata', "NA")
+   style = args.style if args.style else config.get('the_style', "factor")
+   col_table = args.col_table if args.col_table else config.get('color_table', f"{OMNOM_HOME}/bin/color_data_for_hubs/gray.tint.color.table")
+   color_data_folder = args.color_data_folder if args.color_data_folder else config.get('color_data_folder', f"{OMNOM_HOME}/bin/color_data_for_hubs")
+   overlay = args.overlay if args.overlay else config.get('overlay', "transparentOverlay")
+   hub_mail = args.hub_mail if args.hub_mail else config.get('hub_mail', "m.dewinther@amsterdamumc.nl")
+   no_multiqc = args.no_multiqc if args.no_multiqc else config.get('no_multiqc', 0)
+   name_fields = args.name_fields if args.name_fields else config.get('name_fields', "1-3")
+   type_field = args.type_field if args.type_field else config.get('type_field', "1")
+   col_field = args.col_field if args.col_field else config.get('col_field', "2")
+   separator = args.separator if args.separator else config.get('separator', "_")
+   appendix = args.appendix if args.appendix else config.get('appendix', "hub")
+   homer_mindist = args.homer_mindist if args.homer_mindist else config.get('homer_mindist', 2000)
+   homer_size = args.homer_size if args.homer_size else config.get('homer_size', 500)
+   keep_unpaired = args.keepunpaired if args.keepunpaired else config.get('keep_unpaired', 0) ##########what should be default?
+
+
+   # Check required variables
+   check_required_vars(the_type, experiment_dir, genome, config)
+
+
+   # Set user subroutine choices
+   selected_routine_trim, selected_routine_map = set_user_subroutine_choices(trim_tool, map_tool, config)
+
+
+   # Validate user-defined variables
+   homer_input = validate_user_defined_vars(OMNOM_HOME, metadata, experiment_dir, INPUT, style, color_data_folder, col_table, overlay, the_type, map_tool, homer_size, homer_mindist, config)
+
+
+   # Setup variables
+   node_cores, max_cores, run_date = setup_variables(experiment_dir, config)
+   #### something to test/verify. When updating the current config file with the old one, the currents gets updated.
+   #### do those variable changes carry over to the main function or not? I'm returning config dict now so should be fine?!
+   #### look at this this when clear on how we are going to use the running config file. Update: test this.
+
+
+   #getting job mode (which steps)
+   mode_steps, config = set_job_mode(args, config, experiment_dir, mode)
+
+
+   #checking input files
+   num_files, num_pairs, paired, input_folder_mod_range_min, input_file_type_mod_range_min = validate_input_files(the_type, config, min(mode_steps),experiment_dir)
+
+
+   #checking field settings
+   check_name_field_settings(experiment_dir, separator, name_fields, type_field, col_field, config, input_folder_mod_range_min, input_file_type_mod_range_min)
+
+
+   #checking sample names
+   check_unique_sample_names(experiment_dir, input_folder_mod_range_min, input_file_type_mod_range_min, name_fields, separator)
+
+
+   #setting up runtime parameters (my_cores and max_time commented out for now.)
+   the_mem, the_heap_init = setup_runtime_parameters(num_pairs, max_cores)
+
+
+   run_config_data = {
+       ## Run configuration for omnomnomics run for $EXPERIMENT_DIR on $RUN_DATE
+       'OMNOM_HOME': OMNOM_HOME,
+       'EXPERIMENT_DIR': experiment_dir,
+       'RUNDATE': run_date,
+       'INPUT_FOLDER': input_folder_mod_range_min,
+       'INPUT_FILE_TYPE': input_file_type_mod_range_min,
+       'MAXCORES': max_cores,
+       'INPUT': INPUT,
+       'HOMERINPUT': homer_input,
+       'BROAD': broad,
+       'THESTYLE': style,
+       'THEMODE': mode_steps,
+       'THETYPE': the_type,
+       'NUMFILES': num_files,
+       'NUMPAIRS': num_pairs,
+       'KEEPUNPAIRED': keep_unpaired,
+       'PAIRED': paired,
+       'THEMODERANGEMIN': min(mode_steps),
+       'THEMODERANGEMAX': max(mode_steps),
+       'THEGENOME': genome,
+       'MYFORMULA': formula,
+       'MYMETADATA': metadata,
+       'THETRIMTOOL': trim_tool,
+       'THEMAPTOOL': map_tool,
+       'NO_MULTIQC': no_multiqc,
+       'THETYPEFIELD': type_field,
+       'NAMEFIELDS': name_fields,
+       'THECOLFIELD': col_field,
+       'THESEPARATOR': separator,
+       'THEAPPENDIX': appendix,
+       'THEOVERLAY': overlay,
+       'THECOLORDATAFOLDER': color_data_folder,
+       'THEHUBMAIL': hub_mail,
+       'THECOLTABLE': col_table,
+       'HOMERSIZE': homer_size,
+       'HOMERMINDIST': homer_mindist,
+       'THEMEM': the_mem,
+       'THEHEAPINIT': the_heap_init,
+       'SELECTED_ROUTINE_TRIM': selected_routine_trim,
+       'SELECTED_ROUTINE_QC': config['selected_routine_qc'],   
+       'SELECTED_ROUTINE_MAP':selected_routine_map,  
+       'SELECTED_ROUTINE_MERGE': config['selected_routine_merge'],
+       'SELECTED_ROUTINE_TOUCHUP': config['selected_routine_touchup'], 
+       'SELECTED_ROUTINE_INDEX': config['selected_routine_index'],
+       'SELECTED_ROUTINE_STATS': config['selected_routine_stats'],
+       'SELECTED_ROUTINE_TAGDIR': config['selected_routine_tagdir'],
+       'SELECTED_ROUTINE_WIG': config['selected_routine_wig'],
+       'SELECTED_ROUTINE_MERGEWIG': config['selected_routine_mergewig'],
+       'SELECTED_ROUTINE_COUNTREADS': config['selected_routine_countreads'],
+       'SELECTED_ROUTINE_CALLPEAKS': config['selected_routine_callpeaks'],
+       'SELECTED_ROUTINE_DE': config['selected_routine_de']   
+   }
+
+
+   write_run_config(experiment_dir, run_date, run_config_data)
+
+
+   # Check for a running or queued instance
+   #check_instance(experiment_dir)
+
+
+   # Initialize the log file
+   log_file = start_log(experiment_dir, run_date, config)
+
+
+   """Print some status info."""
+   print("")
+   print("####################################################################################")
+   print("Submitting omnomnomics pipeline job...")
+   print(f"\tMODE:\t\t{mode_steps}")
+   print(f"\tTYPE:\t\t{the_type}")
+   print(f"\tFILES:\t\t{num_files}")
+   print(f"\tPAIRS:\t\t{num_pairs}")
+   #print(f"\tThreads:\t{my_cores}")
+   #print(f"\tMax Time:\t{max_time}")
+   print(f"\tExperiment DIR:\t\t{experiment_dir}")
+   print(f"\tRun date:\t{run_date}")
+   print("")
+
+
+   """Dispatch the job using Snakemake."""
+   print("Dispatching job...")
+
+
+   sub_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+  
+   print("####################################################################################")
+   print(f"Submitted omnomnomics run at {sub_time}")
+   print("####################################################################################")
+
+
+   with open(log_file, 'a') as log:
+       log.write(f"Invocation:\t{the_command}\n")
+       log.write(f"Job submitted at:\t{sub_time}\n")
+       #log.write(f"Max walltime:\t{max_time}\n\n") leave time out for now
+       log.write(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
+       log.write("WAITING FOR SNAKEMAKE & SLURM TO COMPLETE...\n")
+       log.write("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+
+
+
+
+       # Call Snakemake with the appropriate parameters
+   #cmd = [ "snakemake", "--snakefile", "Snakefile.smk", "--profile", os.path.join(experiment_dir, "snakemake_profiles/slurm_profile"),
+           #"--configfile", os.path.join(experiment_dir, f"omnomnomics.run.{run_date}.config"), "--cores", f"{max_cores}"]
+
+
+   cmd = [ "snakemake", "--profile", os.path.join(experiment_dir, "snakemake_profiles/slurm_profile"), "--snakefile", "omnomnomics/Snakefile.smk",
+          "--config", "config_file="+os.path.join(experiment_dir, f'omnomnomics.run.{run_date}.config.yaml'), "--jobs", "1000", "--cores", "1280"
+   ]
+
+
+   try:
+       subprocess.run(cmd, check=True)
+   except subprocess.CalledProcessError as e:
+       print(f"Error: {e}", file=sys.stderr)
+       sys.exit(1)
+
+
+   # with open(os.path.join(experiment_dir, "omnomnomics.run_queued"), 'w') as queued_file:
+   #     queued_file.write("")
+  
+   print("")
+   print("All done!")
+
+
+if __name__ == "__main__":
+   main()
+

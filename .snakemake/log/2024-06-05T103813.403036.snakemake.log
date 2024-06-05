@@ -1,0 +1,26 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/omnomnomics.run.2024-06-05.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job      count    min threads    max threads
+-----  -------  -------------  -------------
+all          1              1              1
+rule1        1             10             10
+total        2              1             10
+
+Select jobs to execute...
+
+[Wed Jun  5 10:38:14 2024]
+rule rule1:
+    input: FASTQ/test_test_test.fastq.gz
+    output: trimmed_FASTQ/rule1_output.test_test_test.fastq.gz
+    jobid: 1
+    reason: Missing output files: trimmed_FASTQ/rule1_output.test_test_test.fastq.gz
+    wildcards: sample=test_test_test
+    threads: 10
+    resources: mem_mb=32000, mem_mib=30518, disk_mb=1000, disk_mib=954, tmpdir=<TBD>
+
+RuleException in rule rule1 in file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/rules/rule1.smk, line 13:
+AttributeError: 'Resources' object has no attribute 'partition', when formatting the following:
+sbatch --cpus-per-task={threads} --mem={resources.mem_mb} --partition = {resources.partition}

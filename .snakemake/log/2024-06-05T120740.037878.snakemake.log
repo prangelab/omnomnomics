@@ -1,0 +1,5 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/omnomnomics.run.2024-06-05.config.yaml is extended by additional config specified via the command line.
+KeyError in file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/rules/rule1.smk, line 28:
+'min_slice_cores'
+  File "/net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/Snakefile.smk", line 451, in <module>
+  File "/net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/rules/rule1.smk", line 28, in <module>
