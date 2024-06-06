@@ -1,0 +1,159 @@
+#################################
+## Run log for omnomnomics run ##
+#################################
+
+Pipeline version: 0.4
+
+Invocation:	/net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/run_snakemake.py -i /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics -t RNA -g hg38 -j 3
+Job submitted at:	2024-06-06 13:57:46
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+WAITING FOR SNAKEMAKE & SLURM TO COMPLETE...
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+INITIALIZATION
+
+2024-06-06 13:57:47: JOB DISPATCHED!
+
+MICROMAMBA INIT
+
+2024-06-06 13:57:47: MAMBA_EXE: /net/beegfs/cfg/projects/dewintherlab/bin/micromamba
+2024-06-06 13:57:47: Initializing shell...
+
+SANITY CHECK
+
+2024-06-06 13:57:47: Sanity check completed
+2024-06-06 13:57:47: Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics
+
+RUN INFO
+
+2024-06-06 13:57:47: Job Start time: 1717675067.0454767
+2024-06-06 13:57:47: Experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics
+2024-06-06 13:57:47: Run date: 2024-06-06
+2024-06-06 13:57:47: Log file: omnomnomics.run.2024-06-06.log
+2024-06-06 13:57:47: Files: 2
+2024-06-06 13:57:47: Pairs: 1
+2024-06-06 13:57:47: Paired run: True
+2024-06-06 13:57:47: Type: RNA
+2024-06-06 13:57:47: Genome: hg38
+2024-06-06 13:57:47: Mode: 3
+2024-06-06 13:57:47: Mode min: 3
+2024-06-06 13:57:47: Mode max: 3
+2024-06-06 13:57:47: Trim tool: skewer
+2024-06-06 13:57:47: Map tool: hisat2
+
+READ COUNTING SETTINGS
+
+2024-06-06 13:57:47: Design formula: 1
+2024-06-06 13:57:47: Metadata file: NA
+
+PEAK CALLING SETTINGS
+
+2024-06-06 13:57:47: Input file (MACS3): NA
+2024-06-06 13:57:47: Input file (HOMER): NA.HOMER_tagDir
+2024-06-06 13:57:47: Broad peaks: NA
+2024-06-06 13:57:47: Peak style: factor
+2024-06-06 13:57:47: HOMER peaksize: 500
+2024-06-06 13:57:47: HOMER minDist: 2000
+
+JAVA MEMORY SETTINGS
+
+2024-06-06 13:57:47: 250000M HEAP init
+2024-06-06 13:57:47: 500000M memory per sample
+
+TRACKHUB SETTINGS
+
+2024-06-06 13:57:47: Hub type field: 1
+2024-06-06 13:57:47: Hub name field: 1-3
+2024-06-06 13:57:47: Hub col field: 2
+2024-06-06 13:57:47: Hub separator: _
+2024-06-06 13:57:47: Hub appendix: hub
+2024-06-06 13:57:47: Hub overlay: transparentOverlay
+2024-06-06 13:57:47: Hub coldata folder: ${OMNOM_HOME}/bin/color_data_for_hubs
+2024-06-06 13:57:47: Hub color table: ${OMNOM_HOME}/bin/color_data_for_hubs/gray.tint.color.table
+2024-06-06 13:57:47: Hub mail: m.dewinther@amsterdamumc.nl
+
+PREFLIGHT
+
+2024-06-06 13:57:47: Checking snake rule functions...
+
+WORKLFLOW SNAKE RULES CHECK
+
+2024-06-06 13:57:47: Workflow Snake rules Good!
+
+INITIALIZATION
+
+2024-06-06 13:57:48: JOB DISPATCHED!
+
+MICROMAMBA INIT
+
+2024-06-06 13:57:48: MAMBA_EXE: /net/beegfs/cfg/projects/dewintherlab/bin/micromamba
+2024-06-06 13:57:48: Initializing shell...
+
+SANITY CHECK
+
+2024-06-06 13:57:48: Sanity check completed
+2024-06-06 13:57:48: Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics
+
+RUN INFO
+
+2024-06-06 13:57:48: Job Start time: 1717675068.69829
+2024-06-06 13:57:48: Experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics
+2024-06-06 13:57:48: Run date: 2024-06-06
+2024-06-06 13:57:48: Log file: omnomnomics.run.2024-06-06.log
+2024-06-06 13:57:48: Files: 2
+2024-06-06 13:57:48: Pairs: 1
+2024-06-06 13:57:48: Paired run: True
+2024-06-06 13:57:48: Type: RNA
+2024-06-06 13:57:48: Genome: hg38
+2024-06-06 13:57:48: Mode: 3
+2024-06-06 13:57:48: Mode min: 3
+2024-06-06 13:57:48: Mode max: 3
+2024-06-06 13:57:48: Trim tool: skewer
+2024-06-06 13:57:48: Map tool: hisat2
+
+READ COUNTING SETTINGS
+
+2024-06-06 13:57:48: Design formula: 1
+2024-06-06 13:57:48: Metadata file: NA
+
+PEAK CALLING SETTINGS
+
+2024-06-06 13:57:48: Input file (MACS3): NA
+2024-06-06 13:57:48: Input file (HOMER): NA.HOMER_tagDir
+2024-06-06 13:57:48: Broad peaks: NA
+2024-06-06 13:57:48: Peak style: factor
+2024-06-06 13:57:48: HOMER peaksize: 500
+2024-06-06 13:57:48: HOMER minDist: 2000
+
+JAVA MEMORY SETTINGS
+
+2024-06-06 13:57:48: 250000M HEAP init
+2024-06-06 13:57:48: 500000M memory per sample
+
+TRACKHUB SETTINGS
+
+2024-06-06 13:57:48: Hub type field: 1
+2024-06-06 13:57:48: Hub name field: 1-3
+2024-06-06 13:57:48: Hub col field: 2
+2024-06-06 13:57:48: Hub separator: _
+2024-06-06 13:57:48: Hub appendix: hub
+2024-06-06 13:57:48: Hub overlay: transparentOverlay
+2024-06-06 13:57:48: Hub coldata folder: ${OMNOM_HOME}/bin/color_data_for_hubs
+2024-06-06 13:57:48: Hub color table: ${OMNOM_HOME}/bin/color_data_for_hubs/gray.tint.color.table
+2024-06-06 13:57:48: Hub mail: m.dewinther@amsterdamumc.nl
+
+PREFLIGHT
+
+2024-06-06 13:57:48: Checking snake rule functions...
+
+WORKLFLOW SNAKE RULES CHECK
+
+2024-06-06 13:57:48: Workflow Snake rules Good!
+
+EXECUTING STEP 3
+
+2024-06-06 13:57:49: Mapping reads...
+2024-06-06 13:57:49: Input folder: trimmed_FASTQ
+2024-06-06 13:57:49: Output folder: BAM
+2024-06-06 13:57:49: Running HISAT2 in Paired End mode on RNA data.
+2024-06-06 13:57:49: Launching: mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed.fastq.gz...

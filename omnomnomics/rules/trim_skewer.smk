@@ -8,9 +8,11 @@ rule run_skewer:
     input:
         fastq1=f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.fastq.gz",
         fastq2=f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.fastq.gz" if config["PAIRED"] else None
+        #still account for unpaired scenario
     output:
         trimmed_fastq1=f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1_Skewer.trimmed.fastq.gz",
         trimmed_fastq2=f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2_Skewer.trimmed.fastq.gz" if config["PAIRED"] else None
+        #still account for unpaired scenario
     params:
         seq_type=config["THETYPE"],
         inputfolder = master_config['input_folders'][master_config['trim_rule_num']-1],
@@ -89,23 +91,23 @@ rule run_skewer:
             log_it(logfile, "Renaming trimmed results ...")
             for file_path in glob.glob(os.path.join(f"{outputfolder}", '*pair1.fastq.gz')):
                 base_name = os.path.basename(file_path)
-                new_name = os.path.join(f"{outputfolder}", base_name.replace('-trimmed-pair1.fastq.gz', '_R1.trimmed.fastq.gz'))
+                new_name = os.path.join(f"{outputfolder}", base_name.replace('-trimmed-pair1.fastq.gz', '_R1_Skewer.trimmed.fastq.gz'))
                 os.rename(file_path, new_name)
 
             # Rename R2 trimmed files
             for file_path in glob.glob(os.path.join(f"{outputfolder}", '*pair2.fastq.gz')):
                 base_name = os.path.basename(file_path)
-                new_name = os.path.join(f"{outputfolder}", base_name.replace('-trimmed-pair2.fastq.gz', '_R2.trimmed.fastq.gz'))
+                new_name = os.path.join(f"{outputfolder}", base_name.replace('-trimmed-pair2.fastq.gz', '_R2_Skewer.trimmed.fastq.gz'))
                 os.rename(file_path, new_name)
 
-            # Rename trimmed files for Skewer
-            for filename in os.listdir('trimmed_FASTQ'):
-                file_path = os.path.join(directory, filename)
-                if os.path.isfile(file_path):
-                    base, ext = os.path.splitext(filename)
-                    new_filename = f"{base}_Skewer{ext}"
-                    new_file_path = os.path.join(directory, new_filename)
-                    os.rename(file_path, new_file_path)
+            # # Rename trimmed files for Skewer
+            # for filename in os.listdir('trimmed_FASTQ'):
+            #     file_path = os.path.join(directory, filename)
+            #     if os.path.isfile(file_path):
+            #         base, ext = os.path.splitext(filename)
+            #         new_filename = f"{base}_Skewer{ext}"
+            #         new_file_path = os.path.join(directory, new_filename)
+            #         os.rename(file_path, new_file_path)
 
         # Call the function with parameters
         run_skewer(config["THETRIMTOOL"], params.seq_type, threads, input.fastq1, input.fastq2, params.inputfolder, params.outputfolder, wildcards.sample)

@@ -8,9 +8,11 @@ rule run_trimmomatic:
     input:
         fastq1=f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.fastq.gz",
         fastq2=f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.fastq.gz" if config["PAIRED"] else None
+        #still account for unpaired scenario
     output:
         trimmed_fastq1=f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1_Trimmomatic.trimmed.fastq.gz",
         trimmed_fastq2=f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2_Trimmomatic.trimmed.fastq.gz" if config["PAIRED"] else None
+        #still account for unpaired scenario
     params:
         trim_tool=config["THETRIMTOOL"],
         trim_heap=config["THEHEAPINIT"],
@@ -21,8 +23,8 @@ rule run_trimmomatic:
     threads:
         Threads_Per_Rule['1']
     resources:
-        mem_mb = 512000
-        #mem_mb = Memory_Per_Rule['1']
+        #mem_mb = 512000
+        mem_mb = Memory_Per_Rule['1']
     run:
         def run_trimmomatic(trim_tool, trim_heap, trim_mem, seq_type, threads, fastq1, fastq2, inputfolder, outputfolder, sample):
             log_it(logfile, "Trimming Reads...", f"EXECUTING STEP {master_config['trim_rule_num']}")
@@ -65,13 +67,13 @@ rule run_trimmomatic:
             log_it(logfile, "Renaming trimmed results ...")
             for file_path in glob.glob(os.path.join(f"{outputfolder}", '*1P.fastq.gz')):
                 base_name = os.path.basename(file_path)
-                new_name = os.path.join(f"{outputfolder}", base_name.replace('.trimmed_1P.fastq.gz', '_R1.trimmed.fastq.gz'))
+                new_name = os.path.join(f"{outputfolder}", base_name.replace('.trimmed_1P.fastq.gz', '_R1_Trimmomatic.trimmed.fastq.gz'))
                 os.rename(file_path, new_name)
 
             # Rename R2 trimmed files
             for file_path in glob.glob(os.path.join(f"{outputfolder}", '*2P.fastq.gz')):
                 base_name = os.path.basename(file_path)
-                new_name = os.path.join(f"{outputfolder}", base_name.replace('.trimmed_2P.fastq.gz', '_R2.trimmed.fastq.gz'))
+                new_name = os.path.join(f"{outputfolder}", base_name.replace('.trimmed_2P.fastq.gz', '_R2_Trimmomatic.trimmed.fastq.gz'))
                 os.rename(file_path, new_name)
 
             # Remove unpaired files if PAIRED is 1

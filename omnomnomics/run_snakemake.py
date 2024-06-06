@@ -655,7 +655,7 @@ def check_unique_sample_names(experiment_dir, input_folder_mod_range_min, input_
       
    name_fields = parse_fields(name_fields)
   
-   if input_file_type_mod_range_min != ".fastq.gz":
+   if input_file_type_mod_range_min != ".fastq.gz" and input_file_type_mod_range_min != ".trimmed.fastq.gz" :
        # Get all files with the specified type
        files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}")
    else:
@@ -664,6 +664,7 @@ def check_unique_sample_names(experiment_dir, input_folder_mod_range_min, input_
   
    # Extract names using the specified fields
    sample_names = [extract_fields(os.path.basename(f), name_fields, separator) for f in files]
+   print(sample_names)
   
    # Check for uniqueness
    if len(sample_names) != len(set(sample_names)):
@@ -889,7 +890,7 @@ def main():
    #setting up runtime parameters (my_cores and max_time commented out for now.)
    the_mem, the_heap_init = setup_runtime_parameters(num_pairs, max_cores)
 
-
+#    print(f"PAIRED = {paired}")
    run_config_data = {
        ## Run configuration for omnomnomics run for $EXPERIMENT_DIR on $RUN_DATE
        'OMNOM_HOME': OMNOM_HOME,

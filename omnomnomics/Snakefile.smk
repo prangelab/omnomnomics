@@ -422,7 +422,7 @@ for i in range(1,master_config['max_step']+1):
                                     else master_config['cores_per_node']), ((master_config['nodes_in_partition']*master_config['cores_per_node'])/num_samples)) ) )
 print(Threads_Per_Rule)
 Memory_Per_Rule = {}
-for i in range(master_config['max_step']):
+for i in range(1,master_config['max_step']+1):
     rule_num = i
     Memory_Per_Rule[f'{rule_num}'] =  (master_config['min_mem_mb'][i - 1]
                                     if 'min_mem_mb' in master_config
@@ -438,14 +438,15 @@ for i in range(master_config['max_step']):
                                             and master_config['min_mem_mb'][i - 1] is not None
                                             and isinstance(master_config['min_mem_mb'][i - 1], int)
                                             and master_config['min_mem_mb'][i - 1] <= master_config['min_slice_mem'])
-                                        else (master_config['mincores_single_sample_step1_9'][i - 1]
-                                        if 'mincores_single_sample_step1_9' in master_config
-                                        and isinstance(master_config['mincores_single_sample_step1_9'], list)
-                                        and len(master_config['mincores_single_sample_step1_9']) > (i - 1)
-                                        and master_config['mincores_single_sample_step1_9'][i - 1] is not None
-                                        and isinstance(master_config['mincores_single_sample_step1_9'][i - 1], int)
-                                        and master_config['mincores_single_sample_step1_9'][i - 1] > master_config['min_slice_cores']
-                                        else master_config['min_slice_cores'])* master_config['max_mem_per_core_mb']))
+                                        else Threads_Per_Rule[f'{rule_num}'] * master_config['max_mem_per_core_mb']))
+                                        # else (master_config['mincores_single_sample_step1_9'][i - 1]
+                                        # if 'mincores_single_sample_step1_9' in master_config
+                                        # and isinstance(master_config['mincores_single_sample_step1_9'], list)
+                                        # and len(master_config['mincores_single_sample_step1_9']) > (i - 1)
+                                        # and master_config['mincores_single_sample_step1_9'][i - 1] is not None
+                                        # and isinstance(master_config['mincores_single_sample_step1_9'][i - 1], int)
+                                        # and master_config['mincores_single_sample_step1_9'][i - 1] > master_config['min_slice_cores']
+                                        # else master_config['min_slice_cores'])* master_config['max_mem_per_core_mb']))
 ##--------------------------------------------------------------------------------------------------------------
 # Include Snakemake rules for your actual data processing pipeline
 ##--------------------------------------------------------------------------------------------------------------
@@ -453,9 +454,7 @@ for i in range(master_config['max_step']):
 def check_and_include_rules(logfile, omnom_home, experiment_dir):
    log_it(logfile, "Checking snake rule functions...", "PREFLIGHT")
 
-
    rules_dir = os.path.join(omnom_home, "rules")
-
 
    # Check if the rules directory exists
    if not os.path.isdir(rules_dir):
@@ -466,7 +465,6 @@ def check_and_include_rules(logfile, omnom_home, experiment_dir):
 #        os.remove(os.path.join(experiment_dir, "omnomnomics.run_in_progress"))
        sys.exit(1)
 
-
    # Check if the directory contains any .smk files
    smk_files = glob.glob(os.path.join("rules", "*.smk"))
    if len(smk_files) == 0:
@@ -476,7 +474,6 @@ def check_and_include_rules(logfile, omnom_home, experiment_dir):
        print("Aborting...")
 #       os.remove(os.path.join(experiment_dir, "omnomnomics.run_in_progress"))
        sys.exit(1)
-
 
    # Sanity check if they contain the right header
    valid_smk_files = []
@@ -505,17 +502,25 @@ include: "rules/trim_skewer.smk"
 
 include: "rules/trim_trimmomatic.smk"
 
+include: "rules/fastqc.smk"
 
+include: "rules/align_reads_hisat2.smk"
 
+include: "rules/align_reads_STAR.smk"
 
+include: "rules/align_reads_STAR_TE.smk"
+
+include: "rules/merge_lanes_and_clean_names.smk"
+
+include: "rules/touchup_bam.smk"
+
+include: "rules/index_bam.smk"
+
+include: "rules/bam_stats.smk"
 
 ##--------------------------------------------------------------------------------------------------------------
 # Execute the desired rules
 ##--------------------------------------------------------------------------------------------------------------
-
-
-
-
 
 print(themode)
 for rule_num in themode:
@@ -550,7 +555,29 @@ for rule_num in themode:
             if config['PAIRED']: 
                 all_outputs += expand(f"{output_folder}/{{sample}}_R1_Trimmomatic.trimmed{output_file_type}", sample = samples)
                 all_outputs += expand(f"{output_folder}/{{sample}}_R2_Trimmomatic.trimmed{output_file_type}", sample = samples)
-        
+    if rule_num == 2:
+        if config['PAIRED']: 
+            all_outputs += expand(f"{output_folder}/{{sample}}_R1{output_file_type[0]}", sample = samples)
+            all_outputs += expand(f"{output_folder}/{{sample}}_R2{output_file_type[0]}", sample = samples)
+            all_outputs += expand(f"{output_folder}/{{sample}}_R1{output_file_type[1]}", sample = samples)
+            all_outputs += expand(f"{output_folder}/{{sample}}_R2{output_file_type[1]}", sample = samples)
+        else:
+            all_outputs += expand(f"{output_folder}/{{sample}}{output_file_type[0]}", sample = samples)
+            all_outputs += expand(f"{output_folder}/{{sample}}{output_file_type[1]}", sample = samples)
+    if rule_num == 3:
+        if config['THEMAPTOOL'] == 'star':
+            if config['PAIRED']: 
+                all_outputs += expand(f"{output_folder}/{{sample}}_STAR.bam", sample = samples)
+                all_outputs += expand(f"{output_folder}/{{sample}}.STAR_stats.txt", sample = samples)
+        if config['THEMAPTOOL'] == 'hisat2':
+            if config['PAIRED']: 
+                all_outputs += expand(f"{output_folder}/{{sample}}_HISAT2.bam", sample = samples)
+                all_outputs += expand(f"{output_folder}/{{sample}}.HISAT2_stats.txt", sample = samples)
+        if config['THEMAPTOOL'] == 'star_te':
+            if config['PAIRED']: 
+                all_outputs += expand(f"{output_folder}/{{sample}}_STAR_TE.bam")
+                all_outputs += expand(f"{output_folder}/{{sample}}.STAR_TE_stats.txt", sample = samples)
+    #all_output.append("pipeline_completed.txt")
     print(all_outputs)
     #add output of final rule
 

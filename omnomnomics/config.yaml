@@ -112,10 +112,10 @@ output_folders:
   - "DE_calling"
   - "DE_calling"
 
-input_file_types:
+input_file_types: ####update this by looking at rules
   - ".fastq.gz"
-  - ".fastq.gz"
-  - ".fastq.gz"
+  - ".trimmed.fastq.gz"
+  - ".trimmed.fastq.gz"
   - ".bam"
   - ".bam"
   - ".bam"
@@ -128,9 +128,9 @@ input_file_types:
   - ".raw_read_quant.table.txt"
 
 ### added output file types
-output_file_types:
+output_file_types: ####update this by looking at rules
   - ".fastq.gz"
-  - ".fastq.gz"
+  - [".trimmed_fastqc.html", ".trimmed_fastqc.zip"]
   - ".bam"
   - ".bam"
   - ".sorted.dups_marked.filtered.bam"
@@ -178,7 +178,7 @@ maxcores_per_rule_run_step10_13:
   - 1
 
 min_mem_mb:
-  - 
+  - 32000
   - 
   - 32000
   - 

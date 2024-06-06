@@ -5,18 +5,19 @@ import os
 import subprocess
 rule run_star:
     input:
-        fastq1="trimmed_FASTQ/{sample}_R1.fastq.gz",
-        fastq2="trimmed_FASTQ/{sample}_R2.fastq.gz" if config["PAIRED"] else None
+        trimmed_fastqc1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R1{'_Skewer' if config['THEMAPTOOL'] == 'skewer' else ('_Trimmomatic' if config['THEMAPTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz",
+        trimmed_fastqc2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2{'_Skewer' if config['THEMAPTOOL'] == 'skewer' else ('_Trimmomatic' if config['THEMAPTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz" if config['PAIRED'] else None
     output:
-        bam="BAM/{sample}.Aligned.out.bam"
+        bam=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}_STAR.bam",
+        stats=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}.STAR_stats.txt"
     params:
         genome_path=os.path.join(f"{config['OMNOM_HOME']}", "genomes", "STAR", f"{config['THEGENOME']}"),
         inputfolder = master_config['input_folders'][master_config['map_rule_num']-1],
         outputfolder = master_config['output_folders'][master_config['map_rule_num']-1]
     threads:
-        10
+        Threads_Per_Rule['3']
     resources:
-        mem_mb = (10*4000)
+        mem_mb = Memory_Per_Rule['3']
     run:
         logIt(logfile, "Mapping reads...", f"EXECUTING STEP {master_config['map_rule_num']}")
         log_it(logfile, f"Input folder: {params.outputfolder}")
@@ -51,7 +52,7 @@ rule run_star:
 
             bam_files = [f for f in os.listdir(f"{outputfolder}") if f.endswith("Aligned.out.bam")]
             for bam in bam_files:
-                bam_path = os.path.join(f"{outputfolder}", "bam")
+                bam_path = os.path.join(f"{outputfolder}", bam)
                 temp_bam_path = bam_path + ".tmp"
                 # Modify header
                 header_process = subprocess.Popen(["samtools", "view", "-H", bam_path], stdout=subprocess.PIPE)
@@ -64,5 +65,17 @@ rule run_star:
                     reheader_process.communicate()
                 # Rename temporary BAM to final BAM
                 os.rename(temp_bam_path, bam_path)
+
+                # Rename *.Aligned.out.bam files to *_STAR.bam
+                old_path = os.path.join(outputfolder, bam)
+                new_path = os.path.join(outputfolder, bam.replace("Aligned.out.bam", "_STAR.bam"))
+                os.rename(old_path, new_path)
+
+            # Rename *.Log.final.out files to *.STAR_stats.txt
+            log_files = [f for f in os.listdir(f"{outputfolder}") if f.endswith("Log.final.out")]
+            for log_file in log_files:
+                old_path = os.path.join(outputfolder, log_file)
+                new_path = os.path.join(outputfolder, log_file.replace(".Log.final.out", ".STAR_stats.txt"))
+                os.rename(old_path, new_path)
 
         run_star(params.genome_path, input.fastq1, input.fastq2, params.paired, threads, params.inputfolder, params.outputfolder, wildcards.sample)

@@ -1,0 +1,25 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/omnomnomics.run.2024-06-06.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 128
+Rules claiming more threads will be scaled down.
+Provided resources: mem_mb=32000, mem_mib=30518, disk_mb=4815, disk_mib=4592
+Select jobs to execute...
+
+[Thu Jun  6 13:57:49 2024]
+rule run_hisat2:
+    input: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed.fastq.gz
+    output: BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_HISAT2.bam, BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.HISAT2_stats.txt
+    jobid: 0
+    reason: Missing output files: BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_HISAT2.bam, BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.HISAT2_stats.txt
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004
+    threads: 128
+    resources: mem_mb=32000, mem_mib=30518, disk_mb=4815, disk_mib=4592, tmpdir=/tmp/kcarroll.5306012
+
+Warning: Output file 'UMC' was specified without -S.  This will not work in future HISAT 2 versions.  Please use -S instead.
+Extra parameter(s) specified: "Klinische", "Genetica", "Internship/omnomnomics/genomes/HISAT2/hg38"
+Note that if <mates> files are specified using -1/-2, a <singles> file cannot
+also be specified.  Please run bowtie separately for mates and singles.
+Error: Encountered internal HISAT2 exception (#1)
+Command: /net/beegfs/cfg/projects/dewintherlab/bin/hisat2-2.1.0/hisat2-align-s --wrapper basic-0 -p 128 -x /net/beegfs/scratch/kcarroll/Amsterdam --mm --add-chrname --new-summary --dta-cufflinks -1 /tmp/837556.inpipe1 -2 /tmp/837556.inpipe2 UMC Klinische Genetica Internship/omnomnomics/genomes/HISAT2/hg38 
+(ERR): hisat2-align exited with value 1
