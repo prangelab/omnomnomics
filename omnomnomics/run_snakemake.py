@@ -798,7 +798,7 @@ def main():
    # Define variables for paths
    #OMNOM_HOME = "/net/beegfs/cfg/projects/dewintherlab/"
    #OMNOM_HOME = os.path.join("/Users/kierancarroll/Documents/","Amsterdam UMC Klinische Genetica Internship","omnomnomics")
-   OMNOM_HOME = "/net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics"
+   OMNOM_HOME = "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics"
    #CONFIG_FILE = os.path.join(OMNOM_HOME,"", "config.yaml")
    CONFIG_FILE = os.path.join(f"{OMNOM_HOME}","config.yaml")
 

@@ -6,13 +6,11 @@ import glob
 
 rule run_trimmomatic:
     input:
-        fastq1=f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.fastq.gz",
+        fastq1=f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.fastq.gz" if config["PAIRED"] else f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}.fastq.gz",
         fastq2=f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.fastq.gz" if config["PAIRED"] else None
-        #still account for unpaired scenario
     output:
-        trimmed_fastq1=f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1_Trimmomatic.trimmed.fastq.gz",
+        trimmed_fastq1=f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1_Trimmomatic.trimmed.fastq.gz" if config["PAIRED"] else f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_Trimmomatic.trimmed.fastq.gz",
         trimmed_fastq2=f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2_Trimmomatic.trimmed.fastq.gz" if config["PAIRED"] else None
-        #still account for unpaired scenario
     params:
         trim_tool=config["THETRIMTOOL"],
         trim_heap=config["THEHEAPINIT"],

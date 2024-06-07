@@ -5,8 +5,8 @@ import os
 import subprocess
 rule run_star:
     input:
-        trimmed_fastqc1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R1{'_Skewer' if config['THEMAPTOOL'] == 'skewer' else ('_Trimmomatic' if config['THEMAPTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz",
-        trimmed_fastqc2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2{'_Skewer' if config['THEMAPTOOL'] == 'skewer' else ('_Trimmomatic' if config['THEMAPTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz" if config['PAIRED'] else None
+        trimmed_fastqc1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R1{'_Skewer' if config['THETRIMTOOL'] == 'skewer' else ('_Trimmomatic' if config['THETRIMTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz",
+        trimmed_fastqc2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2{'_Skewer' if config['THETRIMTOOL'] == 'skewer' else ('_Trimmomatic' if config['THETRIMTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz" if config['PAIRED'] else None
     output:
         bam=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}_STAR.bam",
         stats=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}.STAR_stats.txt"

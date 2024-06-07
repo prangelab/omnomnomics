@@ -32,7 +32,7 @@ rule run_fastqc:
         # fastq1=f"{master_config['input_folders'][master_config['qc_rule_num']-1]}/{{sample}}_R1.fastq.gz",
         # fastq2=f"{master_config['input_folders'][master_config['qc_rule_num']-1]}/{{sample}}_R2.fastq.gz" if config["PAIRED"] else None
         # get_fastqc_input
-        trimmed_fastqc1= (f"{master_config['input_folders'][master_config['qc_rule_num']-1]}/{{sample}}_R1{'_Skewer' if config['THEMAPTOOL'] == 'skewer' else ('_Trimmomatic' if config['THEMAPTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz") if config['PAIRED'] else f"{master_config['input_folders'][master_config['qc_rule_num']-1]}/{{sample}}{'_Skewer' if config['THEMAPTOOL'] == 'skewer' else ('_Trimmomatic' if config['THEMAPTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz"
+        trimmed_fastqc1= (f"{master_config['input_folders'][master_config['qc_rule_num']-1]}/{{sample}}_R1{'_Skewer' if config['THEMAPTOOL'] == 'skewer' else ('_Trimmomatic' if config['THEMAPTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz") if config['PAIRED'] else f"{master_config['input_folders'][master_config['qc_rule_num']-1]}/{{sample}}{'_Skewer' if config['THEMAPTOOL'] == 'skewer' else ('_Trimmomatic' if config['THEMAPTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz",
         trimmed_fastqc2= f"{master_config['input_folders'][master_config['qc_rule_num']-1]}/{{sample}}_R2{'_Skewer' if config['THEMAPTOOL'] == 'skewer' else ('_Trimmomatic' if config['THEMAPTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz" if config['PAIRED'] else None
    output:
     #    report1="fastqc_reports/{sample}_R1_fastqc.html",

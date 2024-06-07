@@ -1,0 +1,4 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/omnomnomics.run.2024-06-06.config.yaml is extended by additional config specified via the command line.
+SyntaxError in file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/rules/align_reads_hisat2.smk, line 56:
+duplicate argument 'keepunpaired' in function definition
+  File "/net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/Snakefile.smk", line 511, in <module>

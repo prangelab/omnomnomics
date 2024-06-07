@@ -1,0 +1,35 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/omnomnomics.run.2024-06-06.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job           count    min threads    max threads
+----------  -------  -------------  -------------
+all               1              1              1
+run_fastqc        1            128            128
+total             2              1            128
+
+Select jobs to execute...
+
+[Thu Jun  6 11:50:27 2024]
+rule run_fastqc:
+    input: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed.fastq.gz
+    output: fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed_fastqc.html, fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed_fastqc.html, fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed_fastqc.zip, fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed_fastqc.zip
+    jobid: 1
+    reason: Missing output files: fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed_fastqc.zip, fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed_fastqc.zip, fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed_fastqc.html, fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed_fastqc.html
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004
+    threads: 128
+    resources: mem_mb=4000, mem_mib=3815, disk_mb=4815, disk_mib=4592, tmpdir=<TBD>
+
+Submitted job 1 with external jobid 'Submitted batch job 5305961'.
+[Thu Jun  6 11:52:37 2024]
+Error in rule run_fastqc:
+    jobid: 1
+    input: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed.fastq.gz
+    output: fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed_fastqc.html, fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed_fastqc.html, fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed_fastqc.zip, fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed_fastqc.zip
+    cluster_jobid: Submitted batch job 5305961
+
+Error executing rule run_fastqc on cluster (jobid: 1, external: Submitted batch job 5305961, jobscript: /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/.snakemake/tmp.lx_fijzy/snakejob.run_fastqc.1.sh). For error details see the cluster log and the log files of the involved rule(s).
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+Complete log: ../.snakemake/log/2024-06-06T114958.982557.snakemake.log

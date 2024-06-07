@@ -388,6 +388,8 @@ print(input_files)
 samples = [os.path.basename(f).replace(input_file_type, "") for f in input_files]
 samples = [f.replace("_R1", "") for f in samples]
 samples = [f.replace("_R2", "") for f in samples]
+samples = [f.replace("_Skewer", "") for f in samples]
+samples = [f.replace("_Trimmomatic", "") for f in samples]
 print(samples)
 samples = list(set(samples))
 print(samples)

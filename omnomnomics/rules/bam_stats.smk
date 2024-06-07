@@ -1,6 +1,6 @@
-# Rule 7: Get BAM file statistics
+# Rule 7: Get Bam Stats
 
-## Omnomnomics Snake Rule ##
+## Omnomnomics Snake Rule  ##
 import os
 
 rule bam_stats:

@@ -32,11 +32,11 @@ rule run_hisat2:
         # fastq1=f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R1_Skewer.fastq.gz" if config["PAIRED"] else None,
         # fastq2=f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2.fastq.gz" if config["PAIRED"] else None,
         # fastq3 = f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2.fastq.gz" if not config["PAIRED"] else None
-        trimmed_fastqc1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R1{'_Skewer' if config['THEMAPTOOL'] == 'skewer' else ('_Trimmomatic' if config['THEMAPTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz",
-        trimmed_fastqc2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2{'_Skewer' if config['THEMAPTOOL'] == 'skewer' else ('_Trimmomatic' if config['THEMAPTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz" if config['PAIRED'] else None
+        trimmed_fastqc1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample1}}_R1{'_Skewer' if config['THETRIMTOOL'] == 'skewer' else ('_Trimmomatic' if config['THETRIMTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz",
+        trimmed_fastqc2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample1}}_R2{'_Skewer' if config['THETRIMTOOL'] == 'skewer' else ('_Trimmomatic' if config['THETRIMTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz" if config['PAIRED'] else None
     output:
-        bam=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}_HISAT2.bam",
-        stats=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}.HISAT2_stats.txt"
+        bam=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample1}}_HISAT2.bam",
+        stats=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample1}}.HISAT2_stats.txt"
         #could add the 2 extra  output files if keepunpaired = 1, but not necesarry because will be made then automatically
     params:
         genome_path=os.path.join(f"{config['OMNOM_HOME']}", "genomes", "HISAT2", f"{config['THEGENOME']}"),
@@ -112,4 +112,4 @@ rule run_hisat2:
                     """)
 
         # Call the function with parameters
-        run_hisat2(params.seq_type, threads, params.genome_path, input.trimmed_fastqc1, input.trimmed_fastqc2, params.keepunpaired, params.inputfolder, params.outputfolder, wildcards.sample)
+        run_hisat2(params.seq_type, threads, params.genome_path, input.trimmed_fastqc1, input.trimmed_fastqc2, params.keepunpaired, params.inputfolder, params.outputfolder, wildcards.sample1)

@@ -6,13 +6,11 @@ import glob
 
 rule run_skewer:
     input:
-        fastq1=f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.fastq.gz",
+        fastq1=f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.fastq.gz" if config["PAIRED"] else f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}.fastq.gz",
         fastq2=f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.fastq.gz" if config["PAIRED"] else None
-        #still account for unpaired scenario
     output:
-        trimmed_fastq1=f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1_Skewer.trimmed.fastq.gz",
+        trimmed_fastq1=f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1_Skewer.trimmed.fastq.gz" if config["PAIRED"] else f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_Skewer.trimmed.fastq.gz",
         trimmed_fastq2=f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2_Skewer.trimmed.fastq.gz" if config["PAIRED"] else None
-        #still account for unpaired scenario
     params:
         seq_type=config["THETYPE"],
         inputfolder = master_config['input_folders'][master_config['trim_rule_num']-1],
