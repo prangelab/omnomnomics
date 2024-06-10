@@ -19,11 +19,15 @@ rule run_star_te:
     resources:
         mem_mb = Memory_Per_Rule['3']
     run:
-        logIt(logfile, "Mapping reads...", f"EXECUTING STEP {master_config['map_rule_num']}")
+        log_it(logfile, "Mapping reads...", f"EXECUTING STEP {master_config['map_rule_num']}")
         log_it(logfile, f"Input folder: {params.inputfolder}")
         log_it(logfile, f"Output folder: {params.outputfolder}")
 
-
+        STAR_version = subprocess.check_output(["STAR", "--version"])
+        log_it(logfile, "\n"+STAR_version.decode("utf-8"), "STAR VERSION")
+        print(STAR_version.decode("utf-8"))
+        sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['map_rule_num']-1])
+        
         def run_star(genome_path, fastq1, fastq2, paired, threads,inputfolder, outputfolder, sample):
             if config['PAIRED']:
                 logIt(logfile, "Running STAR in Paired End mode")

@@ -53,6 +53,11 @@ rule run_hisat2:
         log_it(logfile, f"Input folder: {params.inputfolder}")
         log_it(logfile, f"Output folder: {params.outputfolder}")
 
+        hisat2_version = subprocess.check_output(["hisat2", "--version"])
+        log_it(logfile, "\n"+hisat2_version.decode("utf-8"), "HISAT2 VERSION")
+        print(hisat2_version.decode("utf-8"))
+        sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['map_rule_num']-1])
+
         def run_hisat2(seq_type, threads, genome_path, fastq1, fastq2, keepunpaired, inputfolder, outputfolder, sample):
             if seq_type == "RNA":
                 if config["PAIRED"]:

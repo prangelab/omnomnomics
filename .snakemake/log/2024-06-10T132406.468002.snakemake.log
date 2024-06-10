@@ -1,0 +1,35 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-10.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job           count    min threads    max threads
+----------  -------  -------------  -------------
+all               1              1              1
+run_skewer        1            128            128
+total             2              1            128
+
+Select jobs to execute...
+
+[Mon Jun 10 13:24:12 2024]
+rule run_skewer:
+    input: FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.fastq.gz, FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.fastq.gz
+    output: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1_Skewer.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2_Skewer.trimmed.fastq.gz
+    jobid: 1
+    reason: Missing output files: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1_Skewer.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2_Skewer.trimmed.fastq.gz; Code has changed since last execution
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004
+    threads: 128
+    resources: mem_mb=32000, mem_mib=30518, disk_mb=5899, disk_mib=5626, tmpdir=<TBD>
+
+Submitted job 1 with external jobid 'Submitted batch job 5316384'.
+[Mon Jun 10 13:34:43 2024]
+Error in rule run_skewer:
+    jobid: 1
+    input: FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.fastq.gz, FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.fastq.gz
+    output: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1_Skewer.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2_Skewer.trimmed.fastq.gz
+    cluster_jobid: Submitted batch job 5316384
+
+Error executing rule run_skewer on cluster (jobid: 1, external: Submitted batch job 5316384, jobscript: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.cxvftxb4/snakejob.run_skewer.1.sh). For error details see the cluster log and the log files of the involved rule(s).
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+Complete log: ../.snakemake/log/2024-06-10T132406.468002.snakemake.log

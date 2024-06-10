@@ -3,19 +3,23 @@
 ## Omnomnomics Snake Rule  ##
 import os
 rule index_bam:
-   input:
+    input:
         filtered_BAM=f"{master_config['input_folders'][master_config['index_rule_num']-1]}/{{sample}}.filtered.bam"
-   output:
+    output:
         f"{master_config['output_folders'][master_config['index_rule_num']-1]}/{{sample}}.filtered.bam.bai"
-   threads:
-       Threads_Per_Rule['6']
-   resources:
-       mem_mb = Memory_Per_Rule['6']
-   run:
-       log_it(logfile, f"Index BAM files...",f"EXECUTING STEP {master_config['index_rule_num']}")
-       log_it(logfile, f"Input folder: BAM")
-       log_it(logfile, f"Output folder: filtered_BAM")
-       log_it(logfile, f"Indexing {wildcards.sample}")
-       shell(f"""
+    threads:
+        Threads_Per_Rule['6']
+    params:
+        inputfolder = master_config['input_folders'][master_config['index_rule_num']-1],
+        outputfolder = master_config['output_folders'][master_config['index_rule_num']-1]       
+    resources:
+        mem_mb = Memory_Per_Rule['6']
+    run:
+        log_it(logfile, f"Index BAM files...",f"EXECUTING STEP {master_config['index_rule_num']}")
+        log_it(logfile, f"Input folder: BAM")
+        log_it(logfile, f"Output folder: filtered_BAM")
+        log_it(logfile, f"Indexing {wildcards.sample}")
+        sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['index_rule_num']-1])
+        shell(f"""
             module load samtools && \
             samtools index -@ {threads} {input.filtered_BAM}""")

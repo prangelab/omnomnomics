@@ -1,6 +1,6 @@
 # Rule 8: Create HOMER tag directories
 
-## Omnomnomics Snake Rule ##
+## Omnomnomics Snake Rule  ##
 import os
 import glob
 import pysam
@@ -22,6 +22,11 @@ rule create_homer_tagDir:
         log_it(logfile, f"Creating HOMER tag directories...", f"EXECUTING STEP {master_config['tagdir']}")
         log_it(logfile, f"Input folder: filtered_BAM")
         log_it(logfile, f"Output folder: HOMER_tagDirs")
+
+        version = subprocess.check_output(["perl", os.path.join(OMNOM_HOME, "bin", "homer", "configureHomer.pl"), "-list", "2>", "/dev/null", "|", "grep", "homer"])
+        log_it(logfile, "\n"+version.decode("utf-8"), "VERSION")
+        print(version.decode("utf-8"))
+        sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['tagdir_rule_num']-1])
 
         # Function to create HOMER tag directories
         def create_homer_tagDir(filepath, outfolder, genome):

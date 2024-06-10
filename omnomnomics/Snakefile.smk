@@ -83,28 +83,28 @@ def log_elapsed(logfile, wildcards = None):
 
 # Function for sanity check on directory
 def sanity_check_dir(logfile, input_directory, file_ext):
-   #check if input directiory exists
-   if not os.path.isdir(input_directory):
-       log_it(logfile, f"{file_ext} files should be contained in a {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir})!", "ERROR")
-       log_it(logfile, "Aborting...", "ERROR")
-       print(f"{file_ext} files should be contained in a {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir})! Aborting...")
-#        os.remove(os.path.join(experiment_dir, "omnomnomics.run_in_progress"))
-       sys.exit(1)
-   #check if input directory contains input files
-   if len([f for f in os.listdir(input_directory) if f.endswith(file_ext)]) == 0:
-       log_it(logfile, f"The {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir}) does not contain any {file_ext} files!", "ERROR")
-       log_it(logfile, "Aborting...", "ERROR")
-       print(f"The {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir}) does not contain any {file_ext} files! Aborting...")
-#        os.remove(os.path.join(experiment_dir, "omnomnomics.run_in_progress"))
-       sys.exit(1)
-   log_it(logfile, "Sanity check completed", "SANITY CHECK")
+    #check if input directiory exists
+    if not os.path.isdir(input_directory):
+        log_it(logfile, f"{file_ext} files should be contained in a {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir})!", "ERROR")
+        log_it(logfile, "Aborting...")
+        print(f"{file_ext} files should be contained in a {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir})! Aborting...")
+    #        os.remove(os.path.join(experiment_dir, "omnomnomics.run_in_progress"))
+        sys.exit(1)
+    #check if input directory contains input files
+    if len([f for f in os.listdir(input_directory) if f.endswith(file_ext)]) == 0:
+        log_it(logfile, f"The {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir}) does not contain any {file_ext} files!", "ERROR")
+        log_it(logfile, "Aborting...")
+        print(f"The {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir}) does not contain any {file_ext} files! Aborting...")
+    #        os.remove(os.path.join(experiment_dir, "omnomnomics.run_in_progress"))
+        sys.exit(1)
+    log_it(logfile, "Sanity check completed", "SANITY CHECK")
 
 
 # Initialize micromamba shell and logging micromamba executable
 def initialize_micromamba(logfile):
-   log_it(logfile, "MAMBA_EXE: {}".format(os.environ.get('MAMBA_EXE', 'Not set')), "MICROMAMBA INIT")
-   log_it(logfile, "Initializing shell...")
-   os.system('eval "$(micromamba shell hook --shell=bash)"')
+    log_it(logfile, "MAMBA_EXE: {}".format(os.environ.get('MAMBA_EXE', 'Not set')), "MICROMAMBA INIT")
+    log_it(logfile, "Initializing shell...")
+    os.system('eval "$(micromamba shell hook --shell=bash)"')
 
 
 # Hold our horses for a little while to let the dispatch script initialise the log file

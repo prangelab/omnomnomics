@@ -10,6 +10,7 @@ rule touchup_bam:
         filtered_BAM1=f"{master_config['output_folders'][master_config['touchup_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.bam" if config['THETYPE'] != "CHIP" else f"{master_config['output_folders'][master_config['touchup_rule_num']-1]}/{{sample}}.filtered.bam"
     params:
         thetype=config['THETYPE'],
+        inputfolder = master_config['input_folders'][master_config['touchup_rule_num']-1],
         outputfolder = master_config['output_folders'][master_config['touchup_rule_num']-1]
     threads:
         Threads_Per_Rule['5']
@@ -19,6 +20,8 @@ rule touchup_bam:
         log_it(f"Touching up BAM files with samtools (collate | fixmate | sort | markdup | filter)...",f"EXECUTING STEP {master_config['touchup_rule_num']}")
         log_it(f"Input folder: BAM")
         log_it(f"Output folder: filtered_BAM")
+        sanity_check_dir(logfile, params.inputfolder, master_config['input_file_types'][master_config['touchup_rule_num']-1])
+
         # def sanity_check_dir(directory, filetype):
         #     if not os.path.isdir(directory):
         #         raise Exception(f"Directory {directory} does not exist")

@@ -122,7 +122,7 @@ input_file_types: ####update this by looking at rules
   - ".bam"
   - ".bam"
   - ".HOMER_tagDir|.HOMER_tagDir.tar.gz"
-  - ".hub"
+  - [".hub", ".bw"]
   - ".bam"
   - ".HOMER_tagDir|.HOMER_tagDir.tar.gz"
   - ".raw_read_quant.table.txt"

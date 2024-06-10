@@ -6,15 +6,12 @@ import glob
 
 rule merge_bam:
     input:
-        bam_files = glob.glob(f"BAM/{{sample}}_L00*.bam")
+        bam_files = glob.glob(f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample}}_L00*.bam")
     output:
-        bam="merged_BAM/{sample}.bam"
+        f"{master_config['output_folders'][master_config['merge_rule_num']-1]}/{{sample}}.bam"
     params:
-        infolder="trimmed_FASTQ",
-        outfolder="merged_BAM",
-        maxcores=config["MAXCORES"],
-        step_merge=4,
-        inputfiletype=".bam"
+        inputfolder = master_config['input_folders'][master_config['merge_rule_num']-1],
+        outputfolder = master_config['output_folders'][master_config['merge_rule_num']-1]
     threads:
         Threads_Per_Rule['4']
     resources:
@@ -23,6 +20,11 @@ rule merge_bam:
         log_it(logfile, "Merging lanes...", f"EXECUTING STEP {master_config['merge_rule_num']}")
         log_it(logfile, "Input folder: BAM")
         log_it(logfile, "Output folder: BAM")
+
+        merging_version = subprocess.check_output(["samtools", "--version", "|", "head", "-n2"])
+        log_it(logfile, "\n"+merging_version.decode("utf-8"), "SAMTOOLS VERSION")
+        print(merging_version.decode("utf-8"))
+        sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['merge_rule_num']-1])
 
         def merge_bam_files(input_bamfiles, threads):
             # Check if we have lane info

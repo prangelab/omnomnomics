@@ -32,6 +32,12 @@ rule run_trimmomatic:
             log_it(logfile, f"Trim Heap: {trim_heap}")
             log_it(logfile, f"Trim Mem: {trim_mem}")
 
+            trimmomatic_version = subprocess.check_output(["java ", "-jar ", os.path.join(OMNOM_HOME, "bin", "Trimmomatic-0.39", "trimmomatic-0.39.jar") , "-version"])
+
+            log_it(logfile, "\n"+trimmomatic_version.decode("utf-8"), "trimmomatic VERSION")
+            print(trimmomatic_version.decode("utf-8"))
+            sanity_check_dir(logfile, inputfolder, master_config['input_file_types'][master_config['trim_rule_num']-1])
+
             if seq_type == "ATAC":
                 adapter_file = "NexteraPE-PE.fa" if config["PAIRED"] else "Nextera-SE.fa"
             else:

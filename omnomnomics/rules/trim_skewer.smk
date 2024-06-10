@@ -3,6 +3,7 @@
 ## Omnomnomics Snake Rule  ##
 import os
 import glob
+import subprocess
 
 rule run_skewer:
     input:
@@ -60,11 +61,16 @@ rule run_skewer:
         #         else master_config['min_slice_cores'])* master_config['max_mem_per_core_mb']))
         mem_mb = Memory_Per_Rule['1']
     run:
-        def run_skewer(trim_tool, seq_type, threads, fastq1, fastq2, inputfolder, outputfolder, sample):
+        def run_skewer(logfile, trim_tool, seq_type, threads, fastq1, fastq2, inputfolder, outputfolder, sample):
             log_it(logfile, "Trimming reads...", f"EXECUTING STEP {master_config['trim_rule_num']}")
             log_it(logfile, f"Input folder: {inputfolder}")
             log_it(logfile, f"Output folder: {outputfolder}")
             log_it(logfile, f"Trim Tool: {trim_tool}")
+
+            skewer_version = subprocess.check_output(["skewer", "--version"])
+            log_it(logfile, "\n"+skewer_version.decode("utf-8"), "SKEWER VERSION")
+            print(skewer_version.decode("utf-8"))
+            sanity_check_dir(logfile, inputfolder,  master_config['input_file_types'][master_config['trim_rule_num']-1])
 
             if seq_type == "ATAC":
                 adapter_option = "-x CTGTCTCTTATACACATCT -y AGATGTGTATAAGAGACAG" if config["PAIRED"] else "-x CTGTCTCTTATACACATCT"
@@ -79,14 +85,14 @@ rule run_skewer:
             else:
                 log_it(logfile, "Running skewer in Single End mode.")
                 skewer_command = f"""
-                    skewer --quiet {adapter_option} -m any -q 15 -Q 15 -z -t {threads} -of"{outputfolder}/{sample}" {fastq1}
+                    skewer --quiet {adapter_option} -m any -q 15 -Q 15 -z -t {threads} -o "{outputfolder}/{sample}" {fastq1}
                 """
 
             # Run the skewer command
             shell(skewer_command)
 
             # Rename R1 trimmed files
-            log_it(logfile, "Renaming trimmed results ...")
+            log_it(logfile, "Renaming trimmed results...")
             for file_path in glob.glob(os.path.join(f"{outputfolder}", '*pair1.fastq.gz')):
                 base_name = os.path.basename(file_path)
                 new_name = os.path.join(f"{outputfolder}", base_name.replace('-trimmed-pair1.fastq.gz', '_R1_Skewer.trimmed.fastq.gz'))
@@ -97,6 +103,7 @@ rule run_skewer:
                 base_name = os.path.basename(file_path)
                 new_name = os.path.join(f"{outputfolder}", base_name.replace('-trimmed-pair2.fastq.gz', '_R2_Skewer.trimmed.fastq.gz'))
                 os.rename(file_path, new_name)
+            os.remove((os.path.join(f"{outputfolder}", f"{sample}" + "-trimmed.log" )))
 
             # # Rename trimmed files for Skewer
             # for filename in os.listdir('trimmed_FASTQ'):
@@ -108,4 +115,4 @@ rule run_skewer:
             #         os.rename(file_path, new_file_path)
 
         # Call the function with parameters
-        run_skewer(config["THETRIMTOOL"], params.seq_type, threads, input.fastq1, input.fastq2, params.inputfolder, params.outputfolder, wildcards.sample)
+        run_skewer(logfile, config["THETRIMTOOL"], params.seq_type, threads, input.fastq1, input.fastq2, params.inputfolder, params.outputfolder, wildcards.sample)

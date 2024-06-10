@@ -20,6 +20,12 @@ rule bam_stats:
         log_it(logfile, f"Input folder: filtere_BAM")
         log_it(logfile, f"Output folder: filtered_BAM")
 
+        bamtools_version = subprocess.check_output(["bamtools", "--version"])
+
+        log_it(logfile, "\n"+bamtools_version.decode("utf-8"), "BAMTOOLS VERSION")
+        print(bamtools_version.decode("utf-8"))
+        sanity_check_dir(logfile, inputfolder, master_config['input_file_types'][master_config['stats_rule_num']-1])
+
         outfile = os.path.join(params.outputfolder, f"{wildcards.sample}.filtered.bam.stats.txt")
         log_it(logfile, f"Generating stats for {wildcards.sample}")
         shell(f"""
