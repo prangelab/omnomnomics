@@ -25,7 +25,7 @@ rule final_steps:
            )
       
        #---------------------------------------------------------------------------------------------------------------
-       # Clean up: Compress and package the tag directories if needed
+       # Clean up: Compress and package the tag directories if needed ####################################can delete this I think
        #---------------------------------------------------------------------------------------------------------------
        if os.path.isdir("HOMER_tagDirs"):
            log_it(logfile, "Compressing tagDirs...", "CLEANUP")
@@ -44,6 +44,8 @@ rule final_steps:
 
 
            log_it(logfile, "Cleanup complete")
+
+        #delete the step 11 random final from rule_all if snakemake allows that. else just leave it
       
        shell("echo 'Pipeline Execution Complete!' > pipeline_completed.txt")
        log_it(logfile, "All done!" "FINAL REMARKS")

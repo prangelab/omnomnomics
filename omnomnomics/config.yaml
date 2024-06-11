@@ -207,9 +207,10 @@ max_nodes: 10
 #slurm config, get from sinfo or obligate to fill out
 nodes_in_partition: 10 
 cores_per_node: 128
+max_mem_per_core_mb: 4096
 min_slice_cores: 1
 min_slice_mem: 4000
-max_mem_per_core_mb: 4000
+
 
 
 trim_tool: "skewer"

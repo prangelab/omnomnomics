@@ -8,7 +8,7 @@ rule merge_bam:
     input:
         bam_files = glob.glob(f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample}}_L00*.bam")
     output:
-        f"{master_config['output_folders'][master_config['merge_rule_num']-1]}/{{sample}}.bam"
+        f"{master_config['output_folders'][master_config['merge_rule_num']-1]}/{{sample}}_merged.bam"
     params:
         inputfolder = master_config['input_folders'][master_config['merge_rule_num']-1],
         outputfolder = master_config['output_folders'][master_config['merge_rule_num']-1]
@@ -75,12 +75,12 @@ rule merge_bam:
 
                         # Run samtools merge
                         log_it(logfile, f"Merging {myname} lanes...")
-                        shell(f"samtools merge -@ {threads} -o BAM/{myname}{ext} {' '.join(bam_list)}")
+                        shell(f"samtools merge -@ {threads} -o BAM/{myname}_merged{ext} {' '.join(bam_list)}")
                     else:
                         # If there is only one lane we don't need to bother with merging and can simply clean the name
                         parts = sample_key.split('.', 1)
                         from_file = glob.glob(f"BAM/{parts[0]}_L00*.{parts[1]}")
-                        to_file = os.path.join('BAM', parts[0], ('.'+parts[1]))
+                        to_file = os.path.join('BAM', parts[0], ('_merged.'+parts[1]))
                         log_it(logfile, f"Renaming {from_file} to {to_file}...")
                         shell(f"mv {from_file} {to_file}")
 

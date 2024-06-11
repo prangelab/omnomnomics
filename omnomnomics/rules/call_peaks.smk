@@ -1,6 +1,6 @@
 # Rule 11: Call Peaks
 
-## Omnomnomics Snake Rule ##
+## Omnomnomics Snake Rule  ##
 import os
 import re
 import glob
@@ -10,8 +10,12 @@ import subprocess
 rule call_peaks:
     input:
         bam_files = glob.glob(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1]}/*.bam")
+        #use rules."rule_name".output
+        #output of rule 5 and 8? of runt hij dan altijd rule 5 en 8 ook als ze niet specified zijn en output al aanwezig is? ik denk het niet dus dan prima maar wel even testen.
     output:
-        all_merged_peaks = f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/all_groups.merged_peaks.bed"
+        f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/{{THENAME}}.bed", ###, just add a random file for this rule to rule all and create that file here and then delete it in final steps
+        f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/all_groups.merged_peaks.bed" if config['THETYPE'] == 'ATAC' else None,
+        f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/all_groups.merged_peaks.bed" if config['THETYPE'] == 'CHIP' else None
     params:
         thetype=config['THETYPE'],  
         broad=config['BROAD'],
@@ -41,7 +45,7 @@ rule call_peaks:
                 #might have to make the output files, or condition in output on if type = RNA, and then already not execute this step. find a handy way to account for this.
                 return
             
-            log_it(logfile, "Calling peaks...", f"EXECUTING STEP {step_callpeaks}")
+            log_it(logfile, "Calling peaks...", f"EXECUTING STEP {step_callpeaks}") #place this down below only if type is CHiP, if type is ATAC, call open regions?
             log_it(logfile, f"The type = {thetype}")
 
             # Report version
@@ -106,11 +110,11 @@ rule call_peaks:
                     the_name = os.path.basename(
                         next(bam for bam in os.listdir(inputfolder) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.bam$", bam))
                     ).split(separator)[name_fields - 1] ##### why -1? # Set group name
-                    log_it(logfile, the_name)
-                    for file in glob.glob(f"{outputfolder}/{the_name}.MACS3*"):
-                        if not re.search(r"(broadPeak|narrowPeak)$", file): ############correct translation?
-                            os.remove(file) # Delete all redundant MACS3 output
-                    #can also do: shell(f"find {outputfolder} -type f -name {$the_name}.MACS3* ! \( -name *broadPeak -o -name *narrowPeak \) -delete &")
+                    # for file in glob.glob(f"{outputfolder}/{the_name}.MACS3*"): #################alternate (possible) translation if code under this somehow doesnt work
+                    #     if not re.search(r"(broadPeak|narrowPeak)$", file): 
+                    #         os.remove(file) 
+                    shell(f"find {outputfolder} -type f -name {the_name}.MACS3* ! \( -name *broadPeak -o -name *narrowPeak \) -delete ") # Delete all redundant MACS3 output
+
 
                 log_it(logfile, "Cleaning up MACS3 output (keeping only narrowPeak and broadPeak files)...")
 
@@ -164,9 +168,9 @@ rule call_peaks:
                 for tagdir in tagdirs:
                     log_it(logfile, f"Testpp {tagdir}")
                     if thestyle == "factor":
-                        shell(f"pos2bed.pl {tagdir}/peaks.txt | grep -v '#\\|alt\\|Un\\|random' | sort -k1,1 -k2,2n -k3,3n | cut -f-3 > {tagdir}/peaks.bed &")
+                        shell(f"pos2bed.pl {tagdir}/peaks.txt | grep -v '#\\|alt\\|Un\\|random' | sort -k1,1 -k2,2n -k3,3n | cut -f-3 > {tagdir}/peaks.bed ")
                     elif thestyle == "histone":
-                        shell(f"pos2bed.pl {tagdir}/regions.txt | grep -v '#\\|alt\\|Un\\|random' | sort -k1,1 -k2,2n -k3,3n | cut -f-3 > {tagdir}/regions.bed &")
+                        shell(f"pos2bed.pl {tagdir}/regions.txt | grep -v '#\\|alt\\|Un\\|random' | sort -k1,1 -k2,2n -k3,3n | cut -f-3 > {tagdir}/regions.bed ")
 
                 ## Distribute samples over groups based on the file name pattern
                 # Build group list
@@ -196,51 +200,51 @@ rule call_peaks:
                     shell(f"cat {' '.join(beds)} | sort -k1,1 -k2,2n -k3,3n | bedtools merge -i - > {sorted_bed}")
             else:
                 # If ATAC, call open regions
-                log_it("Calling open regions...", f"EXECUTING STEP {step_callpeaks}")
+                log_it(logfile, "Calling open regions...")
                 
-                inputfolder = sys.argv[1]
+                inputfolder = sys.argv[1] ############################ if type is ATAC, then input folder from config must be the right one?
                 outputfolder = sys.argv[2]
 
-                log_it(f"Input folder: {inputfolder}")
-                log_it(f"Output folder: {outputfolder}")
-
-                os.makedirs(outputfolder, exist_ok=True)
-                
                 # Sanity check the working dir
-                sanity_check_dir(inputfolder, ".filtered.bam", step_callpeaks)
-                
+                sanity_check_dir(logfile, inputfolder,  master_config['input_file_types'][master_config['callpeaks_rule_num']-1]) ###############might have to adjust this based on what I do with input and output folders
+
                 # Distribute samples over groups based on the file name pattern
                 bams = [os.path.basename(bam).split(separator)[thetype_field - 1] for bam in glob.glob(f"{inputfolder}/*.bam")]
                 atac_groups = sorted(set(bams))
 
-                for group in atac_groups:
+                for group in atac_groups: # Iterate over the groups
                     bams = [bam for bam in os.listdir(inputfolder) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.bam$", bam)]
-                    bams = [os.path.join(inputfolder, bam) for bam in bams]
+                    bams = [os.path.join(inputfolder, bam) for bam in bams] # Fetch BAM files
                     
-                    log_it(f"Calling open regions for: {group}...")
-                    log_it(f"Files in group: {', '.join(bams)}")
-
+                    log_it(logfile, f"Calling open regions for: {group}...")
+                    log_it(logfile, f"Files in group: {', '.join(bams)}")
+                    # Set group name
                     the_name = os.path.basename(
                         next(bam for bam in os.listdir(inputfolder) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.bam$", bam))
                     ).split(separator)[name_fields - 1]
 
-                    log_it("Calling peaks with MACS3, q value 1e-9...")
-                    shell(f"macs3 callpeak -t {' '.join(bams)} --outdir {outputfolder} -n {the_name}.MACS3.q-9 -q 1e-9 --verbose 0 &")
-                
-                log_it("Waiting for MACS to finish calling open regions...")
-                shell("wait")
+                    # Call open regions with MACS3 hmmr
+                    # Turns out this MACS subroutine is till buggy and not functining prooerply, check back with it later but for now just call as ChIP peaks
+                    #logIt "Calling open regions with MACS3 hmmratac..."
+                    #logIt "	macs3 hmmratac -b $BAMS --outdir \"$THEOUTFOLDER\" -n $NAMEFIELDS --verbose 0 &"
+                    #macs3 hmmratac -b ${BAMS[*]} --outdir "$THEOUTFOLDER" -n $THENAME --verbose 2 &
 
-                log_it("Cleaning up MACS3 output (keeping only narrowPeak files)...")
-                for group in atac_groups:
+                    log_it(logfile, "Calling peaks with MACS3, q value 1e-9...")
+                    log_it(logfile, f"macs3 callpeak -t {' '.join(bams)} --outdir {outputfolder} -n {the_name}.MACS3.q-9 -q 1e-9 --verbose 0" )
+                    shell(f""" micromamba activate macs3 && \
+                        macs3 callpeak -t {' '.join(bams)} --outdir {outputfolder} -n {the_name}.MACS3.q-9 -q 1e-9 --verbose 0 """)
+
+                log_it(logfile, "Cleaning up MACS3 output (keeping only narrowPeak files)...")
+                for group in atac_groups: ## Clean up the output
+                    # Set group name
                     the_name = os.path.basename(
                         next(bam for bam in os.listdir(inputfolder) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.bam$", bam))
                     ).split(separator)[name_fields - 1]
-                    log_it(the_name)
-                    shell(f"find {outputfolder} -type f -name {the_name}.MACS3* ! -name *narrowPeak -delete &")
-
-                shell("wait")
+                    # Delete all redundant MACS3 output
+                    shell(f"find {outputfolder} -type f -name {the_name}.MACS3* ! -name *narrowPeak -delete")
                 
-                log_it("Converting to a clean 3 column BED format...")
+                # Create clean BED files
+                log_it(logfile, "Converting to a clean 3 column BED format...")
                 for file in glob.glob(f"{outputfolder}/*narrowPeak"):
                     sorted_bed = f"{outputfolder}/{os.path.basename(file).replace('narrowPeak', '')}.bed"
                     shell(f"cut -f1-3 {file} | sort -k1,1 -k2,2n -k3,3n > {sorted_bed}")
@@ -248,12 +252,11 @@ rule call_peaks:
 
                 # Concatenate the peak files
                 shell(f"cat {outputfolder}/*.bed | sort -k1,1 -k2,2n -k3,3n | mergeBed -i - > {outputfolder}/all_groups.merged_peaks.bed")
-                log_it(f"Total merged peaks: {subprocess.getoutput(f'wc -l {outputfolder}/all_groups.merged_peaks.bed').strip().split()[0]}")
+                log_it(logfile, f"Total merged peaks: {subprocess.getoutput(f'wc -l {outputfolder}/all_groups.merged_peaks.bed').strip().split()[0]}")
 
             # Clean up
-            os.remove("groups.tmp.txt")
-            shell("micromamba deactivate")
-
+            # os.remove("groups.tmp.txt")
+            # shell("micromamba deactivate")
 
         call_peaks(
             logfile,

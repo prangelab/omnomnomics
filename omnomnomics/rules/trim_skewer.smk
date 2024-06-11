@@ -60,6 +60,8 @@ rule run_skewer:
         #         and master_config['mincores_single_sample_step1_9'][master_config['trim_rule_num'] - 1] > master_config['min_slice_cores']
         #         else master_config['min_slice_cores'])* master_config['max_mem_per_core_mb']))
         mem_mb = Memory_Per_Rule['1']
+    benchmark:
+        f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_benchmark.tsv"
     run:
         def run_skewer(logfile, trim_tool, seq_type, threads, fastq1, fastq2, inputfolder, outputfolder, sample):
             log_it(logfile, "Trimming reads...", f"EXECUTING STEP {master_config['trim_rule_num']}")
@@ -67,11 +69,11 @@ rule run_skewer:
             log_it(logfile, f"Output folder: {outputfolder}")
             log_it(logfile, f"Trim Tool: {trim_tool}")
 
-            macs3_version = subprocess.check_output(["micromamba", "activate", "&&", "macs3", "--version"])
-            log_it(logfile, "\n"+macs3_version.decode("utf-8"), "MACS3 VERSION")
-            print(macs3_version.decode("utf-8"))
+            skewer_version = subprocess.check_output(["skewer", "--version"])
+            log_it(logfile, "\n"+skewer_version.decode("utf-8"), "SKEWER VERSION")
+            print(skewer_version.decode("utf-8"))
 
-            
+
             sanity_check_dir(logfile, inputfolder,  master_config['input_file_types'][master_config['trim_rule_num']-1])
 
             if seq_type == "ATAC":

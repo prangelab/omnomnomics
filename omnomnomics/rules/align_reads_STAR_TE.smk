@@ -5,15 +5,16 @@ import os
 import subprocess
 rule run_star_te:
     input:
-        trimmed_fastqc1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R1{'_Skewer' if config['THETRIMTOOL'] == 'skewer' else ('_Trimmomatic' if config['THETRIMTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz",
-        trimmed_fastqc2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2{'_Skewer' if config['THETRIMTOOL'] == 'skewer' else ('_Trimmomatic' if config['THETRIMTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz" if config['PAIRED'] else None
+        trimmed_fastq1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R1{'_Skewer' if config['THETRIMTOOL'] == 'skewer' else ('_Trimmomatic' if config['THETRIMTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz",
+        trimmed_fastq2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2{'_Skewer' if config['THETRIMTOOL'] == 'skewer' else ('_Trimmomatic' if config['THETRIMTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz" if config['PAIRED'] else None
     output:
         bam=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}_STAR_TE.bam",
         stats=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}.STAR_TE_stats.txt"
     params:
         genome_path=os.path.join(f"{config['OMNOM_HOME']}", "genomes", "STAR", f"{config['THEGENOME']}"),
         inputfolder = master_config['input_folders'][master_config['map_rule_num']-1],
-        outputfolder = master_config['output_folders'][master_config['map_rule_num']-1]
+        outputfolder = master_config['output_folders'][master_config['map_rule_num']-1],
+        paired = config['PAIRED']
     threads:
         Threads_Per_Rule['3']
     resources:
@@ -23,33 +24,35 @@ rule run_star_te:
         log_it(logfile, f"Input folder: {params.inputfolder}")
         log_it(logfile, f"Output folder: {params.outputfolder}")
 
-        STAR_version = subprocess.check_output(["STAR", "--version"])
+        STAR_version = subprocess.check_output("module load STAR && STAR --version", shell=True, executable='/bin/bash')
         log_it(logfile, "\n"+STAR_version.decode("utf-8"), "STAR VERSION")
         print(STAR_version.decode("utf-8"))
         sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['map_rule_num']-1])
         
         def run_star(genome_path, fastq1, fastq2, paired, threads,inputfolder, outputfolder, sample):
             if config['PAIRED']:
-                logIt(logfile, "Running STAR in Paired End mode")
-                MYNAME = os.path.basename(input.fastq1)
-                logIt(logfile, f"Launching: {MYNAME}...")
+                log_it(logfile, "Running STAR in Paired End mode")
+                MYNAME = os.path.basename(fastq1)
+                log_it(logfile, f"Launching: {MYNAME}...").replace("_R1", '')
                 shell(
                     f"""
+                    module load STAR && \
                     STAR --runThreadN {threads} --genomeDir "{params.genome_path}" \
-                    --readFilesIn "{input.fastq1}" "{input.fastq2}" --readFilesCommand zcat \
+                    --readFilesIn "{fastq1}" "{fastq2}" --readFilesCommand zcat \
                     --outFileNamePrefix "{outputfolder}/{sample}." --outSAMtype BAM Unsorted \
                     --outBAMcompression -1 --genomeLoad LoadAndRemove --twopassMode Basic\
                     --outFilterMultimapNmax 100 --winAnchorMultimapNmax 100
                     """
                 )
             else:
-                logIt(logfile, "Running STAR in Single End mode")
-                MYNAME = os.path.basename(input.fastq1)
-                logIt(logfile, f"Launching: {MYNAME}...")
+                log_it(logfile, "Running STAR in Single End mode")
+                MYNAME = os.path.basename(fastq1)
+                log_it(logfile, f"Launching: {MYNAME}...").replace("_R1", '')
                 shell(
                     f"""
+                    module load STAR && \
                     STAR --runThreadN {threads} --genomeDir "{params.genome_path}" \
-                    --readFilesIn "{input.fastq1}" --readFilesCommand zcat \
+                    --readFilesIn "{fastq1}" --readFilesCommand zcat \
                     --outFileNamePrefix "{outputfolder}/{sample}." --outSAMtype BAM Unsorted \
                     --outBAMcompression -1 --genomeLoad LoadAndRemove --twopassMode Basic --outSAMstrandField intronMotif \
                     --outFilterMultimapNmax 100 --winAnchorMultimapNmax 100
@@ -57,7 +60,7 @@ rule run_star_te:
                 )
 
             bam_files = [f for f in os.listdir(f"{outputfolder}") if f.endswith("Aligned.out.bam")]
-            for bam in bam_files:
+            for bam in bam_files: ####update from STAR
                 bam_path = os.path.join(f"{outputfolder}", "bam")
                 temp_bam_path = bam_path + ".tmp"
                 # Modify header
@@ -84,8 +87,7 @@ rule run_star_te:
                 new_path = os.path.join(outputfolder, log_file.replace(".Log.final.out", ".STAR_TE_stats.txt"))
                 os.rename(old_path, new_path)
 
-
-        run_star(params.genome_path, input.fastq1, input.fastq2, params.paired, threads, params.inputfolder, params.outputfolder, wildcards.sample)
+        run_star(params.genome_path, input.trimmed_fastq1, input.trimmed_fastq2, params.paired, threads, params.inputfolder, params.outputfolder, wildcards.sample)
 
 
 

@@ -399,6 +399,8 @@ if config['PAIRED'] == 1 and THEMODERANGEMIN <= 4:
 else: 
     num_samples = len(samples)
 
+max_nodes = master_config.get('max_nodes', f"{master_config['nodes_in_partition']}") if master_config.get('max_nodes', f"{master_config['nodes_in_partition']}") <= master_config['nodes_in_partition'] else master_config['nodes_in_partition'] 
+
 ##--------------------------------------------------------------------------------------------------------------
 # Obtain Threads and Memory per rule
 ##--------------------------------------------------------------------------------------------------------------
@@ -421,7 +423,7 @@ for i in range(1,master_config['max_step']+1):
                                     and master_config['maxcores_single_sample_step1_9'][i - 1] is not None
                                     and isinstance(master_config['maxcores_single_sample_step1_9'][i - 1], int)
                                     and master_config['maxcores_single_sample_step1_9'][i - 1] < master_config['cores_per_node']
-                                    else master_config['cores_per_node']), ((master_config['nodes_in_partition']*master_config['cores_per_node'])/num_samples)) ) )
+                                    else master_config['cores_per_node']), ((max_nodes*master_config['cores_per_node'])/num_samples)) ) )
 print(Threads_Per_Rule)
 Memory_Per_Rule = {}
 for i in range(1,master_config['max_step']+1):
