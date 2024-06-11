@@ -67,9 +67,11 @@ rule run_skewer:
             log_it(logfile, f"Output folder: {outputfolder}")
             log_it(logfile, f"Trim Tool: {trim_tool}")
 
-            skewer_version = subprocess.check_output(["skewer", "--version"])
-            log_it(logfile, "\n"+skewer_version.decode("utf-8"), "SKEWER VERSION")
-            print(skewer_version.decode("utf-8"))
+            macs3_version = subprocess.check_output(["micromamba", "activate", "&&", "macs3", "--version"])
+            log_it(logfile, "\n"+macs3_version.decode("utf-8"), "MACS3 VERSION")
+            print(macs3_version.decode("utf-8"))
+
+            
             sanity_check_dir(logfile, inputfolder,  master_config['input_file_types'][master_config['trim_rule_num']-1])
 
             if seq_type == "ATAC":

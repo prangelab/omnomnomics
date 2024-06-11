@@ -55,6 +55,11 @@ rule merge_wig:
                     negcols = f.read().splitlines()
 
                 for superhub in hubtypes:
+                    hubs = [
+                        hub for hub in os.listdir(input_folder)
+                        if re.match(re.escape(superhub).replace(re.escape(separator), ".*") + ".*\\.hub$", hub)
+                    ]
+                    for hub in hubs:
                         hub_path = os.path.join(input_folder, hub)
                         hub_basename = os.path.basename(hub_path)
                         name = hub_basename.split(separator)[name_fields - 1]
@@ -139,7 +144,7 @@ rule merge_wig:
                     for bw in [f for f in os.listdir(input_folder) if re.match(re.escape(superhub).replace(re.escape(separator), ".*") + ".*\\.bw$", f)]:
                         bw_path = os.path.join(input_folder, bw)
                         bw_basename = os.path.basename(bw_path)
-                        name = bw_basename.split(separator)[name_fields - 1]
+                        name = bw_basename.split(separator)[name_fields - 1] ### why -1? in bash code not
                         htype = bw_basename.split(separator)[type_field - 1]
                         coltype = bw_basename.split(separator)[col_field - 1]
 
