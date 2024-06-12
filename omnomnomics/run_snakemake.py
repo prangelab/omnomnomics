@@ -7,6 +7,7 @@ import argparse
 import re
 import glob
 import random
+import math
 from datetime import date, datetime
 
 
@@ -534,57 +535,58 @@ def set_job_mode(args, config, experiment_dir, mode):
 
 
 def validate_input_files(the_type, config, mode_range_min, experiment_dir):
-   print("Validating input files...")
+    print("Validating input files...")
 
 
-   # Check permissions on experiment dir
-   if not (os.access(experiment_dir, os.R_OK) and os.access(experiment_dir, os.W_OK)):
-       print(f"Permission error! {experiment_dir} is not readable and/or writable! Aborting...", file=sys.stderr)
-       sys.exit(1)
+    # Check permissions on experiment dir
+    if not (os.access(experiment_dir, os.R_OK) and os.access(experiment_dir, os.W_OK)):
+        print(f"Permission error! {experiment_dir} is not readable and/or writable! Aborting...", file=sys.stderr)
+        sys.exit(1)
 
 
-   # Check if we have a paired-end run (if we are dealing with FASTQs) and set the flag accordingly
-   paired = False
-   fastq_files = glob.glob(f"{experiment_dir}/FASTQ/*_R2*fastq.gz") + glob.glob(f"{experiment_dir}/trimmed_FASTQ/*_R2*fastq.gz")
-   if len(fastq_files) > 0:
-       paired = True
+    # Check if we have a paired-end run (if we are dealing with FASTQs) and set the flag accordingly
+    paired = False
+    fastq_files = glob.glob(f"{experiment_dir}/FASTQ/*_R2*fastq.gz") + glob.glob(f"{experiment_dir}/trimmed_FASTQ/*_R2*fastq.gz")
+    if len(fastq_files) > 0:
+        paired = True
 
 
-   input_file_types = config['input_file_types']
-   input_folders = config['input_folders']
-   # Determine the starting file type based on the min range value of the job mode
-   if the_type != "RNA":
-       mergewig = config['mergewig']
-       input_file_types[mergewig - 1] = ".bw"
+    input_file_types = config['input_file_types']
+    input_folders = config['input_folders']
+    # Determine the starting file type based on the min range value of the job mode
+    if the_type != "RNA":
+        mergewig = config['mergewig']
+        input_file_types[mergewig - 1] = ".bw"
 
 
-   # Check if the input dir exists for the first step and count files with the correct extension
-   num_files = 0
-   input_folder_mod_range_min = input_folders[mode_range_min - 1]
-   input_file_type_mod_range_min = input_file_types[mode_range_min - 1]
+    # Check if the input dir exists for the first step and count files with the correct extension
+    num_files = 0
+    input_folder_mod_range_min = input_folders[mode_range_min - 1]
+    input_file_type_mod_range_min = input_file_types[mode_range_min - 1]
 
 
-   if os.path.isdir(f"{experiment_dir}/{input_folder_mod_range_min}"):
-       num_files = len(glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}"))
+    if os.path.isdir(f"{experiment_dir}/{input_folder_mod_range_min}"):
+        num_files = len(glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}"))
 
 
-   # Sanity check file number
-   if num_files == 0:
-       print("No input files detected! Aborting...", file=sys.stderr)
-       sys.exit(1)
+    # Sanity check file number
+    if num_files == 0:
+        print("No input files detected! Aborting...", file=sys.stderr)
+        sys.exit(1)
+
+    print("NUMBER OF FILES")
+    print(num_files)
+    # Check if input files are readable
+    input_files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}")
+    if not os.access(input_files[0], os.R_OK): #################can check this for all files in here
+        print(f"Permission error! {input_file_type_mod_range_min} files in {experiment_dir}/{input_folder_mod_range_min} are not readable! Aborting...", file=sys.stderr)
+        sys.exit(1)
 
 
-   # Check if input files are readable
-   input_files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}")
-   if not os.access(input_files[0], os.R_OK): #################can check this for all files in here
-       print(f"Permission error! {input_file_type_mod_range_min} files in {experiment_dir}/{input_folder_mod_range_min} are not readable! Aborting...", file=sys.stderr)
-       sys.exit(1)
+    # Set the number of pairs (if dealing with FASTQs, else just keep it equal to file number)
+    num_pairs = num_files // 2 if paired and mode_range_min < 4 else num_files
 
-
-   # Set the number of pairs (if dealing with FASTQs, else just keep it equal to file number)
-   num_pairs = num_files // 2 if paired and mode_range_min <= 4 else num_files
-
-   return num_files, num_pairs, paired, input_folder_mod_range_min, input_file_type_mod_range_min
+    return num_files, num_pairs, paired, input_folder_mod_range_min, input_file_type_mod_range_min
 
 
 def check_name_field_settings(experiment_dir, separator, name_fields, type_field, col_field, config, input_folder_mod_range_min, input_file_type_mod_range_min):
@@ -795,227 +797,239 @@ def start_log(experiment_dir, run_date, config):
 
 def main():
   
-   # Define variables for paths
-   #OMNOM_HOME = "/net/beegfs/cfg/projects/dewintherlab/"
-   #OMNOM_HOME = os.path.join("/Users/kierancarroll/Documents/","Amsterdam UMC Klinische Genetica Internship","omnomnomics")
-   OMNOM_HOME = "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics"
-   #CONFIG_FILE = os.path.join(OMNOM_HOME,"", "config.yaml")
-   CONFIG_FILE = os.path.join(f"{OMNOM_HOME}","config.yaml")
+    # Define variables for paths
+    #OMNOM_HOME = "/net/beegfs/cfg/projects/dewintherlab/"
+    #OMNOM_HOME = os.path.join("/Users/kierancarroll/Documents/","Amsterdam UMC Klinische Genetica Internship","omnomnomics")
+    OMNOM_HOME = "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics"
+    #CONFIG_FILE = os.path.join(OMNOM_HOME,"", "config.yaml")
+    CONFIG_FILE = os.path.join(f"{OMNOM_HOME}","config.yaml")
 
 
-   #Check if OMNOM_HOME exists
-   if not os.path.isdir(OMNOM_HOME):
-       print(f"OMNOM_HOME directory '{OMNOM_HOME}' does not exist. Please set it correctly. Aborting...")
-       sys.exit(1)
+    #Check if OMNOM_HOME exists
+    if not os.path.isdir(OMNOM_HOME):
+        print(f"OMNOM_HOME directory '{OMNOM_HOME}' does not exist. Please set it correctly. Aborting...")
+        sys.exit(1)
 
 
-   # Check if CONFIG_FILE exists
-   if not os.path.isfile(CONFIG_FILE):
-       print(f"Master config file '{CONFIG_FILE}' does not exist. Please make sure it exists. Aborting...")
-       sys.exit(1)
-   #load and validate the config file
-   config = load_and_validate_yaml(CONFIG_FILE, "## Omnomnomics pipeline config ##")
-  
-   # Capture command line invocation
-   the_command = ' '.join(sys.argv)
-      
-   # Parse command-line arguments
-   args = parse_arguments()
+    # Check if CONFIG_FILE exists
+    if not os.path.isfile(CONFIG_FILE):
+        print(f"Master config file '{CONFIG_FILE}' does not exist. Please make sure it exists. Aborting...")
+        sys.exit(1)
+    #load and validate the config file
+    config = load_and_validate_yaml(CONFIG_FILE, "## Omnomnomics pipeline config ##")
+
+    # Capture command line invocation
+    the_command = ' '.join(sys.argv)
+        
+    # Parse command-line arguments
+    args = parse_arguments()
 
 
-   # Access parsed arguments
-   ##### Hiermee forceer ik dus dat de config file helemaal ingevuld moet worden. hoeft niet dus.
-   #anders kan ik dit doen: homer_size = args.homer_size if args.homer_size else config.get('homer_size', '500'). update: did this.
-   experiment_dir = args.experiment_dir
-   the_type = args.type.upper()
-   genome = args.genome
-   trim_tool = args.trim_tool if args.trim_tool else config.get("trim_tool","skewer")
-   map_tool = args.map_tool if args.map_tool else config.get('map_tool', "hisat2")
-   mode = args.mode.lower() if args.mode else config.get('mode', "auto")
-   formula = args.formula if args.formula else config.get('formula', "1")
-   broad = args.broad if args.broad else config.get('broad', "NA")
-   INPUT = args.input if args.input else config.get('input',"NA")
-   metadata = args.metadata if args.metadata else config.get('metadata', "NA")
-   style = args.style if args.style else config.get('the_style', "factor")
-   col_table = args.col_table if args.col_table else config.get('color_table', f"{OMNOM_HOME}/bin/color_data_for_hubs/gray.tint.color.table")
-   color_data_folder = args.color_data_folder if args.color_data_folder else config.get('color_data_folder', f"{OMNOM_HOME}/bin/color_data_for_hubs")
-   overlay = args.overlay if args.overlay else config.get('overlay', "transparentOverlay")
-   hub_mail = args.hub_mail if args.hub_mail else config.get('hub_mail', "m.dewinther@amsterdamumc.nl")
-   no_multiqc = args.no_multiqc if args.no_multiqc else config.get('no_multiqc', 0)
-   name_fields = args.name_fields if args.name_fields else config.get('name_fields', "1-3")
-   type_field = args.type_field if args.type_field else config.get('type_field', "1")
-   col_field = args.col_field if args.col_field else config.get('col_field', "2")
-   separator = args.separator if args.separator else config.get('separator', "_")
-   appendix = args.appendix if args.appendix else config.get('appendix', "hub")
-   homer_mindist = args.homer_mindist if args.homer_mindist else config.get('homer_mindist', 2000)
-   homer_size = args.homer_size if args.homer_size else config.get('homer_size', 500)
-   keep_unpaired = args.keepunpaired if args.keepunpaired else config.get('keep_unpaired', 0) ##########what should be default?
+    # Access parsed arguments
+    ##### Hiermee forceer ik dus dat de config file helemaal ingevuld moet worden. hoeft niet dus.
+    #anders kan ik dit doen: homer_size = args.homer_size if args.homer_size else config.get('homer_size', '500'). update: did this.
+    experiment_dir = args.experiment_dir
+    the_type = args.type.upper()
+    genome = args.genome
+    trim_tool = args.trim_tool if args.trim_tool else config.get("trim_tool","skewer")
+    map_tool = args.map_tool if args.map_tool else config.get('map_tool', "hisat2")
+    mode = args.mode.lower() if args.mode else config.get('mode', "auto")
+    formula = args.formula if args.formula else config.get('formula', "1")
+    broad = args.broad if args.broad else config.get('broad', "NA")
+    INPUT = args.input if args.input else config.get('input',"NA")
+    metadata = args.metadata if args.metadata else config.get('metadata', "NA")
+    style = args.style if args.style else config.get('the_style', "factor")
+    col_table = args.col_table if args.col_table else config.get('color_table', f"{OMNOM_HOME}/bin/color_data_for_hubs/gray.tint.color.table")
+    color_data_folder = args.color_data_folder if args.color_data_folder else config.get('color_data_folder', f"{OMNOM_HOME}/bin/color_data_for_hubs")
+    overlay = args.overlay if args.overlay else config.get('overlay', "transparentOverlay")
+    hub_mail = args.hub_mail if args.hub_mail else config.get('hub_mail', "m.dewinther@amsterdamumc.nl")
+    no_multiqc = args.no_multiqc if args.no_multiqc else config.get('no_multiqc', 0)
+    name_fields = args.name_fields if args.name_fields else config.get('name_fields', "1-3")
+    type_field = args.type_field if args.type_field else config.get('type_field', "1")
+    col_field = args.col_field if args.col_field else config.get('col_field', "2")
+    separator = args.separator if args.separator else config.get('separator', "_")
+    appendix = args.appendix if args.appendix else config.get('appendix', "hub")
+    homer_mindist = args.homer_mindist if args.homer_mindist else config.get('homer_mindist', 2000)
+    homer_size = args.homer_size if args.homer_size else config.get('homer_size', 500)
+    keep_unpaired = args.keepunpaired if args.keepunpaired else config.get('keep_unpaired', 0) ##########what should be default?
 
 
-   # Check required variables
-   check_required_vars(the_type, experiment_dir, genome, config)
+    # Check required variables
+    check_required_vars(the_type, experiment_dir, genome, config)
 
 
-   # Set user subroutine choices
-   selected_routine_trim, selected_routine_map = set_user_subroutine_choices(trim_tool, map_tool, config)
+    # Set user subroutine choices
+    selected_routine_trim, selected_routine_map = set_user_subroutine_choices(trim_tool, map_tool, config)
+    selected_routines = {}
+    selected_routines['selected_routine_trim'] = selected_routine_trim
+    selected_routines['selected_routine_map'] = selected_routine_map
+    selected_routines['selected_routine_qc'] = config['selected_routine_qc']
+    selected_routines['selected_routine_merge'] = config['selected_routine_merge']
+    selected_routines['selected_routine_touchup'] = config['selected_routine_touchup']   
+    selected_routines['selected_routine_index'] = config['selected_routine_index']
+    selected_routines['selected_routine_stats'] = config['selected_routine_stats']
+    selected_routines['selected_routine_tagdir'] = config['selected_routine_tagdir']
+    selected_routines['selected_routine_wig'] = config['selected_routine_wig']
+    selected_routines['selected_routine_mergewig'] = config['selected_routine_mergewig']
+    selected_routines['selected_routine_callpeaks'] = config['selected_routine_callpeaks']
+    selected_routines['selected_routine_countreads'] = config['selected_routine_countreads']
+    selected_routines['selected_routine_de'] = config['selected_routine_de']
+
+    # Validate user-defined variables
+    homer_input = validate_user_defined_vars(OMNOM_HOME, metadata, experiment_dir, INPUT, style, color_data_folder, col_table, overlay, the_type, map_tool, homer_size, homer_mindist, config)
 
 
-   # Validate user-defined variables
-   homer_input = validate_user_defined_vars(OMNOM_HOME, metadata, experiment_dir, INPUT, style, color_data_folder, col_table, overlay, the_type, map_tool, homer_size, homer_mindist, config)
+    # Setup variables
+    node_cores, max_cores, run_date = setup_variables(experiment_dir, config)
+    #### something to test/verify. When updating the current config file with the old one, the currents gets updated.
+    #### do those variable changes carry over to the main function or not? I'm returning config dict now so should be fine?!
+    #### look at this this when clear on how we are going to use the running config file. Update: test this.
 
 
-   # Setup variables
-   node_cores, max_cores, run_date = setup_variables(experiment_dir, config)
-   #### something to test/verify. When updating the current config file with the old one, the currents gets updated.
-   #### do those variable changes carry over to the main function or not? I'm returning config dict now so should be fine?!
-   #### look at this this when clear on how we are going to use the running config file. Update: test this.
+    #getting job mode (which steps)
+    mode_steps, config = set_job_mode(args, config, experiment_dir, mode)
 
 
-   #getting job mode (which steps)
-   mode_steps, config = set_job_mode(args, config, experiment_dir, mode)
+    #checking input files
+    num_files, num_pairs, paired, input_folder_mod_range_min, input_file_type_mod_range_min = validate_input_files(the_type, config, min(mode_steps),experiment_dir)
 
 
-   #checking input files
-   num_files, num_pairs, paired, input_folder_mod_range_min, input_file_type_mod_range_min = validate_input_files(the_type, config, min(mode_steps),experiment_dir)
+    #checking field settings
+    check_name_field_settings(experiment_dir, separator, name_fields, type_field, col_field, config, input_folder_mod_range_min, input_file_type_mod_range_min)
 
 
-   #checking field settings
-   check_name_field_settings(experiment_dir, separator, name_fields, type_field, col_field, config, input_folder_mod_range_min, input_file_type_mod_range_min)
+    #checking sample names
+    check_unique_sample_names(experiment_dir, input_folder_mod_range_min, input_file_type_mod_range_min, name_fields, separator)
 
 
-   #checking sample names
-   check_unique_sample_names(experiment_dir, input_folder_mod_range_min, input_file_type_mod_range_min, name_fields, separator)
+    #setting up runtime parameters (my_cores and max_time commented out for now.)
+    the_mem, the_heap_init = setup_runtime_parameters(num_pairs, max_cores)
+
+    #    print(f"PAIRED = {paired}")
+    run_config_data = {
+        ## Run configuration for omnomnomics run for $EXPERIMENT_DIR on $RUN_DATE
+        'OMNOM_HOME': OMNOM_HOME,
+        'EXPERIMENT_DIR': experiment_dir,
+        'RUNDATE': run_date,
+        'INPUT_FOLDER': input_folder_mod_range_min,
+        'INPUT_FILE_TYPE': input_file_type_mod_range_min,
+        'MAXCORES': max_cores,
+        'INPUT': INPUT,
+        'HOMERINPUT': homer_input,
+        'BROAD': broad,
+        'THESTYLE': style,
+        'THEMODE': mode_steps,
+        'THETYPE': the_type,
+        'NUMFILES': num_files,
+        'NUMPAIRS': num_pairs,
+        'KEEPUNPAIRED': keep_unpaired,
+        'PAIRED': paired,
+        'THEMODERANGEMIN': min(mode_steps),
+        'THEMODERANGEMAX': max(mode_steps),
+        'THEGENOME': genome,
+        'MYFORMULA': formula,
+        'MYMETADATA': metadata,
+        'THETRIMTOOL': trim_tool,
+        'THEMAPTOOL': map_tool,
+        'NO_MULTIQC': no_multiqc,
+        'THETYPEFIELD': type_field,
+        'NAMEFIELDS': name_fields,
+        'THECOLFIELD': col_field,
+        'THESEPARATOR': separator,
+        'THEAPPENDIX': appendix,
+        'THEOVERLAY': overlay,
+        'THECOLORDATAFOLDER': color_data_folder,
+        'THEHUBMAIL': hub_mail,
+        'THECOLTABLE': col_table,
+        'HOMERSIZE': homer_size,
+        'HOMERMINDIST': homer_mindist,
+        'THEMEM': the_mem,
+        'THEHEAPINIT': the_heap_init  
+    }
 
 
-   #setting up runtime parameters (my_cores and max_time commented out for now.)
-   the_mem, the_heap_init = setup_runtime_parameters(num_pairs, max_cores)
-
-#    print(f"PAIRED = {paired}")
-   run_config_data = {
-       ## Run configuration for omnomnomics run for $EXPERIMENT_DIR on $RUN_DATE
-       'OMNOM_HOME': OMNOM_HOME,
-       'EXPERIMENT_DIR': experiment_dir,
-       'RUNDATE': run_date,
-       'INPUT_FOLDER': input_folder_mod_range_min,
-       'INPUT_FILE_TYPE': input_file_type_mod_range_min,
-       'MAXCORES': max_cores,
-       'INPUT': INPUT,
-       'HOMERINPUT': homer_input,
-       'BROAD': broad,
-       'THESTYLE': style,
-       'THEMODE': mode_steps,
-       'THETYPE': the_type,
-       'NUMFILES': num_files,
-       'NUMPAIRS': num_pairs,
-       'KEEPUNPAIRED': keep_unpaired,
-       'PAIRED': paired,
-       'THEMODERANGEMIN': min(mode_steps),
-       'THEMODERANGEMAX': max(mode_steps),
-       'THEGENOME': genome,
-       'MYFORMULA': formula,
-       'MYMETADATA': metadata,
-       'THETRIMTOOL': trim_tool,
-       'THEMAPTOOL': map_tool,
-       'NO_MULTIQC': no_multiqc,
-       'THETYPEFIELD': type_field,
-       'NAMEFIELDS': name_fields,
-       'THECOLFIELD': col_field,
-       'THESEPARATOR': separator,
-       'THEAPPENDIX': appendix,
-       'THEOVERLAY': overlay,
-       'THECOLORDATAFOLDER': color_data_folder,
-       'THEHUBMAIL': hub_mail,
-       'THECOLTABLE': col_table,
-       'HOMERSIZE': homer_size,
-       'HOMERMINDIST': homer_mindist,
-       'THEMEM': the_mem,
-       'THEHEAPINIT': the_heap_init,
-       'SELECTED_ROUTINE_TRIM': selected_routine_trim,
-       'SELECTED_ROUTINE_QC': config['selected_routine_qc'],   
-       'SELECTED_ROUTINE_MAP':selected_routine_map,  
-       'SELECTED_ROUTINE_MERGE': config['selected_routine_merge'],
-       'SELECTED_ROUTINE_TOUCHUP': config['selected_routine_touchup'], 
-       'SELECTED_ROUTINE_INDEX': config['selected_routine_index'],
-       'SELECTED_ROUTINE_STATS': config['selected_routine_stats'],
-       'SELECTED_ROUTINE_TAGDIR': config['selected_routine_tagdir'],
-       'SELECTED_ROUTINE_WIG': config['selected_routine_wig'],
-       'SELECTED_ROUTINE_MERGEWIG': config['selected_routine_mergewig'],
-       'SELECTED_ROUTINE_COUNTREADS': config['selected_routine_countreads'],
-       'SELECTED_ROUTINE_CALLPEAKS': config['selected_routine_callpeaks'],
-       'SELECTED_ROUTINE_DE': config['selected_routine_de']   
-   }
+    write_run_config(experiment_dir, run_date, run_config_data)
 
 
-   write_run_config(experiment_dir, run_date, run_config_data)
+    # Check for a running or queued instance
+    #check_instance(experiment_dir)
 
 
-   # Check for a running or queued instance
-   #check_instance(experiment_dir)
+    # Initialize the log file
+    log_file = start_log(experiment_dir, run_date, config)
 
 
-   # Initialize the log file
-   log_file = start_log(experiment_dir, run_date, config)
+    """Print some status info."""
+    print("")
+    print("####################################################################################")
+    print("Submitting omnomnomics pipeline job...")
+    print(f"\tMODE:\t\t{mode_steps}")
+    print(f"\tTYPE:\t\t{the_type}")
+    print(f"\tFILES:\t\t{num_files}")
+    print(f"\tPAIRS:\t\t{num_pairs}")
+    #print(f"\tThreads:\t{my_cores}")
+    #print(f"\tMax Time:\t{max_time}")
+    print(f"\tExperiment DIR:\t\t{experiment_dir}")
+    print(f"\tRun date:\t{run_date}")
+    print("")
 
 
-   """Print some status info."""
-   print("")
-   print("####################################################################################")
-   print("Submitting omnomnomics pipeline job...")
-   print(f"\tMODE:\t\t{mode_steps}")
-   print(f"\tTYPE:\t\t{the_type}")
-   print(f"\tFILES:\t\t{num_files}")
-   print(f"\tPAIRS:\t\t{num_pairs}")
-   #print(f"\tThreads:\t{my_cores}")
-   #print(f"\tMax Time:\t{max_time}")
-   print(f"\tExperiment DIR:\t\t{experiment_dir}")
-   print(f"\tRun date:\t{run_date}")
-   print("")
+    """Dispatch the job using Snakemake."""
+    print("Dispatching job...")
 
 
-   """Dispatch the job using Snakemake."""
-   print("Dispatching job...")
+    sub_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    print("####################################################################################")
+    print(f"Submitted omnomnomics run at {sub_time}")
+    print("####################################################################################")
 
 
-   sub_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-  
-   print("####################################################################################")
-   print(f"Submitted omnomnomics run at {sub_time}")
-   print("####################################################################################")
-
-
-   with open(log_file, 'a') as log:
-       log.write(f"Invocation:\t{the_command}\n")
-       log.write(f"Job submitted at:\t{sub_time}\n")
-       #log.write(f"Max walltime:\t{max_time}\n\n") leave time out for now
-       log.write(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
-       log.write("WAITING FOR SNAKEMAKE & SLURM TO COMPLETE...\n")
-       log.write("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+    with open(log_file, 'a') as log:
+        log.write(f"Invocation:\t{the_command}\n")
+        log.write(f"Job submitted at:\t{sub_time}\n")
+        #log.write(f"Max walltime:\t{max_time}\n\n") leave time out for now
+        log.write(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
+        log.write("WAITING FOR SNAKEMAKE & SLURM TO COMPLETE...\n")
+        log.write("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
 
 
 
 
-       # Call Snakemake with the appropriate parameters
-   #cmd = [ "snakemake", "--snakefile", "Snakefile.smk", "--profile", os.path.join(experiment_dir, "snakemake_profiles/slurm_profile"),
-           #"--configfile", os.path.join(experiment_dir, f"omnomnomics.run.{run_date}.config"), "--cores", f"{max_cores}"]
+        # Call Snakemake with the appropriate parameters
+    #cmd = [ "snakemake", "--snakefile", "Snakefile.smk", "--profile", os.path.join(experiment_dir, "snakemake_profiles/slurm_profile"),
+            #"--configfile", os.path.join(experiment_dir, f"omnomnomics.run.{run_date}.config"), "--cores", f"{max_cores}"]
+    cmd = [ "snakemake",  "--profile", os.path.join(experiment_dir, "snakemake_profiles/slurm_profile"), "--snakefile", "omnomnomics/Snakefile.smk",
+        "--config", "config_file="+os.path.join(experiment_dir, f'omnomnomics.run.{run_date}.config.yaml'), "--jobs", "1000", "--cores", "1280"
+    ]
+
+    # forced_runners = []
+    cmd.append("--forcerun")
+    for i in mode_steps:
+        routine = config['routines'][i-1]
+        cmd.append(config[routine][selected_routines[f'selected_routine_{routine}']])
+    #     forced_runners = forced_runners + " "
+    # forced_runners = forced_runners[:-1]
+
+    # cmd = [ "snakemake", "-n", "--profile", os.path.join(experiment_dir, "snakemake_profiles/slurm_profile"), "--snakefile", "omnomnomics/Snakefile.smk",
+    #         "--config", "config_file="+os.path.join(experiment_dir, f'omnomnomics.run.{run_date}.config.yaml'), "--jobs", "1000", "--cores", "1280",
+    #         "-R", forced_runners
+    # ]
+
+    
+
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
-   cmd = [ "snakemake", "--profile", os.path.join(experiment_dir, "snakemake_profiles/slurm_profile"), "--snakefile", "omnomnomics/Snakefile.smk",
-          "--config", "config_file="+os.path.join(experiment_dir, f'omnomnomics.run.{run_date}.config.yaml'), "--jobs", "1000", "--cores", "1280"
-   ]
-
-
-   try:
-       subprocess.run(cmd, check=True)
-   except subprocess.CalledProcessError as e:
-       print(f"Error: {e}", file=sys.stderr)
-       sys.exit(1)
-
-
-   # with open(os.path.join(experiment_dir, "omnomnomics.run_queued"), 'w') as queued_file:
-   #     queued_file.write("")
-  
-   print("")
-   print("All done!")
+    # with open(os.path.join(experiment_dir, "omnomnomics.run_queued"), 'w') as queued_file:
+    #     queued_file.write("")
+    print(cmd)
+    print("")
+    print("All done!")
 
 
 if __name__ == "__main__":

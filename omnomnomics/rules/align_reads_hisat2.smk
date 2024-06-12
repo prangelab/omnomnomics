@@ -32,14 +32,14 @@ rule run_hisat2:
         # fastq1=f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R1_Skewer.fastq.gz" if config["PAIRED"] else None,
         # fastq2=f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2.fastq.gz" if config["PAIRED"] else None,
         # fastq3 = f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2.fastq.gz" if not config["PAIRED"] else None
-        trimmed_fastqc1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample1}}_R1{'_Skewer' if config['THETRIMTOOL'] == 'skewer' else ('_Trimmomatic' if config['THETRIMTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz",
-        trimmed_fastqc2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample1}}_R2{'_Skewer' if config['THETRIMTOOL'] == 'skewer' else ('_Trimmomatic' if config['THETRIMTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz" if config['PAIRED'] else None
+        trimmed_fastq1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample1}}_R1.trimmed.fastq.gz" if config["PAIRED"] else f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}.trimmed.fastq.gz",
+        trimmed_fastq2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample1}}_R2.trimmed.fastq.gz" if config['PAIRED'] else None
     output:
-        bam=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample1}}_HISAT2.bam",
+        bam=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample1}}.bam",
         stats=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample1}}.HISAT2_stats.txt"
         #could add the 2 extra  output files if keepunpaired = 1, but not necesarry because will be made then automatically
     params:
-        genome_path=os.path.join(f"{config['OMNOM_HOME']}", "genomes", "HISAT2", f"{config['THEGENOME']}"),
+        genome_path=os.path.join(f"{config['OMNOM_HOME']}", "genomes", "STAR", f"{config['THEGENOME']}"), ##CHANGE TO HISAT2
         keepunpaired=config.get("KEEPUNPAIRED", "0"),
         seq_type=config["THETYPE"],
         inputfolder = master_config['input_folders'][master_config['map_rule_num']-1],
@@ -62,7 +62,7 @@ rule run_hisat2:
             if seq_type == "RNA":
                 if config["PAIRED"]:
                     log_it(logfile, f"Running HISAT2 in Paired End mode on RNA data.")
-                    MYNAME = os.path.basename(input.trimmed_fastqc1)
+                    MYNAME = os.path.basename(fastq1)
                     log_it(logfile, f"Launching: {MYNAME}...")
                     if keepunpaired == "1":
                         shell(f"""
@@ -70,14 +70,14 @@ rule run_hisat2:
                         hisat2 -p {threads} -x {genome_path} \
                         -1 {fastq1} -2 {fastq2} --mm --add-chrname --new-summary --dta-cufflinks \
                         --un-gz "{outputfolder}/{sample}.unpaired.unaligned.bam" --al-gz "{outputfolder}/{sample}.unpaired.aligned.bam" \
-                        | samtools view -b - 1> "{outputfolder}/{sample}_HISAT2.bam" 2> "{outputfolder}/{sample}.HISAT2_stats.txt"
+                        | samtools view -b - 1> "{outputfolder}/{sample}.bam" 2> "{outputfolder}/{sample}.HISAT2_stats.txt"
                         """)
                     else:
                         shell(f"""
                         module load samtools && \
                         hisat2 -p {threads} -x {genome_path} \
                         -1 {fastq1} -2 {fastq2} --mm --add-chrname --new-summary --dta-cufflinks \
-                        | samtools view -b - 1> "{outputfolder}/{sample}_HISAT2.bam" 2> "{outputfolder}/{sample}.HISAT2_stats.txt"
+                        | samtools view -b - 1> "{outputfolder}/{sample}.bam" 2> "{outputfolder}/{sample}.HISAT2_stats.txt"
                         """)
                 else:
                     log_it(logfile, f"Running HISAT2 in Single End mode on RNA data.")
@@ -85,12 +85,12 @@ rule run_hisat2:
                     module load samtools && \
                     hisat2 -p {threads} -x {genome_path} \
                     -U {fastq1} --mm --add-chrname --new-summary --dta-cufflinks \
-                    | samtools view -b - 1> "{outputfolder}/{sample}_HISAT2.bam" 2> "{outputfolder}/{sample}.HISAT2_stats.txt"
+                    | samtools view -b - 1> "{outputfolder}/{sample}.bam" 2> "{outputfolder}/{sample}.HISAT2_stats.txt"
                     """)
             else: #if ChIP- or ATAC data
                 if config["PAIRED"]:
                     log_it(logfile, f"Running HISAT2 in Paired End mode  on ChIP or ATAC data.")
-                    MYNAME = os.path.basename(input.trimmed_fastqc1)
+                    MYNAME = os.path.basename(fastq1)
                     log_it(logfile, f"Launching: {MYNAME}...")
                     if keepunpaired == "1":
                         shell(f"""
@@ -98,14 +98,14 @@ rule run_hisat2:
                         hisat2 -p {threads} -x {genome_path} \
                         -1 {fastq1} -2 {fastq2} --mm --add-chrname --new-summary --no-spliced-alignment \
                         --un-gz "BAM/{sample}.unpaired.unaligned.bam" --al-gz "BAM/{sample}.unpaired.aligned.bam"\
-                        | samtools view -b - 1> "{outputfolder}/{sample}_HISAT2.bam" 2> "{outputfolder}/{sample}.HISAT2_stats.txt"
+                        | samtools view -b - 1> "{outputfolder}/{sample}.bam" 2> "{outputfolder}/{sample}.HISAT2_stats.txt"
                         """)
                     else:
                         shell(f"""
                         module load samtools && \
                         hisat2 -p {threads} -x {genome_path} \
                         -1 {fastq1} -2 {fastq2} --mm --add-chrname --new-summary --no-spliced-alignment \
-                        | samtools view -b - 1> "{outputfolder}/{sample}_HISAT2.bam" 2> "{outputfolder}/{sample}.HISAT2_stats.txt"
+                        | samtools view -b - 1> "{outputfolder}/{sample}.bam" 2> "{outputfolder}/{sample}.HISAT2_stats.txt"
                         """)
                 else:
                     log_it(logfile, f"Running HISAT2 in Single End mode  on ChIP or ATAC data.")
@@ -113,8 +113,8 @@ rule run_hisat2:
                     module load samtools && \
                     hisat2 -p {threads} -x {genome_path} \
                     -U {fastq1} --mm --add-chrname --new-summary --no-spliced-alignment \
-                    | samtools view -b - 1> "{outputfolder}"/{sample}_HISAT2.bam" 2> "{outputfolder}/{sample}.HISAT2_stats.txt"
+                    | samtools view -b - 1> "{outputfolder}"/{sample}.bam" 2> "{outputfolder}/{sample}.HISAT2_stats.txt"
                     """)
 
         # Call the function with parameters
-        run_hisat2(params.seq_type, threads, params.genome_path, input.trimmed_fastqc1, input.trimmed_fastqc2, params.keepunpaired, params.inputfolder, params.outputfolder, wildcards.sample1)
+        run_hisat2(params.seq_type, threads, params.genome_path, input.trimmed_fastq1, input.trimmed_fastq2, params.keepunpaired, params.inputfolder, params.outputfolder, wildcards.sample1)

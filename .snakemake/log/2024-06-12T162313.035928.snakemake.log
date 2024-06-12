@@ -1,0 +1,24 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-12.config.yaml is extended by additional config specified via the command line.
+Full Traceback (most recent call last):
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/__init__.py", line 643, in snakemake
+    workflow.include(
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/workflow.py", line 1234, in include
+    exec(compile(code, snakefile.get_path_or_uri(), "exec"), self.globals)
+  File "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/Snakefile.smk", line 532, in <module>
+    # routine = master_config[rule_name][config['SELECTED_ROUTINE_'+ rule_name.upper()]]
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/workflow.py", line 1234, in include
+    exec(compile(code, snakefile.get_path_or_uri(), "exec"), self.globals)
+  File "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/rules/merge_lanes_and_clean_names.smk", line 16, in <module>
+    rule merge_bam:
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/workflow.py", line 1411, in decorate
+    rule.set_output(*ruleinfo.output.paths, **ruleinfo.output.kwpaths)
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/rules.py", line 463, in set_output
+    self.register_wildcards(item.get_wildcard_names())
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/rules.py", line 429, in register_wildcards
+    raise SyntaxError(
+SyntaxError: Not all output, log and benchmark files of rule merge_bam contain the same wildcards. This is crucial though, in order to avoid that two or more jobs write to the same file.
+
+SyntaxError:
+Not all output, log and benchmark files of rule merge_bam contain the same wildcards. This is crucial though, in order to avoid that two or more jobs write to the same file.
+  File "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/Snakefile.smk", line 518, in <module>
+  File "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/rules/merge_lanes_and_clean_names.smk", line 16, in <module>

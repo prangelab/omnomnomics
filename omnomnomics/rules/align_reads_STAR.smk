@@ -6,10 +6,12 @@ import subprocess
 import shutil
 rule run_star:
     input:
-        trimmed_fastq1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R1{'_Skewer' if config['THETRIMTOOL'] == 'skewer' else ('_Trimmomatic' if config['THETRIMTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz",
-        trimmed_fastq2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2{'_Skewer' if config['THETRIMTOOL'] == 'skewer' else ('_Trimmomatic' if config['THETRIMTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz" if config['PAIRED'] else None
+        # trimmed_fastq1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R1{'_Skewer' if config['THETRIMTOOL'] == 'skewer' else ('_Trimmomatic' if config['THETRIMTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz",
+        # trimmed_fastq2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2{'_Skewer' if config['THETRIMTOOL'] == 'skewer' else ('_Trimmomatic' if config['THETRIMTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz" if config['PAIRED'] else None
+        trimmed_fastq1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R1.trimmed.fastq.gz" if config["PAIRED"] else f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}.trimmed.fastq.gz",
+        trimmed_fastq2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2.trimmed.fastq.gz" if config['PAIRED'] else None
     output:
-        bam=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}_STAR.bam",
+        bam=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}.bam",
         stats=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}.STAR_stats.txt"
     params:
         genome_path=os.path.join(f"{config['OMNOM_HOME']}", "genomes", "STAR", f"{config['THEGENOME']}"),
@@ -21,6 +23,8 @@ rule run_star:
     resources:
         #mem_mb = Memory_Per_Rule['3']
         mem_mb = 128000
+    benchmark:
+        f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_benchmark.tsv"
     run:
         log_it(logfile, "Mapping reads...", f"EXECUTING STEP {master_config['map_rule_num']}")
         log_it(logfile, f"Input folder: {params.outputfolder}")
@@ -44,12 +48,12 @@ rule run_star:
                     --readFilesIn {fastq1} {fastq2} --readFilesCommand zcat \
                     --outFileNamePrefix "{outputfolder}/{sample}." --outSAMtype BAM Unsorted \
                     --outBAMcompression -1 --genomeLoad NoSharedMemory --twopassMode Basic
-                    """
+                    """, bench_record=bench_record
                 )
             else:
                 log_it(logfile, "Running STAR in Single End mode")
-                MYNAME = os.path.basename(fastq1)
-                log_it(logfile, f"Launching: {MYNAME}...").replace("_R1", '')
+                MYNAME = os.path.basename(fastq1).replace("_R1", '')
+                log_it(logfile, f"Launching: {MYNAME}...")
                 shell(
                     f"""
                     module load STAR && \
@@ -57,16 +61,9 @@ rule run_star:
                     --readFilesIn "{fastq1}" --readFilesCommand zcat \
                     --outFileNamePrefix "{outputfolder}/{sample}." --outSAMtype BAM Unsorted \
                     --outBAMcompression -1 --genomeLoad NoSharedMemory --outSAMstrandField intronMotif --twopassMode Basic\
-                    """
+                    """, bench_record=bench_record
                 )
 
-            def run_command(command):
-                """ Helper function to run a command and check its output """
-                process = subprocess.Popen(command, shell=True, executable='/bin/bash', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                stdout, stderr = process.communicate()
-                if process.returncode != 0:
-                    raise Exception(f"Command failed: {command}\nError: {stderr.decode()}\nOutput: {stdout.decode()}")
-                return stdout.decode()
 
             bam_files = [f for f in os.listdir(f"{outputfolder}") if f.endswith("Aligned.out.bam")]
             print(bam_files)
@@ -100,7 +97,7 @@ rule run_star:
                 # Rename *.Aligned.out.bam files to *_STAR.bam
                 old_path = os.path.join(outputfolder, bam)
                 print(old_path)
-                new_path = os.path.join(outputfolder, bam.replace(".Aligned.out.bam", "_STAR.bam"))
+                new_path = os.path.join(outputfolder, bam.replace(".Aligned.out.bam", ".bam"))
                 print(new_path)
                 os.rename(old_path, new_path)
 
@@ -110,8 +107,8 @@ rule run_star:
                 old_path = os.path.join(outputfolder, log_file)
                 new_path = os.path.join(outputfolder, log_file.replace(".Log.final.out", ".STAR_stats.txt"))
                 os.rename(old_path, new_path)
-            shutil.rmtree(sample + "._STARgenome")
-            shutil.rmtree(sample + "._STARpass1")
+            shutil.rmtree("BAM/" + sample + "._STARgenome")
+            shutil.rmtree("BAM/" + sample + "._STARpass1")
             os.remove(f"BAM/{sample}.Log.out")
             os.remove(f"BAM/{sample}.Log.progress.out")
             os.remove(f"BAM/{sample}.SJ.out.tab")

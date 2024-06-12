@@ -33,13 +33,27 @@ rule create_wiggles:
 
             os.system(f"tar --strip-components=1 -xzf {input_tar_gz_file}")
 
+            
+            #for if above doesnt work
+
+            # if shell(f"ls {input_folder}/*tagDir.tar.gz | wc -l").strip() != "0":
+            #     log_it(logfile, "Unpacking HOMER tagDir tar balls...")
+            #     shell(f"""
+            #         cd {input_folder} &&
+            #         for TAGDIR in *tagDir.tar.gz; do
+            #             tar --strip-components=1 -xzf $TAGDIR &
+            #         done
+            #         wait &&
+            #         cd ..
+            #     """)
+
             tag_dir = f"{inputfolder}/{{sample}}.HOMER_tagDir"
             if thetype == "RNA":
                 log_it(logfile, f"Creating trackhub from {tag_dir}")
                 #log_it(f"makeMultiWigHub.pl {outfolder}/{os.path.basename(i)}.hub {genome} -d {i} -fsize 1e8 -strand -webdir . -url \"https:/www.macrophages.eu/UCSCtracks/\"")
                 shell(f"makeMultiWigHub.pl {outputfolder}/{os.path.basename(tag_dir).replace(".HOMER_tagDir", '')}.hub {genome} -d {tag_dir} -fsize 1e8 -strand -webdir . -url \"https:/www.macrophages.eu/UCSCtracks/\"")
             else:
-                log_it(logfile, f"Creating bigwig from tag_diri}")
+                log_it(logfile, f"Creating bigwig from {tag_dir}")
                 #log_it(f"makeUCSCfile {i} -fsize 1e8 > {outfolder}/{os.path.basename(i)}.bw")
                 shell(f"makeUCSCfile {tag_dir} -fsize 1e8 > {outputfolder}/{os.path.basename(tag_dir).replace(".HOMER_tagDir", '')}.bw")
 

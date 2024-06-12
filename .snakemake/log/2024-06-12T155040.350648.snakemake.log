@@ -1,0 +1,113 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-12.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Full Traceback (most recent call last):
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/__init__.py", line 757, in snakemake
+    success = workflow.execute(
+              ^^^^^^^^^^^^^^^^^
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/workflow.py", line 747, in execute
+    dag.init()
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/dag.py", line 207, in init
+    job = self.update([job], progress=progress, create_inventory=True)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/dag.py", line 919, in update
+    raise exceptions[0]
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/dag.py", line 877, in update
+    self.update_(
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/dag.py", line 1010, in update_
+    raise ex
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/dag.py", line 992, in update_
+    selected_job = self.update(
+                   ^^^^^^^^^^^^
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/dag.py", line 919, in update
+    raise exceptions[0]
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/dag.py", line 877, in update
+    self.update_(
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/dag.py", line 1010, in update_
+    raise ex
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/dag.py", line 992, in update_
+    selected_job = self.update(
+                   ^^^^^^^^^^^^
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/dag.py", line 917, in update
+    raise WorkflowError(*exceptions)
+snakemake.exceptions.WorkflowError: WorkflowError:
+    MissingInputException: Missing input files for rule run_skewer:
+        output: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.trimmed.fastq.gz
+        wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020
+        affected files:
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.fastq.gz
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.fastq.gz
+    MissingInputException: Missing input files for rule run_trimmomatic:
+        output: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.trimmed.fastq.gz
+        wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020
+        affected files:
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.fastq.gz
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.fastq.gz
+WorkflowError:
+    MissingInputException: Missing input files for rule run_skewer:
+        output: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.trimmed.fastq.gz
+        wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020
+        affected files:
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.fastq.gz
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.fastq.gz
+    MissingInputException: Missing input files for rule run_trimmomatic:
+        output: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.trimmed.fastq.gz
+        wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020
+        affected files:
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.fastq.gz
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.fastq.gz
+WorkflowError:
+    MissingInputException: Missing input files for rule run_skewer:
+        output: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.trimmed.fastq.gz
+        wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020
+        affected files:
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.fastq.gz
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.fastq.gz
+    MissingInputException: Missing input files for rule run_trimmomatic:
+        output: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.trimmed.fastq.gz
+        wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020
+        affected files:
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.fastq.gz
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.fastq.gz
+
+WorkflowError:
+WorkflowError:
+    MissingInputException: Missing input files for rule run_skewer:
+        output: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.trimmed.fastq.gz
+        wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020
+        affected files:
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.fastq.gz
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.fastq.gz
+    MissingInputException: Missing input files for rule run_trimmomatic:
+        output: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.trimmed.fastq.gz
+        wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020
+        affected files:
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.fastq.gz
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.fastq.gz
+WorkflowError:
+    MissingInputException: Missing input files for rule run_skewer:
+        output: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.trimmed.fastq.gz
+        wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020
+        affected files:
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.fastq.gz
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.fastq.gz
+    MissingInputException: Missing input files for rule run_trimmomatic:
+        output: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.trimmed.fastq.gz
+        wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020
+        affected files:
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.fastq.gz
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.fastq.gz
+WorkflowError:
+    MissingInputException: Missing input files for rule run_skewer:
+        output: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.trimmed.fastq.gz
+        wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020
+        affected files:
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.fastq.gz
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.fastq.gz
+    MissingInputException: Missing input files for rule run_trimmomatic:
+        output: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.trimmed.fastq.gz
+        wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020
+        affected files:
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R2.fastq.gz
+            FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_R1.fastq.gz
+unlocking
+removed all locks

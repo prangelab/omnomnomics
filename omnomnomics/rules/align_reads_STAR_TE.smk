@@ -5,10 +5,10 @@ import os
 import subprocess
 rule run_star_te:
     input:
-        trimmed_fastq1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R1{'_Skewer' if config['THETRIMTOOL'] == 'skewer' else ('_Trimmomatic' if config['THETRIMTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz",
-        trimmed_fastq2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2{'_Skewer' if config['THETRIMTOOL'] == 'skewer' else ('_Trimmomatic' if config['THETRIMTOOL'] == 'trimmomatic' else '')}.trimmed.fastq.gz" if config['PAIRED'] else None
+        trimmed_fastq1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R1.trimmed.fastq.gz" if config["PAIRED"] else f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}.trimmed.fastq.gz",
+        trimmed_fastq2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2.trimmed.fastq.gz" if config['PAIRED'] else None
     output:
-        bam=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}_STAR_TE.bam",
+        bam=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}.bam",
         stats=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}.STAR_TE_stats.txt"
     params:
         genome_path=os.path.join(f"{config['OMNOM_HOME']}", "genomes", "STAR", f"{config['THEGENOME']}"),
@@ -32,8 +32,8 @@ rule run_star_te:
         def run_star(genome_path, fastq1, fastq2, paired, threads,inputfolder, outputfolder, sample):
             if config['PAIRED']:
                 log_it(logfile, "Running STAR in Paired End mode")
-                MYNAME = os.path.basename(fastq1)
-                log_it(logfile, f"Launching: {MYNAME}...").replace("_R1", '')
+                MYNAME = os.path.basename(fastq1).replace("_R1", '')
+                log_it(logfile, f"Launching: {MYNAME}...")
                 shell(
                     f"""
                     module load STAR && \
@@ -46,8 +46,8 @@ rule run_star_te:
                 )
             else:
                 log_it(logfile, "Running STAR in Single End mode")
-                MYNAME = os.path.basename(fastq1)
-                log_it(logfile, f"Launching: {MYNAME}...").replace("_R1", '')
+                MYNAME = os.path.basename(fastq1).replace("_R1", '')
+                log_it(logfile, f"Launching: {MYNAME}...")
                 shell(
                     f"""
                     module load STAR && \
@@ -77,7 +77,7 @@ rule run_star_te:
 
                 # Rename *.Aligned.out.bam files to *_STAR.bam
                 old_path = os.path.join(outputfolder, bam)
-                new_path = os.path.join(outputfolder, bam.replace("Aligned.out.bam", "_STAR_TE.bam"))
+                new_path = os.path.join(outputfolder, bam.replace("Aligned.out.bam", ".bam"))
                 os.rename(old_path, new_path)
 
             # Rename *.Log.final.out files to *.STAR_stats.txt

@@ -122,7 +122,7 @@ log_it(logfile,"JOB DISPATCHED!", "INITIALIZATION")
 
 
 
-initialize_micromamba(logfile)
+#initialize_micromamba(logfile)
 sanity_check_dir(logfile, os.path.join(experiment_dir, config["INPUT_FOLDER"]), config["INPUT_FILE_TYPE"])
 
 
@@ -390,6 +390,7 @@ samples = [f.replace("_R1", "") for f in samples]
 samples = [f.replace("_R2", "") for f in samples]
 samples = [f.replace("_Skewer", "") for f in samples]
 samples = [f.replace("_Trimmomatic", "") for f in samples]
+samples2 = [re.sub(r'_L00.', '', string) for string in samples]
 print(samples)
 samples = list(set(samples))
 print(samples)
@@ -518,14 +519,13 @@ include: "rules/merge_lanes_and_clean_names.smk"
 
 include: "rules/touchup_bam.smk"
 
-include: "rules/index_bam.smk"
+# include: "rules/index_bam.smk"
 
-include: "rules/bam_stats.smk"
+# include: "rules/bam_stats.smk"
 
 ##--------------------------------------------------------------------------------------------------------------
 # Execute the desired rules
 ##--------------------------------------------------------------------------------------------------------------
-
 print(themode)
 for rule_num in themode:
     # rule_ne = master_config['routines'][rule_num - 1]
@@ -553,12 +553,12 @@ for rule_num in themode:
     if rule_num == 1:
         if config['THETRIMTOOL'] == 'skewer':
             if config['PAIRED']: 
-                all_outputs += expand(f"{output_folder}/{{sample}}_R1_Skewer.trimmed{output_file_type}", sample = samples)
-                all_outputs += expand(f"{output_folder}/{{sample}}_R2_Skewer.trimmed{output_file_type}", sample = samples)
+                all_outputs += expand(f"{output_folder}/{{sample}}_R1.trimmed{output_file_type}", sample = samples)
+                all_outputs += expand(f"{output_folder}/{{sample}}_R2.trimmed{output_file_type}", sample = samples)
         else:
             if config['PAIRED']: 
-                all_outputs += expand(f"{output_folder}/{{sample}}_R1_Trimmomatic.trimmed{output_file_type}", sample = samples)
-                all_outputs += expand(f"{output_folder}/{{sample}}_R2_Trimmomatic.trimmed{output_file_type}", sample = samples)
+                all_outputs += expand(f"{output_folder}/{{sample}}_R1.trimmed{output_file_type}", sample = samples)
+                all_outputs += expand(f"{output_folder}/{{sample}}_R2.trimmed{output_file_type}", sample = samples)
     if rule_num == 2:
         if config['PAIRED']: 
             all_outputs += expand(f"{output_folder}/{{sample}}_R1{output_file_type[0]}", sample = samples)
@@ -571,20 +571,40 @@ for rule_num in themode:
     if rule_num == 3:
         if config['THEMAPTOOL'] == 'star':
             if config['PAIRED']: 
-                all_outputs += expand(f"{output_folder}/{{sample}}_STAR.bam", sample = samples)
+                all_outputs += expand(f"{output_folder}/{{sample}}.bam", sample = samples)
                 all_outputs += expand(f"{output_folder}/{{sample}}.STAR_stats.txt", sample = samples)
         if config['THEMAPTOOL'] == 'hisat2':
             if config['PAIRED']: 
-                all_outputs += expand(f"{output_folder}/{{sample}}_HISAT2.bam", sample = samples)
+                all_outputs += expand(f"{output_folder}/{{sample}}.bam", sample = samples)
                 all_outputs += expand(f"{output_folder}/{{sample}}.HISAT2_stats.txt", sample = samples)
         if config['THEMAPTOOL'] == 'star_te':
             if config['PAIRED']: 
-                all_outputs += expand(f"{output_folder}/{{sample}}_STAR_TE.bam")
+                all_outputs += expand(f"{output_folder}/{{sample}}.bam", sample = samples)
                 all_outputs += expand(f"{output_folder}/{{sample}}.STAR_TE_stats.txt", sample = samples)
+    if rule_num == 4:
+        all_outputs += expand(f"{output_folder}/{{sample}}.bam", sample = samples2)
+        all_outputs += expand(f"{output_folder}/{{sample}}.extra.tmp",  sample = samples2)
+    if rule_num == 5:
+        if config['THETYPE'] != "CHIP":
+            all_outputs += expand(f"{output_folder}/{{sample}}.sorted.dups_marked.filtered.bam", sample = samples2)
+        else: 
+            all_outputs += expand(f"{output_folder}/{{sample}}.filtered.bam", sample = samples2)
+    
     #all_output.append("pipeline_completed.txt")
     print(all_outputs)
     #add output of final rule
-
+if config['THETRIMTOOL'] == "skewer" and config['THEMAPTOOL'] == "star":
+    ruleorder: merge_bam > run_skewer > run_trimmomatic > run_star > run_star_te > run_hisat2
+elif config['THETRIMTOOL'] == "skewer" and config['THEMAPTOOL'] == "star_te":
+    ruleorder: merge_bam > run_skewer > run_trimmomatic > run_star_te > run_star > run_hisat2
+elif config['THETRIMTOOL'] == "skewer" and config['THEMAPTOOL'] == "hisat2":
+    ruleorder: merge_bam > run_skewer > run_trimmomatic > run_hisat2 > run_star_te > run_star
+elif config['THETRIMTOOL'] == "trimmomatic" and config['THEMAPTOOL'] == "star":
+    ruleorder: merge_bam > run_trimmomatic > run_skewer > run_star > run_star_te > run_hisat2
+elif config['THETRIMTOOL'] == "trimmomatic" and config['THEMAPTOOL'] == "star_te":
+    ruleorder: merge_bam > run_trimmomatic > run_skewer > run_star_te > run_star > run_hisat2
+elif config['THETRIMTOOL'] == "trimmomatic" and config['THEMAPTOOL'] == "hisat2":
+    ruleorder: merge_bam > run_trimmomatic > run_skewer > run_hisat2 > run_star_te > run_star
 
 
 
