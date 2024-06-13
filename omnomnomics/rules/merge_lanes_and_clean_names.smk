@@ -6,24 +6,21 @@ import glob
 
 def input_function(wildcards):
     input_folder = master_config['input_folders'][master_config['merge_rule_num']-1]
-    sample = wildcards.sample
-    input_files = []
-
-    for i in range(1,100):
-        if os.path.exists(f"{input_folder}/{sample}_L00{i}.bam"):
-            input_files.append(f"{input_folder}/{sample}_L00{i}.bam")
+    
+    #input_files = [f"{input_folder}/{sample}_L0{i:02}.bam" for i in range(1, 100) if os.path.exists(f"{input_folder}/{sample}_L0{i:02}.bam")]
 
     # Use glob.glob to list all files matching the pattern
-    # input_files = glob.glob(f"{input_folder}/{sample}_L00*.bam")
+    input_files = glob.glob(f"{input_folder}/{wildcards.sample}_L*.bam")
     
     return input_files
 
 rule merge_bam:
     input:
         # bam_files = glob.glob(f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample}}_L00{{num}}.bam")
-        #bam_files = input_function
+        bam_files = input_function
+        #bam_files =  glob.glob(f"{input_folder}/{{sample}}_L00*.bam")
         #bam_files = f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample}}_L004.bam"
-        bam_files = [f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample}}_L0{i:02d}.bam" for i in range(1, 100) if os.path.exists(f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample}}_L00{i:02d}.bam")]
+        #bam_files = [f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample}}_L0{i:02}.bam" for i in range(1, 100) if os.path.exists(f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample}}_L00{i:02}.bam")]
     output:
         f"{master_config['output_folders'][master_config['merge_rule_num']-1]}/{{sample}}.bam",
         f"{master_config['output_folders'][master_config['merge_rule_num']-1]}/{{sample}}.extra.tmp"
@@ -38,8 +35,17 @@ rule merge_bam:
         log_it(logfile, "Merging lanes...", f"EXECUTING STEP {master_config['merge_rule_num']}")
         log_it(logfile, "Input folder: BAM")
         log_it(logfile, "Output folder: BAM")
+        # mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.bam
         print(input.bam_files)
-        merging_version = subprocess.check_output(["samtools", "--version", "|", "head", "-n2"])
+        # input_files = [f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{wildcards.sample}_L0{i:02}.bam" for i in range(1, 100) if os.path.exists(f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{wildcards.sample}_L0{i:02}.bam")]
+
+        # for file in input_files:
+        #     print(file)
+
+        input_files = glob.glob(f"{input_folder}/{wildcards.sample}_L*.bam")
+        print(input_files)
+            
+        merging_version = subprocess.check_output("module load samtools && samtools --version | head -n2", shell=True, executable='/bin/bash')
         log_it(logfile, "\n"+merging_version.decode("utf-8"), "SAMTOOLS VERSION")
         print(merging_version.decode("utf-8"))
         sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['merge_rule_num']-1])
@@ -93,7 +99,9 @@ rule merge_bam:
 
                         # Run samtools merge
                         log_it(logfile, f"Merging {myname} lanes...")
-                        shell(f"samtools merge -@ {threads} -o BAM/{myname}{ext} {' '.join(bam_list)}")
+                        shell(f"""
+                            module load samtools && \
+                            samtools merge -@ {threads} -o BAM/{myname}{ext} {' '.join(bam_list)}""")
                         shell(f"""echo "necessity file for merge bams. can delete this." > BAM/{wildcards.sample}.extra.tmp""")
                     else:
                         # If there is only one lane we don't need to bother with merging and can simply clean the name

@@ -1000,7 +1000,7 @@ def main():
     #cmd = [ "snakemake", "--snakefile", "Snakefile.smk", "--profile", os.path.join(experiment_dir, "snakemake_profiles/slurm_profile"),
             #"--configfile", os.path.join(experiment_dir, f"omnomnomics.run.{run_date}.config"), "--cores", f"{max_cores}"]
     cmd = [ "snakemake",  "--profile", os.path.join(experiment_dir, "snakemake_profiles/slurm_profile"), "--snakefile", "omnomnomics/Snakefile.smk",
-        "--config", "config_file="+os.path.join(experiment_dir, f'omnomnomics.run.{run_date}.config.yaml'), "--jobs", "1000", "--cores", "1280"
+        "--config", "config_file="+os.path.join(experiment_dir, f'omnomnomics.run.{run_date}.config.yaml'), "--jobs", "1000", "--cores", "1280", "--rerun-triggers", "mtime"
     ]
 
     # forced_runners = []

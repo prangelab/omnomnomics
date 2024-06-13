@@ -27,7 +27,7 @@ rule run_star:
         f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_benchmark.tsv"
     run:
         log_it(logfile, "Mapping reads...", f"EXECUTING STEP {master_config['map_rule_num']}")
-        log_it(logfile, f"Input folder: {params.outputfolder}")
+        log_it(logfile, f"Input folder: {params.inputfolder}")
         log_it(logfile, f"Output folder: {params.outputfolder}")
 
         STAR_version = subprocess.check_output("module load STAR && STAR --version", shell=True, executable='/bin/bash')

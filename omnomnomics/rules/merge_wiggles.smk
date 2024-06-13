@@ -6,7 +6,7 @@ import re
 import shutil
 import subprocess
 
-rule merge_wig:
+rule merge_wiggles:
     input:
         theinfolder=lambda wildcards: master_config['input_folders'][master_config['mergewig_rule_num']-1],
         coltable=config["COLTABLE"]

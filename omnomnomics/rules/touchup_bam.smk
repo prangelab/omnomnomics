@@ -21,7 +21,7 @@ rule touchup_bam:
         log_it(logfile, f"Touching up BAM files with samtools (collate | fixmate | sort | markdup | filter)...",f"EXECUTING STEP {master_config['touchup_rule_num']}")
         log_it(logfile, f"Input folder: BAM")
         log_it(logfile, f"Output folder: filtered_BAM")
-        samtools_version = subprocess.check_output(["samtools", "--version", "|", "head", "-n2"])
+        samtools_version = subprocess.check_output("module load samtools && samtools --version | head -n2", shell=True, executable='/bin/bash')
         log_it(logfile, "\n"+samtools_version.decode("utf-8"), "SAMTOOLS VERSION")
         print(samtools_version.decode("utf-8"))
         sanity_check_dir(logfile, params.inputfolder, master_config['input_file_types'][master_config['touchup_rule_num']-1])

@@ -7,14 +7,14 @@ import glob
 
 rule create_wiggles:
     input:
-        input_tar_gz_file=glob.glob(f"{master_config['input_folders'][master_config['wig_rule_num']-1]}/{{sample}}.HOMER_tagDir.tar.gz")
+        input_tar_gz_file= f"{master_config['input_folders'][master_config['wig_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz" if config['THETYPE'] != "CHIP" else f"{master_config['input_folders'][master_config['wig_rule_num']-1]}/{{sample}}.filtered.HOMER_tagDir.tar.gz"
         # input2 = glob.glob(f"{master_config['input_folders'][master_config['wig_rule_num']-1]}/{{sample}}.HOMER_tagDir/*")
     output:
-        f"{master_config['output_folders'][master_config['wig_rule_num']-1]}/{{sample}}.bw"
+        f"{master_config['output_folders'][master_config['wig_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.bw" if config['THETYPE'] != "CHIP" else f"{master_config['output_folders'][master_config['wig_rule_num']-1]}/{{sample}}.filtered.bw"
     params:
-        thetype = config['THETYPE']
-        genome = config['THEGENOME']
-        inputfolder =master_config['input_folders'][master_config['wig_rule_num']-1]
+        thetype = config['THETYPE'],
+        genome = config['THEGENOME'],
+        inputfolder =master_config['input_folders'][master_config['wig_rule_num']-1],
         outputfolder = master_config['output_folders'][master_config['wig_rule_num']-1]
     threads:
         Threads_Per_Rule['9']
@@ -26,56 +26,53 @@ rule create_wiggles:
             log_it(logfile, f"Input folder: HOMER_tagDirs")
             log_it(logfile, f"Output folder: BigWigs")
 
-            version = subprocess.check_output(["perl", os.path.join(OMNOM_HOME, "bin", "homer", "configureHomer.pl"), "-list", "2>", "/dev/null", "|", "grep", "homer"])
-            log_it(logfile, "\n"+version.decode("utf-8"), "VERSION")
-            print(version.decode("utf-8"))
+            # version = subprocess.check_output(["perl", os.path.join(OMNOM_HOME, "bin", "homer", "configureHomer.pl"), "-list", "2>", "/dev/null", "|", "grep", "homer"])
+            # log_it(logfile, "\n"+version.decode("utf-8"), "VERSION")
+            # print(version.decode("utf-8"))
             sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['wig_rule_num']-1])
-
-            os.system(f"tar --strip-components=1 -xzf {input_tar_gz_file}")
-
+            basename = os.path.basename(input_tar_gz_file)
+            tag_dir = os.path.join(inputfolder, basename.replace(".tar.gz", ""))
             
-            #for if above doesnt work
+            # unpack the tar.gz file
+            log_it(logfile, f"Unpacking {basename} into {inputfolder}")
+            shell(f"""
+                cd {inputfolder} && \
+                tar --strip-components=1 -xzf {basename}
+            """)
+            
+            if os.path.exists(tag_dir):
+                print("TARGZ UNPACKED SUCCESSFULLY")
+                log_it(logfile, f"Unpacked {basename} successfully")
+            else:
+                print("DIDN'T UNPACK SUCCESSFULLY")
+                log_it(logfile, f"Failed to unpack {basename}")
+            print(f"TAGDIR IS {tag_dir}")
 
-            # if shell(f"ls {input_folder}/*tagDir.tar.gz | wc -l").strip() != "0":
-            #     log_it(logfile, "Unpacking HOMER tagDir tar balls...")
-            #     shell(f"""
-            #         cd {input_folder} &&
-            #         for TAGDIR in *tagDir.tar.gz; do
-            #             tar --strip-components=1 -xzf $TAGDIR &
-            #         done
-            #         wait &&
-            #         cd ..
-            #     """)
-
-            tag_dir = f"{inputfolder}/{{sample}}.HOMER_tagDir"
             if thetype == "RNA":
                 log_it(logfile, f"Creating trackhub from {tag_dir}")
-                #log_it(f"makeMultiWigHub.pl {outfolder}/{os.path.basename(i)}.hub {genome} -d {i} -fsize 1e8 -strand -webdir . -url \"https:/www.macrophages.eu/UCSCtracks/\"")
-                shell(f"makeMultiWigHub.pl {outputfolder}/{os.path.basename(tag_dir).replace(".HOMER_tagDir", '')}.hub {genome} -d {tag_dir} -fsize 1e8 -strand -webdir . -url \"https:/www.macrophages.eu/UCSCtracks/\"")
+                base_name = os.path.basename(tag_dir).replace(".HOMER_tagDir", '')
+                log_it(logfile, f"makeMultiWigHub.pl {outputfolder}/{base_name}.hub {genome} -d {tag_dir} -fsize 1e8 -strand -webdir . -url \"https:/www.macrophages.eu/UCSCtracks/\"")
+                shell(f"makeMultiWigHub.pl {outputfolder}/{base_name}.hub {genome} -d {tag_dir} -fsize 1e8 -strand -webdir . -url \"https:/www.macrophages.eu/UCSCtracks/\"")
             else:
                 log_it(logfile, f"Creating bigwig from {tag_dir}")
-                #log_it(f"makeUCSCfile {i} -fsize 1e8 > {outfolder}/{os.path.basename(i)}.bw")
-                shell(f"makeUCSCfile {tag_dir} -fsize 1e8 > {outputfolder}/{os.path.basename(tag_dir).replace(".HOMER_tagDir", '')}.bw")
-
-            # Set nullglob to avoid running on the literal wildcard string if no files exist
-            os.system("shopt -s nullglob")
+                basename = os.path.basename(tag_dir).replace(".HOMER_tagDir", '')
+                log_it(logfile, f"makeUCSCfile {tag_dir} -fsize 1e8 > {outputfolder}/{basename}.bw")
+                shell(f"makeUCSCfile {tag_dir} -fsize 1e8 > {outputfolder}/{basename}.bw")
 
             # Fix results by converting bedGraph to bigWig if needed
             for hub_file in glob.glob(os.path.join(outputfolder, "*.hub")):
                 log_it(logfile, f"Fixing trackhub {hub_file}...")
-                #log_it(f"fix_HOMER_trackHub.sh -i {hub_file} -g {genome}")
-                shell(f"fix_HOMER_trackHub.sh -i {hub_file} -g {genome}")
-
+                log_it(logfile, f"fix_HOMER_trackHub.sh -i {hub_file} -g {genome}")
+                path = os.path.join(OMNOM_HOME, "fix_HOMER_trackHub.sh")
+                shell(f"{path} -i {hub_file} -g {genome}")
 
             for bw_file in glob.glob(os.path.join(THEOUTFOLDER, "*.bw")):
                 log_it(logfile, f"Fixing bigwig {bw_file}...")
-                #log_it(f"fix_HOMER_bigwig.sh -i {bw_file} -g {genome}")
-                shell(f"fix_HOMER_bigwig.sh -i {bw_file} -g {genome}")
-
-            # Unset nullglob for safety
-            os.system("shopt -u nullglob")
+                log_it(logfile, f"fix_HOMER_bigwig.sh -i {bw_file} -g {genome}")
+                path = os.path.join(OMNOM_HOME, "fix_HOMER_bigwig.sh")
+                shell(f"{path} -i {bw_file} -g {genome}")
         
-        create_wig(input.input_tar_gz_file, params.inputfolder, params.outfolder, params.thetype, params.genome)
+        create_wig(input.input_tar_gz_file, params.inputfolder, params.outputfolder, params.thetype, params.genome)
 
 
     ##can do it like this if have problem with the nullglob

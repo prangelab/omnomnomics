@@ -40,9 +40,9 @@ stats:
 tagdir:
   - "create_homer_tagDir"
 wig:
-  - "create_wig"
+  - "create_wiggles"
 mergewig:
-  - "merge_wig"
+  - "merge_wiggles"
 callpeaks:
   - "call_peaks"
 countreads:
@@ -118,10 +118,10 @@ input_file_types: ####update this by looking at rules
   - ".trimmed.fastq.gz"
   - ".bam"
   - ".bam"
-  - ".bam"
-  - ".bam"
-  - ".bam"
-  - ".HOMER_tagDir|.HOMER_tagDir.tar.gz"
+  - ".filtered.bam"
+  - ".filtered.bam"
+  - ".filtered.bam"
+  - ".HOMER_tagDir.tar.gz"
   - [".hub", ".bw"]
   - ".bam"
   - ".HOMER_tagDir|.HOMER_tagDir.tar.gz"
@@ -129,7 +129,7 @@ input_file_types: ####update this by looking at rules
 
 ### added output file types
 output_file_types: ####update this by looking at rules
-  - ".fastq.gz"
+  - ".trimmed.fastq.gz"
   - [".trimmed_fastqc.html", ".trimmed_fastqc.zip"]
   - ".bam"
   - ".bam"

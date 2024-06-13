@@ -123,7 +123,7 @@ log_it(logfile,"JOB DISPATCHED!", "INITIALIZATION")
 
 
 #initialize_micromamba(logfile)
-sanity_check_dir(logfile, os.path.join(experiment_dir, config["INPUT_FOLDER"]), config["INPUT_FILE_TYPE"])
+#sanity_check_dir(logfile, os.path.join(experiment_dir, config["INPUT_FOLDER"]), config["INPUT_FILE_TYPE"])
 
 
 
@@ -390,8 +390,10 @@ samples = [f.replace("_R1", "") for f in samples]
 samples = [f.replace("_R2", "") for f in samples]
 samples = [f.replace("_Skewer", "") for f in samples]
 samples = [f.replace("_Trimmomatic", "") for f in samples]
+samples = [f.replace(".sorted.dups_marked", "") for f in samples]
 samples2 = [re.sub(r'_L00.', '', string) for string in samples]
 print(samples)
+
 samples = list(set(samples))
 print(samples)
 
@@ -519,9 +521,13 @@ include: "rules/merge_lanes_and_clean_names.smk"
 
 include: "rules/touchup_bam.smk"
 
-# include: "rules/index_bam.smk"
+include: "rules/index_bam.smk"
 
-# include: "rules/bam_stats.smk"
+include: "rules/bam_stats.smk"
+
+include: "rules/make_HOMER_tagDIR.smk"
+
+include: "rules/create_wiggles.smk"
 
 ##--------------------------------------------------------------------------------------------------------------
 # Execute the desired rules
@@ -553,12 +559,16 @@ for rule_num in themode:
     if rule_num == 1:
         if config['THETRIMTOOL'] == 'skewer':
             if config['PAIRED']: 
-                all_outputs += expand(f"{output_folder}/{{sample}}_R1.trimmed{output_file_type}", sample = samples)
-                all_outputs += expand(f"{output_folder}/{{sample}}_R2.trimmed{output_file_type}", sample = samples)
+                all_outputs += expand(f"{output_folder}/{{sample}}_R1{output_file_type}", sample = samples)
+                all_outputs += expand(f"{output_folder}/{{sample}}_R2{output_file_type}", sample = samples)
+            else: 
+                all_outputs += expand(f"{output_folder}/{{sample}}{output_file_type}", sample = samples)
         else:
             if config['PAIRED']: 
-                all_outputs += expand(f"{output_folder}/{{sample}}_R1.trimmed{output_file_type}", sample = samples)
-                all_outputs += expand(f"{output_folder}/{{sample}}_R2.trimmed{output_file_type}", sample = samples)
+                all_outputs += expand(f"{output_folder}/{{sample}}_R1{output_file_type}", sample = samples)
+                all_outputs += expand(f"{output_folder}/{{sample}}_R2{output_file_type}", sample = samples)
+            else:
+                all_outputs += expand(f"{output_folder}/{{sample}}{output_file_type}", sample = samples)
     if rule_num == 2:
         if config['PAIRED']: 
             all_outputs += expand(f"{output_folder}/{{sample}}_R1{output_file_type[0]}", sample = samples)
@@ -570,15 +580,12 @@ for rule_num in themode:
             all_outputs += expand(f"{output_folder}/{{sample}}{output_file_type[1]}", sample = samples)
     if rule_num == 3:
         if config['THEMAPTOOL'] == 'star':
-            if config['PAIRED']: 
                 all_outputs += expand(f"{output_folder}/{{sample}}.bam", sample = samples)
                 all_outputs += expand(f"{output_folder}/{{sample}}.STAR_stats.txt", sample = samples)
         if config['THEMAPTOOL'] == 'hisat2':
-            if config['PAIRED']: 
                 all_outputs += expand(f"{output_folder}/{{sample}}.bam", sample = samples)
                 all_outputs += expand(f"{output_folder}/{{sample}}.HISAT2_stats.txt", sample = samples)
         if config['THEMAPTOOL'] == 'star_te':
-            if config['PAIRED']: 
                 all_outputs += expand(f"{output_folder}/{{sample}}.bam", sample = samples)
                 all_outputs += expand(f"{output_folder}/{{sample}}.STAR_TE_stats.txt", sample = samples)
     if rule_num == 4:
@@ -589,22 +596,42 @@ for rule_num in themode:
             all_outputs += expand(f"{output_folder}/{{sample}}.sorted.dups_marked.filtered.bam", sample = samples2)
         else: 
             all_outputs += expand(f"{output_folder}/{{sample}}.filtered.bam", sample = samples2)
+    if rule_num == 6:
+        if config['THETYPE'] != "CHIP":
+            all_outputs += expand(f"{output_folder}/{{sample}}.sorted.dups_marked.filtered.bam.bai", sample = samples2)
+        else: 
+            all_outputs += expand(f"{output_folder}/{{sample}}.filtered.bam.bai", sample = samples2)
+    if rule_num == 7:
+        if config['THETYPE'] != "CHIP":
+            all_outputs += expand(f"{output_folder}/{{sample}}.sorted.dups_marked.filtered.bam.stats.txt", sample = samples2)
+        else: 
+            all_outputs += expand(f"{output_folder}/{{sample}}.filtered.bam.stats.txt", sample = samples2)
+    if rule_num == 8:
+        if config['THETYPE'] != "CHIP":
+            all_outputs += expand(f"{output_folder}/{{sample}}.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz", sample = samples2)
+        else:
+            all_outputs += expand(f"{output_folder}/{{sample}}.filtered.HOMER_tagDir.tar.gz", sample = samples2)
+    if rule_num == 9:
+        if config['THETYPE'] != "CHIP":
+            all_outputs += expand(f"{output_folder}/{{sample}}.filtered.sorted.dups_marked.bw", sample = samples2)
+        else:
+            all_outputs += expand(f"{output_folder}/{{sample}}.filtered.bw", sample = samples2)
     
     #all_output.append("pipeline_completed.txt")
     print(all_outputs)
     #add output of final rule
 if config['THETRIMTOOL'] == "skewer" and config['THEMAPTOOL'] == "star":
-    ruleorder: merge_bam > run_skewer > run_trimmomatic > run_star > run_star_te > run_hisat2
+    ruleorder: run_skewer > run_trimmomatic > run_star > run_star_te > run_hisat2 > merge_bam 
 elif config['THETRIMTOOL'] == "skewer" and config['THEMAPTOOL'] == "star_te":
-    ruleorder: merge_bam > run_skewer > run_trimmomatic > run_star_te > run_star > run_hisat2
+    ruleorder: run_skewer > run_trimmomatic > run_star_te > run_star > run_hisat2 > merge_bam 
 elif config['THETRIMTOOL'] == "skewer" and config['THEMAPTOOL'] == "hisat2":
-    ruleorder: merge_bam > run_skewer > run_trimmomatic > run_hisat2 > run_star_te > run_star
+    ruleorder: run_skewer > run_trimmomatic > run_hisat2 > run_star_te > run_star > merge_bam 
 elif config['THETRIMTOOL'] == "trimmomatic" and config['THEMAPTOOL'] == "star":
-    ruleorder: merge_bam > run_trimmomatic > run_skewer > run_star > run_star_te > run_hisat2
+    ruleorder: run_trimmomatic > run_skewer > run_star > run_star_te > run_hisat2 > merge_bam 
 elif config['THETRIMTOOL'] == "trimmomatic" and config['THEMAPTOOL'] == "star_te":
-    ruleorder: merge_bam > run_trimmomatic > run_skewer > run_star_te > run_star > run_hisat2
+    ruleorder: run_trimmomatic > run_skewer > run_star_te > run_star > run_hisat2 > merge_bam 
 elif config['THETRIMTOOL'] == "trimmomatic" and config['THEMAPTOOL'] == "hisat2":
-    ruleorder: merge_bam > run_trimmomatic > run_skewer > run_hisat2 > run_star_te > run_star
+    ruleorder: run_trimmomatic > run_skewer > run_hisat2 > run_star_te > run_star > merge_bam 
 
 
 
@@ -612,25 +639,33 @@ elif config['THETRIMTOOL'] == "trimmomatic" and config['THEMAPTOOL'] == "hisat2"
 rule all:
    input:
        all_outputs
-##################################################### all code after this, it processes before the snakemake rule all actually runs
-##################################################### maybe once i use slurm it doesnt do that
 
 
-
-
-# #Final things:
-# #---------------------------------------------------------------------------------------------------------------
-# # Run multiqc to gather all stats
-# #---------------------------------------------------------------------------------------------------------------
-# if config['NO_MULTIQC'] == "0":
-#     log_it(logfile, "Running multiQC...", "STATS")
-#     subprocess.run(
-#         f"micromamba activate multiqc && "
-#         f"multiqc --filename omnomnomics.run.{RUN_DATE}.multiqc_report.html --dirs --export . && "
-#         f"micromamba deactivate",
-#         shell=True,
-#         check=True
-#     )
+onsuccess:
+    #Final things:
+    #---------------------------------------------------------------------------------------------------------------
+    # Run multiqc to gather all stats
+    #---------------------------------------------------------------------------------------------------------------
+    # if config['NO_MULTIQC'] == 0:
+    #     log_it(logfile, "Running multiQC...", "STATS")
+    #     subprocess.run(
+    #         f"micromamba activate multiqc && "
+    #         f"multiqc --filename omnomnomics.run.{run_date}.multiqc_report.html --dirs --export . && "
+    #         f"micromamba deactivate",
+    #         shell=True,
+    #         check=True
+    #     )
+    # #================================================================================================================
+    if 4 in themode:
+        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['merge_rule_num']-1]}/*.extra.tmp")
+        for file in list_of_extra_files:
+            os.remove(file)
+    # # Log completion
+    log_it(logfile, "All done!" ,"FINAL REMARKS")
+    # #ELAPSED=(time.time() - start_time)/60s
+    # #log_it(logfile, f"Final run time: {ELAPSED:.2f} minutes.")
+    log_it(logfile, "Good luck with your downstream analyses!")
+    #os.remove(os.path.join(experiment_dir, "omnomnomics.run_in_progress"))
 
 
 # #---------------------------------------------------------------------------------------------------------------
@@ -655,11 +690,4 @@ rule all:
 #     log_it(logfile, "Cleanup complete")
 
 
-# #================================================================================================================
-# # Log completion
-# log_it(logfile, "All done!" "FINAL REMARKS")
-# #ELAPSED=(time.time() - start_time)/60s
-# #log_it(logfile, f"Final run time: {ELAPSED:.2f} minutes.")
-# log_it(logfile, "Good luck with your downstream analyses!")
-#os.remove(os.path.join(experiment_dir, "omnomnomics.run_in_progress"))
-
+# https://moodle.france-bioinformatique.fr/pluginfile.php/346/course/section/47/12_tutoriel_smk.pdf

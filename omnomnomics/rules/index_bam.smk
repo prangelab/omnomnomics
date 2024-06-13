@@ -4,9 +4,9 @@
 import os
 rule index_bam:
     input:
-        filtered_BAM=f"{master_config['input_folders'][master_config['index_rule_num']-1]}/{{sample}}.filtered.bam"
+        filtered_BAM= f"{master_config['input_folders'][master_config['index_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.bam" if config['THETYPE'] != "CHIP" else f"{master_config['output_folders'][master_config['index_rule_num']-1]}/{{sample}}.filtered.bam"
     output:
-        f"{master_config['output_folders'][master_config['index_rule_num']-1]}/{{sample}}.filtered.bam.bai"
+        f"{master_config['output_folders'][master_config['index_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.bam.bai" if config['THETYPE'] != "CHIP" else f"{master_config['output_folders'][master_config['index_rule_num']-1]}/{{sample}}.filtered.bam.bai"
     threads:
         Threads_Per_Rule['6']
     params:
@@ -19,6 +19,9 @@ rule index_bam:
         log_it(logfile, f"Input folder: BAM")
         log_it(logfile, f"Output folder: filtered_BAM")
         log_it(logfile, f"Indexing {wildcards.sample}")
+        samtools_version = subprocess.check_output("module load samtools && samtools --version | head -n2", shell=True, executable='/bin/bash')
+        log_it(logfile, "\n"+samtools_version.decode("utf-8"), "SAMTOOLS VERSION")
+        print(samtools_version.decode("utf-8"))
         sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['index_rule_num']-1])
         shell(f"""
             module load samtools && \

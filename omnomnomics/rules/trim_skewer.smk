@@ -7,7 +7,7 @@ import subprocess
 
 rule run_skewer:
     input:
-        fastq1=f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.fastq.gz" if config["PAIRED"] else f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}.fastq.gz",
+        fastq1=f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.fastq.gz",
         fastq2=f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.fastq.gz" if config["PAIRED"] else None
     output:
         trimmed_fastq1=f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.trimmed.fastq.gz" if config["PAIRED"] else f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_Skewer.trimmed.fastq.gz",
@@ -99,7 +99,7 @@ rule run_skewer:
             log_it(logfile, "Renaming trimmed results...")
             for file_path in glob.glob(os.path.join(f"{outputfolder}", '*pair1.fastq.gz')):
                 base_name = os.path.basename(file_path)
-                new_name = os.path.join(f"{outputfolder}", base_name.replace('-trimmed-pair1.fastq.gz', '_R1.trimmed.fastq.gz'))
+                new_name = os.path.join(f"{outputfolder}", base_name.replace('-trimmed-pair1.fastq.gz', '_R1.trimmed.fastq.gz')) ######check what it outputs with unpaired
                 os.rename(file_path, new_name)
 
             # Rename R2 trimmed files
