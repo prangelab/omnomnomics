@@ -564,6 +564,15 @@ def validate_input_files(the_type, config, mode_range_min, experiment_dir):
     input_folder_mod_range_min = input_folders[mode_range_min - 1]
     input_file_type_mod_range_min = input_file_types[mode_range_min - 1]
 
+    if mode_range_min == 10:
+        if the_type == "RNA":
+            input_file_type_mod_range_min = input_file_type_mod_range_min[0]
+        else:
+            input_file_type_mod_range_min = input_file_type_mod_range_min[1]
+    if mode_range_min == 11:
+        input_file_type_mod_range_min = input_file_type_mod_range_min[0]
+        input_folder_mod_range_min = input_folder_mod_range_min[0]
+
 
     if os.path.isdir(f"{experiment_dir}/{input_folder_mod_range_min}"):
         num_files = len(glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}"))

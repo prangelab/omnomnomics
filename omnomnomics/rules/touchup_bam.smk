@@ -1,4 +1,4 @@
-# Rule 3 touchup BAM
+# Rule 5 touchup BAM
 
 ## Omnomnomics Snake Rule  ##
 import os
@@ -7,7 +7,7 @@ rule touchup_bam:
     input:
         bamfile=f"{master_config['input_folders'][master_config['touchup_rule_num']-1]}/{{sample2}}.bam"
     output:
-        filtered_BAM1=f"{master_config['output_folders'][master_config['touchup_rule_num']-1]}/{{sample2}}.sorted.dups_marked.filtered.bam" if config['THETYPE'] != "CHIP" else f"{master_config['output_folders'][master_config['touchup_rule_num']-1]}/{{sample}}.filtered.bam"
+        f"{master_config['output_folders'][master_config['touchup_rule_num']-1]}/{{sample2}}.sorted.dups_marked.filtered.bam" if config['THETYPE'] != "CHIP" else f"{master_config['output_folders'][master_config['touchup_rule_num']-1]}/{{sample}}.filtered.bam"
     params:
         thetype=config['THETYPE'],
         inputfolder = master_config['input_folders'][master_config['touchup_rule_num']-1],

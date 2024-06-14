@@ -1,0 +1,69 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-14.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job                    count    min threads    max threads
+-------------------  -------  -------------  -------------
+all                        1              1              1
+create_homer_tagDir        1              1              1
+create_wiggles             1              1              1
+merge_bam                  1            128            128
+touchup_bam                1            128            128
+total                      5              1            128
+
+Select jobs to execute...
+
+[Fri Jun 14 12:11:14 2024]
+rule merge_bam:
+    input: BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.bam
+    output: BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.bam, BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.extra.tmp
+    jobid: 4
+    reason: Missing output files: BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.bam; Updated input files: BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.bam
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1594, disk_mib=1521, tmpdir=<TBD>
+
+Submitted job 4 with external jobid 'Submitted batch job 5330061'.
+[Fri Jun 14 12:11:24 2024]
+Finished job 4.
+1 of 5 steps (20%) done
+Select jobs to execute...
+
+[Fri Jun 14 12:11:24 2024]
+rule touchup_bam:
+    input: BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.bam
+    output: filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.sorted.dups_marked.filtered.bam
+    jobid: 3
+    reason: Missing output files: filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.sorted.dups_marked.filtered.bam; Input files updated by another job: BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.bam
+    wildcards: sample2=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1594, disk_mib=1521, tmpdir=<TBD>
+
+Submitted job 3 with external jobid 'Submitted batch job 5330062'.
+[Fri Jun 14 12:12:44 2024]
+Finished job 3.
+2 of 5 steps (40%) done
+Select jobs to execute...
+
+[Fri Jun 14 12:12:44 2024]
+rule create_homer_tagDir:
+    input: filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.sorted.dups_marked.filtered.bam
+    output: HOMER_tagDirs/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz
+    jobid: 2
+    reason: Input files updated by another job: filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.sorted.dups_marked.filtered.bam
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020
+    resources: mem_mb=4000, mem_mib=3815, disk_mb=1000, disk_mib=954, tmpdir=<TBD>
+
+Submitted job 2 with external jobid 'Submitted batch job 5330063'.
+[Fri Jun 14 12:12:54 2024]
+Error in rule create_homer_tagDir:
+    jobid: 2
+    input: filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.sorted.dups_marked.filtered.bam
+    output: HOMER_tagDirs/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz
+    cluster_jobid: Submitted batch job 5330063
+
+Error executing rule create_homer_tagDir on cluster (jobid: 2, external: Submitted batch job 5330063, jobscript: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.d4su3tqr/snakejob.create_homer_tagDir.2.sh). For error details see the cluster log and the log files of the involved rule(s).
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+Complete log: ../.snakemake/log/2024-06-14T121111.638856.snakemake.log

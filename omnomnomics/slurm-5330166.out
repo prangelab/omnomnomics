@@ -1,0 +1,74 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-14.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 128
+Rules claiming more threads will be scaled down.
+Provided resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954
+Select jobs to execute...
+
+[Fri Jun 14 16:57:03 2024]
+rule call_peaks:
+    input: filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.sorted.dups_marked.filtered.bam
+    output: peak_calling/extra.tmp
+    jobid: 0
+    reason: Missing output files: peak_calling/extra.tmp
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954, tmpdir=/tmp/kcarroll.5330166
+
+[Fri Jun 14 16:57:03 2024]
+Finished job 0.
+1 of 1 steps (100%) done
+2024-06-14 16:57:02: JOB DISPATCHED!
+2024-06-14 16:57:02: Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+Updated logfile path: omnomnomics.run.2024-06-14.log
+2024-06-14 16:57:02: Job Start time: 1718377022.4848666
+2024-06-14 16:57:02: Experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+2024-06-14 16:57:02: Run date: 2024-06-14
+2024-06-14 16:57:02: Log file: omnomnomics.run.2024-06-14.log
+2024-06-14 16:57:02: Files: 1
+2024-06-14 16:57:02: Pairs: 1
+2024-06-14 16:57:02: Paired run: True
+2024-06-14 16:57:02: Type: RNA
+2024-06-14 16:57:02: Genome: hg38
+2024-06-14 16:57:02: Mode: 11
+2024-06-14 16:57:02: Mode min: 11
+2024-06-14 16:57:02: Mode max: 11
+2024-06-14 16:57:02: Trim tool: skewer
+2024-06-14 16:57:02: Map tool: hisat2
+2024-06-14 16:57:02: Design formula: 1
+2024-06-14 16:57:02: Metadata file: NA
+2024-06-14 16:57:02: Input file (MACS3): NA
+2024-06-14 16:57:02: Input file (HOMER): NA.HOMER_tagDir
+2024-06-14 16:57:02: Broad peaks: NA
+2024-06-14 16:57:02: Peak style: factor
+2024-06-14 16:57:02: HOMER peaksize: 500
+2024-06-14 16:57:02: HOMER minDist: 2000
+2024-06-14 16:57:02: 250000M HEAP init
+2024-06-14 16:57:02: 500000M memory per sample
+2024-06-14 16:57:02: Hub type field: 1
+2024-06-14 16:57:02: Hub name field: 1-3
+2024-06-14 16:57:02: Hub col field: 2
+2024-06-14 16:57:02: Hub separator: _
+2024-06-14 16:57:02: Hub appendix: hub
+2024-06-14 16:57:02: Hub overlay: transparentOverlay
+2024-06-14 16:57:02: Hub coldata folder: ${OMNOM_HOME}/bin/color_data_for_hubs
+2024-06-14 16:57:02: Hub color table: ${OMNOM_HOME}/bin/color_data_for_hubs/gray.tint.color.table
+2024-06-14 16:57:02: Hub mail: m.dewinther@amsterdamumc.nl
+['filtered_BAM', 'HOMER_tagDirs']
+['.bam', '.HOMER_tagDir.tar.gz']
+filtered_BAM/*.bam
+['filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.sorted.dups_marked.filtered.bam']
+['mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020']
+['mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020']
+{'1': 128, '2': 128, '3': 128, '4': 128, '5': 128, '6': 128, '7': 1, '8': 1, '9': 1, '10': 128, '11': 128, '12': 128, '13': 128}
+2024-06-14 16:57:02: Checking snake rule functions...
+2024-06-14 16:57:02: Workflow Snake rules Good!
+[11]
+peak_calling
+.bed
+['peak_calling/extra.tmp']
+2024-06-14 16:57:03: Calling Peaks...
+2024-06-14 16:57:03: Input folders: filtered_BAM and HOMER_tagDirs
+2024-06-14 16:57:03: Output folder: peak_calling
+2024-06-14 16:57:03: Not a ChIP- or ATAC-seq experiment, skipping this step...

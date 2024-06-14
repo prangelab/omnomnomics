@@ -1,0 +1,5 @@
+hub BigWigs/mouse.hub
+shortLabel BigWigs/mouse.hub
+longLabel BigWigs/mouse.hub
+genomesFile genomes.txt
+email kcarroll@ucsd.edu

@@ -379,8 +379,15 @@ input_folder = master_config['input_folders'][THEMODERANGEMIN-1]
 print(input_folder)
 input_file_type =  master_config['input_file_types'][THEMODERANGEMIN-1]
 print(input_file_type)
-
-
+if THEMODERANGEMIN == 10:
+    if config['THETYPE'] == "RNA":
+        input_file_type = input_file_type[0]
+    else:
+        input_file_type = input_file_type[1]
+if THEMODERANGEMIN == 11:
+    input_file_type = input_file_type[0]
+    input_folder = input_folder[0]
+    
 input_pattern = os.path.join(input_folder, f"*{input_file_type}")
 print(input_pattern)
 input_files = glob.glob(input_pattern)
@@ -390,6 +397,7 @@ samples = [f.replace("_R1", "") for f in samples]
 samples = [f.replace("_R2", "") for f in samples]
 samples = [f.replace("_Skewer", "") for f in samples]
 samples = [f.replace("_Trimmomatic", "") for f in samples]
+samples = [f.replace(".filtered", "") for f in samples]
 samples = [f.replace(".sorted.dups_marked", "") for f in samples]
 samples2 = [re.sub(r'_L00.', '', string) for string in samples]
 print(samples)
@@ -529,6 +537,10 @@ include: "rules/make_HOMER_tagDIR.smk"
 
 include: "rules/create_wiggles.smk"
 
+include: "rules/merge_wiggles.smk"
+
+include: "rules/call_peaks.smk"
+
 ##--------------------------------------------------------------------------------------------------------------
 # Execute the desired rules
 ##--------------------------------------------------------------------------------------------------------------
@@ -611,11 +623,17 @@ for rule_num in themode:
             all_outputs += expand(f"{output_folder}/{{sample}}.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz", sample = samples2)
         else:
             all_outputs += expand(f"{output_folder}/{{sample}}.filtered.HOMER_tagDir.tar.gz", sample = samples2)
+    # if rule_num == 9:
+    #     if config['THETYPE'] != "CHIP":
+    #         all_outputs += expand(f"{output_folder}/{{sample}}.sorted.dups_marked.filtered.bw", sample = samples2)
+    #     else:
+    #         all_outputs += expand(f"{output_folder}/{{sample}}.filtered.bw", sample = samples2)
     if rule_num == 9:
-        if config['THETYPE'] != "CHIP":
-            all_outputs += expand(f"{output_folder}/{{sample}}.filtered.sorted.dups_marked.bw", sample = samples2)
-        else:
-            all_outputs += expand(f"{output_folder}/{{sample}}.filtered.bw", sample = samples2)
+        all_outputs += expand(f"{output_folder}/{{sample}}.extra.tmp",  sample = samples2)
+    if rule_num == 10:
+        all_outputs.append( f"{output_folder}/extra.tmp")
+    if rule_num == 11:
+        all_outputs.append( f"{output_folder}/extra.tmp")
     
     #all_output.append("pipeline_completed.txt")
     print(all_outputs)
@@ -656,8 +674,23 @@ onsuccess:
     #         check=True
     #     )
     # #================================================================================================================
+    #---------------------------------------------------------------------------------------------------------------
+    # Clean up tmp files for workflow
+    #---------------------------------------------------------------------------------------------------------------
     if 4 in themode:
         list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['merge_rule_num']-1]}/*.extra.tmp")
+        for file in list_of_extra_files:
+            os.remove(file)
+    if 9 in themode:
+        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['wig_rule_num']-1]}/*.extra.tmp")
+        for file in list_of_extra_files:
+            os.remove(file)
+    if 10 in themode:
+        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['mergewig_rule_num']-1]}/extra.tmp")
+        for file in list_of_extra_files:
+            os.remove(file)
+    if 11 in themode:
+        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/extra.tmp")
         for file in list_of_extra_files:
             os.remove(file)
     # # Log completion

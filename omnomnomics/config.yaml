@@ -93,7 +93,7 @@ input_folders:
   - "filtered_BAM"
   - "HOMER_tagDirs"
   - "BigWigs"
-  - "filtered_BAM"
+  - ["filtered_BAM", "HOMER_tagDirs"]
   - "HOMER_tagDirs"
   - "DE_calling"
 
@@ -123,7 +123,7 @@ input_file_types: ####update this by looking at rules
   - ".filtered.bam"
   - ".HOMER_tagDir.tar.gz"
   - [".hub", ".bw"]
-  - ".bam"
+  - [".bam", ".HOMER_tagDir.tar.gz"]
   - ".HOMER_tagDir|.HOMER_tagDir.tar.gz"
   - ".raw_read_quant.table.txt"
 

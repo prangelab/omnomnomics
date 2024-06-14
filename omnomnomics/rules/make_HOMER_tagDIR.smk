@@ -36,7 +36,7 @@ rule create_homer_tagDir:
         # Function to create HOMER tag directories
         def create_homer_tagDir(filepath, outfolder, genome, thetype):
             basename = os.path.basename(filepath)
-            sample_name = basename.replace('.filtered.bam', '')
+            sample_name = basename.replace('.bam', '')
             tag_dir = os.path.join(outfolder, f"{sample_name}.HOMER_tagDir")
             tar_gz_path = f"{tag_dir}.tar.gz"
 

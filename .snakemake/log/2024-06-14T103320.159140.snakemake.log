@@ -1,0 +1,36 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-14.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job                    count    min threads    max threads
+-------------------  -------  -------------  -------------
+all                        1              1              1
+create_homer_tagDir        1              1              1
+create_wiggles             1              1              1
+merge_bam                  1            128            128
+touchup_bam                1            128            128
+total                      5              1            128
+
+Select jobs to execute...
+
+[Fri Jun 14 10:33:24 2024]
+rule merge_bam:
+    output: BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.filtered.bam, BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.filtered.extra.tmp
+    jobid: 4
+    reason: Missing output files: BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.filtered.bam
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.filtered
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954, tmpdir=<TBD>
+
+Submitted job 4 with external jobid 'Submitted batch job 5330046'.
+[Fri Jun 14 10:33:34 2024]
+Error in rule merge_bam:
+    jobid: 4
+    output: BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.filtered.bam, BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.filtered.extra.tmp
+    cluster_jobid: Submitted batch job 5330046
+
+Error executing rule merge_bam on cluster (jobid: 4, external: Submitted batch job 5330046, jobscript: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.2_moqr55/snakejob.merge_bam.4.sh). For error details see the cluster log and the log files of the involved rule(s).
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+Complete log: ../.snakemake/log/2024-06-14T103320.159140.snakemake.log

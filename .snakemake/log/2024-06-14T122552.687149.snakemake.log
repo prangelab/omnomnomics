@@ -1,0 +1,5 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-14.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+WildcardError in rule create_wiggles in file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/rules/create_wiggles.smk, line 8:
+Wildcards in input files cannot be determined from output files:
+'sample'

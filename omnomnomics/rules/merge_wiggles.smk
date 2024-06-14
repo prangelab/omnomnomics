@@ -6,37 +6,51 @@ import re
 import shutil
 import subprocess
 
+def input_function(wildcards):
+    input_folder = master_config['input_folders'][master_config['mergewig_rule_num']-1]
+    if config['THETYPE'] == "RNA":
+        input_files = glob.glob(f"{input_folder}/*.hub")
+    else:
+        input_files = glob.glob(f"{input_folder}/*.bw")
+    return input_files
+
 rule merge_wiggles:
     input:
-        theinfolder=lambda wildcards: master_config['input_folders'][master_config['mergewig_rule_num']-1],
-        coltable=config["COLTABLE"]
+        #theinfolder=lambda wildcards: master_config['input_folders'][master_config['mergewig_rule_num']-1],
+        #rules.create_wiggles.output
         #use rules."rule_name".output
+        input_function #possibly leave this out? or keep it for readability? and makes sure that there is input, although there is also a sanitycheck
     output:
-        theoutfolder=lambda wildcards: master_config['output_folders'][master_config['mergewig_rule_num']-1]
+        #theoutfolder=lambda wildcards: master_config['output_folders'][master_config['mergewig_rule_num']-1]
         #directory()
+        f"{master_config['output_folders'][master_config['mergewig_rule_num']-1]}/extra.tmp"
+        #Note that this step will also make a THENAME.hub/ directory with files in it, 
+        #but it is hard to know at this point what THENAME will be, so use this as a workaround to perform the step.
     params:
-        thegenome=config['THEGENOME'],
-        theappendix=config['THEAPPENDIX'],
-        thetype= config['THETYPE']
-        theseparator=config['THESEPARATOR'],
-        thecolfield=config['THECOLFIELD'],
-        thenamefields=config['THENAMEFIELDS'],
-        thetypefield=config['THETYPEFIELD'],
-        thehubmail=config['THEHUBMAIL'],
-        theoverlay=config['THEOVERLAY'], 
-        inputfolder = master_config['input_folders'][master_config['mergewig_rule_num']-1],
-        outputfolder = master_config['output_folders'][master_config['mergewig_rule_num']-1]
+        thegenome=lambda wildcards: config['THEGENOME'],
+        coltable=lambda wildcards: config["THECOLTABLE"],
+        theappendix=lambda wildcards: config['THEAPPENDIX'],
+        thetype=lambda wildcards: config['THETYPE'],
+        theseparator=lambda wildcards: config['THESEPARATOR'],
+        thecolfield=lambda wildcards: config['THECOLFIELD'],
+        thenamefields=lambda wildcards: config['NAMEFIELDS'],
+        thetypefield=lambda wildcards: config['THETYPEFIELD'],
+        thehubmail=lambda wildcards: config['THEHUBMAIL'],
+        theoverlay=lambda wildcards: config['THEOVERLAY'],
+        inputfolder=lambda wildcards: master_config['input_folders'][master_config['mergewig_rule_num']-1],
+        outputfolder=lambda wildcards: master_config['output_folders'][master_config['mergewig_rule_num']-1]
     threads:
-        Threads_Per_Rule['10']
+        lambda wildcards: Threads_Per_Rule['10']
     resources:
-        mem_mb = Memory_Per_Rule['10']
+      # mem_mb=lambda wildcards: Memory_Per_Rule['10']
+      mem_mb=lambda wildcards: 128000
     run:
-        logIt(logfile, "Merging Wiggles and TrackHubs...", f"EXECUTING STEP {master_config['mergewig_rule_num']}")
-        logIt(logfile, f"Input folder: {input.theinfolder}")
-        logIt(logfile, f"Output folder: {output.theoutfolder}")
+        log_it(logfile, "Merging Wiggles and TrackHubs...", f"EXECUTING STEP {master_config['mergewig_rule_num']}")
+        log_it(logfile, f"Input folder: {params.inputfolder}")
+        log_it(logfile, f"Output folder: {params.outputfolder}")
 
         def merge_wig(input_folder, output_folder, type_, col_field, separator, type_field, name_fields, col_table, appendix, genome, hub_mail, overlay):
-            log_it(f"Merging Wiggles and TrackHubs...\nInput folder: {input_folder}\nOutput folder: {output_folder}")
+            log_it(logfile, f"Merging Wiggles and TrackHubs...\nInput folder: {input_folder}\nOutput folder: {output_folder}")
 
             if type_ == "RNA":
                 sanity_check_dir(logfile, input_folder,  master_config['input_file_types'][master_config['mergewig_rule_num']-1][0])
@@ -48,10 +62,10 @@ rule merge_wiggles:
                     os.path.basename(hub).split(separator)[type_field - 1] for hub in os.listdir(input_folder) if hub.endswith(".hub")
                 ))
 
-                with open(os.path.join(os.environ["OMNOM_HOME"], "bin/color_data_for_hubs/poscols.hub")) as f:
+                with open(os.path.join(f"/net/beegfs/cfg/projects/dewintherlab/", "bin/color_data_for_hubs/poscols.hub")) as f: ###########change first part to OMNOM_HOME
                     poscols = f.read().splitlines()
 
-                with open(os.path.join(os.environ["OMNOM_HOME"], "bin/color_data_for_hubs/negcols.hub")) as f:
+                with open(os.path.join(f"/net/beegfs/cfg/projects/dewintherlab/", "bin/color_data_for_hubs/negcols.hub")) as f: ##########change first part to OMNOM_HOME
                     negcols = f.read().splitlines()
 
                 for superhub in hubtypes:
@@ -62,11 +76,26 @@ rule merge_wiggles:
                     for hub in hubs:
                         hub_path = os.path.join(input_folder, hub)
                         hub_basename = os.path.basename(hub_path)
-                        name = hub_basename.split(separator)[name_fields - 1]
+                        fields = hub_basename.split(separator)
+
+                        # Function to parse the NAMEFIELDS and return the specified field indices
+                        def parse_namefields(namefields):
+                            indices = []
+                            for part in namefields.split(','):
+                                if '-' in part:
+                                    start, end = map(int, part.split('-'))
+                                    indices.extend(range(start, end + 1))
+                                else:
+                                    indices.append(int(part))
+                            return sorted(set(indices))  # Remove duplicates and sort the indices
+                        field_indices = parse_namefields(name_fields)
+
+                        name = separator.join(fields[i-1] for i in field_indices if i-1 < len(fields))
+
                         htype = hub_basename.split(separator)[type_field - 1]
                         coltype = hub_basename.split(separator)[col_field - 1]
 
-                        log_it(f"Processing {superhub} {name}...")
+                        log_it(logfile, f"Processing {superhub} {name}...")
 
                         poscol = next(poscols[i] for i, ct in enumerate(coltypes) if ct == coltype)
                         negcol = next(negcols[i] for i, ct in enumerate(coltypes) if ct == coltype)
@@ -81,7 +110,7 @@ rule merge_wiggles:
                             shutil.copyfile(os.path.join(hub_path, f"{genome}/trackDb.txt"), os.path.join(genome_folder, "trackDb.txt"))
 
                             subprocess.run(["sed", "-i", f"s|{hub_basename}|{htype}.{appendix}|", os.path.join(merged_hub_folder, "hub.txt")])
-                            subprocess.run(["sed", "-i", f"s|maxHeightPixels [0-9]+:[0-9]+:[0-9]+|maxHeightPixels 64:32:8|;s|{hub_basename}|{htype}.{appendix}|", os.path.join(genome_folder, "trackDb.txt")])
+                            subprocess.run(["sed", "-i", f"s|maxHeightPixels [0-9]\+:[0-9]\+:[0-9]\+|maxHeightPixels 64:32:8|;s|{hub_basename}|{htype}.{appendix}|", os.path.join(genome_folder, "trackDb.txt")])
 
                             # with open(os.path.join(merged_hub_folder, "hub.txt"), "a") as hub_file:
                             #     hub_file.write(f"\ntrack {htype}.{appendix}\ncontainer multiWig\nnoInherit on\nshortLabel {htype}.{appendix}\nlongLabel {htype}.{appendix}\ntype bigWig\nconfigurable on\nvisibility full\naggregate {overlay}\nshowSubtrackColorOnUi on\nautoScale on\nwindowingFunction maximum\nsmoothingWindow 2\npriority 1.4\nyLineMark 0\nyLineOnOff on\nmaxHeightPixels 64:32:8\n")
@@ -91,16 +120,21 @@ rule merge_wiggles:
                             subprocess.run(['sed', '-n', '-e', '/^$/,$p', os.path.join(input_folder, hub, genome, 'trackDb.txt'), '>>', os.path.join(input_folder, htype + '.' + appendix, genome, 'trackDb.txt')])
 
                         subprocess.run(['sed', '-i', f's|{hub_basename}|{htype}.{appendix}|;s|{os.path.splitext(hub_basename)[0]}.HOMER_tagDir+|{name}.{appendix}+|;s|{os.path.splitext(hub_basename)[0]}.HOMER_tagDir-|{name}.{appendix}-|', os.path.join(input_folder, htype + '.' + appendix, genome, 'trackDb.txt')])
-                        subprocess.run(['sed', '-i', '-E', f's|{master_config['homerposcol']}|{master_config['altposcol']}|{poscol}|;s|{master_config['homernegcol']}|{master_config['altnegcol']}|{negcol}|;', os.path.join(input_folder, htype + '.' + appendix, genome, 'trackDb.txt')])
+                        path = os.path.join(input_folder, htype + '.' + appendix, genome, 'trackDb.txt')
+                        homerposcol = master_config['homerposcol']
+                        altposcol = master_config['altposcol']
+                        homernegcol = master_config['homernegcol']
+                        altnegcol = master_config['altnegcol']
+                        subprocess.run(['sed', '-i', '-E', f's|{homerposcol}\|{altposcol}|{poscol}|;s|{homernegcol}\|{altnegcol}|{negcol}|;', f"{path}" ])
                         subprocess.run(['sed', '-i', 's/\"//g', os.path.join(input_folder, htype + '.' + appendix, genome, 'trackDb.txt')])
 
                         shutil.copyfile(os.path.join(hub_path, f"{genome}/{hub_basename.replace('.hub', '.HOMER_tagDirneg.ucsc.bigWig')}"), os.path.join(genome_folder, f"{hub_basename.replace('.hub', '.HOMER_tagDirneg.ucsc.bigWig')}"))
                         shutil.copyfile(os.path.join(hub_path, f"{genome}/{hub_basename.replace('.hub', '.HOMER_tagDirpos.ucsc.bigWig')}"), os.path.join(genome_folder, f"{hub_basename.replace('.hub', '.HOMER_tagDirpos.ucsc.bigWig')}"))
 
                     if input_folder != output_folder:
-                        log_it(f"Moving merged hub {merged_hub_folder} to {output_folder}...")
-                        if os.path.isdir(os.path.join(output_folder, merged_hub_folder)):
-                            shutil.rmtree(os.path.join(output_folder, merged_hub_folder))
+                        log_it(logfile, f"Moving merged hub {htype}.{appendix} to {output_folder}...")
+                        if os.path.isdir(os.path.join(output_folder, f'{htype}.{appendix}')):
+                            shutil.rmtree(os.path.join(output_folder, f'{htype}.{appendix}'))
                         shutil.move(merged_hub_folder, output_folder)
 
             else:
@@ -108,7 +142,7 @@ rule merge_wiggles:
                 thecol = "0,255,0"
                 col_array = []
                 if col_table.endswith(".txt"):
-                    log_it(f"Color table file: {col_table}")
+                    log_it(logfile, f"Color table file: {col_table}")
                     with open(col_table) as f:
                         col_array = f.read().splitlines()
                 else:
@@ -144,7 +178,9 @@ rule merge_wiggles:
                     for bw in [f for f in os.listdir(input_folder) if re.match(re.escape(superhub).replace(re.escape(separator), ".*") + ".*\\.bw$", f)]:
                         bw_path = os.path.join(input_folder, bw)
                         bw_basename = os.path.basename(bw_path)
-                        name = bw_basename.split(separator)[name_fields - 1] ### why -1? in bash code not
+                        fields = bw_basename.split(separator)
+                        field_indices = parse_namefields(name_fields)
+                        name = separator.join(fields[i-1] for i in field_indices if i-1 < len(fields))
                         htype = bw_basename.split(separator)[type_field - 1]
                         coltype = bw_basename.split(separator)[col_field - 1]
 
@@ -155,7 +191,7 @@ rule merge_wiggles:
                                 break
                         thecol  = mycols[i]
 
-                        log_it(f"Processing {name}...")
+                        log_it(logfile, f"Processing {name}...")
 
                         merged_hub_folder = os.path.join(input_folder, f"{htype}.{appendix}")
                         genome_folder = os.path.join(merged_hub_folder, genome)
@@ -181,7 +217,7 @@ rule merge_wiggles:
 
                 # Copy merged hubs to output folder if needed
                 if input_folder != output_folder:
-                    log_it(f"Moving merged hubs from {input_folder} to {output_folder}...")
+                    log_it(logfile, f"Moving merged hubs from {input_folder} to {output_folder}...")
                     for folder in os.listdir(input_folder):
                         folder_path = os.path.join(input_folder, folder)
                         if os.path.isdir(folder_path) and folder.endswith(appendix):
@@ -190,12 +226,13 @@ rule merge_wiggles:
                                 shutil.rmtree(os.path.join(output_folder, folder))
                             shutil.move(folder_path, output_folder)
 
-                log_it("Merge Wiggles and TrackHubs completed!")
+            shell(f"""echo "necessity file for merge wiggle. can delete this." > merged_hubs/extra.tmp""")
+            log_it(logfile, "Merge Wiggles and TrackHubs completed!")
 
         merge_wig(
             input_folder=params.inputfolder, output_folder=params.outputfolder,
-            type_=params.thetype, col_field=params.thecolfield, separator=params.theseparator,
-            type_field=params.thetypefield, name_fields=params.thenamefields,
+            type_=params.thetype, col_field=int(params.thecolfield), separator=params.theseparator,
+            type_field=int(params.thetypefield), name_fields=params.thenamefields,
             col_table=params.coltable, appendix=params.theappendix,
             genome=params.thegenome, hub_mail=params.thehubmail,
             overlay=params.theoverlay

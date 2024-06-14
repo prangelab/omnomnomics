@@ -74,29 +74,32 @@ then
 	exit 3
 fi
 
+FILE_PATH="$MYBW"
+FILE_OUTPUT=$(file "$FILE_PATH")
+
 # Check filetype
-if [ $(file $MYBW | grep -c text) == 0 ]
+if [ $(file $MYBW | grep -c text) != 0 ]
 then
-	echo "Not a bedGraph file! (well, not a text file at least... Is it already a bigwig?)"
-	exit 4
+	# Get a random number to name the temp file
+	MYRND=$RANDOM
+	let "MYRND %= 9999"
+
+	# Clean up the unwanted contigs
+	grep -v 'chrUn\|random\|alt\|GL\|KI' $MYBW > tmp.$MYRND.bg
+
+	# Remove the trackline from the tmp file
+	sed -i '1d' tmp.$MYRND.bg
+
+	# Sort the tmp file
+	sort -k1,1 -k2,2n -k3,3n tmp.$MYRND.bg > tmp.sorted.$MYRND.bg
+
+	# Make bigwig
+	bedGraphToBigWig tmp.sorted.$MYRND.bg $OMNOM_HOME/genomes/$MYGENOME"_chrom_sizes.2_column" $MYBW
+
+	# Clean up
+	rm tmp.$MYRND.bg
+	rm tmp.sorted.$MYRND.bg
+else
+	echo "Already not a bedGraph file! (well, not a text file at least... Is it already a bigwig?)"
+	echo "Assuming we have a working HOMER installation, the file $FILE_PATH is already of type $FILE_OUTPUT. No need to do anything."
 fi
-
-# Get a random number to name the temp file
-MYRND=$RANDOM
-let "MYRND %= 9999"
-
-# Clean up the unwanted contigs
-grep -v 'chrUn\|random\|alt\|GL\|KI' $MYBW > tmp.$MYRND.bg
-
-# Remove the trackline from the tmp file
-sed -i '1d' tmp.$MYRND.bg
-
-# Sort the tmp file
-sort -k1,1 -k2,2n -k3,3n tmp.$MYRND.bg > tmp.sorted.$MYRND.bg
-
-# Make bigwig
-bedGraphToBigWig tmp.sorted.$MYRND.bg $OMNOM_HOME/genomes/$MYGENOME"_chrom_sizes.2_column" $MYBW
-
-# Clean up
-rm tmp.$MYRND.bg
-rm tmp.sorted.$MYRND.bg

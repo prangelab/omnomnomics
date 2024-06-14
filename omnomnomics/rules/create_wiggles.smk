@@ -10,7 +10,8 @@ rule create_wiggles:
         input_tar_gz_file= f"{master_config['input_folders'][master_config['wig_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz" if config['THETYPE'] != "CHIP" else f"{master_config['input_folders'][master_config['wig_rule_num']-1]}/{{sample}}.filtered.HOMER_tagDir.tar.gz"
         # input2 = glob.glob(f"{master_config['input_folders'][master_config['wig_rule_num']-1]}/{{sample}}.HOMER_tagDir/*")
     output:
-        f"{master_config['output_folders'][master_config['wig_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.bw" if config['THETYPE'] != "CHIP" else f"{master_config['output_folders'][master_config['wig_rule_num']-1]}/{{sample}}.filtered.bw"
+        #f"{master_config['output_folders'][master_config['wig_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.bw" if config['THETYPE'] != "CHIP" else f"{master_config['output_folders'][master_config['wig_rule_num']-1]}/{{sample}}.filtered.bw"
+        f"{master_config['output_folders'][master_config['wig_rule_num']-1]}/{{sample}}.extra.tmp"
     params:
         thetype = config['THETYPE'],
         genome = config['THEGENOME'],
@@ -66,11 +67,13 @@ rule create_wiggles:
                 path = os.path.join(OMNOM_HOME, "fix_HOMER_trackHub.sh")
                 shell(f"{path} -i {hub_file} -g {genome}")
 
-            for bw_file in glob.glob(os.path.join(THEOUTFOLDER, "*.bw")):
+            for bw_file in glob.glob(os.path.join(outputfolder, "*.bw")):
                 log_it(logfile, f"Fixing bigwig {bw_file}...")
                 log_it(logfile, f"fix_HOMER_bigwig.sh -i {bw_file} -g {genome}")
                 path = os.path.join(OMNOM_HOME, "fix_HOMER_bigwig.sh")
                 shell(f"{path} -i {bw_file} -g {genome}")
+
+            shell(f"""echo "necessity file for create wiggs. can delete this." > BigWigs/{wildcards.sample}.extra.tmp""")
         
         create_wig(input.input_tar_gz_file, params.inputfolder, params.outputfolder, params.thetype, params.genome)
 
