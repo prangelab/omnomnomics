@@ -39,7 +39,7 @@ rule run_hisat2:
         stats=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample1}}.HISAT2_stats.txt"
         #could add the 2 extra  output files if keepunpaired = 1, but not necesarry because will be made then automatically
     params:
-        genome_path=os.path.join(f"{config['OMNOM_HOME']}", "genomes", "STAR", f"{config['THEGENOME']}"), ##CHANGE TO HISAT2
+        genome_path=os.path.join(f"{config['OMNOM_HOME']}", "genomes", "HISAT2", f"{config['THEGENOME']}"), ##CHANGE TO HISAT2
         keepunpaired=config.get("KEEPUNPAIRED", "0"),
         seq_type=config["THETYPE"],
         inputfolder = master_config['input_folders'][master_config['map_rule_num']-1],
@@ -48,6 +48,8 @@ rule run_hisat2:
         Threads_Per_Rule['3']
     resources:
         mem_mb = Memory_Per_Rule['3']
+    benchmark:
+        f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample1}}_benchmark.tsv"
     run:
         log_it(logfile, "Mapping reads...", f"EXECUTING STEP {master_config['map_rule_num']}")
         log_it(logfile, f"Input folder: {params.inputfolder}")

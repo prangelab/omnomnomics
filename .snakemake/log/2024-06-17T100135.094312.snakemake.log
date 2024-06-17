@@ -1,0 +1,34 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-17.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job            count    min threads    max threads
+-----------  -------  -------------  -------------
+all                1              1              1
+count_reads        1            128            128
+total              2              1            128
+
+Select jobs to execute...
+
+[Mon Jun 17 10:01:37 2024]
+rule count_reads:
+    input: HOMER_tagDirs/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz
+    output: DE_calling/omnomnomics.raw_read_quant.table.txt
+    jobid: 1
+    reason: Forced execution
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954, tmpdir=<TBD>
+
+Submitted job 1 with external jobid 'Submitted batch job 5332748'.
+[Mon Jun 17 10:02:17 2024]
+Error in rule count_reads:
+    jobid: 1
+    input: HOMER_tagDirs/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz
+    output: DE_calling/omnomnomics.raw_read_quant.table.txt
+    cluster_jobid: Submitted batch job 5332748
+
+Error executing rule count_reads on cluster (jobid: 1, external: Submitted batch job 5332748, jobscript: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.8ccatzm5/snakejob.count_reads.1.sh). For error details see the cluster log and the log files of the involved rule(s).
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+Complete log: ../.snakemake/log/2024-06-17T100135.094312.snakemake.log

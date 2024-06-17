@@ -1,0 +1,57 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-17.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job           count    min threads    max threads
+----------  -------  -------------  -------------
+all               1              1              1
+run_hisat2        2            128            128
+total             3              1            128
+
+Select jobs to execute...
+
+[Mon Jun 17 21:21:42 2024]
+rule run_hisat2:
+    input: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed.fastq.gz, trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed.fastq.gz
+    output: BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.bam, BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.HISAT2_stats.txt
+    jobid: 1
+    benchmark: BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_benchmark.tsv
+    reason: Forced execution
+    wildcards: sample1=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=4815, disk_mib=4592, tmpdir=<TBD>
+
+Submitted job 1 with external jobid 'Submitted batch job 5336518'.
+
+[Mon Jun 17 21:21:42 2024]
+rule run_hisat2:
+    input: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R1.trimmed.fastq.gz, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R2.trimmed.fastq.gz
+    output: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.HISAT2_stats.txt
+    jobid: 2
+    benchmark: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_benchmark.tsv
+    reason: Forced execution
+    wildcards: sample1=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=7817, disk_mib=7455, tmpdir=<TBD>
+
+Submitted job 2 with external jobid 'Submitted batch job 5336519'.
+[Mon Jun 17 21:36:54 2024]
+Finished job 1.
+1 of 3 steps (33%) done
+[Mon Jun 17 21:42:05 2024]
+Finished job 2.
+2 of 3 steps (67%) done
+Select jobs to execute...
+
+[Mon Jun 17 21:42:05 2024]
+localrule all:
+    input: BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.bam, BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.HISAT2_stats.txt, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.HISAT2_stats.txt
+    jobid: 0
+    reason: Input files updated by another job: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.HISAT2_stats.txt, BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.bam, BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.HISAT2_stats.txt, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.bam
+    resources: mem_mb=15973, mem_mib=15234, disk_mb=15973, disk_mib=15234, tmpdir=/tmp
+
+[Mon Jun 17 21:42:05 2024]
+Finished job 0.
+3 of 3 steps (100%) done
+Complete log: ../.snakemake/log/2024-06-17T212139.556320.snakemake.log

@@ -7,7 +7,7 @@ rule touchup_bam:
     input:
         bamfile=f"{master_config['input_folders'][master_config['touchup_rule_num']-1]}/{{sample2}}.bam"
     output:
-        f"{master_config['output_folders'][master_config['touchup_rule_num']-1]}/{{sample2}}.sorted.dups_marked.filtered.bam" if config['THETYPE'] != "CHIP" else f"{master_config['output_folders'][master_config['touchup_rule_num']-1]}/{{sample}}.filtered.bam"
+        f"{master_config['output_folders'][master_config['touchup_rule_num']-1]}/{{sample2}}.sorted.dups_marked.filtered.bam" if config['THETYPE'] != "CHIP" else f"{master_config['output_folders'][master_config['touchup_rule_num']-1]}/{{sample2}}.filtered.bam"
     params:
         thetype=config['THETYPE'],
         inputfolder = master_config['input_folders'][master_config['touchup_rule_num']-1],
@@ -16,8 +16,9 @@ rule touchup_bam:
         Threads_Per_Rule['5']
     resources:
         mem_mb = Memory_Per_Rule['5']
+    benchmark:
+        f"{master_config['output_folders'][master_config['touchup_rule_num']-1]}/{{sample2}}_benchmark.tsv"
     run:
-        print("HEREEEE!!!!!!!")
         log_it(logfile, f"Touching up BAM files with samtools (collate | fixmate | sort | markdup | filter)...",f"EXECUTING STEP {master_config['touchup_rule_num']}")
         log_it(logfile, f"Input folder: BAM")
         log_it(logfile, f"Output folder: filtered_BAM")

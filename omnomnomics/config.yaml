@@ -94,7 +94,7 @@ input_folders:
   - "HOMER_tagDirs"
   - "BigWigs"
   - ["filtered_BAM", "HOMER_tagDirs"]
-  - "HOMER_tagDirs"
+  - {"HOMER_tagDirs", "peak_calling"}
   - "DE_calling"
 
 output_folders:
@@ -124,7 +124,7 @@ input_file_types: ####update this by looking at rules
   - ".HOMER_tagDir.tar.gz"
   - [".hub", ".bw"]
   - [".bam", ".HOMER_tagDir.tar.gz"]
-  - ".HOMER_tagDir|.HOMER_tagDir.tar.gz"
+  - [".HOMER_tagDir.tar.gz", ".bed"]
   - ".raw_read_quant.table.txt"
 
 ### added output file types
@@ -137,7 +137,7 @@ output_file_types: ####update this by looking at rules
   - ".sorted.dups_marked.filtered.bam.bai"
   - ".sorted.dups_marked.filtered.bam.stats.txt"
   - ".HOMER_tagDir"
-  - ".bw"
+  - [".bw", ".hub"]
   - ".hub"
   - ".bed"
   - ".raw_read_quant.table.txt"
@@ -178,8 +178,8 @@ maxcores_per_rule_run_step10_13:
   - 1
 
 min_mem_mb:
-  - 32000
-  - 
+  - 32000 
+  -  
   - 32000
   - 
   - 

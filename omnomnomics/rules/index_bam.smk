@@ -14,6 +14,8 @@ rule index_bam:
         outputfolder = master_config['output_folders'][master_config['index_rule_num']-1]       
     resources:
         mem_mb = Memory_Per_Rule['6']
+    benchmark:
+        f"{master_config['output_folders'][master_config['index_rule_num']-1]}/{{sample}}_benchmark.tsv"
     run:
         log_it(logfile, f"Index BAM files...",f"EXECUTING STEP {master_config['index_rule_num']}")
         log_it(logfile, f"Input folder: BAM")

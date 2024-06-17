@@ -31,6 +31,8 @@ rule merge_bam:
         Threads_Per_Rule['4']
     resources:
         mem_mb = Memory_Per_Rule['4']
+    benchmark:
+        f"{master_config['output_folders'][master_config['merge_rule_num']-1]}/{{sample}}_benchmark.tsv"
     run:
         log_it(logfile, "Merging lanes...", f"EXECUTING STEP {master_config['merge_rule_num']}")
         log_it(logfile, "Input folder: BAM")

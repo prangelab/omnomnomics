@@ -19,6 +19,8 @@ rule run_star_te:
         Threads_Per_Rule['3']
     resources:
         mem_mb = Memory_Per_Rule['3']
+    benchmark:
+        f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}_benchmark.tsv"
     run:
         log_it(logfile, "Mapping reads...", f"EXECUTING STEP {master_config['map_rule_num']}")
         log_it(logfile, f"Input folder: {params.inputfolder}")

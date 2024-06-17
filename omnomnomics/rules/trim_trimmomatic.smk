@@ -21,8 +21,9 @@ rule run_trimmomatic:
     threads:
         Threads_Per_Rule['1']
     resources:
-        #mem_mb = 512000
         mem_mb = Memory_Per_Rule['1']
+    benchmark:
+        f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_benchmark.tsv"
     run:
         def run_trimmomatic(trim_tool, trim_heap, trim_mem, seq_type, threads, fastq1, fastq2, inputfolder, outputfolder, sample):
             log_it(logfile, "Trimming Reads...", f"EXECUTING STEP {master_config['trim_rule_num']}")
@@ -32,10 +33,11 @@ rule run_trimmomatic:
             log_it(logfile, f"Trim Heap: {trim_heap}")
             log_it(logfile, f"Trim Mem: {trim_mem}")
 
-            trimmomatic_version = subprocess.check_output(["java ", "-jar ", os.path.join(OMNOM_HOME, "bin", "Trimmomatic-0.39", "trimmomatic-0.39.jar") , "-version"])
-
-            log_it(logfile, "\n"+trimmomatic_version.decode("utf-8"), "trimmomatic VERSION")
-            print(trimmomatic_version.decode("utf-8"))
+            ##uncomment when have right bin
+            # path = os.path.join(OMNOM_HOME, "bin", "Trimmomatic-0.39", "trimmomatic-0.39.jar")
+            # trimmomatic_version = subprocess.check_output(f"module load java && java -jar {path} -version",  shell=True, executable='/bin/bash')
+            # log_it(logfile, "\n"+trimmomatic_version.decode("utf-8"), "trimmomatic VERSION")
+            # print(trimmomatic_version.decode("utf-8"))
             sanity_check_dir(logfile, inputfolder, master_config['input_file_types'][master_config['trim_rule_num']-1])
 
             if seq_type == "ATAC":

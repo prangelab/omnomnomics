@@ -15,6 +15,8 @@ rule bam_stats:
         Threads_Per_Rule['7']
     resources:
         mem_mb = Memory_Per_Rule['7']
+    benchmark:
+        f"{master_config['output_folders'][master_config['stats_rule_num']-1]}/{{sample}}_benchmark.tsv"
     run:
         import sys
         print(sys.executable)

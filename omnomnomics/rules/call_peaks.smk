@@ -9,22 +9,28 @@ import subprocess
 def input_function(wildcards):
     input_folder1 = master_config['input_folders'][master_config['callpeaks_rule_num']-1][0]
     input_folder2 = master_config['input_folders'][master_config['callpeaks_rule_num']-1][1]
+    input_files = []
     if config['THETYPE'] == "CHIP":
-        input_files = glob.glob(f"{input_folder1}/*.bam")
-        input_files2 = glob.glob(f"{input_folder2}/*.tar.gz")
-        for file in input_files2:
-            input_files.append(file)
+        for sample in samples2:
+            input_files.append(f"{input_folder1}/{sample}.filtered.bam")
+            input_files.append(f"{input_folder2}/{sample}.filtered.HOMER_tagDir.tar.gz")
     else:
-        input_files = glob.glob(f"{input_folder1}/*.bam")
+        input_files.append(f"{input_folder1}/{sample}.sorted.dups_marked.filtered.bam")
     return input_files
 
 rule call_peaks:
     input:
         input_function
-        #bam_files = glob.glob(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1]}/*.bam")
-        #filtered_bam = rules.touchup_bam.output,
-        #homer_tagDirs = rules.create_homer_tagDir.output if config['THETYPE'] == "CHIP" else None
-        #output of rule 5 and 8? of runt hij dan altijd rule 5 en 8 ook als ze niet specified zijn en output al aanwezig is? ik denk het niet dus dan prima maar wel even testen.
+       #( expand(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1][0]}/{{sample}}.sorted.dups_marked.filtered.bam", sample = samples2) ) if config['THETYPE'] != "CHIP" else ( expand(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1][0]}/{{sample}}.filtered.bam", sample = samples2) ),
+        #( expand(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1][1]}/{{sample}}.filtered.HOMER_tagDir.tar.gz", sample = samples2) )  if config['THETYPE'] == "CHIP" else ( None )
+        # bam_files = glob.glob(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1]}/*.bam")
+        # if config['THETYPE'] != "CHIP":
+        #     a = expand(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1][0]}/{{sample}}.sorted.dups_marked.filtered.bam", sample=samples2)
+        #     b = expand(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1][1]}/{{sample}}.filtered.HOMER_tagDir.tar.gz", sample=samples2)
+        # else:
+        #     a = expand(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1]}/{{sample}}.filtered.bam", sample=samples2)
+        #     b = None
+
     output:
         # f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/{{THENAME}}.bed", ###, just add a random file for this rule to rule all and create that file here and then delete it in final steps
         # f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/all_groups.merged_peaks.bed" if config['THETYPE'] == 'ATAC' else None,
@@ -49,11 +55,32 @@ rule call_peaks:
     threads:
         lambda wildcards: Threads_Per_Rule['11']
     resources:
-        #mem_mb = lambda wildcards: Memory_Per_Rule['11']
+        mem_mb = lambda wildcards: Memory_Per_Rule['11']
+    benchmark:
+        f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/benchmark.tsv"
     run: 
         log_it(logfile, "Calling Peaks...", f"EXECUTING STEP {master_config['callpeaks_rule_num']}")
         log_it(logfile, f"Input folders: {params.inputfolder1} and {params.inputfolder2}")
         log_it(logfile, f"Output folder: {params.outputfolder}")
+
+        def get_name_from_bam(inputfolder, group, name_fields, separator):
+            pattern = group.replace(separator, ".*")
+            cmd = f'$(echo $(basename $(ls "{inputfolder}" | grep $(echo {group} | sed "s|{separator}|.*|g") - | grep ".bam$" | head -n1)) | cut -f{name_fields} -d {separator})'
+            try:
+                result = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
+                return result
+            except subprocess.CalledProcessError:
+                return None
+
+        def get_name_from_bam(inputfolder, group, name_fields, separator):
+            pattern = group.replace(separator, ".*")
+            cmd = f'$(echo $(basename $(ls "{inputfolder}" | grep $(echo {group} | sed "s|{separator}|.*|g") - | grep ".HOMER_tagDir$" | head -n1)) | cut -f{name_fields} -d {separator})'
+            try:
+                result = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
+                return result
+            except subprocess.CalledProcessError:
+                return None
+    
         def call_peaks(logfile, thetype, inputfolder1, inputfolder2, outputfolder, separator, thetype_field, name_fields, broad, input_sample, homer_input, homer_size, homer_mindist, thestyle):
             if thetype == "RNA":
                 log_it(logfile, "Not a ChIP- or ATAC-seq experiment, skipping this step...")
@@ -136,9 +163,10 @@ rule call_peaks:
                                 macs3 callpeak -t {' '.join(bams)} -c {input_sample} --outdir {outputfolder} -n {the_name}.MACS3.{ext} -{'q' if ext.startswith('q') else 'p'} {'1e-9' if ext.endswith('9') else '1e-6'} --verbose 0""")
                 # Clean up the output
                 for group in chip_groups: 
-                    the_name = os.path.basename(
-                        next(bam for bam in os.listdir(inputfolder1) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.bam$", bam))
-                    ).split(separator)[name_fields - 1] ##### why -1? # Set group name
+                    the_name = get_name_from_bam(inputfolder1, group, name_fields, separator)
+                    # the_name = os.path.basename(
+                    #     next(bam for bam in os.listdir(inputfolder1) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.bam$", bam))
+                    # ).split(separator)[name_fields - 1] ##### why -1? # Set group name
                     # for file in glob.glob(f"{outputfolder}/{the_name}.MACS3*"): #################alternate (possible) translation if code under this somehow doesnt work
                     #     if not re.search(r"(broadPeak|narrowPeak)$", file): 
                     #         os.remove(file) 
@@ -221,9 +249,10 @@ rule call_peaks:
                     elif thestyle == "histone":
                         beds = [f"{bed}/regions.bed" for bed in beds]
                     
-                    the_name = os.path.basename(
-                        next(bed for bed in os.listdir(inputfolder2) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.HOMER_tagDir$", bed))
-                    ).split(separator)[name_fields - 1]
+                    the_name = get_name_from_homer(inputfolder2, group, name_fields, separator)
+                    # the_name = os.path.basename(
+                    #     next(bed for bed in os.listdir(inputfolder2) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.HOMER_tagDir$", bed))
+                    # ).split(separator)[name_fields - 1]
 
                     sorted_bed = f"{outputfolder}/{the_name}.HOMER.merged_peaks.bed"
                     shell(f"cat {' '.join(beds)} | sort -k1,1 -k2,2n -k3,3n | bedtools merge -i - > {sorted_bed}")
@@ -245,9 +274,10 @@ rule call_peaks:
                     log_it(logfile, f"Calling open regions for: {group}...")
                     log_it(logfile, f"Files in group: {', '.join(bams)}")
                     # Set group name
-                    the_name = os.path.basename(
-                        next(bam for bam in os.listdir(inputfolder1) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.bam$", bam))
-                    ).split(separator)[name_fields - 1]
+                    the_name = get_name_from_bam(inputfolder1, group, name_fields, separator)
+                    # the_name = os.path.basename(
+                    #     next(bam for bam in os.listdir(inputfolder1) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.bam$", bam))
+                    # ).split(separator)[name_fields - 1]
 
                     # Call open regions with MACS3 hmmr
                     # Turns out this MACS subroutine is till buggy and not functining prooerply, check back with it later but for now just call as ChIP peaks
@@ -263,9 +293,10 @@ rule call_peaks:
                 log_it(logfile, "Cleaning up MACS3 output (keeping only narrowPeak files)...")
                 for group in atac_groups: ## Clean up the output
                     # Set group name
-                    the_name = os.path.basename(
-                        next(bam for bam in os.listdir(inputfolder1) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.bam$", bam))
-                    ).split(separator)[name_fields - 1]
+                    the_name = get_name_from_bam(inputfolder1, group, name_fields, separator)
+                    # the_name = os.path.basename(
+                    #     next(bam for bam in os.listdir(inputfolder1) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.bam$", bam))
+                    # ).split(separator)[name_fields - 1]
                     # Delete all redundant MACS3 output
                     shell(f"find {outputfolder} -type f -name {the_name}.MACS3* ! -name *narrowPeak -delete")
                 
@@ -304,48 +335,48 @@ rule call_peaks:
         shell(f"""echo "necessity file for callpeaks. can delete this." > peak_calling/extra.tmp""")
 
 
-#### for the 4 occasions of namefields with re
-import os
-import re
+#### for the 4 occasions of namefields with re. can also just copy the command
+# import os
+# import re
 
-def parse_namefields(namefields_str):
-    fields = []
-    for part in namefields_str.split(','):
-        if '-' in part:
-            start, end = map(int, part.split('-'))
-            fields.extend(range(start, end + 1))
-        else:
-            fields.append(int(part))
-    return fields
+# def parse_namefields(namefields_str):
+#     fields = []
+#     for part in namefields_str.split(','):
+#         if '-' in part:
+#             start, end = map(int, part.split('-'))
+#             fields.extend(range(start, end + 1))
+#         else:
+#             fields.append(int(part))
+#     return fields
 
-# Define the variables
-THEINFOLDER = "/data/input"
-THEGROUP = "sample_group"
-THESEPARATOR = "_"
-NAMEFIELDS = "1,2,4-6"
+# # Define the variables
+# THEINFOLDER = "/data/input"
+# THEGROUP = "sample_group"
+# THESEPARATOR = "_"
+# NAMEFIELDS = "1,2,4-6"
 
-# Step 1: List the contents of the input folder
-all_files = os.listdir(THEINFOLDER)
+# # Step 1: List the contents of the input folder
+# all_files = os.listdir(THEINFOLDER)
 
-# Step 2: Filter the list using a regex based on THEGROUP and THESEPARATOR
-group_pattern = re.escape(THEGROUP).replace(re.escape(THESEPARATOR), ".*")
-filtered_files = [f for f in all_files if re.match(group_pattern + r".*", f)]
+# # Step 2: Filter the list using a regex based on THEGROUP and THESEPARATOR
+# group_pattern = re.escape(THEGROUP).replace(re.escape(THESEPARATOR), ".*")
+# filtered_files = [f for f in all_files if re.match(group_pattern + r".*", f)]
 
-# Step 3: Further filter the list to only include .bam files
-bam_files = [f for f in filtered_files if f.endswith(".bam")]
+# # Step 3: Further filter the list to only include .bam files
+# bam_files = [f for f in filtered_files if f.endswith(".bam")]
 
-# Step 4: Select the first match from the filtered list
-if bam_files:
-    first_bam = bam_files[0]
-else:
-    raise FileNotFoundError("No matching BAM files found.")
+# # Step 4: Select the first match from the filtered list
+# if bam_files:
+#     first_bam = bam_files[0]
+# else:
+#     raise FileNotFoundError("No matching BAM files found.")
 
-# Step 5: Extract the basename of the selected file
-basename = os.path.basename(first_bam)
+# # Step 5: Extract the basename of the selected file
+# basename = os.path.basename(first_bam)
 
-# Step 6: Split the basename using THESEPARATOR and select the fields specified by NAMEFIELDS
-fields = basename.split(THESEPARATOR)
-namefields_indices = parse_namefields(NAMEFIELDS)
-THENAME = THESEPARATOR.join(fields[i-1] for i in namefields_indices if i-1 < len(fields))
+# # Step 6: Split the basename using THESEPARATOR and select the fields specified by NAMEFIELDS
+# fields = basename.split(THESEPARATOR)
+# namefields_indices = parse_namefields(NAMEFIELDS)
+# THENAME = THESEPARATOR.join(fields[i-1] for i in namefields_indices if i-1 < len(fields))
 
-print(THENAME)
+# # print(THENAME)

@@ -1,0 +1,35 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-17.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job                count    min threads    max threads
+---------------  -------  -------------  -------------
+all                    1              1              1
+run_trimmomatic        1            128            128
+total                  2              1            128
+
+Select jobs to execute...
+
+[Mon Jun 17 19:59:22 2024]
+rule run_trimmomatic:
+    input: FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R1.fastq.gz, FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R2.fastq.gz
+    output: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R1.trimmed.fastq.gz, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R2.trimmed.fastq.gz
+    jobid: 1
+    reason: Forced execution
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=9655, disk_mib=9208, tmpdir=<TBD>
+
+Submitted job 1 with external jobid 'Submitted batch job 5336435'.
+[Mon Jun 17 19:59:32 2024]
+Error in rule run_trimmomatic:
+    jobid: 1
+    input: FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R1.fastq.gz, FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R2.fastq.gz
+    output: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R1.trimmed.fastq.gz, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R2.trimmed.fastq.gz
+    cluster_jobid: Submitted batch job 5336435
+
+Error executing rule run_trimmomatic on cluster (jobid: 1, external: Submitted batch job 5336435, jobscript: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.8un97n67/snakejob.run_trimmomatic.1.sh). For error details see the cluster log and the log files of the involved rule(s).
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+Complete log: ../.snakemake/log/2024-06-17T195920.131101.snakemake.log

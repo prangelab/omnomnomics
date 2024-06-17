@@ -43,34 +43,36 @@ rule run_fastqc:
         report4=f"{master_config['output_folders'][master_config['qc_rule_num']-1]}/{{sample}}_R2.trimmed_fastqc.zip" if config["PAIRED"] else None
 
     params:
-        inputfolder = master_config['output_folders'][master_config['qc_rule_num']-1],
+        inputfolder = master_config['input_folders'][master_config['qc_rule_num']-1],
         outputfolder = master_config['output_folders'][master_config['qc_rule_num']-1]
     threads:
         Threads_Per_Rule['2']
     resources:
         mem_mb = Memory_Per_Rule['2']
+    benchmark:
+        f"{master_config['output_folders'][master_config['qc_rule_num']-1]}/{{sample}}_benchmark.tsv"
     run:
         def run_fastqc(threads, input, outputfolder):
             log_it(logfile, "Generating FastQC reports...", f"EXECUTING STEP {master_config['qc']}")
             log_it(logfile, "Input folder: trimmed_FASTQ")
             log_it(logfile, "Output folder: fastqc_reports")
 
-            fastqc_version = subprocess.check_output(["fastqc", "--version"])
+            fastqc_version = subprocess.check_output("module load fastqc && fastqc --version", shell=True, executable='/bin/bash')
             log_it(logfile, "\n"+fastqc_version.decode("utf-8"), "FASTQC VERSION")
             print(fastqc_version.decode("utf-8"))
             sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['qc_rule_num']-1])
 
-            if input.trimmed_fastqc2:
+            if config['PAIRED']:
                 log_it(logfile, "Running FastQC in paired end mode...")
                 fastqc_command = f"""
                     module load fastqc && \
-                    fastqc -t {threads} -o {outputfolder} {input.trimmed_fastqc1} {input.trimmed_fastqc2}
+                    fastqc -t {threads} -o {outputfolder} {input.trimmed_fastq1} {input.trimmed_fastq2}
                 """
             else:
                 log_it(logfile, "Running FastQC in single end mode...")
                 fastqc_command = f"""
                     module load fastqc && \
-                    fastqc -t {threads} -o {outputfolder} {input.trimmed_fastqc1}
+                    fastqc -t {threads} -o {outputfolder} {input.trimmed_fastq1}
                 """
 
             # Run the FastQC command

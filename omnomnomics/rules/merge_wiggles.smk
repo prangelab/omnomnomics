@@ -19,7 +19,8 @@ rule merge_wiggles:
         #theinfolder=lambda wildcards: master_config['input_folders'][master_config['mergewig_rule_num']-1],
         #rules.create_wiggles.output
         #use rules."rule_name".output
-        input_function #possibly leave this out? or keep it for readability? and makes sure that there is input, although there is also a sanitycheck
+        input_function, #possibly leave this out? or keep it for readability? and makes sure that there is input, although there is also a sanitycheck
+        expand(f"{master_config['input_folders'][master_config['mergewig_rule_num']-1]}/{{sample}}.extra.tmp", sample = samples2)
     output:
         #theoutfolder=lambda wildcards: master_config['output_folders'][master_config['mergewig_rule_num']-1]
         #directory()
@@ -42,8 +43,10 @@ rule merge_wiggles:
     threads:
         lambda wildcards: Threads_Per_Rule['10']
     resources:
-      # mem_mb=lambda wildcards: Memory_Per_Rule['10']
-      mem_mb=lambda wildcards: 128000
+      mem_mb=lambda wildcards: Memory_Per_Rule['10']
+      #mem_mb=lambda wildcards: 128000
+    benchmark:
+        f"{master_config['output_folders'][master_config['mergewig_rule_num']-1]}/benchmark.tsv"
     run:
         log_it(logfile, "Merging Wiggles and TrackHubs...", f"EXECUTING STEP {master_config['mergewig_rule_num']}")
         log_it(logfile, f"Input folder: {params.inputfolder}")

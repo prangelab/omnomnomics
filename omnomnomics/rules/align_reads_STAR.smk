@@ -24,7 +24,7 @@ rule run_star:
         #mem_mb = Memory_Per_Rule['3']
         mem_mb = 128000
     benchmark:
-        f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_benchmark.tsv"
+        f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}_benchmark.tsv"
     run:
         log_it(logfile, "Mapping reads...", f"EXECUTING STEP {master_config['map_rule_num']}")
         log_it(logfile, f"Input folder: {params.inputfolder}")

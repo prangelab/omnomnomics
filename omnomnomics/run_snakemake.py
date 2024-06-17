@@ -20,30 +20,29 @@ def parse_arguments(): #############add a feauture to make sure it specifies the
 
    # Define command-line options
    parser.add_argument('-i', '--experiment-dir', help='Path to the experiment directory')
-   parser.add_argument('-t', '--type', help='The type')
-   parser.add_argument('-g', '--genome', help='The genome')
-   parser.add_argument('-j', '--mode', help='The mode')
-   parser.add_argument('-T', '--trim-tool', help='The trim tool')
-   parser.add_argument('-M', '--map-tool', help='The map tool')
-   parser.add_argument('-f', '--formula', help='Your formula')
-   parser.add_argument('-I', '--input', help='The input file used for ChIP peak calling')
-   parser.add_argument('-m', '--metadata', help='Your metadata')
-   parser.add_argument('-b', '--broad', action='store_true', help='Enable broad option')
-   parser.add_argument('-S', '--style', help='The style')
-   parser.add_argument('-C', '--col-table', help='The col table')
-   parser.add_argument('-P', '--color-data-folder', help='The color data folder')
-   parser.add_argument('-o', '--overlay', help='The overlay')
-   parser.add_argument('-L', '--hub-mail', help='The hub mail')
-   parser.add_argument('-X', '--no-multiqc', action='store_true', help='Disable multiqc')
-   parser.add_argument('-n', '--name-fields', help='The name fields')
-   parser.add_argument('-e', '--type-field', help='The type field')
-   parser.add_argument('-c', '--col-field', help='The col field')
-   parser.add_argument('-s', '--separator', help='The separator')
-   parser.add_argument('-a', '--appendix', help='The appendix')
-   parser.add_argument('-d', '--homer-mindist', help='The homer mindist')
-   parser.add_argument('-z', '--homer-size', help='The homer size')
-   parser.add_argument('-k', '--keepunpaired', help='Keep Unpaired or not')
-   #parser.add_argument('-C', '--cores', help='The number of cores')
+   parser.add_argument('-t', '--type', help='Type of experiment: RNA, ChIP, ATAC')
+   parser.add_argument('-g', '--genome', help='Genome version. Avaliable versions: \n \t UCSC/RefSeq/NCBI: mm10, mm39, hg38. \n" "\t ENSMBL/GenBank: GRCh38.p14, GRCm39')
+   parser.add_argument('-j', '--mode', help='Job mode. Can be auto, all or a range of jobs. See readme for some examples. \n \t Default: auto')
+   parser.add_argument('-T', '--trim-tool', help='Trimming tool choice. can be Skewer or Trimmomatic \n \t Default: Skewer')
+   parser.add_argument('-M', '--map-tool', help='Mapping tool choice. Can be HISAT2, STAR, or STAR_TE. STAR(_TE) can only be used for RNA-seq data. \n \t Default: HISAT2')
+   parser.add_argument('-f', '--formula', help='RNA: Experimental Design for DE calling. \n \t Default: 1 (just an intercept)')
+   parser.add_argument('-I', '--input', help='Input file used for ChIP peak calling. Has to be a .bam file or HOMER tag directory. \n \t Default: do not use input')
+   parser.add_argument('-m', '--metadata', help='.txt file with columns of metadata for RNA-seq experiments. \n \t Default: DESeq2 style metadata table describing all samples. Rownames should be samplenames')
+   parser.add_argument('-b', '--broad', action='store_true', help='ChIP: Peak calling style. If set, use MACS3 in --broad mode, and use HOMER findPeaks with -size, -minDist and -region settings. Works best with STYLE histone.')
+   parser.add_argument('-S', '--style', help='ChIP: Peak calling style for HOMER peak calling. Can be factor or histone. \n \t Default: factor')
+   parser.add_argument('-C', '--col-table', help='File specifying which colors to use for the tracks. \n \t Default: gray.tint.color.table. Can be a *txt list file with one color table per line. Different color tables will be used per hub as split by -e. Can be a full (relative) path to a file or a file basename only in conjuction with -P. Use createTrackColorTable.sh to roll your own. Use displayTrackColorTable.sh to visualize existing color tables.')
+   parser.add_argument('-P', '--color-data-folder', help='Path to a folder with color tables. \n \t Default: dewintherlab/bin/color_data_for_hubs') ##################change this default??
+   parser.add_argument('-o', '--overlay', help='Overlay type (transparentOverlay|stacked|solidOverlay|none) \n \t Default: transparentOverlay')
+   parser.add_argument('-L', '--hub-mail', help='Email to use in trackhub \n \t Default: m.dewinther@amsterdamumc.nl')
+   parser.add_argument('-X', '--no-multiqc', action='store_true', help='Exclude multiQC stats aggregator. Set if you don not wish to run multiQC.')
+   parser.add_argument('-n', '--name-fields', help='Field(s) in filename to use as track name, peak file name, and column header in the count table \n \t Default: 1-3')
+   parser.add_argument('-e', '--type-field', help='Field(s) in filename to use as merged hub or peak calling group identifier \n \t Default: 1 (Creates separate merged hubs for each unique entry)')
+   parser.add_argument('-c', '--col-field', help='Field(s) in filename to use as color type \n \t Default: 2')
+   parser.add_argument('-s', '--separator', help='Separator used in file names. \n \t Default: _')
+   parser.add_argument('-a', '--appendix', help='Appendix to add to track name \n \t Default: hub')
+   parser.add_argument('-d', '--homer-mindist', help='Minimum distance bewteen peaks. Used for merging regions in HOMER broad peak calling mode. \n \t Default: 2000')
+   parser.add_argument('-z', '--homer-size', help='Minimum peak size. Used for defining peaks in HOMER broad peak calling mode. \n \t Default: 500')
+   parser.add_argument('-k', '--keepunpaired', help='Keep unpaired or not in HISAT2')
 
 
    args, unknown = parser.parse_known_args()
@@ -53,11 +52,10 @@ def parse_arguments(): #############add a feauture to make sure it specifies the
 
 
    # Check if at least one argument is provided besides the script name
-   if len(sys.argv) < 2: #### change to 2 to force to have another argument besides script? is this necesarry? you already check if 3 required arguments are given so this is redundant then.
+   if len(sys.argv) < 2: 
        print("Not enough input arguments...")
        parser.print_help()
        sys.exit(1)
-
 
    return args
 
@@ -326,207 +324,205 @@ def expand_range(mode):
    return range_list
 
 
-
-
 def set_job_mode(args, config, experiment_dir, mode):
-   """Set job mode."""
-   print("Setup job mode...")
-   experiment_dir = args.experiment_dir
-   max_step = config['max_step']
+    """Set job mode."""
+    print("Setup job mode...")
+    max_step = config['max_step']
 
 
-   next_step = None
-   final_step = None
+    next_step = None
+    final_step = None
 
 
-   if mode == "auto":
-       print("Job mode is 'auto'")
-       print("Checking for aborted runs...")
-       semaphore_file = os.path.join(experiment_dir, "omnomnomics.semaphore")
-       if os.path.isfile(semaphore_file):
-           print("Aborted run found!")
-           ## Sanity check the semaphore file
-           # Check if number of lines is within range of job types
-           with open(semaphore_file, 'r') as f:
-               semaphore_lines = f.readlines()
-           sem_len = len(semaphore_lines)
-           print(f"Testing number of steps in semaphore file: {sem_len}")
-           if not (1 <= sem_len <= max_step):
-               print("Malformed semaphore file! (too many lines)")
-               print(f"{semaphore_file}")
-               # Set the malformed semaphore file flag
-               mal_sem = True
-           else:
-               mal_sem = False
-               print("Testing job ranges in semaphore file...")
-               for line in semaphore_lines:
-                   line = line.strip()
-                   print(f"Testing job range for line: {line}")
-                   # Check if this line is within range of job types
-                   if not (1 <= int(line) <= max_step):
-                       print("Malformed line found in aborted run log!")
-                       print(f"{semaphore_file}")
-                       # Set the malformed semaphore file flag
-                       mal_sem = True
-                       break
-           # Check if we have pre-flight aborted run
-           if sem_len == 1:
-               print("The aborted run log shows this run has never actually started, therefore we cannot resume this run!")
-               mal_sem = True
-           # Check if final step doesn't overflow the workflow
-           elif int(semaphore_lines[-1].strip()) >= max_step:
-               print("Final recorded step in aborted run log implies a finished run, so we cannot resume this run!")
-               mal_sem = True
+    if mode == "auto":
+        # print("Job mode is 'auto'")
+        # print("Checking for aborted runs...")
+        # semaphore_file = os.path.join(experiment_dir, "omnomnomics.semaphore")
+        # if os.path.isfile(semaphore_file):
+        #     print("Aborted run found!")
+        #     ## Sanity check the semaphore file
+        #     # Check if number of lines is within range of job types
+        #     with open(semaphore_file, 'r') as f:
+        #         semaphore_lines = f.readlines()
+        #     sem_len = len(semaphore_lines)
+        #     print(f"Testing number of steps in semaphore file: {sem_len}")
+        #     if not (1 <= sem_len <= max_step):
+        #         print("Malformed semaphore file! (too many lines)")
+        #         print(f"{semaphore_file}")
+        #         # Set the malformed semaphore file flag
+        #         mal_sem = True
+        #     else:
+        #         mal_sem = False
+        #         print("Testing job ranges in semaphore file...")
+        #         for line in semaphore_lines:
+        #             line = line.strip()
+        #             print(f"Testing job range for line: {line}")
+        #             # Check if this line is within range of job types
+        #             if not (1 <= int(line) <= max_step):
+        #                 print("Malformed line found in aborted run log!")
+        #                 print(f"{semaphore_file}")
+        #                 # Set the malformed semaphore file flag
+        #                 mal_sem = True
+        #                 break
+        #     # Check if we have pre-flight aborted run
+        #     if sem_len == 1:
+        #         print("The aborted run log shows this run has never actually started, therefore we cannot resume this run!")
+        #         mal_sem = True
+        #     # Check if final step doesn't overflow the workflow
+        #     elif int(semaphore_lines[-1].strip()) >= max_step:
+        #         print("Final recorded step in aborted run log implies a finished run, so we cannot resume this run!")
+        #         mal_sem = True
 
 
-           # Check the malformed semaphore file flag and act accordingly
-           if mal_sem:
-               # Ask the user what to do
-               fresh = input("The old semaphore file is malformed. Start a fresh run with mode 'all' instead? (Y/n): ").strip()
-               # If user selected 'n', drop everything and die
-               if fresh.lower() == 'n':
-                   print("Exiting...")
-                   sys.exit(1)
-               # Else, user has selected 'Y', so set mode to 'all' and continue.
-               print("Starting a fresh run.")
-               print("Setting mode to 'all'...")
-               mode = "all"
+        #     # Check the malformed semaphore file flag and act accordingly
+        #     if mal_sem:
+        #         # Ask the user what to do
+        #         fresh = input("The old semaphore file is malformed. Start a fresh run with mode 'all' instead? (Y/n): ").strip()
+        #         # If user selected 'n', drop everything and die
+        #         if fresh.lower() == 'n':
+        #             print("Exiting...")
+        #             sys.exit(1)
+        #         # Else, user has selected 'Y', so set mode to 'all' and continue.
+        #         print("Starting a fresh run.")
+        #         print("Setting mode to 'all'...")
+        #         mode = "all"
 
 
-           # Semaphore file is ok: continue using it  
-           else:
-               # Check were we left off
-               final_step = int(semaphore_lines[0].strip())
-               last_step = int(semaphore_lines[-1].strip())
-               # Resume from the next step
-               next_step = last_step + 1
-               print(f"Resuming run from step: {next_step}")
-               print(f"Previously set end point: {final_step}")
+        #     # Semaphore file is ok: continue using it  
+        #     else:
+        #         # Check were we left off
+        #         final_step = int(semaphore_lines[0].strip())
+        #         last_step = int(semaphore_lines[-1].strip())
+        #         # Resume from the next step
+        #         next_step = last_step + 1
+        #         print(f"Resuming run from step: {next_step}")
+        #         print(f"Previously set end point: {final_step}")
 
 
-               ## If requested, use the parameters used in an existing run config file
-               print("attempting to parse previous run config file so we can use the same settings...")
+        #         ## If requested, use the parameters used in an existing run config file
+        #         print("attempting to parse previous run config file so we can use the same settings...")
 
 
-               # Check how many (if any) existing config files there are
-               config_files = [f for f in os.listdir(experiment_dir) if f.startswith("omnomnomics.run.") and f.endswith(".config")]
-               # If there are none, report that we are using newly supplied settings
-               if len(config_files) == 0:
-                   print("Previous run config file not found!")
-                   print("Starting run with parameters currently specified on the command line!")
-               else:
-                   # If there are more than one, let the user pick one
-                   if len(config_files) > 1:
-                       print("Multiple run config files found!")
-                       print("Please select one or abort:")
-                       ### ?lines 687-690 in github
-                       #Add abort option
-                       config_files.append("Abort")
-                       for i, f in enumerate(config_files, 1): #list all the options
-                           print(f"{i}. {f}")
-                       choice = int(input("Select a run config file (enter the index number): ").strip())
-                       if choice == len(config_files): #if abort was chosen, abort
-                           print("Aborting...")
-                           sys.exit(1)
-                       #Get the chosen config file
-                       the_run_conf = os.path.join(experiment_dir, config_files[choice - 1])
-                   else:
-                       #Get the only config file
-                       the_run_conf = os.path.join(experiment_dir, config_files[0])
-                   #Check the currently used config file
-                   if not os.path.isfile(the_run_conf):
-                       print("Previous run config file not found!")
-                       print("Starting run with parameters currently specified on the command line!")
-                   else:
-                       with open(the_run_conf, 'r') as f:
-                           #Check if config file contains proper header
-                           if "## Run configuration for omnomnomics run" not in f.readline():
-                               print("Run config file malformed!")
-                               print("Starting run with parameters currently specified on the command line!")
-                               os.rename(the_run_conf, f"{the_run_conf}.malformed")
-                           else:
-                           #correct header!
-                               reuse = input("Previous run config found. Do you wish to use it for the current run? (Y/n): ").strip()
-                               if reuse.lower() == 'y':
-                                   #load the config
-                                   with open(the_run_conf, 'r') as conf_file:
-                                       old_config = yaml.safe_load(conf_file)
-                                       #update the config
-                                       config.update(old_config)
-                                   print("Previous config restored!")
-                                   os.remove(the_run_conf) ####remove redundant config files
-                               else:
-                                   print("Using settings as currently supplied on the command line!")
-               mode = f"{next_step}-{final_step}"
-               print(f"Job mode set to: {mode}")
-       else:
-            print("No aborted run found. Starting a fresh run. Setting mode to 'all'...")
-            mode = "all"
+        #         # Check how many (if any) existing config files there are
+        #         config_files = [f for f in os.listdir(experiment_dir) if f.startswith("omnomnomics.run.") and f.endswith(".config")]
+        #         # If there are none, report that we are using newly supplied settings
+        #         if len(config_files) == 0:
+        #             print("Previous run config file not found!")
+        #             print("Starting run with parameters currently specified on the command line!")
+        #         else:
+        #             # If there are more than one, let the user pick one
+        #             if len(config_files) > 1:
+        #                 print("Multiple run config files found!")
+        #                 print("Please select one or abort:")
+        #                 ### ?lines 687-690 in github
+        #                 #Add abort option
+        #                 config_files.append("Abort")
+        #                 for i, f in enumerate(config_files, 1): #list all the options
+        #                     print(f"{i}. {f}")
+        #                 choice = int(input("Select a run config file (enter the index number): ").strip())
+        #                 if choice == len(config_files): #if abort was chosen, abort
+        #                     print("Aborting...")
+        #                     sys.exit(1)
+        #                 #Get the chosen config file
+        #                 the_run_conf = os.path.join(experiment_dir, config_files[choice - 1])
+        #             else:
+        #                 #Get the only config file
+        #                 the_run_conf = os.path.join(experiment_dir, config_files[0])
+        #             #Check the currently used config file
+        #             if not os.path.isfile(the_run_conf):
+        #                 print("Previous run config file not found!")
+        #                 print("Starting run with parameters currently specified on the command line!")
+        #             else:
+        #                 with open(the_run_conf, 'r') as f:
+        #                     #Check if config file contains proper header
+        #                     if "## Run configuration for omnomnomics run" not in f.readline():
+        #                         print("Run config file malformed!")
+        #                         print("Starting run with parameters currently specified on the command line!")
+        #                         os.rename(the_run_conf, f"{the_run_conf}.malformed")
+        #                     else:
+        #                     #correct header!
+        #                         reuse = input("Previous run config found. Do you wish to use it for the current run? (Y/n): ").strip()
+        #                         if reuse.lower() == 'y':
+        #                             #load the config
+        #                             with open(the_run_conf, 'r') as conf_file:
+        #                                 old_config = yaml.safe_load(conf_file)
+        #                                 #update the config
+        #                                 config.update(old_config)
+        #                             print("Previous config restored!")
+        #                             os.remove(the_run_conf) ####remove redundant config files
+        #                         else:
+        #                             print("Using settings as currently supplied on the command line!")
+        #         mode = f"{next_step}-{final_step}"
+        #         print(f"Job mode set to: {mode}")
+        # else:
+        #     print("No aborted run found. Starting a fresh run. Setting mode to 'all'...")
+        mode = "all"
 
-   if mode == "all":
-   # If we are running the whole pipeline, set the maximum range
-       mode_range_min = 1
-       mode_range_max = max_step
-       mode = f"1-{max_step}"
-       mode_steps = list(range(1, max_step + 1))
-   else:
-   # Handle different job mode patterns (single step, single range, complex patterns)
-       #single step pattern
-       if re.match(r'^[0-9]+$', mode):
-           mode_range_min = int(mode)
-           mode_range_max = int(mode)
-          
-           # Check if it's a valid range
-           if mode_range_min < 1 or mode_range_max > max_step:
-               print(f"Job mode range should lie between 1 and {max_step}! See help (-h) for job type usage info. Aborting...")
-               sys.exit(1)
-          
-           mode_steps = [mode_range_min]
-      
-       #single range pattern
-       elif re.match(r'^[0-9]+-[0-9]+$', mode):
-           mode_range_min, mode_range_max = map(int, mode.split('-'))
-          
-           # Check if it's a valid range
-           if mode_range_min > mode_range_max:
-               print("Job mode range has to increase from start to end! Aborting...")
-               sys.exit(1)
-          
-           if mode_range_min < 1 or mode_range_max > max_step:
-               print(f"Job mode range should lie between 1 and {max_step}! See help (-h) for job type usage info. Aborting...")
-               sys.exit(1)
-          
-           mode_steps = list(range(mode_range_min, mode_range_max + 1))
-      
-       #complex pattern
-       else:
-           # Expand the range for complex patterns
-           mode_steps = expand_range(mode)
-          
-           # Check if it's valid (i.e., only numbers separated by commas). If not, exit!
-           if not all(isinstance(step, int) for step in mode_steps):
-               print("Job mode should be 'all', 'auto', a single step number, a numeric range of steps separated by a dash (e.g., 1-12), or a number of ranges and steps separated by commas (e.g., 1-3,6,8,10-12,14).")
-               print("Aborting...")
-               sys.exit(1)
-          
-           mode_range_min = mode_steps[0]
-           mode_range_max = mode_steps[-1]
-          
-           # Check if it's a valid range
-           if mode_range_min < 1 or mode_range_max > max_step:
-               print(f"Job mode range should lie between 1 and {max_step}! See help (-h) for job type usage info. Aborting...")
-               sys.exit(1)
-          
-           # Check if the job mode range increases from start to end
-           if any(mode_steps[i] >= mode_steps[i+1] for i in range(len(mode_steps) - 1)):
-               print("Job mode range has to increase from start to end! Aborting...")
-               sys.exit(1)
-   # Initialise semaphore file with the desired end step to keep track of progress
-   semaphore_path = os.path.join(experiment_dir, "omnomnomics.semaphore")
-   with open(semaphore_path, 'w') as sem_file:
-       sem_file.write(f"{max(mode_steps)}\n")
+    if mode == "all":
+    # If we are running the whole pipeline, set the maximum range
+        mode_range_min = 1
+        mode_range_max = max_step
+        mode = f"1-{max_step}"
+        mode_steps = list(range(1, max_step + 1))
+    else:
+    # Handle different job mode patterns (single step, single range, complex patterns)
+        #single step pattern
+        if re.match(r'^[0-9]+$', mode):
+            mode_range_min = int(mode)
+            mode_range_max = int(mode)
+            
+            # Check if it's a valid range
+            if mode_range_min < 1 or mode_range_max > max_step:
+                print(f"Job mode range should lie between 1 and {max_step}! See help (-h) for job type usage info. Aborting...")
+                sys.exit(1)
+            
+            mode_steps = [mode_range_min]
         
-   return mode_steps, config
+        #single range pattern
+        elif re.match(r'^[0-9]+-[0-9]+$', mode):
+            mode_range_min, mode_range_max = map(int, mode.split('-'))
+            
+            # Check if it's a valid range
+            if mode_range_min > mode_range_max:
+                print("Job mode range has to increase from start to end! Aborting...")
+                sys.exit(1)
+            
+            if mode_range_min < 1 or mode_range_max > max_step:
+                print(f"Job mode range should lie between 1 and {max_step}! See help (-h) for job type usage info. Aborting...")
+                sys.exit(1)
+            
+            mode_steps = list(range(mode_range_min, mode_range_max + 1))
+        
+        #complex pattern
+        else:
+            # Expand the range for complex patterns
+            mode_steps = expand_range(mode)
+            
+            # Check if it's valid (i.e., only numbers separated by commas). If not, exit!
+            if not all(isinstance(step, int) for step in mode_steps):
+                print("Job mode should be 'all', 'auto', a single step number, a numeric range of steps separated by a dash (e.g., 1-12), or a number of ranges and steps separated by commas (e.g., 1-3,6,8,10-12,14).")
+                print("Aborting...")
+                sys.exit(1)
+            
+            mode_range_min = mode_steps[0]
+            mode_range_max = mode_steps[-1]
+            
+            # Check if it's a valid range
+            if mode_range_min < 1 or mode_range_max > max_step:
+                print(f"Job mode range should lie between 1 and {max_step}! See help (-h) for job type usage info. Aborting...")
+                sys.exit(1)
+            
+            # Check if the job mode range increases from start to end
+            if any(mode_steps[i] >= mode_steps[i+1] for i in range(len(mode_steps) - 1)):
+                print("Job mode range has to increase from start to end! Aborting...")
+                sys.exit(1)
+
+    # Initialise semaphore file with the desired end step to keep track of progress
+    # semaphore_path = os.path.join(experiment_dir, "omnomnomics.semaphore")
+    # with open(semaphore_path, 'w') as sem_file:
+    #     sem_file.write(f"{max(mode_steps)}\n")
+        
+    return mode_steps, config
 
 
 ##---------------------------------------------------------------------------------------------------------------
@@ -550,14 +546,8 @@ def validate_input_files(the_type, config, mode_range_min, experiment_dir):
     if len(fastq_files) > 0:
         paired = True
 
-
     input_file_types = config['input_file_types']
     input_folders = config['input_folders']
-    # Determine the starting file type based on the min range value of the job mode
-    if the_type != "RNA":
-        mergewig = config['mergewig']
-        input_file_types[mergewig - 1] = ".bw"
-
 
     # Check if the input dir exists for the first step and count files with the correct extension
     num_files = 0
@@ -804,6 +794,30 @@ def start_log(experiment_dir, run_date, config):
    return log_file 
 
 
+##--------------------------------------------------------------------------------------------------------------
+# Remove already present outputs of rules that you want to run
+##--------------------------------------------------------------------------------------------------------------
+def delete_outputs_to_be_updated(mode_steps, config):
+    for num in mode_steps:
+        outputfolder = config['output_folders'][num-1]
+        output_filetype = config['output_file_types'][num-1]
+        if isinstance(output_filetype, list):
+            for filetype in output_filetype:
+                files = glob.glob(f"{outputfolder}/*{filetype}")
+                for file in files:
+                    if os.path.exists(file):
+                        os.remove(file)
+        else:
+            files = glob.glob(f"{outputfolder}/*{output_filetype}")
+            for file in files:
+                if os.path.exists(file):
+                    if num == 10:
+                        shutil.rmtree(file) #is actually the hub directory
+                    else:
+                        os.remove(file)
+##--------------------------------------------------------------------------------------------------------------
+# Main function
+##--------------------------------------------------------------------------------------------------------------
 def main():
   
     # Define variables for paths
@@ -840,8 +854,8 @@ def main():
     experiment_dir = args.experiment_dir
     the_type = args.type.upper()
     genome = args.genome
-    trim_tool = args.trim_tool if args.trim_tool else config.get("trim_tool","skewer")
-    map_tool = args.map_tool if args.map_tool else config.get('map_tool', "hisat2")
+    trim_tool = args.trim_tool.lower() if args.trim_tool else config.get("trim_tool","skewer").lower()
+    map_tool = args.map_tool.lower() if args.map_tool else config.get('map_tool', "hisat2").lower()
     mode = args.mode.lower() if args.mode else config.get('mode', "auto")
     formula = args.formula if args.formula else config.get('formula', "1")
     broad = args.broad if args.broad else config.get('broad', "NA")
@@ -966,6 +980,9 @@ def main():
 
     # Initialize the log file
     log_file = start_log(experiment_dir, run_date, config)
+
+    #Delete to be updated outputs
+    delete_outputs_to_be_updated(mode_steps, config)
 
 
     """Print some status info."""

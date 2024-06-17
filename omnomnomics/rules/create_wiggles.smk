@@ -4,7 +4,6 @@
 import os
 import glob
 
-
 rule create_wiggles:
     input:
         input_tar_gz_file= f"{master_config['input_folders'][master_config['wig_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz" if config['THETYPE'] != "CHIP" else f"{master_config['input_folders'][master_config['wig_rule_num']-1]}/{{sample}}.filtered.HOMER_tagDir.tar.gz"
@@ -21,6 +20,8 @@ rule create_wiggles:
         Threads_Per_Rule['9']
     resources:
         mem_mb = Memory_Per_Rule['9']
+    benchmark:
+        f"{master_config['output_folders'][master_config['wig_rule_num']-1]}/{{sample}}_benchmark.tsv"
     run:
         def create_wig(input_tar_gz_file, inputfolder, outputfolder, thetype, genome):
             log_it(logfile, "Creating Wiggles and TrackHubs...", f"EXECUTING STEP {master_config['wig']}")

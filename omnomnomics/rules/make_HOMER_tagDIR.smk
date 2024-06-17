@@ -10,27 +10,30 @@ rule create_homer_tagDir:
         filtered_BAM=f"{master_config['input_folders'][master_config['stats_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.bam" if config['THETYPE'] != "CHIP" else f"{master_config['input_folders'][master_config['stats_rule_num']-1]}/{{sample}}.filtered.bam"
     output:
         f"{master_config['output_folders'][master_config['tagdir_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz" if config['THETYPE'] != "CHIP" else f"{master_config['output_folders'][master_config['tagdir_rule_num']-1]}/{{sample}}.filtered.HOMER_tagDir.tar.gz"
-    threads:
-        Threads_Per_Rule['8']
-    resources:
-        mem_mb = Memory_Per_Rule['8']
     params:
         genome = config['THEGENOME'],
         thetype = config['THETYPE'],
         inputfolder = master_config['input_folders'][master_config['tagdir_rule_num']-1],
         outputfolder = master_config['output_folders'][master_config['tagdir_rule_num']-1]
+    threads:
+        Threads_Per_Rule['8']
+    resources:
+        mem_mb = Memory_Per_Rule['8']
+    benchmark:
+        f"{master_config['output_folders'][master_config['tagdir_rule_num']-1]}/{{sample}}_benchmark.tsv"
     run:
         log_it(logfile, f"Creating HOMER tag directories...", f"EXECUTING STEP {master_config['tagdir']}")
         log_it(logfile, f"Input folder: filtered_BAM")
         log_it(logfile, f"Output folder: HOMER_tagDirs")
-        # path = os.path.join(OMNOM_HOME, "bin", "homer", "configureHomer.pl")
-        # version = subprocess.check_output(f"perl {path} -list 2> /dev/null | grep homer", shell=True, executable='/bin/bash')
-        # log_it(logfile, "\n"+version.decode("utf-8"), "VERSION")
-        # print(version.decode("utf-8"))
+        #uncomment when in right folder,
+        # path = os.path.join(OMNOM_HOME, "bin", "Trimmomatic-0.39", "trimmomatic-0.39.jar")
+        # trimmomatic_version = subprocess.check_output(f"module load java && java -jar {path} -version", shell=True, executable='/bin/bash')
+        # log_it(logfile, "\n"+trimmomatic_version.decode("utf-8"), "trimmomatic VERSION")
+        # print(trimmomatic_version.decode("utf-8"))
 
-        # samtools_version = subprocess.check_output("module load samtools && samtools --version | head -n2", shell=True, executable='/bin/bash')
-        # log_it(logfile, "\n"+merging_version.decode("utf-8"), "SAMTOOLS VERSION")
-        # print(merging_version.decode("utf-8"))
+        samtools_version = subprocess.check_output("module load samtools && samtools --version | head -n2", shell=True, executable='/bin/bash')
+        log_it(logfile, "\n"+samtools_version.decode("utf-8"), "SAMTOOLS VERSION")
+        print(samtools_version.decode("utf-8"))
         sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['tagdir_rule_num']-1])
 
         # Function to create HOMER tag directories

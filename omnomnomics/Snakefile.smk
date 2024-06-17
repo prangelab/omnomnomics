@@ -365,8 +365,6 @@ log_it(logfile, f"Hub color table: {config['THECOLTABLE']}")
 log_it(logfile, f"Hub mail: {config['THEHUBMAIL']}")
 
 
-
-
 ##--------------------------------------------------------------------------------------------------------------
 # Obtain Sample Names and Number of Samples
 ##--------------------------------------------------------------------------------------------------------------
@@ -385,6 +383,9 @@ if THEMODERANGEMIN == 10:
     else:
         input_file_type = input_file_type[1]
 if THEMODERANGEMIN == 11:
+    input_file_type = input_file_type[0]
+    input_folder = input_folder[0]
+if THEMODERANGEMIN == 12:
     input_file_type = input_file_type[0]
     input_folder = input_folder[0]
     
@@ -439,21 +440,37 @@ print(Threads_Per_Rule)
 Memory_Per_Rule = {}
 for i in range(1,master_config['max_step']+1):
     rule_num = i
-    Memory_Per_Rule[f'{rule_num}'] =  (master_config['min_mem_mb'][i - 1]
-                                    if 'min_mem_mb' in master_config
-                                    and isinstance(master_config['min_mem_mb'], list)
-                                    and len(master_config['min_mem_mb']) > (i - 1)
-                                    and master_config['min_mem_mb'][i - 1] is not None
-                                    and isinstance(master_config['min_mem_mb'][i - 1], int)
-                                    and master_config['min_mem_mb'][i - 1] > master_config['min_slice_mem']
-                                    else (master_config['min_slice_mem'] 
-                                        if('min_mem_mb' in master_config
-                                            and isinstance(master_config['min_mem_mb'], list)
-                                            and len(master_config['min_mem_mb']) > (i - 1)
-                                            and master_config['min_mem_mb'][i - 1] is not None
-                                            and isinstance(master_config['min_mem_mb'][i - 1], int)
-                                            and master_config['min_mem_mb'][i - 1] <= master_config['min_slice_mem'])
-                                        else Threads_Per_Rule[f'{rule_num}'] * master_config['max_mem_per_core_mb']))
+    if ('min_mem_mb' in master_config
+    and isinstance(master_config['min_mem_mb'], list)
+    and len(master_config['min_mem_mb']) > (i - 1)
+    and master_config['min_mem_mb'][i - 1] is not None
+    and isinstance(master_config['min_mem_mb'][i - 1], int)
+    and master_config['min_mem_mb'][i - 1] > master_config['min_slice_mem']
+    and master_config['min_mem_mb'][i - 1] > Threads_Per_Rule[f'{rule_num}'] * master_config['max_mem_per_core_mb']):
+        log_it(logfile, "ERROR! minimum memory needed is greater than the amount of memory available from cores. Aborting...")
+        sys.exit(1)
+    else:
+        if (Threads_Per_Rule[f'{rule_num}'] * master_config['max_mem_per_core_mb'] >= master_config['min_slice_mem'] ):
+            Memory_Per_Rule[f'{rule_num}']= (Threads_Per_Rule[f'{rule_num}'] * master_config['max_mem_per_core_mb'] )
+        else:
+            Memory_Per_Rule[f'{rule_num}']= (master_config['min_slice_mem'])
+
+    # Memory_Per_Rule[f'{rule_num}'] =  (master_config['min_mem_mb'][i - 1]
+    #                                 if 'min_mem_mb' in master_config
+    #                                 and isinstance(master_config['min_mem_mb'], list)
+    #                                 and len(master_config['min_mem_mb']) > (i - 1)
+    #                                 and master_config['min_mem_mb'][i - 1] is not None
+    #                                 and isinstance(master_config['min_mem_mb'][i - 1], int)
+    #                                 and master_config['min_mem_mb'][i - 1] > master_config['min_slice_mem']
+    #                                 else (master_config['min_slice_mem'] 
+    #                                     if('min_mem_mb' in master_config
+    #                                         and isinstance(master_config['min_mem_mb'], list)
+    #                                         and len(master_config['min_mem_mb']) > (i - 1)
+    #                                         and master_config['min_mem_mb'][i - 1] is not None
+    #                                         and isinstance(master_config['min_mem_mb'][i - 1], int)
+    #                                         and master_config['min_mem_mb'][i - 1] <= master_config['min_slice_mem'])
+    #                                     else Threads_Per_Rule[f'{rule_num}'] * master_config['max_mem_per_core_mb']))
+
                                         # else (master_config['mincores_single_sample_step1_9'][i - 1]
                                         # if 'mincores_single_sample_step1_9' in master_config
                                         # and isinstance(master_config['mincores_single_sample_step1_9'], list)
@@ -540,6 +557,10 @@ include: "rules/create_wiggles.smk"
 include: "rules/merge_wiggles.smk"
 
 include: "rules/call_peaks.smk"
+
+include: "rules/count_reads.smk"
+
+include: "rules/call_DE.smk"
 
 ##--------------------------------------------------------------------------------------------------------------
 # Execute the desired rules
@@ -634,6 +655,10 @@ for rule_num in themode:
         all_outputs.append( f"{output_folder}/extra.tmp")
     if rule_num == 11:
         all_outputs.append( f"{output_folder}/extra.tmp")
+    if rule_num == 12:
+        all_outputs.append( f"{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.raw_read_quant.table.txt")
+    if rule_num == 13:
+        all_outputs.append( f"{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.results.zip")
     
     #all_output.append("pipeline_completed.txt")
     print(all_outputs)
