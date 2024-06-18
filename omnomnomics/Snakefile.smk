@@ -2,11 +2,11 @@
 import os
 import sys
 import time
+import datetime
 import yaml
 import shutil
 import glob
 import random
-from datetime import datetime
 
 
 # Load the configuration file from command line arguments
@@ -19,16 +19,20 @@ experiment_dir = config["EXPERIMENT_DIR"]
 run_date = config["RUNDATE"]
 logfile = os.path.join(experiment_dir, f"omnomnomics.run.{run_date}.log")
 
+onstart:
+    global start_time
+    start_time = time.time()
+    log_it(logfile, "Pipeline started at {}\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")), "PIPELINE START TIME")
 
-start_time = time.time()
-previous_step_time = 0
-
-
-
+onerror:
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    log_it(logfile, "Pipeline failed at {}\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")), "PIPELINE RUN TIME")
+    log_it(logfile, "Total elapsed time: {:.2f} seconds\n".format(elapsed_time))
 
 # Function to log messages
 def log_it(logfile, message, heading=None):
-   timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+   timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
    with open(logfile, 'a') as log:
        if heading: #Check if heading
            log.write("\n{}\n\n".format(heading))
@@ -38,13 +42,13 @@ def log_it(logfile, message, heading=None):
 
 # Function to log elapsed time
 ### possibly use benchmarking to log elapsed time.
-def log_elapsed(logfile, wildcards = None):
-   global previous_step_time
-   elapsed = (time.time() - start_time) / 60
-   interval = elapsed - previous_step_time
-   previous_step_time = elapsed
-   log_it(logfile, f"Last step took: {interval:.2f} minutes...", "RUN DURATION")
-   log_it(logfile, f"Time elapsed so far: {elapsed:.2f} minutes...")
+# def log_elapsed(logfile, wildcards = None):
+#    global previous_step_time
+#    elapsed = (time.time() - start_time) / 60
+#    interval = elapsed - previous_step_time
+#    previous_step_time = elapsed
+#    log_it(logfile, f"Last step took: {interval:.2f} minutes...", "RUN DURATION")
+#    log_it(logfile, f"Time elapsed so far: {elapsed:.2f} minutes...")
    # if wildcards:
    #     log_it(f"Completed processing for sample: {wildcards.sample}")
    #return previous_step_time
@@ -101,10 +105,10 @@ def sanity_check_dir(logfile, input_directory, file_ext):
 
 
 # Initialize micromamba shell and logging micromamba executable
-def initialize_micromamba(logfile):
-    log_it(logfile, "MAMBA_EXE: {}".format(os.environ.get('MAMBA_EXE', 'Not set')), "MICROMAMBA INIT")
-    log_it(logfile, "Initializing shell...")
-    os.system('eval "$(micromamba shell hook --shell=bash)"')
+# def initialize_micromamba(logfile):
+#     log_it(logfile, "MAMBA_EXE: {}".format(os.environ.get('MAMBA_EXE', 'Not set')), "MICROMAMBA INIT")
+#     log_it(logfile, "Initializing shell...")
+#     os.system('eval "$(micromamba shell hook --shell=bash)"')
 
 
 # Hold our horses for a little while to let the dispatch script initialise the log file
@@ -160,7 +164,7 @@ def load_and_validate_yaml(logfile, config_file_path, expected_header):
    return config_content
 
 
-CONFIG_FILE = os.path.join(f"{OMNOM_HOME}", "config.yaml")
+CONFIG_FILE = os.path.join(f"{OMNOM_HOME}", "bin", "config.yaml")
 # Check if CONFIG_FILE exists
 if not os.path.isfile(CONFIG_FILE):
    log_it(logfile, "Master config file  does not exist! Aborting...", "ERROR")
@@ -320,7 +324,6 @@ col_table, logfile = final_housekeeping(logfile, config['THECOLTABLE'], experime
 ##---------------------------------------------------------------------------------------------------------------
 ## Report some basic stats
 ##---------------------------------------------------------------------------------------------------------------
-log_it(logfile, f"Job Start time: {start_time}", "RUN INFO")
 log_it(logfile, f"Experiment dir: {experiment_dir}")
 log_it(logfile, f"Run date: {run_date}")
 log_it(logfile, f"Log file: {logfile}")
@@ -406,10 +409,11 @@ print(samples)
 samples = list(set(samples))
 print(samples)
 
-if config['PAIRED'] == 1 and THEMODERANGEMIN <= 4: 
+if config['PAIRED'] == 1 and THEMODERANGEMIN < 4: 
     num_samples = len(samples) / 2
 else: 
     num_samples = len(samples)
+print(f"NUMBER OF SAMPLES = {num_samples}")
 
 max_nodes = master_config.get('max_nodes', f"{master_config['nodes_in_partition']}") if master_config.get('max_nodes', f"{master_config['nodes_in_partition']}") <= master_config['nodes_in_partition'] else master_config['nodes_in_partition'] 
 
@@ -528,39 +532,39 @@ def check_and_include_rules(logfile, omnom_home, experiment_dir):
 
 valid_smk_files = check_and_include_rules(logfile, OMNOM_HOME, experiment_dir)
 # Include snake rules in the main Snakefile
-#for smk_file in valid_smk_files:
-   #include: smk_file
-include: "rules/trim_skewer.smk"
+for smk_file in valid_smk_files:
+   include: smk_file
+# include: "rules/1.trim_skewer.smk"
 
-include: "rules/trim_trimmomatic.smk"
+# include: "rules/1.trim_trimmomatic.smk"
 
-include: "rules/fastqc.smk"
+# include: "rules/2.fastqc.smk"
 
-include: "rules/align_reads_hisat2.smk"
+# include: "rules/3.align_reads_hisat2.smk"
 
-include: "rules/align_reads_STAR.smk"
+# include: "rules/3.align_reads_STAR.smk"
 
-include: "rules/align_reads_STAR_TE.smk"
+# include: "rules/3.align_reads_STAR_TE.smk"
 
-include: "rules/merge_lanes_and_clean_names.smk"
+# include: "rules/4.merge_lanes_and_clean_names.smk"
 
-include: "rules/touchup_bam.smk"
+# include: "rules/5.touchup_bam.smk"
 
-include: "rules/index_bam.smk"
+# include: "rules/6.index_bam.smk"
 
-include: "rules/bam_stats.smk"
+# include: "rules/7.bam_stats.smk"
 
-include: "rules/make_HOMER_tagDIR.smk"
+# include: "rules/8.make_HOMER_tagDIR.smk"
 
-include: "rules/create_wiggles.smk"
+# include: "rules/9.create_wiggles.smk"
 
-include: "rules/merge_wiggles.smk"
+# include: "rules/10.merge_wiggles.smk"
 
-include: "rules/call_peaks.smk"
+# include: "rules/11.call_peaks.smk"
 
-include: "rules/count_reads.smk"
+# include: "rules/12.count_reads.smk"
 
-include: "rules/call_DE.smk"
+# include: "rules/13.call_DE.smk"
 
 ##--------------------------------------------------------------------------------------------------------------
 # Execute the desired rules
@@ -614,21 +618,26 @@ for rule_num in themode:
     if rule_num == 3:
         if config['THEMAPTOOL'] == 'star':
                 all_outputs += expand(f"{output_folder}/{{sample}}.bam", sample = samples)
+                all_outputs += expand(f"{output_folder}/{{sample}}.extra_3.tmp", sample = samples)
                 all_outputs += expand(f"{output_folder}/{{sample}}.STAR_stats.txt", sample = samples)
         if config['THEMAPTOOL'] == 'hisat2':
                 all_outputs += expand(f"{output_folder}/{{sample}}.bam", sample = samples)
+                all_outputs += expand(f"{output_folder}/{{sample}}.extra_3.tmp", sample = samples)
                 all_outputs += expand(f"{output_folder}/{{sample}}.HISAT2_stats.txt", sample = samples)
         if config['THEMAPTOOL'] == 'star_te':
                 all_outputs += expand(f"{output_folder}/{{sample}}.bam", sample = samples)
+                all_outputs += expand(f"{output_folder}/{{sample}}.extra_3.tmp", sample = samples)
                 all_outputs += expand(f"{output_folder}/{{sample}}.STAR_TE_stats.txt", sample = samples)
     if rule_num == 4:
         all_outputs += expand(f"{output_folder}/{{sample}}.bam", sample = samples2)
-        all_outputs += expand(f"{output_folder}/{{sample}}.extra.tmp",  sample = samples2)
+        all_outputs += expand(f"{output_folder}/{{sample}}.extra_4.tmp",  sample = samples2)
     if rule_num == 5:
         if config['THETYPE'] != "CHIP":
             all_outputs += expand(f"{output_folder}/{{sample}}.sorted.dups_marked.filtered.bam", sample = samples2)
+            all_outputs += expand(f"{output_folder}/{{sample}}.extra_5.tmp",  sample = samples2)
         else: 
             all_outputs += expand(f"{output_folder}/{{sample}}.filtered.bam", sample = samples2)
+            all_outputs += expand(f"{output_folder}/{{sample}}.extra_5.tmp",  sample = samples2)
     if rule_num == 6:
         if config['THETYPE'] != "CHIP":
             all_outputs += expand(f"{output_folder}/{{sample}}.sorted.dups_marked.filtered.bam.bai", sample = samples2)
@@ -642,19 +651,21 @@ for rule_num in themode:
     if rule_num == 8:
         if config['THETYPE'] != "CHIP":
             all_outputs += expand(f"{output_folder}/{{sample}}.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz", sample = samples2)
+            all_outputs += expand(f"{output_folder}/{{sample}}.extra_8.tmp",  sample = samples2)
         else:
             all_outputs += expand(f"{output_folder}/{{sample}}.filtered.HOMER_tagDir.tar.gz", sample = samples2)
+            all_outputs += expand(f"{output_folder}/{{sample}}.extra_8.tmp",  sample = samples2)
     # if rule_num == 9:
     #     if config['THETYPE'] != "CHIP":
     #         all_outputs += expand(f"{output_folder}/{{sample}}.sorted.dups_marked.filtered.bw", sample = samples2)
     #     else:
     #         all_outputs += expand(f"{output_folder}/{{sample}}.filtered.bw", sample = samples2)
     if rule_num == 9:
-        all_outputs += expand(f"{output_folder}/{{sample}}.extra.tmp",  sample = samples2)
+        all_outputs += expand(f"{output_folder}/{{sample}}.extra_9.tmp",  sample = samples2)
     if rule_num == 10:
-        all_outputs.append( f"{output_folder}/extra.tmp")
+        all_outputs.append( f"{output_folder}/extra_10.tmp")
     if rule_num == 11:
-        all_outputs.append( f"{output_folder}/extra.tmp")
+        all_outputs.append( f"{output_folder}/extra_11.tmp")
     if rule_num == 12:
         all_outputs.append( f"{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.raw_read_quant.table.txt")
     if rule_num == 13:
@@ -676,6 +687,12 @@ elif config['THETRIMTOOL'] == "trimmomatic" and config['THEMAPTOOL'] == "star_te
 elif config['THETRIMTOOL'] == "trimmomatic" and config['THEMAPTOOL'] == "hisat2":
     ruleorder: run_trimmomatic > run_skewer > run_hisat2 > run_star_te > run_star > merge_bam 
 
+# extra_input_rule_4 = expand(f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample}}.extra_3.tmp", sample = samples) if 3 in themode else None
+# extra_input_rule_10 = expand(f"{master_config['input_folders'][master_config['mergewig_rule_num']-1]}/{{sample}}.extra_9.tmp", sample = samples2) if 9 in themode else None
+# extra_input_rule_11_1 = expand(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1][0]}/{{sample}}.extra_5.tmp", sample = samples2) if 5 in themode else None
+# extra_input_rule_11_2 = expand(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1][1]}/{{sample}}.extra_8.tmp", sample = samples2) if 8 in themode else None
+# extra_input_rule_12_1 = expand(f"{master_config['input_folders'][master_config['countreads_rule_num']-1][0]}/{{sample}}.extra_8.tmp", sample = samples2) if 8 in themode else None
+# extra_input_rule_12_2 = expand(f"{master_config['input_folders'][master_config['countreads_rule_num']-1][1]}/{{sample}}.extra_11.tmp", sample = samples2) if 11 in themode and config['THETYPE'] == "ATAC" else None
 
 
 #add that a log is made and semaphore file is updated after each run.
@@ -702,23 +719,42 @@ onsuccess:
     #---------------------------------------------------------------------------------------------------------------
     # Clean up tmp files for workflow
     #---------------------------------------------------------------------------------------------------------------
-    if 4 in themode:
-        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['merge_rule_num']-1]}/*.extra.tmp")
+    if 3 in themode:
+        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['merge_rule_num']-1]}/*.extra_3.tmp")
         for file in list_of_extra_files:
             os.remove(file)
+    if 4 in themode:
+        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['merge_rule_num']-1]}/*.extra_4.tmp")
+        for file in list_of_extra_files:
+            os.remove(file)
+    if 5 in themode:
+        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['touchup_rule_num']-1]}/*.extra_5.tmp")
+        for file in list_of_extra_files:
+            os.remove(file)
+    if 8 in themode:
+        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['tagdir_rule_num']-1]}/*.extra_8.tmp")
+        for file in list_of_extra_files:
+            os.remove(file) 
     if 9 in themode:
-        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['wig_rule_num']-1]}/*.extra.tmp")
+        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['wig_rule_num']-1]}/*.extra_9.tmp")
         for file in list_of_extra_files:
             os.remove(file)
     if 10 in themode:
-        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['mergewig_rule_num']-1]}/extra.tmp")
+        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['mergewig_rule_num']-1]}/extra_10.tmp")
         for file in list_of_extra_files:
             os.remove(file)
     if 11 in themode:
-        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/extra.tmp")
+        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/extra_11.tmp")
         for file in list_of_extra_files:
             os.remove(file)
-    # # Log completion
+    
+    #log_elapsed time
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    log_it(logfile, "Pipeline finished at {}\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")), "PIPELINE RUN TIME")
+    log_it(logfile, "Total elapsed time: {:.2f} seconds\n".format(elapsed_time))
+
+    # Log completion
     log_it(logfile, "All done!" ,"FINAL REMARKS")
     # #ELAPSED=(time.time() - start_time)/60s
     # #log_it(logfile, f"Final run time: {ELAPSED:.2f} minutes.")

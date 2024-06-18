@@ -1,5 +1,0 @@
-hub BigWigs/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.sorted.dups_marked.filtered.hub
-shortLabel BigWigs/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.sorted.dups_marked.filtered.hub
-longLabel BigWigs/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.sorted.dups_marked.filtered.hub
-genomesFile genomes.txt
-email kcarroll@ucsd.edu

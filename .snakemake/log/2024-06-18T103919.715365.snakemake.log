@@ -1,0 +1,55 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-18.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+WorkflowError:
+WorkflowError:
+    MissingInputException: Missing input files for rule run_skewer:
+        output: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R1.trimmed.fastq.gz, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R2.trimmed.fastq.gz
+        wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209
+        affected files:
+            FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R2.fastq.gz
+            FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R1.fastq.gz
+    MissingInputException: Missing input files for rule run_trimmomatic:
+        output: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R1.trimmed.fastq.gz, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R2.trimmed.fastq.gz
+        wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209
+        affected files:
+            FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R2.fastq.gz
+            FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R1.fastq.gz
+WorkflowError:
+    MissingInputException: Missing input files for rule run_skewer:
+        output: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R1.trimmed.fastq.gz, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R2.trimmed.fastq.gz
+        wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209
+        affected files:
+            FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R2.fastq.gz
+            FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R1.fastq.gz
+    MissingInputException: Missing input files for rule run_trimmomatic:
+        output: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R1.trimmed.fastq.gz, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R2.trimmed.fastq.gz
+        wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209
+        affected files:
+            FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R2.fastq.gz
+            FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R1.fastq.gz
+WorkflowError:
+    MissingInputException: Missing input files for rule run_skewer:
+        output: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R1.trimmed.fastq.gz, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R2.trimmed.fastq.gz
+        wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209
+        affected files:
+            FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R2.fastq.gz
+            FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R1.fastq.gz
+    MissingInputException: Missing input files for rule run_trimmomatic:
+        output: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R1.trimmed.fastq.gz, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R2.trimmed.fastq.gz
+        wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209
+        affected files:
+            FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R2.fastq.gz
+            FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R1.fastq.gz
+WorkflowError:
+    MissingInputException: Missing input files for rule run_skewer:
+        output: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R1.trimmed.fastq.gz, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R2.trimmed.fastq.gz
+        wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209
+        affected files:
+            FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R2.fastq.gz
+            FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R1.fastq.gz
+    MissingInputException: Missing input files for rule run_trimmomatic:
+        output: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R1.trimmed.fastq.gz, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R2.trimmed.fastq.gz
+        wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209
+        affected files:
+            FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R2.fastq.gz
+            FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_R1.fastq.gz

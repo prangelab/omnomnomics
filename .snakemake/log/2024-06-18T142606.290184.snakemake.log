@@ -1,0 +1,79 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-18.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job           count    min threads    max threads
+----------  -------  -------------  -------------
+all               1              1              1
+merge_bam         2            128            128
+run_hisat2        2             32             32
+total             5              1            128
+
+Select jobs to execute...
+
+[Tue Jun 18 14:26:26 2024]
+checkpoint run_hisat2:
+    input: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002_R1.trimmed.fastq.gz, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002_R2.trimmed.fastq.gz
+    output: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.HISAT2_stats.txt, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.extra_3.tmp
+    jobid: 1
+    benchmark: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002_hisat2_benchmark.tsv
+    reason: Forced execution
+    wildcards: sample1=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002
+    threads: 32
+    resources: mem_mb=4000, mem_mib=3815, disk_mb=8403, disk_mib=8014, tmpdir=<TBD>
+DAG of jobs will be updated after completion.
+
+Submitted job 1 with external jobid 'Submitted batch job 5339683'.
+
+[Tue Jun 18 14:26:26 2024]
+rule merge_bam:
+    output: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_4.tmp
+    jobid: 5
+    benchmark: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_mergebam_benchmark.tsv
+    reason: Forced execution
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954, tmpdir=<TBD>
+
+Submitted job 5 with external jobid 'Submitted batch job 5339684'.
+
+[Tue Jun 18 14:26:26 2024]
+checkpoint run_hisat2:
+    input: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R1.trimmed.fastq.gz, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R2.trimmed.fastq.gz
+    output: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.HISAT2_stats.txt, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra_3.tmp
+    jobid: 3
+    benchmark: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_hisat2_benchmark.tsv
+    reason: Forced execution
+    wildcards: sample1=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002
+    threads: 32
+    resources: mem_mb=4000, mem_mib=3815, disk_mb=7999, disk_mib=7629, tmpdir=<TBD>
+DAG of jobs will be updated after completion.
+
+Submitted job 3 with external jobid 'Submitted batch job 5339685'.
+[Tue Jun 18 14:26:34 2024]
+Error in rule run_hisat2:
+    jobid: 1
+    input: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002_R1.trimmed.fastq.gz, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002_R2.trimmed.fastq.gz
+    output: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.HISAT2_stats.txt, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.extra_3.tmp
+    cluster_jobid: Submitted batch job 5339683
+
+Error executing rule run_hisat2 on cluster (jobid: 1, external: Submitted batch job 5339683, jobscript: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp._4o9zxko/snakejob.run_hisat2.1.sh). For error details see the cluster log and the log files of the involved rule(s).
+[Tue Jun 18 14:26:34 2024]
+Error in rule merge_bam:
+    jobid: 5
+    output: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_4.tmp
+    cluster_jobid: Submitted batch job 5339684
+
+Error executing rule merge_bam on cluster (jobid: 5, external: Submitted batch job 5339684, jobscript: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp._4o9zxko/snakejob.merge_bam.5.sh). For error details see the cluster log and the log files of the involved rule(s).
+[Tue Jun 18 14:26:44 2024]
+Error in rule run_hisat2:
+    jobid: 3
+    input: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R1.trimmed.fastq.gz, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R2.trimmed.fastq.gz
+    output: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.HISAT2_stats.txt, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra_3.tmp
+    cluster_jobid: Submitted batch job 5339685
+
+Error executing rule run_hisat2 on cluster (jobid: 3, external: Submitted batch job 5339685, jobscript: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp._4o9zxko/snakejob.run_hisat2.3.sh). For error details see the cluster log and the log files of the involved rule(s).
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+Complete log: ../.snakemake/log/2024-06-18T142606.290184.snakemake.log

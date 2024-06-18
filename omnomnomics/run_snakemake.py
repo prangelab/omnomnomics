@@ -162,147 +162,144 @@ def set_user_subroutine_choices(trim_tool, map_tool, config):
 ## Validate user defined variables
 ##---------------------------------------------------------------------------------------------------------------
 def validate_user_defined_vars(OMNOM_HOME, metadata, experiment_dir, INPUT, the_style, color_data_folder, col_table, overlay, the_type, map_tool, homer_size, homer_mindist, config):
-   """Validate user-defined variables."""
-   print("Validating options...")
+    """Validate user-defined variables."""
+    print("Validating options...")
 
 
-   # Check metadata file
-   if metadata != "NA":
-       if not os.path.isfile(metadata):
-           print("Metadata file (-m) does not exist! Aborting...", file=sys.stderr)
-           sys.exit(1)
-       elif not metadata.endswith(".txt"):
-           print("Metadata file (-m) is not a .txt file! Aborting...", file=sys.stderr)
-           sys.exit(1)
-       elif not metadata.startswith(experiment_dir):
-           print("Please place your metadata file in your experiment dir!", file=sys.stderr)
-           print(f"e.g., -m {os.path.join(f'{OMNOM_HOME}', 'data', 'me', 'my_fantastic_experiment', 'my_mindboggling_metadata.txt')}. Aborting...", file=sys.stderr)
-           sys.exit(1)
+    # Check metadata file
+    if metadata != "NA":
+        if not os.path.isfile(metadata):
+            print("Metadata file (-m) does not exist! Aborting...", file=sys.stderr)
+            sys.exit(1)
+        elif not metadata.endswith(".txt"):
+            print("Metadata file (-m) is not a .txt file! Aborting...", file=sys.stderr)
+            sys.exit(1)
+        elif not metadata.startswith(experiment_dir):
+            print("Please place your metadata file in your experiment dir!", file=sys.stderr)
+            print(f"e.g., -m {os.path.join(f'{OMNOM_HOME}', 'data', 'me', 'my_fantastic_experiment', 'my_mindboggling_metadata.txt')}. Aborting...", file=sys.stderr)
+            sys.exit(1)
 
 
-   # Check input file
-   homer_input = os.path.join(os.path.dirname(INPUT), f"{os.path.basename(INPUT).replace('.bam', '')}.HOMER_tagDir")
-   if INPUT != "NA":
-       if not os.path.isfile(INPUT):
-           print("ChIP/ATAC Input .bam file (-I) does not exist! Aborting...", file=sys.stderr)
-           sys.exit(1)
-       elif not INPUT.endswith(".bam"):
-           print("ChIP/ATAC Input file (-I) is not a .bam file! Aborting....", file=sys.stderr)
-           sys.exit(1)
-       elif not os.path.isabs(INPUT):
-           print("Please provide the full (absolute) path to your input file!", file=sys.stderr)
-           print(f"e.g., -I {os.path.join(f'{OMNOM_HOME}', 'genomes', 'input_ChIP', 'my_awesome_input.bam')}. Aborting...", file=sys.stderr)
-           sys.exit(1)
-      
-       if not os.path.isdir(homer_input):
-           print(f"WARNING: No corresponding input HOMER tagDir found! ({homer_input}) does not exist...", file=sys.stderr)
-           print("WARNING: Will run HOMER findPeaks without input...", file=sys.stderr)
-           homer_input = "NA"
+    # Check input file
+    homer_input = os.path.join(os.path.dirname(INPUT), f"{os.path.basename(INPUT).replace('.bam', '')}.HOMER_tagDir")
+    if INPUT != "NA":
+        if not os.path.isfile(INPUT):
+            print("ChIP/ATAC Input .bam file (-I) does not exist! Aborting...", file=sys.stderr)
+            sys.exit(1)
+        elif not INPUT.endswith(".bam"):
+            print("ChIP/ATAC Input file (-I) is not a .bam file! Aborting....", file=sys.stderr)
+            sys.exit(1)
+        elif not os.path.isabs(INPUT):
+            print("Please provide the full (absolute) path to your input file!", file=sys.stderr)
+            print(f"e.g., -I {os.path.join(f'{OMNOM_HOME}', 'genomes', 'input_ChIP', 'my_awesome_input.bam')}. Aborting...", file=sys.stderr)
+            sys.exit(1)
+        
+        if not os.path.isdir(homer_input):
+            print(f"WARNING: No corresponding input HOMER tagDir found! ({homer_input}) does not exist...", file=sys.stderr)
+            print("WARNING: Will run HOMER findPeaks without input...", file=sys.stderr)
+            homer_input = "NA"
 
 
-   # Convert peak style to lowercase if given on command line, else take the default from config file
-   the_style = the_style.lower()
+    # Convert peak style to lowercase if given on command line, else take the default from config file
+    the_style = the_style.lower()
 
 
-   # Check peak style
-   if the_style not in ["factor", "histone"]:
-       print("ChIP peak calling style has to be factor or histone! Aborting...", file=sys.stderr)
-       sys.exit(1)
+    # Check peak style
+    if the_style not in ["factor", "histone"]:
+        print("ChIP peak calling style has to be factor or histone! Aborting...", file=sys.stderr)
+        sys.exit(1)
 
 
-   # Check color data folder
-   #necesarry, good code, uncomment when in ares server with good directory.
-   # if not os.path.isdir(color_data_folder):
-   #     print(f"Color table folder (-P) ({color_data_folder}) does not exist! Aborting...", file=sys.stderr)
-   #     sys.exit(1)
+    # Check color data folder
+    #necesarry, good code, uncomment when in ares server with good directory.
+    # if not os.path.isdir(color_data_folder):
+    #     print(f"Color table folder (-P) ({color_data_folder}) does not exist! Aborting...", file=sys.stderr)
+    #     sys.exit(1)
 
 
-   # Remove trailing slash from color data folder path if necessary
-   if color_data_folder.endswith('/'):
-       color_data_folder = color_data_folder.rstrip('/')
+    # Remove trailing slash from color data folder path if necessary
+    if color_data_folder.endswith('/'):
+        color_data_folder = color_data_folder.rstrip('/')
 
 
-   # Check if a full path to a color table (list) file was provided. If not, prepend the color folder path.
-   #necesarry, good code, uncomment when in ares server with good directory.
-   # if not os.path.isfile(col_table):
-   #     col_table = os.path.join(color_data_folder, col_table)
-   #     if not os.path.isfile(col_table):
-   #         print(f"Color table file: {col_table} not found! Aborting...", file=sys.stderr)
-   #         sys.exit(1)
-   # else:
-   #     # If it's a list file, parse the contents to see if we need to prepend the color folder path
-   #     if col_table.endswith(".txt"):
-   #         with open(col_table, 'r') as file:
-   #             for line in file:
-   #                 line = line.strip()
-   #                 if not os.path.isfile(line):
-   #                     # Check if we have an absolute path already
-   #                     if os.path.isabs(line):
-   #                         print(f"Malformed entry in color table list file: {line} is not a file!", file=sys.stderr)
-   #                         sys.exit(1)
-   #                     # Check if we have a valid entry if we prepend the color data folder
-   #                     elif not os.path.isfile(os.path.join(color_data_folder, line)):
-   #                         print(f"Malformed entry in color table list file: {line} does not exist here or in {color_data_folder}", file=sys.stderr)
-   #                         sys.exit(1)
+    # Check if a full path to a color table (list) file was provided. If not, prepend the color folder path.
+    if not os.path.isfile(col_table):
+        col_table = os.path.join(color_data_folder, col_table)
+        if not os.path.isfile(col_table):
+            print(f"Color table file: {col_table} not found! Aborting...", file=sys.stderr)
+            sys.exit(1)
+    else:
+        # If it's a list file, parse the contents to see if we need to prepend the color folder path
+        if col_table.endswith(".txt"):
+            with open(col_table, 'r') as file:
+                lines = file.readlines()
+                for line in lines:
+                    line = line.strip()
+                    if not os.path.isfile(line):
+                        # Check if we have an absolute path already
+                        if os.path.isabs(line):
+                            print(f"Malformed entry in color table list file: {line} is not a file!", file=sys.stderr)
+                            sys.exit(1)
+                        # Check if we have a valid entry if we prepend the color data folder
+                        elif not os.path.isfile(os.path.join(color_data_folder, line)):
+                            print(f"Malformed entry in color table list file: {line} does not exist here or in {color_data_folder}", file=sys.stderr)
+                            sys.exit(1)
+                        else:
+                        #If yes, prepend the color data folder path
+                            with open(col_table, 'w') as file:
+                                for line in lines:
+                                    stripped_line = line.strip()
+                                    if re.match(rf'^{re.escape(stripped_line)}$', stripped_line):
+                                        modified_line = re.sub(rf'^{re.escape(stripped_line)}$', f'{color_data_folder}/{stripped_line}', stripped_line)
+                                        file.write(modified_line + '\n')
+                                    else:
+                                        file.write(line)
+
+    # Check overlay type
+    if overlay and overlay not in config["overlaytypes"]:
+        print(f"Overlay type -o has to be one of: {', '.join(config['overlaytypes'])}. Aborting...", file=sys.stderr)
+        sys.exit(1)
 
 
-   #                     else:
-   #                     #If yes, prepend the color data folder path
-   #                         with open(col_table, 'r') as f:
-   #                             lines = f.readlines()
-   #                         with open(col_table, 'w') as f:
-   #                             for l in lines:
-   #                                 if l.strip() == line:
-   #                                     f.write(f"{color_data_folder}/{line}\n")
-   #                                 else:
-   #                                     f.write(l)
+    # Check valid mapper for the experiment type
+    if the_type and the_type != "RNA" and "star" and map_tool and "star" in map_tool :
+        print("STAR read aligner can only be used with RNA-seq data! Aborting...", file=sys.stderr)
+        sys.exit(1)
 
 
-   # Check overlay type
-   if overlay and overlay not in config["overlaytypes"]:
-       print(f"Overlay type -o has to be one of: {', '.join(config['overlaytypes'])}. Aborting...", file=sys.stderr)
-       sys.exit(1)
-
-
-   # Check valid mapper for the experiment type
-   if the_type and the_type != "RNA" and "star" and map_tool and "star" in map_tool :
-       print("STAR read aligner can only be used with RNA-seq data! Aborting...", file=sys.stderr)
-       sys.exit(1)
-
-
-   # Check if HOMER peak size and mindist are integers
-   if homer_size and not isinstance(homer_size, int):
-       print("HOMER peak size (-z) has to be an integer! Aborting...", file=sys.stderr)
-       sys.exit(1)
-   if homer_mindist and not isinstance(homer_mindist, int):
-       print("HOMER minimal distance (-d) has to be an integer! Aborting...", file=sys.stderr)
-       sys.exit(1)
-   return homer_input
+    # Check if HOMER peak size and mindist are integers
+    if homer_size and not isinstance(homer_size, int):
+        print("HOMER peak size (-z) has to be an integer! Aborting...", file=sys.stderr)
+        sys.exit(1)
+    if homer_mindist and not isinstance(homer_mindist, int):
+        print("HOMER minimal distance (-d) has to be an integer! Aborting...", file=sys.stderr)
+        sys.exit(1)
+    return homer_input
 
 
 ##---------------------------------------------------------------------------------------------------------------
 ## Finetune some vars
 ##---------------------------------------------------------------------------------------------------------------
 def setup_variables(experiment_dir,config):
-   """Setup variables."""
-   print("Setup variables...")
+    """Setup variables."""
+    print("Setup variables...")
 
 
-   # Remove trailing slash from experiment directory path if necessary
-   if experiment_dir.endswith('/'):
-       experiment_dir = experiment_dir.rstrip('/')
+    # Remove trailing slash from experiment directory path if necessary
+    if experiment_dir.endswith('/'):
+        experiment_dir = experiment_dir.rstrip('/')
 
 
-   # Set the number of cores per node (max=n-1) to keep a physical core free for system tasks)
-   node_cores = config['cores_per_node']
-   max_cores = node_cores - 1 ##########################################################################################correct?
+    # Set the number of cores per node (max=n-1) to keep a physical core free for system tasks)
+    node_cores = config['cores_per_node']
+    max_cores = node_cores - 1 ##########################################################################################correct?
 
 
-   # Set the date
-   run_date = date.today().isoformat()
+    # Set the date
+    run_date = date.today().isoformat()
 
 
-   return node_cores, max_cores, run_date
+    return node_cores, max_cores, run_date
 
 
 
@@ -587,21 +584,56 @@ def validate_input_files(the_type, config, mode_range_min, experiment_dir):
 
     return num_files, num_pairs, paired, input_folder_mod_range_min, input_file_type_mod_range_min
 
+def parse_name_fields(fields):
+    """Parse a string of fields like '1,2,4-6' into a list of integers."""
+    field_list = []
+    for part in fields.split(','):
+        if '-' in part:
+            start, end = part.split('-')
+            field_list.extend(range(int(start), int(end) + 1))
+        else:
+            field_list.append(int(part))
+    return field_list
+
+def run_cut_command(filename, fields, separator):
+    """Select specified fields from a filename using the given separator."""
+    try:
+        parts = filename.split(separator)
+        selected_parts = []
+        for field in parse_name_fields(fields):
+            field_index = field - 1
+            if field_index < 0 or field_index >= len(parts):
+                return f"Error: Field index {field} out of range"
+            selected_parts.append(parts[field_index])
+        return ''.join(selected_parts)
+    except ValueError:
+        return "Error: Invalid field value"
 
 def check_name_field_settings(experiment_dir, separator, name_fields, type_field, col_field, config, input_folder_mod_range_min, input_file_type_mod_range_min):
-   def run_cut_command(filename, fields, separator):
-       try:
-           parts = filename.split(separator)
-           selected_parts = []
-           for field in fields.split('-'):
-               field_index = int(field) - 1
-               if field_index < 0 or field_index >= len(parts):
-                   return f"Error: Field index {field} out of range"
-               selected_parts.append(parts[field_index])
-           return ''.join(selected_parts)
-       except ValueError:
-           return "Error: Invalid field value"
-
+#    def parse_name_fields(fields):
+#     """Parse a string of fields like '1,2,4-6' into a list of integers."""
+#     field_list = []
+#     for part in fields.split(','):
+#         if '-' in part:
+#             start, end = part.split('-')
+#             field_list.extend(range(int(start), int(end) + 1))
+#         else:
+#             field_list.append(int(part))
+#     return field_list
+   
+#     def run_cut_command(filename, fields, separator):
+#         """Select specified fields from a filename using the given separator."""
+#         try:
+#             parts = filename.split(separator)
+#             selected_parts = []
+#             for field in parse_name_fields(fields):
+#                 field_index = field - 1
+#                 if field_index < 0 or field_index >= len(parts):
+#                     return f"Error: Field index {field} out of range"
+#                 selected_parts.append(parts[field_index])
+#             return ''.join(selected_parts)
+#         except ValueError:
+#             return "Error: Invalid field value"
 
    try:
        # Get a sample file
@@ -823,9 +855,9 @@ def main():
     # Define variables for paths
     #OMNOM_HOME = "/net/beegfs/cfg/projects/dewintherlab/"
     #OMNOM_HOME = os.path.join("/Users/kierancarroll/Documents/","Amsterdam UMC Klinische Genetica Internship","omnomnomics")
-    OMNOM_HOME = "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics"
+    OMNOM_HOME = "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship"
     #CONFIG_FILE = os.path.join(OMNOM_HOME,"", "config.yaml")
-    CONFIG_FILE = os.path.join(f"{OMNOM_HOME}","config.yaml")
+    CONFIG_FILE = os.path.join(f"{OMNOM_HOME}", "bin", "config.yaml")
 
 
     #Check if OMNOM_HOME exists
@@ -862,7 +894,7 @@ def main():
     INPUT = args.input if args.input else config.get('input',"NA")
     metadata = args.metadata if args.metadata else config.get('metadata', "NA")
     style = args.style if args.style else config.get('the_style', "factor")
-    col_table = args.col_table if args.col_table else config.get('color_table', f"{OMNOM_HOME}/bin/color_data_for_hubs/gray.tint.color.table")
+    col_table = args.col_table.replace("{OMNOM_HOME}", OMNOM_HOME) if args.col_table else config.get('color_table', f"{OMNOM_HOME}/bin/color_data_for_hubs/gray.tint.color.table").replace("{OMNOM_HOME}", OMNOM_HOME)
     color_data_folder = args.color_data_folder if args.color_data_folder else config.get('color_data_folder', f"{OMNOM_HOME}/bin/color_data_for_hubs")
     overlay = args.overlay if args.overlay else config.get('overlay', "transparentOverlay")
     hub_mail = args.hub_mail if args.hub_mail else config.get('hub_mail', "m.dewinther@amsterdamumc.nl")
@@ -1013,7 +1045,7 @@ def main():
 
     with open(log_file, 'a') as log:
         log.write(f"Invocation:\t{the_command}\n")
-        log.write(f"Job submitted at:\t{sub_time}\n")
+        log.write(f"Snakemake Job submitted at:\t{sub_time}\n")
         #log.write(f"Max walltime:\t{max_time}\n\n") leave time out for now
         log.write(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
         log.write("WAITING FOR SNAKEMAKE & SLURM TO COMPLETE...\n")
@@ -1025,7 +1057,7 @@ def main():
         # Call Snakemake with the appropriate parameters
     #cmd = [ "snakemake", "--snakefile", "Snakefile.smk", "--profile", os.path.join(experiment_dir, "snakemake_profiles/slurm_profile"),
             #"--configfile", os.path.join(experiment_dir, f"omnomnomics.run.{run_date}.config"), "--cores", f"{max_cores}"]
-    cmd = [ "snakemake",  "--profile", os.path.join(experiment_dir, "snakemake_profiles/slurm_profile"), "--snakefile", "omnomnomics/Snakefile.smk",
+    cmd = [ "snakemake",  "--profile", os.path.join(OMNOM_HOME, "slurm_profile"), "--snakefile", "omnomnomics/Snakefile.smk",
         "--config", "config_file="+os.path.join(experiment_dir, f'omnomnomics.run.{run_date}.config.yaml'), "--jobs", "1000", "--cores", "1280", "--rerun-triggers", "mtime"
     ]
 

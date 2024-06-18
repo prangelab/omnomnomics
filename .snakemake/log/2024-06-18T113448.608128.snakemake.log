@@ -1,0 +1,91 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-18.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job           count    min threads    max threads
+----------  -------  -------------  -------------
+all               1              1              1
+merge_bam         2            128            128
+run_hisat2        2             32             32
+total             5              1            128
+
+Select jobs to execute...
+
+[Tue Jun 18 11:35:07 2024]
+rule run_hisat2:
+    input: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R1.trimmed.fastq.gz, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R2.trimmed.fastq.gz
+    output: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.HISAT2_stats.txt, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra.tmp
+    jobid: 1
+    benchmark: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_benchmark.tsv
+    reason: Forced execution
+    wildcards: sample1=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002
+    threads: 32
+    resources: mem_mb=128000, mem_mib=122071, disk_mb=7999, disk_mib=7629, tmpdir=<TBD>
+
+Submitted job 1 with external jobid 'Submitted batch job 5339432'.
+
+[Tue Jun 18 11:35:10 2024]
+rule run_hisat2:
+    input: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002_R1.trimmed.fastq.gz, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002_R2.trimmed.fastq.gz
+    output: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.HISAT2_stats.txt, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.extra.tmp
+    jobid: 3
+    benchmark: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002_benchmark.tsv
+    reason: Forced execution
+    wildcards: sample1=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002
+    threads: 32
+    resources: mem_mb=128000, mem_mib=122071, disk_mb=8403, disk_mib=8014, tmpdir=<TBD>
+
+Submitted job 3 with external jobid 'Submitted batch job 5339433'.
+[Tue Jun 18 11:54:06 2024]
+Finished job 1.
+1 of 5 steps (20%) done
+[Tue Jun 18 11:57:53 2024]
+Finished job 3.
+2 of 5 steps (40%) done
+Select jobs to execute...
+
+[Tue Jun 18 11:57:53 2024]
+rule merge_bam:
+    input: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra.tmp, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.extra.tmp
+    output: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_4.tmp
+    jobid: 6
+    benchmark: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_benchmark.tsv
+    reason: Missing output files: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_4.tmp; Input files updated by another job: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra.tmp, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.extra.tmp
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954, tmpdir=<TBD>
+
+Submitted job 6 with external jobid 'Submitted batch job 5339489'.
+
+[Tue Jun 18 11:57:53 2024]
+rule merge_bam:
+    input: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra.tmp, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.extra.tmp
+    output: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_4.tmp
+    jobid: 5
+    benchmark: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_benchmark.tsv
+    reason: Missing output files: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_4.tmp; Input files updated by another job: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra.tmp, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.extra.tmp
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954, tmpdir=<TBD>
+
+Submitted job 5 with external jobid 'Submitted batch job 5339490'.
+[Tue Jun 18 11:58:02 2024]
+Error in rule merge_bam:
+    jobid: 6
+    input: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra.tmp, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.extra.tmp
+    output: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_4.tmp
+    cluster_jobid: Submitted batch job 5339489
+
+Error executing rule merge_bam on cluster (jobid: 6, external: Submitted batch job 5339489, jobscript: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.7lp9ludi/snakejob.merge_bam.6.sh). For error details see the cluster log and the log files of the involved rule(s).
+[Tue Jun 18 11:58:02 2024]
+Error in rule merge_bam:
+    jobid: 5
+    input: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra.tmp, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.extra.tmp
+    output: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_4.tmp
+    cluster_jobid: Submitted batch job 5339490
+
+Error executing rule merge_bam on cluster (jobid: 5, external: Submitted batch job 5339490, jobscript: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.7lp9ludi/snakejob.merge_bam.5.sh). For error details see the cluster log and the log files of the involved rule(s).
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+Complete log: ../.snakemake/log/2024-06-18T113448.608128.snakemake.log
