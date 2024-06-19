@@ -53,7 +53,7 @@ rule merge_bam:
             
         merging_version = subprocess.check_output("module load samtools && samtools --version | head -n2", shell=True, executable='/bin/bash')
         log_it(logfile, "\n"+merging_version.decode("utf-8"), "SAMTOOLS VERSION")
-        print(merging_version.decode("utf-8"))
+
         sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['merge_rule_num']-1])
 
         def merge_bam_files(input_bamfiles, threads):
@@ -114,9 +114,7 @@ rule merge_bam:
                         # If there is only one lane we don't need to bother with merging and can simply clean the name
                         parts = sample_key.split('.', 1)
                         from_file = glob.glob(f"BAM/{parts[0]}_L00*.{parts[1]}")[0]
-                        print(from_file)
                         to_file = os.path.join('BAM', parts[0] + ('.'+parts[1]))
-                        print(to_file)
                         log_it(logfile, f"Renaming {from_file} to {to_file}...")
                         shell(f"mv {from_file} {to_file}")
                         shell(f"""echo "necessity file for merge bams. can delete this." > BAM/{wildcards.sample}.extra_4.tmp""")

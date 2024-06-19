@@ -1,0 +1,594 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-19.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 128
+Rules claiming more threads will be scaled down.
+Provided resources: mem_mb=512000, mem_mib=488282, disk_mb=7264, disk_mib=6928
+Select jobs to execute...
+
+[Wed Jun 19 16:55:45 2024]
+rule call_peaks:
+    input: filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.filtered.bam, HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.filtered.HOMER_tagDir.tar.gz
+    output: peak_calling/extra_11.tmp
+    jobid: 0
+    benchmark: peak_calling/call_peaks_benchmark.tsv
+    reason: Missing output files: peak_calling/extra_11.tmp
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=7264, disk_mib=6928, tmpdir=/tmp/kcarroll.5341953
+
+	Fragment Length = 342
+	Total Tags = 23232551.0
+	Tags per bp = 0.011616
+	Max tags per bp set automatically to 1.0
+	Finding peaks of size 369, no closer than 738
+		Finding peaks on chr1 (minCount=3.3), total tags positions = 3633460
+		Finding peaks on chr2 (minCount=3.3), total tags positions = 3426656
+		Finding peaks on chr3 (minCount=3.3), total tags positions = 2541547
+		Finding peaks on chr4 (minCount=3.3), total tags positions = 2159884
+		Finding peaks on chr5 (minCount=3.3), total tags positions = 2405554
+		Finding peaks on chr6 (minCount=3.3), total tags positions = 2300149
+		Finding peaks on chr7 (minCount=3.3), total tags positions = 2039111
+		Finding peaks on chr8 (minCount=3.3), total tags positions = 1990651
+		Finding peaks on chr9 (minCount=3.3), total tags positions = 1761231
+		Finding peaks on chr10 (minCount=3.3), total tags positions = 2060908
+		Finding peaks on chr11 (minCount=3.3), total tags positions = 1919660
+		Finding peaks on chr12 (minCount=3.3), total tags positions = 1894447
+		Finding peaks on chr13 (minCount=3.3), total tags positions = 1187818
+		Finding peaks on chr14 (minCount=3.3), total tags positions = 1156630
+		Finding peaks on chr15 (minCount=3.3), total tags positions = 1223496
+		Finding peaks on chr16 (minCount=3.3), total tags positions = 1106230
+		Finding peaks on chr17 (minCount=3.3), total tags positions = 1426264
+		Finding peaks on chr18 (minCount=3.3), total tags positions = 912667
+		Finding peaks on chr19 (minCount=3.3), total tags positions = 1054979
+		Finding peaks on chr20 (minCount=3.3), total tags positions = 1030046
+		Finding peaks on chr21 (minCount=3.3), total tags positions = 472334
+		Finding peaks on chr22 (minCount=3.3), total tags positions = 568063
+		Finding peaks on chrX (minCount=3.3), total tags positions = 3387539
+		Finding peaks on chrY (minCount=3.3), total tags positions = 5057
+		Finding peaks on chrM (minCount=3.3), total tags positions = 1210
+		Finding peaks on chr10_GL383545v1_alt (minCount=3.3), total tags positions = 888
+		Finding peaks on chr10_GL383546v1_alt (minCount=3.3), total tags positions = 80
+		Finding peaks on chr10_KI270824v1_alt (minCount=3.3), total tags positions = 131
+		Finding peaks on chr10_KI270825v1_alt (minCount=3.3), total tags positions = 103
+		Finding peaks on chr11_GL383547v1_alt (minCount=3.3), total tags positions = 37
+		Finding peaks on chr11_JH159136v1_alt (minCount=3.3), total tags positions = 36
+		Finding peaks on chr11_JH159137v1_alt (minCount=3.3), total tags positions = 124
+		Finding peaks on chr11_KI270721v1_random (minCount=3.3), total tags positions = 252
+		Finding peaks on chr11_KI270826v1_alt (minCount=3.3), total tags positions = 49
+		Finding peaks on chr11_KI270827v1_alt (minCount=3.3), total tags positions = 183
+		Finding peaks on chr11_KI270829v1_alt (minCount=3.3), total tags positions = 90
+		Finding peaks on chr11_KI270830v1_alt (minCount=3.3), total tags positions = 590
+		Finding peaks on chr11_KI270831v1_alt (minCount=3.3), total tags positions = 588
+		Finding peaks on chr11_KI270832v1_alt (minCount=3.3), total tags positions = 1336
+		Finding peaks on chr11_KI270902v1_alt (minCount=3.3), total tags positions = 26
+		Finding peaks on chr11_KI270903v1_alt (minCount=3.3), total tags positions = 873
+		Finding peaks on chr11_KI270927v1_alt (minCount=3.3), total tags positions = 91
+		Finding peaks on chr12_GL383549v1_alt (minCount=3.3), total tags positions = 50
+		Finding peaks on chr12_GL383550v2_alt (minCount=3.3), total tags positions = 198
+		Finding peaks on chr12_GL383551v1_alt (minCount=3.3), total tags positions = 42
+		Finding peaks on chr12_GL383552v1_alt (minCount=3.3), total tags positions = 32
+		Finding peaks on chr12_GL383553v2_alt (minCount=3.3), total tags positions = 49
+		Finding peaks on chr12_GL877875v1_alt (minCount=3.3), total tags positions = 963
+		Finding peaks on chr12_GL877876v1_alt (minCount=3.3), total tags positions = 16
+		Finding peaks on chr12_KI270833v1_alt (minCount=3.3), total tags positions = 86
+		Finding peaks on chr12_KI270834v1_alt (minCount=3.3), total tags positions = 84
+		Finding peaks on chr12_KI270835v1_alt (minCount=3.3), total tags positions = 215
+		Finding peaks on chr12_KI270836v1_alt (minCount=3.3), total tags positions = 99
+		Finding peaks on chr12_KI270837v1_alt (minCount=3.3), total tags positions = 41
+		Finding peaks on chr12_KI270904v1_alt (minCount=3.3), total tags positions = 653
+		Finding peaks on chr13_KI270838v1_alt (minCount=3.3), total tags positions = 129
+		Finding peaks on chr13_KI270839v1_alt (minCount=3.3), total tags positions = 161
+		Finding peaks on chr13_KI270840v1_alt (minCount=3.3), total tags positions = 17
+		Finding peaks on chr13_KI270841v1_alt (minCount=3.3), total tags positions = 117
+		Finding peaks on chr13_KI270842v1_alt (minCount=3.3), total tags positions = 256
+		Finding peaks on chr13_KI270843v1_alt (minCount=3.3), total tags positions = 32
+		Finding peaks on chr14_GL000009v2_random (minCount=3.3), total tags positions = 1459
+		Finding peaks on chr14_GL000194v1_random (minCount=3.3), total tags positions = 1587
+		Finding peaks on chr14_GL000225v1_random (minCount=3.3), total tags positions = 1627
+		Finding peaks on chr14_KI270722v1_random (minCount=3.3), total tags positions = 1332
+		Finding peaks on chr14_KI270723v1_random (minCount=3.3), total tags positions = 222
+		Finding peaks on chr14_KI270724v1_random (minCount=3.3), total tags positions = 268
+		Finding peaks on chr14_KI270725v1_random (minCount=3.3), total tags positions = 819
+		Finding peaks on chr14_KI270726v1_random (minCount=3.3), total tags positions = 505
+		Finding peaks on chr14_KI270844v1_alt (minCount=3.3), total tags positions = 590
+		Finding peaks on chr14_KI270845v1_alt (minCount=3.3), total tags positions = 325
+		Finding peaks on chr14_KI270846v1_alt (minCount=3.3), total tags positions = 870
+		Finding peaks on chr14_KI270847v1_alt (minCount=3.3), total tags positions = 139
+		Finding peaks on chr15_GL383554v1_alt (minCount=3.3), total tags positions = 27
+		Finding peaks on chr15_GL383555v2_alt (minCount=3.3), total tags positions = 751
+		Finding peaks on chr15_KI270727v1_random (minCount=3.3), total tags positions = 5
+		Finding peaks on chr15_KI270848v1_alt (minCount=3.3), total tags positions = 129
+		Finding peaks on chr15_KI270849v1_alt (minCount=3.3), total tags positions = 193
+		Finding peaks on chr15_KI270850v1_alt (minCount=3.3), total tags positions = 1141
+		Finding peaks on chr15_KI270851v1_alt (minCount=3.3), total tags positions = 188
+		Finding peaks on chr15_KI270852v1_alt (minCount=3.3), total tags positions = 147
+		Finding peaks on chr15_KI270905v1_alt (minCount=3.3), total tags positions = 8033
+		Finding peaks on chr15_KI270906v1_alt (minCount=3.3), total tags positions = 21
+		Finding peaks on chr16_GL383556v1_alt (minCount=3.3), total tags positions = 459
+		Finding peaks on chr16_GL383557v1_alt (minCount=3.3), total tags positions = 492
+		Finding peaks on chr16_KI270728v1_random (minCount=3.3), total tags positions = 2351
+		Finding peaks on chr16_KI270853v1_alt (minCount=3.3), total tags positions = 4298
+		Finding peaks on chr16_KI270854v1_alt (minCount=3.3), total tags positions = 79
+		Finding peaks on chr16_KI270855v1_alt (minCount=3.3), total tags positions = 122
+		Finding peaks on chr16_KI270856v1_alt (minCount=3.3), total tags positions = 474
+		Finding peaks on chr17_GL000205v2_random (minCount=3.3), total tags positions = 4259
+		Finding peaks on chr17_GL000258v2_alt (minCount=3.3), total tags positions = 5602
+		Finding peaks on chr17_GL383563v3_alt (minCount=3.3), total tags positions = 1444
+		Finding peaks on chr17_GL383564v2_alt (minCount=3.3), total tags positions = 75
+		Finding peaks on chr17_GL383565v1_alt (minCount=3.3), total tags positions = 49
+		Finding peaks on chr17_GL383566v1_alt (minCount=3.3), total tags positions = 68
+		Finding peaks on chr17_JH159146v1_alt (minCount=3.3), total tags positions = 542
+		Finding peaks on chr17_JH159147v1_alt (minCount=3.3), total tags positions = 326
+		Finding peaks on chr17_JH159148v1_alt (minCount=3.3), total tags positions = 188
+		Finding peaks on chr17_KI270729v1_random (minCount=3.3), total tags positions = 1084
+		Finding peaks on chr17_KI270730v1_random (minCount=3.3), total tags positions = 170
+		Finding peaks on chr17_KI270857v1_alt (minCount=3.3), total tags positions = 7651
+		Finding peaks on chr17_KI270858v1_alt (minCount=3.3), total tags positions = 42
+		Finding peaks on chr17_KI270859v1_alt (minCount=3.3), total tags positions = 70
+		Finding peaks on chr17_KI270860v1_alt (minCount=3.3), total tags positions = 173
+		Finding peaks on chr17_KI270861v1_alt (minCount=3.3), total tags positions = 90
+		Finding peaks on chr17_KI270862v1_alt (minCount=3.3), total tags positions = 140
+		Finding peaks on chr17_KI270907v1_alt (minCount=3.3), total tags positions = 461
+		Finding peaks on chr17_KI270908v1_alt (minCount=3.3), total tags positions = 1108
+		Finding peaks on chr17_KI270909v1_alt (minCount=3.3), total tags positions = 245
+		Finding peaks on chr17_KI270910v1_alt (minCount=3.3), total tags positions = 32
+		Finding peaks on chr18_GL383567v1_alt (minCount=3.3), total tags positions = 216
+		Finding peaks on chr18_GL383568v1_alt (minCount=3.3), total tags positions = 133
+		Finding peaks on chr18_GL383569v1_alt (minCount=3.3), total tags positions = 96
+		Finding peaks on chr18_GL383570v1_alt (minCount=3.3), total tags positions = 81
+		Finding peaks on chr18_GL383571v1_alt (minCount=3.3), total tags positions = 251
+		Finding peaks on chr18_GL383572v1_alt (minCount=3.3), total tags positions = 154
+		Finding peaks on chr18_KI270863v1_alt (minCount=3.3), total tags positions = 282
+		Finding peaks on chr18_KI270864v1_alt (minCount=3.3), total tags positions = 129
+		Finding peaks on chr18_KI270911v1_alt (minCount=3.3), total tags positions = 125
+		Finding peaks on chr18_KI270912v1_alt (minCount=3.3), total tags positions = 52
+		Finding peaks on chr19_GL383573v1_alt (minCount=3.3), total tags positions = 91
+		Finding peaks on chr19_GL383574v1_alt (minCount=3.3), total tags positions = 141
+		Finding peaks on chr19_GL383575v2_alt (minCount=3.3), total tags positions = 50
+		Finding peaks on chr19_GL383576v1_alt (minCount=3.3), total tags positions = 144
+		Finding peaks on chr19_GL949746v1_alt (minCount=3.3), total tags positions = 1389
+		Finding peaks on chr19_GL949747v2_alt (minCount=3.3), total tags positions = 283
+		Finding peaks on chr19_GL949748v2_alt (minCount=3.3), total tags positions = 12
+		Finding peaks on chr19_GL949749v2_alt (minCount=3.3), total tags positions = 30
+		Finding peaks on chr19_GL949750v2_alt (minCount=3.3), total tags positions = 60
+		Finding peaks on chr19_GL949751v2_alt (minCount=3.3), total tags positions = 4
+		Finding peaks on chr19_GL949752v1_alt (minCount=3.3), total tags positions = 925
+		Finding peaks on chr19_GL949753v2_alt (minCount=3.3), total tags positions = 100
+		Finding peaks on chr19_KI270865v1_alt (minCount=3.3), total tags positions = 21
+		Finding peaks on chr19_KI270866v1_alt (minCount=3.3), total tags positions = 24
+		Finding peaks on chr19_KI270867v1_alt (minCount=3.3), total tags positions = 146
+		Finding peaks on chr19_KI270868v1_alt (minCount=3.3), total tags positions = 312
+		Finding peaks on chr19_KI270882v1_alt (minCount=3.3), total tags positions = 2
+		Finding peaks on chr19_KI270883v1_alt (minCount=3.3), total tags positions = 6
+		Finding peaks on chr19_KI270884v1_alt (minCount=3.3), total tags positions = 11
+		Finding peaks on chr19_KI270885v1_alt (minCount=3.3), total tags positions = 2
+		Finding peaks on chr19_KI270887v1_alt (minCount=3.3), total tags positions = 8
+		Finding peaks on chr19_KI270889v1_alt (minCount=3.3), total tags positions = 5
+		Finding peaks on chr19_KI270914v1_alt (minCount=3.3), total tags positions = 3
+		Finding peaks on chr19_KI270915v1_alt (minCount=3.3), total tags positions = 2
+		Finding peaks on chr19_KI270916v1_alt (minCount=3.3), total tags positions = 4
+		Finding peaks on chr19_KI270920v1_alt (minCount=3.3), total tags positions = 12
+		Finding peaks on chr19_KI270921v1_alt (minCount=3.3), total tags positions = 5
+		Finding peaks on chr19_KI270922v1_alt (minCount=3.3), total tags positions = 9
+		Finding peaks on chr19_KI270923v1_alt (minCount=3.3), total tags positions = 54
+		Finding peaks on chr19_KI270929v1_alt (minCount=3.3), total tags positions = 6
+		Finding peaks on chr19_KI270930v1_alt (minCount=3.3), total tags positions = 6
+		Finding peaks on chr19_KI270931v1_alt (minCount=3.3), total tags positions = 11
+		Finding peaks on chr19_KI270933v1_alt (minCount=3.3), total tags positions = 72
+		Finding peaks on chr19_KI270938v1_alt (minCount=3.3), total tags positions = 386
+		Finding peaks on chr1_GL383518v1_alt (minCount=3.3), total tags positions = 6
+		Finding peaks on chr1_GL383519v1_alt (minCount=3.3), total tags positions = 35
+		Finding peaks on chr1_GL383520v2_alt (minCount=3.3), total tags positions = 97
+		Finding peaks on chr1_KI270706v1_random (minCount=3.3), total tags positions = 769
+		Finding peaks on chr1_KI270707v1_random (minCount=3.3), total tags positions = 126
+		Finding peaks on chr1_KI270708v1_random (minCount=3.3), total tags positions = 584
+		Finding peaks on chr1_KI270709v1_random (minCount=3.3), total tags positions = 2746
+		Finding peaks on chr1_KI270710v1_random (minCount=3.3), total tags positions = 283
+		Finding peaks on chr1_KI270711v1_random (minCount=3.3), total tags positions = 420
+		Finding peaks on chr1_KI270712v1_random (minCount=3.3), total tags positions = 4689
+		Finding peaks on chr1_KI270713v1_random (minCount=3.3), total tags positions = 3739
+		Finding peaks on chr1_KI270714v1_random (minCount=3.3), total tags positions = 1913
+		Finding peaks on chr1_KI270759v1_alt (minCount=3.3), total tags positions = 529
+		Finding peaks on chr1_KI270760v1_alt (minCount=3.3), total tags positions = 293
+		Finding peaks on chr1_KI270761v1_alt (minCount=3.3), total tags positions = 12
+		Finding peaks on chr1_KI270762v1_alt (minCount=3.3), total tags positions = 222
+		Finding peaks on chr1_KI270763v1_alt (minCount=3.3), total tags positions = 381
+		Finding peaks on chr1_KI270764v1_alt (minCount=3.3), total tags positions = 68
+		Finding peaks on chr1_KI270765v1_alt (minCount=3.3), total tags positions = 1834
+		Finding peaks on chr1_KI270766v1_alt (minCount=3.3), total tags positions = 266
+		Finding peaks on chr1_KI270892v1_alt (minCount=3.3), total tags positions = 61
+		Finding peaks on chr20_GL383577v2_alt (minCount=3.3), total tags positions = 247
+		Finding peaks on chr20_KI270869v1_alt (minCount=3.3), total tags positions = 94
+		Finding peaks on chr20_KI270870v1_alt (minCount=3.3), total tags positions = 136
+		Finding peaks on chr20_KI270871v1_alt (minCount=3.3), total tags positions = 243
+		Finding peaks on chr21_GL383578v2_alt (minCount=3.3), total tags positions = 252
+		Finding peaks on chr21_GL383579v2_alt (minCount=3.3), total tags positions = 58
+		Finding peaks on chr21_GL383580v2_alt (minCount=3.3), total tags positions = 275
+		Finding peaks on chr21_GL383581v2_alt (minCount=3.3), total tags positions = 157
+		Finding peaks on chr21_KI270872v1_alt (minCount=3.3), total tags positions = 90
+		Finding peaks on chr21_KI270873v1_alt (minCount=3.3), total tags positions = 60
+		Finding peaks on chr21_KI270874v1_alt (minCount=3.3), total tags positions = 79
+		Finding peaks on chr22_GL383582v2_alt (minCount=3.3), total tags positions = 66
+		Finding peaks on chr22_GL383583v2_alt (minCount=3.3), total tags positions = 205
+		Finding peaks on chr22_KB663609v1_alt (minCount=3.3), total tags positions = 77
+		Finding peaks on chr22_KI270731v1_random (minCount=3.3), total tags positions = 557
+		Finding peaks on chr22_KI270732v1_random (minCount=3.3), total tags positions = 461
+		Finding peaks on chr22_KI270733v1_random (minCount=3.3), total tags positions = 10601
+		Finding peaks on chr22_KI270734v1_random (minCount=3.3), total tags positions = 598
+		Finding peaks on chr22_KI270735v1_random (minCount=3.3), total tags positions = 564
+		Finding peaks on chr22_KI270736v1_random (minCount=3.3), total tags positions = 69
+		Finding peaks on chr22_KI270737v1_random (minCount=3.3), total tags positions = 277
+		Finding peaks on chr22_KI270738v1_random (minCount=3.3), total tags positions = 531
+		Finding peaks on chr22_KI270739v1_random (minCount=3.3), total tags positions = 13
+		Finding peaks on chr22_KI270875v1_alt (minCount=3.3), total tags positions = 464
+		Finding peaks on chr22_KI270876v1_alt (minCount=3.3), total tags positions = 184
+		Finding peaks on chr22_KI270877v1_alt (minCount=3.3), total tags positions = 234
+		Finding peaks on chr22_KI270878v1_alt (minCount=3.3), total tags positions = 665
+		Finding peaks on chr22_KI270879v1_alt (minCount=3.3), total tags positions = 837
+		Finding peaks on chr22_KI270928v1_alt (minCount=3.3), total tags positions = 78
+		Finding peaks on chr2_GL383521v1_alt (minCount=3.3), total tags positions = 168
+		Finding peaks on chr2_GL383522v1_alt (minCount=3.3), total tags positions = 183
+		Finding peaks on chr2_GL582966v2_alt (minCount=3.3), total tags positions = 36
+		Finding peaks on chr2_KI270715v1_random (minCount=3.3), total tags positions = 329
+		Finding peaks on chr2_KI270716v1_random (minCount=3.3), total tags positions = 203
+		Finding peaks on chr2_KI270767v1_alt (minCount=3.3), total tags positions = 121
+		Finding peaks on chr2_KI270768v1_alt (minCount=3.3), total tags positions = 174
+		Finding peaks on chr2_KI270769v1_alt (minCount=3.3), total tags positions = 40
+		Finding peaks on chr2_KI270770v1_alt (minCount=3.3), total tags positions = 681
+		Finding peaks on chr2_KI270771v1_alt (minCount=3.3), total tags positions = 51
+		Finding peaks on chr2_KI270772v1_alt (minCount=3.3), total tags positions = 2889
+		Finding peaks on chr2_KI270773v1_alt (minCount=3.3), total tags positions = 37
+		Finding peaks on chr2_KI270774v1_alt (minCount=3.3), total tags positions = 246
+		Finding peaks on chr2_KI270775v1_alt (minCount=3.3), total tags positions = 23
+		Finding peaks on chr2_KI270776v1_alt (minCount=3.3), total tags positions = 118
+		Finding peaks on chr2_KI270893v1_alt (minCount=3.3), total tags positions = 68
+		Finding peaks on chr2_KI270894v1_alt (minCount=3.3), total tags positions = 3211
+		Finding peaks on chr3_GL000221v1_random (minCount=3.3), total tags positions = 541
+		Finding peaks on chr3_GL383526v1_alt (minCount=3.3), total tags positions = 134
+		Finding peaks on chr3_JH636055v2_alt (minCount=3.3), total tags positions = 341
+		Finding peaks on chr3_KI270777v1_alt (minCount=3.3), total tags positions = 215
+		Finding peaks on chr3_KI270778v1_alt (minCount=3.3), total tags positions = 61
+		Finding peaks on chr3_KI270779v1_alt (minCount=3.3), total tags positions = 227
+		Finding peaks on chr3_KI270780v1_alt (minCount=3.3), total tags positions = 510
+		Finding peaks on chr3_KI270781v1_alt (minCount=3.3), total tags positions = 618
+		Finding peaks on chr3_KI270782v1_alt (minCount=3.3), total tags positions = 479
+		Finding peaks on chr3_KI270783v1_alt (minCount=3.3), total tags positions = 86
+		Finding peaks on chr3_KI270784v1_alt (minCount=3.3), total tags positions = 744
+		Finding peaks on chr3_KI270895v1_alt (minCount=3.3), total tags positions = 81
+		Finding peaks on chr3_KI270924v1_alt (minCount=3.3), total tags positions = 312
+		Finding peaks on chr3_KI270934v1_alt (minCount=3.3), total tags positions = 44
+		Finding peaks on chr3_KI270935v1_alt (minCount=3.3), total tags positions = 193
+		Finding peaks on chr3_KI270936v1_alt (minCount=3.3), total tags positions = 46
+		Finding peaks on chr3_KI270937v1_alt (minCount=3.3), total tags positions = 56
+		Finding peaks on chr4_GL000008v2_random (minCount=3.3), total tags positions = 1050
+		Finding peaks on chr4_GL000257v2_alt (minCount=3.3), total tags positions = 584
+		Finding peaks on chr4_GL383527v1_alt (minCount=3.3), total tags positions = 321
+		Finding peaks on chr4_GL383528v1_alt (minCount=3.3), total tags positions = 35
+		Finding peaks on chr4_KI270785v1_alt (minCount=3.3), total tags positions = 74
+		Finding peaks on chr4_KI270786v1_alt (minCount=3.3), total tags positions = 31
+		Finding peaks on chr4_KI270787v1_alt (minCount=3.3), total tags positions = 140
+		Finding peaks on chr4_KI270788v1_alt (minCount=3.3), total tags positions = 434
+		Finding peaks on chr4_KI270789v1_alt (minCount=3.3), total tags positions = 63
+		Finding peaks on chr4_KI270790v1_alt (minCount=3.3), total tags positions = 2
+		Finding peaks on chr4_KI270896v1_alt (minCount=3.3), total tags positions = 174
+		Finding peaks on chr4_KI270925v1_alt (minCount=3.3), total tags positions = 576
+		Finding peaks on chr5_GL000208v1_random (minCount=3.3), total tags positions = 710
+		Finding peaks on chr5_GL339449v2_alt (minCount=3.3), total tags positions = 1885
+		Finding peaks on chr5_GL383530v1_alt (minCount=3.3), total tags positions = 272
+		Finding peaks on chr5_GL383531v1_alt (minCount=3.3), total tags positions = 117
+		Finding peaks on chr5_GL383532v1_alt (minCount=3.3), total tags positions = 57
+		Finding peaks on chr5_GL949742v1_alt (minCount=3.3), total tags positions = 141
+		Finding peaks on chr5_KI270791v1_alt (minCount=3.3), total tags positions = 135
+		Finding peaks on chr5_KI270792v1_alt (minCount=3.3), total tags positions = 115
+		Finding peaks on chr5_KI270793v1_alt (minCount=3.3), total tags positions = 214
+		Finding peaks on chr5_KI270794v1_alt (minCount=3.3), total tags positions = 65
+		Finding peaks on chr5_KI270795v1_alt (minCount=3.3), total tags positions = 353
+		Finding peaks on chr5_KI270796v1_alt (minCount=3.3), total tags positions = 3
+		Finding peaks on chr5_KI270897v1_alt (minCount=3.3), total tags positions = 472
+		Finding peaks on chr5_KI270898v1_alt (minCount=3.3), total tags positions = 60
+		Finding peaks on chr6_GL000250v2_alt (minCount=3.3), total tags positions = 415
+		Finding peaks on chr6_GL000251v2_alt (minCount=3.3), total tags positions = 5170
+		Finding peaks on chr6_GL000252v2_alt (minCount=3.3), total tags positions = 2937
+		Finding peaks on chr6_GL000253v2_alt (minCount=3.3), total tags positions = 626
+		Finding peaks on chr6_GL000254v2_alt (minCount=3.3), total tags positions = 1439
+		Finding peaks on chr6_GL000255v2_alt (minCount=3.3), total tags positions = 1408
+		Finding peaks on chr6_GL000256v2_alt (minCount=3.3), total tags positions = 7766
+		Finding peaks on chr6_GL383533v1_alt (minCount=3.3), total tags positions = 332
+		Finding peaks on chr6_KB021644v2_alt (minCount=3.3), total tags positions = 63
+		Finding peaks on chr6_KI270758v1_alt (minCount=3.3), total tags positions = 26
+		Finding peaks on chr6_KI270797v1_alt (minCount=3.3), total tags positions = 104
+		Finding peaks on chr6_KI270798v1_alt (minCount=3.3), total tags positions = 171
+		Finding peaks on chr6_KI270799v1_alt (minCount=3.3), total tags positions = 37
+		Finding peaks on chr6_KI270800v1_alt (minCount=3.3), total tags positions = 105
+		Finding peaks on chr6_KI270801v1_alt (minCount=3.3), total tags positions = 139
+		Finding peaks on chr6_KI270802v1_alt (minCount=3.3), total tags positions = 543
+		Finding peaks on chr7_GL383534v2_alt (minCount=3.3), total tags positions = 58
+		Finding peaks on chr7_KI270803v1_alt (minCount=3.3), total tags positions = 3681
+		Finding peaks on chr7_KI270804v1_alt (minCount=3.3), total tags positions = 315
+		Finding peaks on chr7_KI270805v1_alt (minCount=3.3), total tags positions = 81
+		Finding peaks on chr7_KI270806v1_alt (minCount=3.3), total tags positions = 103
+		Finding peaks on chr7_KI270807v1_alt (minCount=3.3), total tags positions = 43
+		Finding peaks on chr7_KI270808v1_alt (minCount=3.3), total tags positions = 103
+		Finding peaks on chr7_KI270809v1_alt (minCount=3.3), total tags positions = 270
+		Finding peaks on chr7_KI270899v1_alt (minCount=3.3), total tags positions = 153
+		Finding peaks on chr8_KI270810v1_alt (minCount=3.3), total tags positions = 818
+		Finding peaks on chr8_KI270811v1_alt (minCount=3.3), total tags positions = 55
+		Finding peaks on chr8_KI270812v1_alt (minCount=3.3), total tags positions = 46
+		Finding peaks on chr8_KI270813v1_alt (minCount=3.3), total tags positions = 477
+		Finding peaks on chr8_KI270814v1_alt (minCount=3.3), total tags positions = 19
+		Finding peaks on chr8_KI270815v1_alt (minCount=3.3), total tags positions = 146
+		Finding peaks on chr8_KI270816v1_alt (minCount=3.3), total tags positions = 81
+		Finding peaks on chr8_KI270817v1_alt (minCount=3.3), total tags positions = 113
+		Finding peaks on chr8_KI270818v1_alt (minCount=3.3), total tags positions = 247
+		Finding peaks on chr8_KI270819v1_alt (minCount=3.3), total tags positions = 613
+		Finding peaks on chr8_KI270820v1_alt (minCount=3.3), total tags positions = 57
+		Finding peaks on chr8_KI270821v1_alt (minCount=3.3), total tags positions = 1213
+		Finding peaks on chr8_KI270822v1_alt (minCount=3.3), total tags positions = 611
+		Finding peaks on chr8_KI270900v1_alt (minCount=3.3), total tags positions = 282
+		Finding peaks on chr8_KI270901v1_alt (minCount=3.3), total tags positions = 131
+		Finding peaks on chr8_KI270926v1_alt (minCount=3.3), total tags positions = 367
+		Finding peaks on chr9_GL383539v1_alt (minCount=3.3), total tags positions = 50
+		Finding peaks on chr9_GL383540v1_alt (minCount=3.3), total tags positions = 19
+		Finding peaks on chr9_GL383541v1_alt (minCount=3.3), total tags positions = 58
+		Finding peaks on chr9_GL383542v1_alt (minCount=3.3), total tags positions = 427
+		Finding peaks on chr9_KI270717v1_random (minCount=3.3), total tags positions = 1150
+		Finding peaks on chr9_KI270718v1_random (minCount=3.3), total tags positions = 486
+		Finding peaks on chr9_KI270719v1_random (minCount=3.3), total tags positions = 1030
+		Finding peaks on chr9_KI270720v1_random (minCount=3.3), total tags positions = 237
+		Finding peaks on chr9_KI270823v1_alt (minCount=3.3), total tags positions = 124
+		Finding peaks on chrUn_GL000195v1 (minCount=3.3), total tags positions = 2681
+		Finding peaks on chrUn_GL000213v1 (minCount=3.3), total tags positions = 184
+		Finding peaks on chrUn_GL000214v1 (minCount=3.3), total tags positions = 1094
+		Finding peaks on chrUn_GL000216v2 (minCount=3.3), total tags positions = 1197
+		Finding peaks on chrUn_GL000218v1 (minCount=3.3), total tags positions = 1043
+		Finding peaks on chrUn_GL000219v1 (minCount=3.3), total tags positions = 4091
+		Finding peaks on chrUn_GL000220v1 (minCount=3.3), total tags positions = 5151
+		Finding peaks on chrUn_GL000224v1 (minCount=3.3), total tags positions = 2362
+		Finding peaks on chrUn_GL000226v1 (minCount=3.3), total tags positions = 57
+		Finding peaks on chrUn_KI270302v1 (minCount=3.3), total tags positions = 10
+		Finding peaks on chrUn_KI270303v1 (minCount=3.3), total tags positions = 585
+		Finding peaks on chrUn_KI270304v1 (minCount=3.3), total tags positions = 569
+		Finding peaks on chrUn_KI270305v1 (minCount=3.3), total tags positions = 5
+		Finding peaks on chrUn_KI270310v1 (minCount=3.3), total tags positions = 914
+		Finding peaks on chrUn_KI270311v1 (minCount=3.3), total tags positions = 31
+		Finding peaks on chrUn_KI270312v1 (minCount=3.3), total tags positions = 2
+		Finding peaks on chrUn_KI270315v1 (minCount=3.3), total tags positions = 2
+		Finding peaks on chrUn_KI270317v1 (minCount=3.3), total tags positions = 255
+		Finding peaks on chrUn_KI270320v1 (minCount=3.3), total tags positions = 33
+		Finding peaks on chrUn_KI270322v1 (minCount=3.3), total tags positions = 49
+		Finding peaks on chrUn_KI270329v1 (minCount=3.3), total tags positions = 82
+		Finding peaks on chrUn_KI270330v1 (minCount=3.3), total tags positions = 122
+		Finding peaks on chrUn_KI270333v1 (minCount=3.3), total tags positions = 58
+		Finding peaks on chrUn_KI270334v1 (minCount=3.3), total tags positions = 4
+		Finding peaks on chrUn_KI270335v1 (minCount=3.3), total tags positions = 3
+		Finding peaks on chrUn_KI270336v1 (minCount=3.3), total tags positions = 25
+		Finding peaks on chrUn_KI270337v1 (minCount=3.3), total tags positions = 264
+		Finding peaks on chrUn_KI270340v1 (minCount=3.3), total tags positions = 8
+		Finding peaks on chrUn_KI270362v1 (minCount=3.3), total tags positions = 9
+		Finding peaks on chrUn_KI270364v1 (minCount=3.3), total tags positions = 11
+		Finding peaks on chrUn_KI270366v1 (minCount=3.3), total tags positions = 9
+		Finding peaks on chrUn_KI270371v1 (minCount=3.3), total tags positions = 2
+		Finding peaks on chrUn_KI270381v1 (minCount=3.3), total tags positions = 14
+		Finding peaks on chrUn_KI270382v1 (minCount=3.3), total tags positions = 3
+		Finding peaks on chrUn_KI270383v1 (minCount=3.3), total tags positions = 12
+		Finding peaks on chrUn_KI270384v1 (minCount=3.3), total tags positions = 3
+		Finding peaks on chrUn_KI270385v1 (minCount=3.3), total tags positions = 1
+		Finding peaks on chrUn_KI270386v1 (minCount=3.3), total tags positions = 69
+		Finding peaks on chrUn_KI270388v1 (minCount=3.3), total tags positions = 3
+		Finding peaks on chrUn_KI270389v1 (minCount=3.3), total tags positions = 2
+		Finding peaks on chrUn_KI270390v1 (minCount=3.3), total tags positions = 3
+		Finding peaks on chrUn_KI270391v1 (minCount=3.3), total tags positions = 227
+		Finding peaks on chrUn_KI270392v1 (minCount=3.3), total tags positions = 3
+		Finding peaks on chrUn_KI270393v1 (minCount=3.3), total tags positions = 9
+		Finding peaks on chrUn_KI270394v1 (minCount=3.3), total tags positions = 1
+		Finding peaks on chrUn_KI270395v1 (minCount=3.3), total tags positions = 227
+		Finding peaks on chrUn_KI270396v1 (minCount=3.3), total tags positions = 92
+		Finding peaks on chrUn_KI270411v1 (minCount=3.3), total tags positions = 1526
+		Finding peaks on chrUn_KI270412v1 (minCount=3.3), total tags positions = 49
+		Finding peaks on chrUn_KI270414v1 (minCount=3.3), total tags positions = 16
+		Finding peaks on chrUn_KI270417v1 (minCount=3.3), total tags positions = 10
+		Finding peaks on chrUn_KI270418v1 (minCount=3.3), total tags positions = 193
+		Finding peaks on chrUn_KI270419v1 (minCount=3.3), total tags positions = 7
+		Finding peaks on chrUn_KI270420v1 (minCount=3.3), total tags positions = 27
+		Finding peaks on chrUn_KI270422v1 (minCount=3.3), total tags positions = 366
+		Finding peaks on chrUn_KI270423v1 (minCount=3.3), total tags positions = 5
+		Finding peaks on chrUn_KI270424v1 (minCount=3.3), total tags positions = 4
+		Finding peaks on chrUn_KI270425v1 (minCount=3.3), total tags positions = 2
+		Finding peaks on chrUn_KI270429v1 (minCount=3.3), total tags positions = 4
+		Finding peaks on chrUn_KI270435v1 (minCount=3.3), total tags positions = 580
+		Finding peaks on chrUn_KI270438v1 (minCount=3.3), total tags positions = 4886
+		Finding peaks on chrUn_KI270442v1 (minCount=3.3), total tags positions = 2498
+		Finding peaks on chrUn_KI270448v1 (minCount=3.3), total tags positions = 47
+		Finding peaks on chrUn_KI270465v1 (minCount=3.3), total tags positions = 268
+		Finding peaks on chrUn_KI270466v1 (minCount=3.3), total tags positions = 968
+		Finding peaks on chrUn_KI270467v1 (minCount=3.3), total tags positions = 2767
+		Finding peaks on chrUn_KI270468v1 (minCount=3.3), total tags positions = 35
+		Finding peaks on chrUn_KI270507v1 (minCount=3.3), total tags positions = 67
+		Finding peaks on chrUn_KI270508v1 (minCount=3.3), total tags positions = 32
+		Finding peaks on chrUn_KI270509v1 (minCount=3.3), total tags positions = 33
+		Finding peaks on chrUn_KI270510v1 (minCount=3.3), total tags positions = 24
+		Finding peaks on chrUn_KI270511v1 (minCount=3.3), total tags positions = 73
+		Finding peaks on chrUn_KI270512v1 (minCount=3.3), total tags positions = 580
+		Finding peaks on chrUn_KI270515v1 (minCount=3.3), total tags positions = 110
+		Finding peaks on chrUn_KI270516v1 (minCount=3.3), total tags positions = 16
+		Finding peaks on chrUn_KI270517v1 (minCount=3.3), total tags positions = 51
+		Finding peaks on chrUn_KI270518v1 (minCount=3.3), total tags positions = 31
+		Finding peaks on chrUn_KI270519v1 (minCount=3.3), total tags positions = 752
+		Finding peaks on chrUn_KI270521v1 (minCount=3.3), total tags positions = 25
+		Finding peaks on chrUn_KI270522v1 (minCount=3.3), total tags positions = 39
+		Finding peaks on chrUn_KI270528v1 (minCount=3.3), total tags positions = 5
+		Finding peaks on chrUn_KI270529v1 (minCount=3.3), total tags positions = 9
+		Finding peaks on chrUn_KI270530v1 (minCount=3.3), total tags positions = 5
+		Finding peaks on chrUn_KI270538v1 (minCount=3.3), total tags positions = 853
+		Finding peaks on chrUn_KI270539v1 (minCount=3.3), total tags positions = 1
+		Finding peaks on chrUn_KI270544v1 (minCount=3.3), total tags positions = 276
+		Finding peaks on chrUn_KI270579v1 (minCount=3.3), total tags positions = 34
+		Finding peaks on chrUn_KI270580v1 (minCount=3.3), total tags positions = 27
+		Finding peaks on chrUn_KI270581v1 (minCount=3.3), total tags positions = 4
+		Finding peaks on chrUn_KI270582v1 (minCount=3.3), total tags positions = 28
+		Finding peaks on chrUn_KI270583v1 (minCount=3.3), total tags positions = 24
+		Finding peaks on chrUn_KI270584v1 (minCount=3.3), total tags positions = 63
+		Finding peaks on chrUn_KI270587v1 (minCount=3.3), total tags positions = 19
+		Finding peaks on chrUn_KI270588v1 (minCount=3.3), total tags positions = 88
+		Finding peaks on chrUn_KI270589v1 (minCount=3.3), total tags positions = 111
+		Finding peaks on chrUn_KI270590v1 (minCount=3.3), total tags positions = 85
+		Finding peaks on chrUn_KI270591v1 (minCount=3.3), total tags positions = 67
+		Finding peaks on chrUn_KI270593v1 (minCount=3.3), total tags positions = 40
+		Finding peaks on chrUn_KI270741v1 (minCount=3.3), total tags positions = 157
+		Finding peaks on chrUn_KI270742v1 (minCount=3.3), total tags positions = 1468
+		Finding peaks on chrUn_KI270743v1 (minCount=3.3), total tags positions = 1068
+		Finding peaks on chrUn_KI270744v1 (minCount=3.3), total tags positions = 2338
+		Finding peaks on chrUn_KI270745v1 (minCount=3.3), total tags positions = 219
+		Finding peaks on chrUn_KI270746v1 (minCount=3.3), total tags positions = 709
+		Finding peaks on chrUn_KI270747v1 (minCount=3.3), total tags positions = 309
+		Finding peaks on chrUn_KI270748v1 (minCount=3.3), total tags positions = 373
+		Finding peaks on chrUn_KI270749v1 (minCount=3.3), total tags positions = 910
+		Finding peaks on chrUn_KI270750v1 (minCount=3.3), total tags positions = 1033
+		Finding peaks on chrUn_KI270751v1 (minCount=3.3), total tags positions = 1176
+		Finding peaks on chrUn_KI270753v1 (minCount=3.3), total tags positions = 209
+		Finding peaks on chrUn_KI270754v1 (minCount=3.3), total tags positions = 244
+		Finding peaks on chrUn_KI270755v1 (minCount=3.3), total tags positions = 42
+		Finding peaks on chrUn_KI270756v1 (minCount=3.3), total tags positions = 177
+		Finding peaks on chrUn_KI270757v1 (minCount=3.3), total tags positions = 460
+		Finding peaks on chrX_KI270880v1_alt (minCount=3.3), total tags positions = 454
+		Finding peaks on chrX_KI270881v1_alt (minCount=3.3), total tags positions = 22
+		Finding peaks on chrX_KI270913v1_alt (minCount=3.3), total tags positions = 144
+		Tags Used for cluster (less clonal tags) = 23006529.0 / 23232551.0
+	Expected tags per peak = 4.244705 (tbp = 0.011503)
+		Threshold	Peak Count	Expected Peak Count	FDR	Poisson
+		22	29175.000	0.011	3.77e-07	1.01e-09
+		21	32347.000	0.058	1.78e-06	5.31e-09
+		20	36186.000	0.288	7.96e-06	2.66e-08
+		19	40802.000	1.373	3.37e-05	1.27e-07
+		18	46477.000	6.232	1.34e-04	5.75e-07
+		17	53706.000	26.834	5.00e-04	2.48e-06
+		16	62620.000	109.347	1.75e-03	1.01e-05
+		15	73733.000	420.372	5.70e-03	3.88e-05
+		14	88096.000	1519.474	1.72e-02	1.40e-04
+		13	106489.000	5144.563	4.83e-02	4.75e-04
+		12	130126.000	16246.900	1.25e-01	1.50e-03
+		11	161174.000	47633.797	2.96e-01	4.39e-03
+		10	201961.000	128971.780	6.39e-01	1.19e-02
+		9	256207.000	320594.119	1.00e+00	2.96e-02
+		8	329360.000	726888.839	1.00e+00	6.71e-02
+		7	429351.000	1492632.616	1.00e+00	1.38e-01
+		6	568718.000	2755431.425	1.00e+00	2.54e-01
+		5	764312.000	4540430.269	1.00e+00	4.19e-01
+		4	1027901.000	6643048.725	1.00e+00	6.13e-01
+		3	1151255.000	8624452.474	1.00e+00	7.96e-01
+		2	1151255.000	10024835.245	1.00e+00	9.25e-01
+		1	1151255.000	10684661.012	1.00e+00	9.86e-01
+		0	1151255.000	10840107.812	1.00e+00	1.00e+00
+	0.10% FDR Threshold set at 17.0 (poisson pvalue ~ 2.48e-06)
+	53706 peaks passed threshold
+	Local Background Filtering: 5502 of 53706 (10.24% passed)
+	Clonal filtering: 5502 of 5502 (100.00% passed)
+	Total Peaks identified = 5502
+	Centering peaks of size 369 using a fragment length of 342
+
+	Converted 5502 peaks total
+
+[Wed Jun 19 17:10:22 2024]
+Finished job 0.
+1 of 1 steps (100%) done
+2024-06-19 16:55:44: JOB DISPATCHED!
+2024-06-19 16:55:44: Moved color table to experiment dir: gray.tint.color.table
+2024-06-19 16:55:44: Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+Updated logfile path: omnomnomics.run.2024-06-19.log
+2024-06-19 16:55:44: Experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+2024-06-19 16:55:44: Run date: 2024-06-19
+2024-06-19 16:55:44: Log file: omnomnomics.run.2024-06-19.log
+2024-06-19 16:55:44: Files: 1
+2024-06-19 16:55:44: Pairs: 1
+2024-06-19 16:55:44: Paired run: True
+2024-06-19 16:55:44: Type: CHIP
+2024-06-19 16:55:44: Genome: hg38
+2024-06-19 16:55:44: Mode: 11
+2024-06-19 16:55:44: Mode min: 11
+2024-06-19 16:55:44: Mode max: 11
+2024-06-19 16:55:44: Trim tool: skewer
+2024-06-19 16:55:44: Map tool: hisat2
+2024-06-19 16:55:44: Design formula: 1
+2024-06-19 16:55:44: Metadata file: NA
+2024-06-19 16:55:44: Input file (MACS3): NA
+2024-06-19 16:55:44: Input file (HOMER): NA
+2024-06-19 16:55:44: Broad peaks: NA
+2024-06-19 16:55:44: Peak style: factor
+2024-06-19 16:55:44: HOMER peaksize: 500
+2024-06-19 16:55:44: HOMER minDist: 2000
+2024-06-19 16:55:44: 250000M HEAP init
+2024-06-19 16:55:44: 500000M memory per sample
+2024-06-19 16:55:44: Hub type field: 1
+2024-06-19 16:55:44: Hub name field: 1,2,8
+2024-06-19 16:55:44: Hub col field: 2
+2024-06-19 16:55:44: Hub separator: _
+2024-06-19 16:55:44: Hub appendix: hub
+2024-06-19 16:55:44: Hub overlay: transparentOverlay
+2024-06-19 16:55:44: Hub coldata folder: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/bin/color_data_for_hubs
+2024-06-19 16:55:44: Hub color table: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/bin/color_data_for_hubs/gray.tint.color.table
+2024-06-19 16:55:44: Hub mail: m.dewinther@amsterdamumc.nl
+['filtered_BAM', 'HOMER_tagDirs']
+['.bam', '.HOMER_tagDir.tar.gz']
+filtered_BAM/*.bam
+['filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.filtered.bam']
+['human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209']
+['human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209']
+NUMBER OF SAMPLES = 1
+{'1': 32, '2': 16, '3': 32, '4': 128, '5': 16, '6': 1, '7': 1, '8': 1, '9': 1, '10': 128, '11': 128, '12': 128, '13': 128}
+2024-06-19 16:55:44: Checking snake rule functions...
+2024-06-19 16:55:44: Workflow Snake rules Good!
+[11]
+peak_calling
+.bed
+['peak_calling/extra_11.tmp']
+2024-06-19 16:55:45: Calling Peaks...
+2024-06-19 16:55:45: Input folders: filtered_BAM and HOMER_tagDirs
+2024-06-19 16:55:45: Output folder: peak_calling
+2024-06-19 16:55:45: Calling peaks...
+2024-06-19 16:55:45: The type = CHIP
+2024-06-19 16:55:48: 
+macs3 3.0.0b1
+
+macs3 3.0.0b1
+
+2024-06-19 16:55:48: Finding ChIP enriched regions...
+2024-06-19 16:55:48: Calling peaks with MACS3...
+2024-06-19 16:55:48: Sanity check completed
+2024-06-19 16:55:48: Calling peaks for: human...
+2024-06-19 16:55:48: Files in group: filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.filtered.bam
+2024-06-19 16:55:48: Calling peaks with MACS3, using p and q values 1e-6 and 1e-9...
+['human_MDM_d284.MACS3.p-6_peaks.bed', 'human_MDM_d284.MACS3.p-9_summits.bed', 'human_MDM_d284.MACS3.q-6_peaks.bed', 'human_MDM_d284.MACS3.q-9_peaks.narrowPeak', 'human_MDM_d284.MACS3.p-9_peaks.xls', 'human_MDM_d284.MACS3.p-6_peaks.xls', 'call_peaks_benchmark.tsv', 'human_MDM_d284.MACS3.p-9_model.r', 'human_MDM_d284.MACS3.q-6_model.r', 'human_MDM_d284.MACS3.q-6_peaks.xls', 'human_MDM_d284.MACS3.p-9_peaks.narrowPeak', 'human_MDM_d284.MACS3.p-6_summits.bed', 'human_MDM_d284.MACS3.p-6_peaks.narrowPeak', 'human_MDM_d284.MACS3.q-9_peaks.xls', 'human_MDM_d284.MACS3.q-6_summits.bed', 'human_MDM_d284.MACS3.p-9_peaks.bed', 'human_MDM_d284.MACS3.q-9_model.r', 'human_MDM_d284.MACS3.p-6_model.r', '.HOMER.merged_peaks.bed', 'human_MDM_d284.MACS3.q-9_peaks.bed', 'human_MDM_d284.MACS3.q-6_peaks.narrowPeak', 'human_MDM_d284.MACS3.q-9_summits.bed']
+2024-06-19 17:05:49: Cleaning up MACS3 output (keeping only narrowPeak and broadPeak files)...
+ group = human
+the_name = human_MDM_d284
+['human_MDM_d284.MACS3.q-9_peaks.narrowPeak', 'call_peaks_benchmark.tsv', 'human_MDM_d284.MACS3.p-9_peaks.narrowPeak', 'human_MDM_d284.MACS3.p-6_peaks.narrowPeak', '.HOMER.merged_peaks.bed', 'human_MDM_d284.MACS3.q-6_peaks.narrowPeak']
+2024-06-19 17:05:49: Converting to a clean 3 column BED format...
+file = peak_calling/human_MDM_d284.MACS3.q-9_peaks.narrowPeak
+sorted_bed = peak_calling/human_MDM_d284.MACS3.q-9_peaks.bed
+file = peak_calling/human_MDM_d284.MACS3.p-9_peaks.narrowPeak
+sorted_bed = peak_calling/human_MDM_d284.MACS3.p-9_peaks.bed
+file = peak_calling/human_MDM_d284.MACS3.p-6_peaks.narrowPeak
+sorted_bed = peak_calling/human_MDM_d284.MACS3.p-6_peaks.bed
+file = peak_calling/human_MDM_d284.MACS3.q-6_peaks.narrowPeak
+sorted_bed = peak_calling/human_MDM_d284.MACS3.q-6_peaks.bed
+['human_MDM_d284.MACS3.p-6_peaks.bed', 'human_MDM_d284.MACS3.q-6_peaks.bed', 'call_peaks_benchmark.tsv', 'human_MDM_d284.MACS3.p-9_peaks.bed', '.HOMER.merged_peaks.bed', 'human_MDM_d284.MACS3.q-9_peaks.bed']
+2024-06-19 17:05:49: Calling peaks with HOMER...
+2024-06-19 17:05:49: Input folder: HOMER_tagDirs
+2024-06-19 17:05:49: Sanity check completed
+tagdir = HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.filtered.HOMER_tagDir.tar.gz
+tagdirs = ['HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.filtered.HOMER_tagDir']
+homer_input = NA
+2024-06-19 17:05:55: Calling peaks with HOMER...
+2024-06-19 17:05:55: findPeaks {tagdir} -style {thestyle} -o auto
+2024-06-19 17:10:21: Converting peaks to BED format and cleaning up unwanted contigs (chrUn | alt | random)...
+2024-06-19 17:10:21: Testpp HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.filtered.HOMER_tagDir
+chip_groups = ['human']
+group = human
+beds = ['HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.filtered.HOMER_tagDir']
+new beds = ['HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.filtered.HOMER_tagDir/peaks.bed']
+2024-06-19 17:10:21: Merging peaks for: human...
+2024-06-19 17:10:21: Samples in group: HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.filtered.HOMER_tagDir/peaks.bed
+the_name = human_MDM_d284
+sorted_bed = peak_calling/human_MDM_d284.HOMER.merged_peaks.bed
+2024-06-19 17:10:21: module load bedtools && cat HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.filtered.HOMER_tagDir/peaks.bed | sort -k1,1 -k2,2n -k3,3n | bedtools merge -i - > peak_calling/human_MDM_d284.HOMER.merged_peaks.bed

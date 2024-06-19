@@ -32,8 +32,8 @@ rule run_hisat2:
         # fastq1=f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R1_Skewer.fastq.gz" if config["PAIRED"] else None,
         # fastq2=f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2.fastq.gz" if config["PAIRED"] else None,
         # fastq3 = f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2.fastq.gz" if not config["PAIRED"] else None
-        trimmed_fastq1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample1}}_R1.trimmed.fastq.gz" if config["PAIRED"] else f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}.trimmed.fastq.gz",
-        trimmed_fastq2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample1}}_R2.trimmed.fastq.gz" if config['PAIRED'] else None
+        trimmed_fastq1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample1}}_R1.trimmed.fastq.gz" if config["PAIRED"] else f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample1}}.trimmed.fastq.gz",
+        trimmed_fastq2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample1}}_R2.trimmed.fastq.gz" if config['PAIRED'] else []
     output:
         bam=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample1}}.bam",
         stats=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample1}}.HISAT2_stats.txt",
@@ -48,7 +48,7 @@ rule run_hisat2:
     threads:
         Threads_Per_Rule['3']
     resources:
-        mem_mb = 4000 #Memory_Per_Rule['3']
+        mem_mb = Memory_Per_Rule['3']
     benchmark:
         f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample1}}_hisat2_benchmark.tsv"
     run:
@@ -58,7 +58,7 @@ rule run_hisat2:
 
         hisat2_version = subprocess.check_output(["hisat2", "--version"])
         log_it(logfile, "\n"+hisat2_version.decode("utf-8"), "HISAT2 VERSION")
-        print(hisat2_version.decode("utf-8"))
+        
         sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['map_rule_num']-1])
 
         def run_hisat2(seq_type, threads, genome_path, fastq1, fastq2, keepunpaired, inputfolder, outputfolder, sample):
@@ -116,7 +116,7 @@ rule run_hisat2:
                     module load samtools && \
                     hisat2 -p {threads} -x {genome_path} \
                     -U {fastq1} --mm --add-chrname --new-summary --no-spliced-alignment \
-                    | samtools view -b - 1> "{outputfolder}"/{sample}.bam" 2> "{outputfolder}/{sample}.HISAT2_stats.txt"
+                    | samtools view -b - 1> "{outputfolder}/{sample}.bam" 2> "{outputfolder}/{sample}.HISAT2_stats.txt"
                     """)
             # file = f"{outputfolder}/{sample}.HISAT2_stats.txt"
             # for i in range(1,100):
@@ -125,4 +125,4 @@ rule run_hisat2:
             #     shell(f"""echo "necessity file for next step. can delete this." > BAM/extra_wait.tmp""")
             shell(f"""echo "necessity file for aligners. can delete this." > {outputfolder}/{sample}.extra_3.tmp""")
         # Call the function with parameters
-        #run_hisat2(params.seq_type, threads, params.genome_path, input.trimmed_fastq1, input.trimmed_fastq2, params.keepunpaired, params.inputfolder, params.outputfolder, wildcards.sample1)
+        run_hisat2(params.seq_type, threads, params.genome_path, input.trimmed_fastq1, input.trimmed_fastq2, params.keepunpaired, params.inputfolder, params.outputfolder, wildcards.sample1)

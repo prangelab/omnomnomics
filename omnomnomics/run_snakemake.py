@@ -10,9 +10,6 @@ import random
 import math
 from datetime import date, datetime
 
-
-
-
 def parse_arguments(): #############add a feauture to make sure it specifies the cores/nodes etc?? or make a default.
    """Parse command-line arguments."""
    parser = argparse.ArgumentParser(description='Description of your script', allow_abbrev=False)
@@ -181,7 +178,6 @@ def validate_user_defined_vars(OMNOM_HOME, metadata, experiment_dir, INPUT, the_
 
 
     # Check input file
-    homer_input = os.path.join(os.path.dirname(INPUT), f"{os.path.basename(INPUT).replace('.bam', '')}.HOMER_tagDir")
     if INPUT != "NA":
         if not os.path.isfile(INPUT):
             print("ChIP/ATAC Input .bam file (-I) does not exist! Aborting...", file=sys.stderr)
@@ -193,12 +189,15 @@ def validate_user_defined_vars(OMNOM_HOME, metadata, experiment_dir, INPUT, the_
             print("Please provide the full (absolute) path to your input file!", file=sys.stderr)
             print(f"e.g., -I {os.path.join(f'{OMNOM_HOME}', 'genomes', 'input_ChIP', 'my_awesome_input.bam')}. Aborting...", file=sys.stderr)
             sys.exit(1)
-        
-        if not os.path.isdir(homer_input):
+
+        if not os.path.isdir(os.path.join(os.path.dirname(INPUT), f"{os.path.basename(INPUT).replace('.bam', '')}.HOMER_tagDir")):
             print(f"WARNING: No corresponding input HOMER tagDir found! ({homer_input}) does not exist...", file=sys.stderr)
             print("WARNING: Will run HOMER findPeaks without input...", file=sys.stderr)
             homer_input = "NA"
-
+        else:
+            homer_input = os.path.join(os.path.dirname(INPUT), f"{os.path.basename(INPUT).replace('.bam', '')}.HOMER_tagDir")
+    else:
+        homer_input = config['homer_input']
 
     # Convert peak style to lowercase if given on command line, else take the default from config file
     the_style = the_style.lower()
@@ -211,10 +210,9 @@ def validate_user_defined_vars(OMNOM_HOME, metadata, experiment_dir, INPUT, the_
 
 
     # Check color data folder
-    #necesarry, good code, uncomment when in ares server with good directory.
-    # if not os.path.isdir(color_data_folder):
-    #     print(f"Color table folder (-P) ({color_data_folder}) does not exist! Aborting...", file=sys.stderr)
-    #     sys.exit(1)
+    if not os.path.isdir(color_data_folder):
+        print(f"Color table folder (-P) ({color_data_folder}) does not exist! Aborting...", file=sys.stderr)
+        sys.exit(1)
 
 
     # Remove trailing slash from color data folder path if necessary
@@ -559,6 +557,9 @@ def validate_input_files(the_type, config, mode_range_min, experiment_dir):
     if mode_range_min == 11:
         input_file_type_mod_range_min = input_file_type_mod_range_min[0]
         input_folder_mod_range_min = input_folder_mod_range_min[0]
+    if mode_range_min == 12:
+        input_file_type_mod_range_min = input_file_type_mod_range_min[0]
+        input_folder_mod_range_min = input_folder_mod_range_min[0]
 
 
     if os.path.isdir(f"{experiment_dir}/{input_folder_mod_range_min}"):
@@ -567,16 +568,26 @@ def validate_input_files(the_type, config, mode_range_min, experiment_dir):
 
     # Sanity check file number
     if num_files == 0:
-        print("No input files detected! Aborting...", file=sys.stderr)
-        sys.exit(1)
+        if mode_range_min == 13 and the_type == "CHIP":
+                pass
+        elif mode_range_min == 12 and the_type == "CHIP":
+                pass
+        else: 
+            print("No input files detected! Aborting...", file=sys.stderr)
+            sys.exit(1)
 
     print("NUMBER OF FILES")
     print(num_files)
-    # Check if input files are readable
-    input_files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}")
-    if not os.access(input_files[0], os.R_OK): #################can check this for all files in here
-        print(f"Permission error! {input_file_type_mod_range_min} files in {experiment_dir}/{input_folder_mod_range_min} are not readable! Aborting...", file=sys.stderr)
-        sys.exit(1)
+   
+
+    if (mode_range_min == 13 or mode_range_min == 12) and the_type == "CHIP":
+        pass
+    else:
+        # Check if input files are readable
+        input_files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}")
+        if not os.access(input_files[0], os.R_OK): #################can check this for all files in here
+            print(f"Permission error! {input_file_type_mod_range_min} files in {experiment_dir}/{input_folder_mod_range_min} are not readable! Aborting...", file=sys.stderr)
+            sys.exit(1)
 
 
     # Set the number of pairs (if dealing with FASTQs, else just keep it equal to file number)
@@ -634,80 +645,76 @@ def check_name_field_settings(experiment_dir, separator, name_fields, type_field
 #             return ''.join(selected_parts)
 #         except ValueError:
 #             return "Error: Invalid field value"
+    try:
+        # Get a sample file
+        sample_files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}")
+        if not sample_files:
+            raise ValueError("No sample files found.")
+        
+        mock_cut = os.path.basename(sample_files[0])
+        print(f"Debug: Mock cut - {mock_cut}")  # Debugging line
+        
+        # Run the cut command simulations
+        cut_test = ""
+        cut_test += run_cut_command(mock_cut, name_fields, separator)
+        cut_test += run_cut_command(mock_cut, type_field, separator)
+        cut_test += run_cut_command(mock_cut, col_field, separator)
+        
+        print(f"Debug: Cut test - {cut_test}")  # Debugging line
+        
+    except (IndexError, ValueError) as e:
+        print("Oops, something is wrong with your field settings! Check your -n, -c, -e, and -s variables!", file=sys.stderr)
+        print(f"Error message: {e}")
+        print("Exiting...", file=sys.stderr)
+        sys.exit(1)
 
-   try:
-       # Get a sample file
-       sample_files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}")
-       if not sample_files:
-           raise ValueError("No sample files found.")
-      
-       mock_cut = os.path.basename(sample_files[0])
-       print(f"Debug: Mock cut - {mock_cut}")  # Debugging line
-      
-       # Run the cut command simulations
-       cut_test = ""
-       cut_test += run_cut_command(mock_cut, name_fields, separator)
-       cut_test += run_cut_command(mock_cut, type_field, separator)
-       cut_test += run_cut_command(mock_cut, col_field, separator)
-      
-       print(f"Debug: Cut test - {cut_test}")  # Debugging line
-      
-   except (IndexError, ValueError) as e:
-       print("Oops, something is wrong with your field settings! Check your -n, -c, -e, and -s variables!", file=sys.stderr)
-       print(f"Error message: {e}")
-       print("Exiting...", file=sys.stderr)
-       sys.exit(1)
-  
-   # If cut_test contains "Error", there was an error
-   if "Error" in cut_test:
-       print("Oops, something is wrong with your field settings! Check your -n, -c, -e, and -s variables!", file=sys.stderr)
-       print("Exiting...", file=sys.stderr)
-       sys.exit(1)
+    # If cut_test contains "Error", there was an error
+    if "Error" in cut_test:
+        print("Oops, something is wrong with your field settings! Check your -n, -c, -e, and -s variables!", file=sys.stderr)
+        print("Exiting...", file=sys.stderr)
+        sys.exit(1)
 
 
 def check_unique_sample_names(experiment_dir, input_folder_mod_range_min, input_file_type_mod_range_min, name_fields, separator):
-   def parse_fields(field_string):
-       """Parse a string representing fields into a list of integers."""
-       fields = []
-       for part in field_string.split(','):
-           if '-' in part:
-               start, end = map(int, part.split('-'))
-               fields.extend(range(start, end + 1))
-           else:
-               fields.append(int(part))
-       return fields
+    def parse_fields(field_string):
+        """Parse a string representing fields into a list of integers."""
+        fields = []
+        for part in field_string.split(','):
+            if '-' in part:
+                start, end = map(int, part.split('-'))
+                fields.extend(range(start, end + 1))
+            else:
+                fields.append(int(part))
+        return fields
 
 
-   def extract_fields(filename, fields, separator):
-       """Extract specified fields from a filename."""
-       parts = filename.split(separator)
-       try:
-           return separator.join([parts[i - 1] for i in fields])
-       except IndexError:
-           raise ValueError(f"Invalid field indices: {fields}")
-      
-   name_fields = parse_fields(name_fields)
-  
-   if input_file_type_mod_range_min != ".fastq.gz" and input_file_type_mod_range_min != ".trimmed.fastq.gz" :
-       # Get all files with the specified type
-       files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}")
-   else:
-       # Only consider R1 files for FASTQs
-       files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*_R1*{input_file_type_mod_range_min}")
-  
-   # Extract names using the specified fields
-   sample_names = [extract_fields(os.path.basename(f), name_fields, separator) for f in files]
-   print(sample_names)
-  
-   # Check for uniqueness
-   if len(sample_names) != len(set(sample_names)):
-       print(f"Error: using name fields: {name_fields} does not yield unique sample names!", file=sys.stderr)
-       print("Please choose a different range of name fields.", file=sys.stderr)
-       print("Exiting...", file=sys.stderr)
-       sys.exit(1)
+    def extract_fields(filename, fields, separator):
+        """Extract specified fields from a filename."""
+        parts = filename.split(separator)
+        try:
+            return separator.join([parts[i - 1] for i in fields])
+        except IndexError:
+            raise ValueError(f"Invalid field indices: {fields}")
+        
+    name_fields = parse_fields(name_fields)
 
+    if input_file_type_mod_range_min != ".fastq.gz" and input_file_type_mod_range_min != ".trimmed.fastq.gz" :
+        # Get all files with the specified type
+        files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}")
+    else:
+        # Only consider R1 files for FASTQs
+        files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*_R1*{input_file_type_mod_range_min}")
 
+    # Extract names using the specified fields
+    sample_names = [extract_fields(os.path.basename(f), name_fields, separator) for f in files]
+    print(sample_names)
 
+    # Check for uniqueness
+    if len(sample_names) != len(set(sample_names)):
+        print(f"Error: using name fields: {name_fields} does not yield unique sample names!", file=sys.stderr)
+        print("Please choose a different range of name fields.", file=sys.stderr)
+        print("Exiting...", file=sys.stderr)
+        sys.exit(1)
 
 def setup_runtime_parameters(num_pairs, max_cores):
    print("Setup runtime parameters...")
@@ -761,69 +768,69 @@ def setup_runtime_parameters(num_pairs, max_cores):
 
 
 def write_run_config(experiment_dir, run_date, config_data):
-   """Write the run configuration to a YAML file."""
-  
-   run_config_filename = os.path.join(experiment_dir, f"omnomnomics.run.{run_date}.config.yaml")
-  
-   # If the config file already exists, back it up with a random suffix
-   if os.path.isfile(run_config_filename):
-       backup_filename = f"{run_config_filename}.{random.randint(0, 9999)}.backup"
-       os.rename(run_config_filename, backup_filename)
-  
-   # Write the new config data to the YAML file
-   with open(run_config_filename, 'w') as yaml_file:
-       yaml.dump(config_data, yaml_file, default_flow_style=False)
-  
-   print(f"Run config file written to {run_config_filename}")
+    """Write the run configuration to a YAML file."""
+
+    run_config_filename = os.path.join(experiment_dir, f"omnomnomics.run.{run_date}.config.yaml")
+
+    # If the config file already exists, back it up with a random suffix
+    if os.path.isfile(run_config_filename):
+        backup_filename = f"{run_config_filename}.{random.randint(0, 9999)}.backup"
+        os.rename(run_config_filename, backup_filename)
+
+    # Write the new config data to the YAML file
+    with open(run_config_filename, 'w') as yaml_file:
+        yaml.dump(config_data, yaml_file, default_flow_style=False)
+
+    print(f"Run config file written to {run_config_filename}")
 
 
-##Commented out for now. Most likely not needed since will load modules in rule shell scripts.
-# def load_modules(config):
-#     """Load required modules."""
-#     print("Loading Modules...")
-#     modules = ["samtools", "bedtools", "bzip2", "GCC", "java", "fastqc"]
-#     for module in modules:
-#         print(f"\t{module}...")
-#         subprocess.run(["module", "load", module], check=True)
-  
-#     # Load STAR only if THETYPE is RNA and THEMAPTOOL is star
-#     if config['THETYPE'] == "RNA" and "star" in config['THEMAPTOOL'].lower():
-#         print("\tSTAR...")
-#         subprocess.run(["module", "load", "STAR"], check=True)
+    ##Commented out for now. Most likely not needed since will load modules in rule shell scripts.
+    # def load_modules(config):
+    #     """Load required modules."""
+    #     print("Loading Modules...")
+    #     modules = ["samtools", "bedtools", "bzip2", "GCC", "java", "fastqc"]
+    #     for module in modules:
+    #         print(f"\t{module}...")
+    #         subprocess.run(["module", "load", module], check=True)
+
+    #     # Load STAR only if THETYPE is RNA and THEMAPTOOL is star
+    #     if config['THETYPE'] == "RNA" and "star" in config['THEMAPTOOL'].lower():
+    #         print("\tSTAR...")
+    #         subprocess.run(["module", "load", "STAR"], check=True)
 
 
-##Commented out everything regarding omnomnomics.run_in_progress and omnomnomics.queued. Most likely not going to use this anymore.
-# def check_instance(experiment_dir):
-#     """Check for a running or queued instance of omnomnomics."""
-#     in_progress = os.path.join(experiment_dir, "omnomnomics.run_in_progress")
-#     queued = os.path.join(experiment_dir, "omnomnomics.run_queued")
-  
-#     if os.path.isfile(in_progress):
-#         print("Omnomnomics pipeline instance already running on this directory! Aborting...", file=sys.stderr)
-#         sys.exit(1)
-  
-#     if os.path.isfile(queued):
-#         print("Omnomnomics pipeline instance already queued on this directory! Aborting...", file=sys.stderr)
-#         sys.exit(1)
+    ##Commented out everything regarding omnomnomics.run_in_progress and omnomnomics.queued. Most likely not going to use this anymore.
+    # def check_instance(experiment_dir):
+    #     """Check for a running or queued instance of omnomnomics."""
+    #     in_progress = os.path.join(experiment_dir, "omnomnomics.run_in_progress")
+    #     queued = os.path.join(experiment_dir, "omnomnomics.run_queued")
+
+    #     if os.path.isfile(in_progress):
+    #         print("Omnomnomics pipeline instance already running on this directory! Aborting...", file=sys.stderr)
+    #         sys.exit(1)
+
+    #     if os.path.isfile(queued):
+    #         print("Omnomnomics pipeline instance already queued on this directory! Aborting...", file=sys.stderr)
+    #         sys.exit(1)
 
 
 def start_log(experiment_dir, run_date, config):
-   """Initialize the log file."""
-   log_file = os.path.join(experiment_dir, f"omnomnomics.run.{run_date}.log")
-   if os.path.isfile(log_file):
-       backup_log = f"{log_file}.{os.urandom(8).hex()}.backup"
-       os.rename(log_file, backup_log)
-       print(f"Existing log file backed up as: {backup_log}")
+    """Initialize the log file."""
+    log_file = os.path.join(experiment_dir, f"omnomnomics.run.{run_date}.log")
+    if os.path.isfile(log_file):
+        backup_log = f"{log_file}.{os.urandom(8).hex()}.backup"
+        os.rename(log_file, backup_log)
+        print(f"Existing log file backed up as: {backup_log}")
 
 
-   with open(log_file, 'w') as log:
-       log.write("#################################\n")
-       log.write("## Run log for omnomnomics run ##\n")
-       log.write("#################################\n\n")
-       log.write(f"Pipeline version: {config['omninomics']}\n\n")
+    with open(log_file, 'w') as log:
+        log.write("#################################\n")
+        log.write("## Run log for omnomnomics run ##\n")
+        log.write("#################################\n\n")
+        log.write(f"Pipeline version: {config['omninomics']}\n\n")
 
 
-   return log_file 
+    return log_file 
 
 
 ##--------------------------------------------------------------------------------------------------------------
@@ -895,7 +902,7 @@ def main():
     metadata = args.metadata if args.metadata else config.get('metadata', "NA")
     style = args.style if args.style else config.get('the_style', "factor")
     col_table = args.col_table.replace("{OMNOM_HOME}", OMNOM_HOME) if args.col_table else config.get('color_table', f"{OMNOM_HOME}/bin/color_data_for_hubs/gray.tint.color.table").replace("{OMNOM_HOME}", OMNOM_HOME)
-    color_data_folder = args.color_data_folder if args.color_data_folder else config.get('color_data_folder', f"{OMNOM_HOME}/bin/color_data_for_hubs")
+    color_data_folder = args.color_data_folder.replace("{OMNOM_HOME}", OMNOM_HOME) if args.color_data_folder else config.get('color_data_folder', f"{OMNOM_HOME}/bin/color_data_for_hubs").replace("{OMNOM_HOME}", OMNOM_HOME)
     overlay = args.overlay if args.overlay else config.get('overlay', "transparentOverlay")
     hub_mail = args.hub_mail if args.hub_mail else config.get('hub_mail', "m.dewinther@amsterdamumc.nl")
     no_multiqc = args.no_multiqc if args.no_multiqc else config.get('no_multiqc', 0)
@@ -908,10 +915,8 @@ def main():
     homer_size = args.homer_size if args.homer_size else config.get('homer_size', 500)
     keep_unpaired = args.keepunpaired if args.keepunpaired else config.get('keep_unpaired', 0) ##########what should be default?
 
-
     # Check required variables
     check_required_vars(the_type, experiment_dir, genome, config)
-
 
     # Set user subroutine choices
     selected_routine_trim, selected_routine_map = set_user_subroutine_choices(trim_tool, map_tool, config)
@@ -944,10 +949,19 @@ def main():
     #getting job mode (which steps)
     mode_steps, config = set_job_mode(args, config, experiment_dir, mode)
 
+    # Check if pipeline needed or user first has to run separate scripts
+    if min(mode_steps) == 12 and the_type == "CHIP":
+        print("For ChIP experiments, first determine optimal peak caller settings, then manually run run_quant_peaks.sh to continue!")
+        return
+    elif min(mode_steps) == 13 and the_type == "CHIP":
+        print("To call DE peaks for ChIP  data, please first manually determine the best peak calling settings for your experiment and use run_quant_peaks.sh.")
+        print("Then execute 'run_call_DE_peaks.sh' on your optimal peak set.")
+        return
 
     #checking input files
     num_files, num_pairs, paired, input_folder_mod_range_min, input_file_type_mod_range_min = validate_input_files(the_type, config, min(mode_steps),experiment_dir)
 
+    print(f"PAIRING = {paired}")
 
     #checking field settings
     check_name_field_settings(experiment_dir, separator, name_fields, type_field, col_field, config, input_folder_mod_range_min, input_file_type_mod_range_min)
@@ -960,7 +974,6 @@ def main():
     #setting up runtime parameters (my_cores and max_time commented out for now.)
     the_mem, the_heap_init = setup_runtime_parameters(num_pairs, max_cores)
 
-    #    print(f"PAIRED = {paired}")
     run_config_data = {
         ## Run configuration for omnomnomics run for $EXPERIMENT_DIR on $RUN_DATE
         'OMNOM_HOME': OMNOM_HOME,

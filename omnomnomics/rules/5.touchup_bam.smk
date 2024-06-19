@@ -26,7 +26,7 @@ rule touchup_bam:
         log_it(logfile, f"Output folder: filtered_BAM")
         samtools_version = subprocess.check_output("module load samtools && samtools --version | head -n2", shell=True, executable='/bin/bash')
         log_it(logfile, "\n"+samtools_version.decode("utf-8"), "SAMTOOLS VERSION")
-        print(samtools_version.decode("utf-8"))
+
         sanity_check_dir(logfile, params.inputfolder, master_config['input_file_types'][master_config['touchup_rule_num']-1])
 
         def touchup_bam_file(input_file, samcores, thetype, sample, outputfolder):
@@ -54,9 +54,8 @@ rule touchup_bam:
                     samtools view -@ {samcores} -q 15 -b -o {outputfolder}/{sample}.sorted.dups_marked.filtered.bam - """
                 )
                 log_it(logfile, f"Getting ATAC statistics for sample {input_file}")
-                shell(
-                    f"""samtools view {input_file} | awk '{{if($3~/chrM/)chrm=chrm+1}}END{{printf \"%13s\\t%11d\\n\", \"Total Reads:\",NR;printf \"%13s\\t%11d %1s%2.2f%2s\\n\", \"ChrM Reads:\",chrm, \"(\", (chrm/NR)*100,\"%)\"}}' > filtered_BAM/{sample}.ATAC_stats.txt"""
-                )
+                shell(f"""module load samtools && samtools view {input_file} | awk '{{{{if($3~/chrM/)chrm=chrm+1}}}}END{{{{printf \"%13s\\t%11d\\n\", \"Total Reads:\",NR;printf \"%13s\\t%11d %1s%2.2f%2s\\n\", \"ChrM Reads:\",chrm, \"(\", (chrm/NR)*100,\"%)\"}}}}' > filtered_BAM/{sample}.ATAC_stats.txt""")       
+
             else:
                 log_it(logfile, f"Touching up ChIP-seq sample {input_file} (sort, remove dups, and keep MAPQ > 15)")
                 shell(f"""

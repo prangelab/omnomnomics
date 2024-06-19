@@ -1,0 +1,89 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-19.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 128
+Rules claiming more threads will be scaled down.
+Provided resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954
+Select jobs to execute...
+
+[Wed Jun 19 18:10:42 2024]
+rule merge_wiggles:
+    input: BigWigs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_9.tmp
+    output: merged_hubs/extra_10.tmp
+    jobid: 0
+    benchmark: merged_hubs/merge_wiggles_benchmark.tsv
+    reason: Missing output files: merged_hubs/extra_10.tmp, merged_hubs/merge_wiggles_benchmark.tsv
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954, tmpdir=/tmp/kcarroll.5341986
+
+[Wed Jun 19 18:10:42 2024]
+Finished job 0.
+1 of 1 steps (100%) done
+2024-06-19 18:10:41: JOB DISPATCHED!
+2024-06-19 18:10:41: Moved color table to experiment dir: gray.tint.color.table
+2024-06-19 18:10:41: Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+Updated logfile path: omnomnomics.run.2024-06-19.log
+2024-06-19 18:10:41: Experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+2024-06-19 18:10:41: Run date: 2024-06-19
+2024-06-19 18:10:41: Log file: omnomnomics.run.2024-06-19.log
+2024-06-19 18:10:41: Files: 1
+2024-06-19 18:10:41: Pairs: 1
+2024-06-19 18:10:41: Paired run: False
+2024-06-19 18:10:41: Type: ATAC
+2024-06-19 18:10:41: Genome: hg38
+2024-06-19 18:10:41: Mode: 9 10
+2024-06-19 18:10:41: Mode min: 9
+2024-06-19 18:10:41: Mode max: 10
+2024-06-19 18:10:41: Trim tool: skewer
+2024-06-19 18:10:41: Map tool: hisat2
+2024-06-19 18:10:41: Design formula: 1
+2024-06-19 18:10:41: Metadata file: NA
+2024-06-19 18:10:41: Input file (MACS3): NA
+2024-06-19 18:10:41: Input file (HOMER): NA
+2024-06-19 18:10:41: Broad peaks: NA
+2024-06-19 18:10:41: Peak style: factor
+2024-06-19 18:10:41: HOMER peaksize: 500
+2024-06-19 18:10:41: HOMER minDist: 2000
+2024-06-19 18:10:41: 250000M HEAP init
+2024-06-19 18:10:41: 500000M memory per sample
+2024-06-19 18:10:41: Hub type field: 1
+2024-06-19 18:10:41: Hub name field: 1,2,8
+2024-06-19 18:10:41: Hub col field: 2
+2024-06-19 18:10:41: Hub separator: _
+2024-06-19 18:10:41: Hub appendix: hub
+2024-06-19 18:10:41: Hub overlay: transparentOverlay
+2024-06-19 18:10:41: Hub coldata folder: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/bin/color_data_for_hubs
+2024-06-19 18:10:41: Hub color table: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/bin/color_data_for_hubs/gray.tint.color.table
+2024-06-19 18:10:41: Hub mail: m.dewinther@amsterdamumc.nl
+HOMER_tagDirs
+.HOMER_tagDir.tar.gz
+HOMER_tagDirs/*.HOMER_tagDir.tar.gz
+['HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz']
+['human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209']
+['human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209']
+NUMBER OF SAMPLES = 1
+{'1': 32, '2': 16, '3': 32, '4': 128, '5': 16, '6': 1, '7': 1, '8': 1, '9': 1, '10': 128, '11': 128, '12': 128, '13': 128}
+2024-06-19 18:10:41: Checking snake rule functions...
+2024-06-19 18:10:41: Workflow Snake rules Good!
+[9, 10]
+BigWigs
+['.bw', '.hub']
+['BigWigs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_9.tmp']
+merged_hubs
+.hub
+['BigWigs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_9.tmp', 'merged_hubs/extra_10.tmp']
+2024-06-19 18:10:42: Merging Wiggles and TrackHubs...
+2024-06-19 18:10:42: Input folder: BigWigs
+2024-06-19 18:10:42: Output folder: merged_hubs
+2024-06-19 18:10:42: Merging Wiggles and TrackHubs...
+Input folder: BigWigs
+Output folder: merged_hubs
+2024-06-19 18:10:42: Sanity check completed
+/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/bin/color_data_for_hubs/gray.tint.color.table
+['/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/bin/color_data_for_hubs/gray.tint.color.table']
+/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/bin/color_data_for_hubs/gray.tint.color.table
+2024-06-19 18:10:42: Processing human_MDM_d284...
+2024-06-19 18:10:42: Processing human_MDM_d284...
+2024-06-19 18:10:42: Moving merged hubs from BigWigs to merged_hubs...
+2024-06-19 18:10:42: Merge Wiggles and TrackHubs completed!

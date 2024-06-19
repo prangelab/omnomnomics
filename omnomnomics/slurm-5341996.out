@@ -1,0 +1,83 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-19.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 128
+Rules claiming more threads will be scaled down.
+Provided resources: mem_mb=512000, mem_mib=488282, disk_mb=4783, disk_mib=4562
+Select jobs to execute...
+
+[Wed Jun 19 18:53:00 2024]
+rule touchup_bam:
+    input: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.bam
+    output: filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.filtered.bam, filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_5.tmp
+    jobid: 0
+    benchmark: filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_touchupbam_benchmark.tsv
+    reason: Missing output files: filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_5.tmp, filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_touchupbam_benchmark.tsv, filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.filtered.bam
+    wildcards: sample2=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=4783, disk_mib=4562, tmpdir=/tmp/kcarroll.5341996
+
+[bam_sort_core] merging from 0 files and 25 in-memory blocks...
+[Wed Jun 19 18:54:20 2024]
+Finished job 0.
+1 of 1 steps (100%) done
+2024-06-19 18:53:00: JOB DISPATCHED!
+2024-06-19 18:53:00: Moved color table to experiment dir: gray.tint.color.table
+2024-06-19 18:53:00: Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+Updated logfile path: omnomnomics.run.2024-06-19.log
+2024-06-19 18:53:00: Experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+2024-06-19 18:53:00: Run date: 2024-06-19
+2024-06-19 18:53:00: Log file: omnomnomics.run.2024-06-19.log
+2024-06-19 18:53:00: Files: 1
+2024-06-19 18:53:00: Pairs: 1
+2024-06-19 18:53:00: Paired run: False
+2024-06-19 18:53:00: Type: CHIP
+2024-06-19 18:53:00: Genome: hg38
+2024-06-19 18:53:00: Mode: 1
+2024-06-19 18:53:00: Mode min: 1
+2024-06-19 18:53:00: Mode max: 1
+2024-06-19 18:53:00: Trim tool: trimmomatic
+2024-06-19 18:53:00: Map tool: hisat2
+2024-06-19 18:53:00: Design formula: 1
+2024-06-19 18:53:00: Metadata file: NA
+2024-06-19 18:53:00: Input file (MACS3): NA
+2024-06-19 18:53:00: Input file (HOMER): NA
+2024-06-19 18:53:00: Broad peaks: NA
+2024-06-19 18:53:00: Peak style: factor
+2024-06-19 18:53:00: HOMER peaksize: 500
+2024-06-19 18:53:00: HOMER minDist: 2000
+2024-06-19 18:53:00: 250000M HEAP init
+2024-06-19 18:53:00: 500000M memory per sample
+2024-06-19 18:53:00: Hub type field: 1
+2024-06-19 18:53:00: Hub name field: 1,2,8
+2024-06-19 18:53:00: Hub col field: 2
+2024-06-19 18:53:00: Hub separator: _
+2024-06-19 18:53:00: Hub appendix: hub
+2024-06-19 18:53:00: Hub overlay: transparentOverlay
+2024-06-19 18:53:00: Hub coldata folder: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/bin/color_data_for_hubs
+2024-06-19 18:53:00: Hub color table: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/bin/color_data_for_hubs/gray.tint.color.table
+2024-06-19 18:53:00: Hub mail: m.dewinther@amsterdamumc.nl
+FASTQ
+.fastq.gz
+FASTQ/*.fastq.gz
+['FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R1.fastq.gz']
+['human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002']
+['human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002']
+NUMBER OF SAMPLES = 1
+{'1': 128, '2': 128, '3': 128, '4': 128, '5': 128, '6': 1, '7': 1, '8': 1, '9': 1, '10': 128, '11': 128, '12': 128, '13': 128}
+2024-06-19 18:53:00: Checking snake rule functions...
+2024-06-19 18:53:00: Workflow Snake rules Good!
+[1]
+trimmed_FASTQ
+.trimmed.fastq.gz
+['trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed.fastq.gz']
+2024-06-19 18:53:00: Touching up BAM files with samtools (collate | fixmate | sort | markdup | filter)...
+2024-06-19 18:53:00: Input folder: BAM
+2024-06-19 18:53:00: Output folder: filtered_BAM
+2024-06-19 18:53:00: 
+samtools 1.17
+Using htslib 1.17
+
+2024-06-19 18:53:00: Sanity check completed
+2024-06-19 18:53:00: Touching up ChIP-seq sample BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.bam (sort, remove dups, and keep MAPQ > 15)

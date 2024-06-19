@@ -1,0 +1,28 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-19.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job                    count    min threads    max threads
+-------------------  -------  -------------  -------------
+all                        1              1              1
+call_peaks                 1            128            128
+create_homer_tagDir        1              1              1
+index_bam                  1              1              1
+total                      4              1            128
+
+Select jobs to execute...
+
+[Wed Jun 19 16:40:55 2024]
+rule index_bam:
+    input: filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.filtered.bam
+    output: filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.filtered.bam.bai
+    jobid: 4
+    benchmark: filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_bamindex_benchmark.tsv
+    reason: Missing output files: filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.filtered.bam.bai; Updated input files: filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.filtered.bam
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209
+    resources: mem_mb=4000, mem_mib=3815, disk_mb=6954, disk_mib=6632, tmpdir=<TBD>
+
+Submitted job 4 with external jobid 'Submitted batch job 5341921'.
+Terminating processes on user request, this might take some time.
+No --cluster-cancel given. Will exit after finishing currently running jobs.

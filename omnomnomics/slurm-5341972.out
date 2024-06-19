@@ -1,0 +1,87 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-19.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 16
+Rules claiming more threads will be scaled down.
+Provided resources: mem_mb=64000, mem_mib=61036, disk_mb=10993, disk_mib=10484
+Select jobs to execute...
+
+[Wed Jun 19 17:42:51 2024]
+rule touchup_bam:
+    input: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.bam
+    output: filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam, filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_5.tmp
+    jobid: 0
+    benchmark: filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_touchupbam_benchmark.tsv
+    reason: Missing output files: filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam, filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_5.tmp
+    wildcards: sample2=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209
+    threads: 16
+    resources: mem_mb=64000, mem_mib=61036, disk_mb=10993, disk_mib=10484, tmpdir=/tmp/kcarroll.5341972
+
+Waiting at most 5 seconds for missing files.
+MissingOutputException in rule touchup_bam in file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/rules/5.touchup_bam.smk, line 6:
+Job 0 completed successfully, but some output files are missing. Missing files after 5 seconds. This might be due to filesystem latency. If that is the case, consider to increase the wait time with --latency-wait:
+filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam
+Removing output files of failed job touchup_bam since they might be corrupted:
+filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_5.tmp
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+2024-06-19 17:42:51: JOB DISPATCHED!
+2024-06-19 17:42:51: Moved color table to experiment dir: gray.tint.color.table
+2024-06-19 17:42:51: Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+Updated logfile path: omnomnomics.run.2024-06-19.log
+2024-06-19 17:42:51: Experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+2024-06-19 17:42:51: Run date: 2024-06-19
+2024-06-19 17:42:51: Log file: omnomnomics.run.2024-06-19.log
+2024-06-19 17:42:51: Files: 1
+2024-06-19 17:42:51: Pairs: 1
+2024-06-19 17:42:51: Paired run: True
+2024-06-19 17:42:51: Type: ATAC
+2024-06-19 17:42:51: Genome: hg38
+2024-06-19 17:42:51: Mode: 5
+2024-06-19 17:42:51: Mode min: 5
+2024-06-19 17:42:51: Mode max: 5
+2024-06-19 17:42:51: Trim tool: skewer
+2024-06-19 17:42:51: Map tool: hisat2
+2024-06-19 17:42:51: Design formula: 1
+2024-06-19 17:42:51: Metadata file: NA
+2024-06-19 17:42:51: Input file (MACS3): NA
+2024-06-19 17:42:51: Input file (HOMER): NA
+2024-06-19 17:42:51: Broad peaks: NA
+2024-06-19 17:42:51: Peak style: factor
+2024-06-19 17:42:51: HOMER peaksize: 500
+2024-06-19 17:42:51: HOMER minDist: 2000
+2024-06-19 17:42:51: 250000M HEAP init
+2024-06-19 17:42:51: 500000M memory per sample
+2024-06-19 17:42:51: Hub type field: 1
+2024-06-19 17:42:51: Hub name field: 1,2,8
+2024-06-19 17:42:51: Hub col field: 2
+2024-06-19 17:42:51: Hub separator: _
+2024-06-19 17:42:51: Hub appendix: hub
+2024-06-19 17:42:51: Hub overlay: transparentOverlay
+2024-06-19 17:42:51: Hub coldata folder: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/bin/color_data_for_hubs
+2024-06-19 17:42:51: Hub color table: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/bin/color_data_for_hubs/gray.tint.color.table
+2024-06-19 17:42:51: Hub mail: m.dewinther@amsterdamumc.nl
+BAM
+.bam
+BAM/*.bam
+['BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.bam']
+['human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209']
+['human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209']
+NUMBER OF SAMPLES = 1
+{'1': 32, '2': 16, '3': 32, '4': 128, '5': 16, '6': 1, '7': 1, '8': 1, '9': 1, '10': 128, '11': 128, '12': 128, '13': 128}
+2024-06-19 17:42:51: Checking snake rule functions...
+2024-06-19 17:42:51: Workflow Snake rules Good!
+[5]
+filtered_BAM
+.sorted.dups_marked.filtered.bam
+['filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam', 'filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_5.tmp']
+2024-06-19 17:42:51: Touching up BAM files with samtools (collate | fixmate | sort | markdup | filter)...
+2024-06-19 17:42:51: Input folder: BAM
+2024-06-19 17:42:51: Output folder: filtered_BAM
+2024-06-19 17:42:52: 
+samtools 1.17
+Using htslib 1.17
+
+2024-06-19 17:42:52: Sanity check completed
+2024-06-19 17:42:52: Getting ATAC statistics for sample BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.bam

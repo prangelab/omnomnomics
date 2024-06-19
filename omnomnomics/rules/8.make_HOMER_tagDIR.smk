@@ -31,11 +31,10 @@ rule create_homer_tagDir:
         # path = os.path.join(OMNOM_HOME, "bin", "homer", "configureHomer.pl")
         # version = subprocess.check_output("perl {path} -list 2> /dev/null | grep homer",  shell=True, executable='/bin/bash')
         # log_it(logfile, "\n"+version.decode("utf-8"), "VERSION")
-        # print(version.decode("utf-8"))
 
         samtools_version = subprocess.check_output("module load samtools && samtools --version | head -n2", shell=True, executable='/bin/bash')
         log_it(logfile, "\n"+samtools_version.decode("utf-8"), "SAMTOOLS VERSION")
-        print(samtools_version.decode("utf-8"))
+
         sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['tagdir_rule_num']-1])
 
         # Function to create HOMER tag directories

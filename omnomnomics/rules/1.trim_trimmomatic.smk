@@ -7,10 +7,10 @@ import glob
 rule run_trimmomatic:
     input:
         fastq1=f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.fastq.gz",
-        fastq2=f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.fastq.gz" if config["PAIRED"] else None
+        fastq2=f"{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.fastq.gz" if config["PAIRED"] else []
     output:
         trimmed_fastq1=f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.trimmed.fastq.gz" if config["PAIRED"] else f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}.trimmed.fastq.gz",
-        trimmed_fastq2=f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.trimmed.fastq.gz" if config["PAIRED"] else None
+        trimmed_fastq2=f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.trimmed.fastq.gz" if config["PAIRED"] else []
     params:
         trim_tool=config["THETRIMTOOL"],
         trim_heap=config["THEHEAPINIT"],
@@ -37,7 +37,7 @@ rule run_trimmomatic:
             # path = os.path.join(OMNOM_HOME, "bin", "Trimmomatic-0.39", "trimmomatic-0.39.jar")
             # trimmomatic_version = subprocess.check_output(f"module load java && java -jar {path} -version",  shell=True, executable='/bin/bash')
             # log_it(logfile, "\n"+trimmomatic_version.decode("utf-8"), "trimmomatic VERSION")
-            # print(trimmomatic_version.decode("utf-8"))
+
             sanity_check_dir(logfile, inputfolder, master_config['input_file_types'][master_config['trim_rule_num']-1])
 
             if seq_type == "ATAC":

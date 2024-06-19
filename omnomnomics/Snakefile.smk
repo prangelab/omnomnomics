@@ -667,7 +667,7 @@ for rule_num in themode:
     if rule_num == 11:
         all_outputs.append( f"{output_folder}/extra_11.tmp")
     if rule_num == 12:
-        all_outputs.append( f"{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.raw_read_quant.table.txt")
+        all_outputs.append( f"{output_folder}/extra_12.tmp")
     if rule_num == 13:
         all_outputs.append( f"{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.results.zip")
     

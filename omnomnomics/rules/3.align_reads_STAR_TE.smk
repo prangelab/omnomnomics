@@ -6,7 +6,7 @@ import subprocess
 rule run_star_te:
     input:
         trimmed_fastq1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R1.trimmed.fastq.gz" if config["PAIRED"] else f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}.trimmed.fastq.gz",
-        trimmed_fastq2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2.trimmed.fastq.gz" if config['PAIRED'] else None
+        trimmed_fastq2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2.trimmed.fastq.gz" if config['PAIRED'] else []
     output:
         bam=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}.bam",
         stats=f"{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample}}.STAR_TE_stats.txt",
@@ -29,7 +29,7 @@ rule run_star_te:
 
         STAR_version = subprocess.check_output("module load STAR && STAR --version", shell=True, executable='/bin/bash')
         log_it(logfile, "\n"+STAR_version.decode("utf-8"), "STAR VERSION")
-        print(STAR_version.decode("utf-8"))
+
         sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['map_rule_num']-1])
         
         def run_star(genome_path, fastq1, fastq2, paired, threads,inputfolder, outputfolder, sample):

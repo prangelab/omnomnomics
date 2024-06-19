@@ -31,7 +31,6 @@ rule create_wiggles:
             # path = os.path.join(OMNOM_HOME, "bin", "homer", "configureHomer.pl")
             # version = subprocess.check_output("perl {path} -list 2> /dev/null | grep homer",  shell=True, executable='/bin/bash')
             # log_it(logfile, "\n"+version.decode("utf-8"), "VERSION")
-            # print(version.decode("utf-8"))
 
             sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['wig_rule_num']-1])
             basename = os.path.basename(input_tar_gz_file)

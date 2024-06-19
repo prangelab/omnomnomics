@@ -1,0 +1,27 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-19.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job                count    min threads    max threads
+---------------  -------  -------------  -------------
+all                    1              1              1
+run_trimmomatic        1             32             32
+total                  2              1             32
+
+Select jobs to execute...
+
+[Wed Jun 19 18:41:45 2024]
+rule run_trimmomatic:
+    input: FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R1.fastq.gz
+    output: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed.fastq.gz
+    jobid: 1
+    benchmark: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_trimmomatic_benchmark.tsv
+    reason: Forced execution
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002
+    threads: 32
+    resources: mem_mb=128000, mem_mib=122071, disk_mb=4741, disk_mib=4522, tmpdir=<TBD>
+
+Submitted job 1 with external jobid 'Submitted batch job 5341994'.
+Terminating processes on user request, this might take some time.
+No --cluster-cancel given. Will exit after finishing currently running jobs.

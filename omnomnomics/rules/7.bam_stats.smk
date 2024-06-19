@@ -2,6 +2,7 @@
 
 ## Omnomnomics Snake Rule  ##
 import os
+import sys
 
 rule bam_stats:
     input:
@@ -19,16 +20,14 @@ rule bam_stats:
     benchmark:
         f"{master_config['output_folders'][master_config['stats_rule_num']-1]}/{{sample}}_bamstats_benchmark.tsv"
     run:
-        import sys
-        print(sys.executable)
+        
         log_it(logfile, f"Getting BAM file statistics...",f"EXECUTING STEP {master_config['stats_rule_num']}")
         log_it(logfile, f"Input folder: filtere_BAM")
         log_it(logfile, f"Output folder: filtered_BAM")
 
         bamtools_version = subprocess.check_output(["bamtools", "--version"])
-
         log_it(logfile, "\n"+bamtools_version.decode("utf-8"), "BAMTOOLS VERSION")
-        print(bamtools_version.decode("utf-8"))
+        
         sanity_check_dir(logfile, params.inputfolder, master_config['input_file_types'][master_config['stats_rule_num']-1])
 
         outfile = os.path.join(params.outputfolder, f"{wildcards.sample}.sorted.dups_marked.filtered.bam.stats.txt") if config['THETYPE'] != "CHIP" else os.path.join(params.outputfolder, f"{wildcards.sample}.filtered.bam.stats.txt")

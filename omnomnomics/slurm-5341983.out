@@ -1,0 +1,115 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-19.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 32
+Rules claiming more threads will be scaled down.
+Provided resources: mem_mb=128000, mem_mib=122071, disk_mb=4741, disk_mib=4522
+Select jobs to execute...
+
+[Wed Jun 19 17:53:59 2024]
+rule run_skewer:
+    input: FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R1.fastq.gz
+    output: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed.fastq.gz
+    jobid: 0
+    benchmark: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_skewer_benchmark.tsv
+    reason: Missing output files: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_skewer_benchmark.tsv, trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed.fastq.gz
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002
+    threads: 32
+    resources: mem_mb=128000, mem_mib=122071, disk_mb=4741, disk_mib=4522, tmpdir=/tmp/kcarroll.5341983
+
+.--. .-.
+: .--': :.-.
+`. `. : `'.' .--. .-..-..-. .--. .--.
+_`, :: . `.' '_.': `; `; :' '_.': ..'
+`.__.':_;:_;`.__.'`.__.__.'`.__.':_;
+skewer v0.2.2 [April 4, 2016]
+Parameters used:
+-- 3' end adapter sequence (-x):[0;33m	AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC
+[0m-- maximum error ratio allowed (-r):	0.100
+-- maximum indel error ratio allowed (-d):	0.030
+-- mean quality threshold (-Q):		15
+-- end quality threshold (-q):		15
+-- minimum read length allowed after trimming (-l):	18
+-- file format (-f):		Sanger/Illumina 1.8+ FASTQ (auto detected)
+-- minimum overlap length for adapter detection (-k):	3
+-- number of concurrent threads (-t):	32
+Wed Jun 19 17:53:59 2024[0;32m >> started[0m
+
+Wed Jun 19 18:10:36 2024[0;32m >> done[0m (996.483s)
+26503418 reads processed; of these:
+       4 ( 0.00%) reads filtered out by quality control
+     110 ( 0.00%) short reads filtered out after trimming by size control
+ 1095877 ( 4.13%) empty reads filtered out after trimming by size control
+25407427 (95.86%) reads available; of these:
+ 2767640 (10.89%) trimmed reads available after processing
+22639787 (89.11%) untrimmed reads available after processing
+log has been saved to "trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002-trimmed.log".
+Waiting at most 5 seconds for missing files.
+MissingOutputException in rule run_skewer in file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/rules/1.trim_skewer.smk, line 8:
+Job 0 completed successfully, but some output files are missing. Missing files after 5 seconds. This might be due to filesystem latency. If that is the case, consider to increase the wait time with --latency-wait:
+trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed.fastq.gz
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+2024-06-19 17:53:58: JOB DISPATCHED!
+2024-06-19 17:53:59: Moved color table to experiment dir: gray.tint.color.table
+2024-06-19 17:53:59: Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+Updated logfile path: omnomnomics.run.2024-06-19.log
+2024-06-19 17:53:59: Experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+2024-06-19 17:53:59: Run date: 2024-06-19
+2024-06-19 17:53:59: Log file: omnomnomics.run.2024-06-19.log
+2024-06-19 17:53:59: Files: 1
+2024-06-19 17:53:59: Pairs: 1
+2024-06-19 17:53:59: Paired run: False
+2024-06-19 17:53:59: Type: CHIP
+2024-06-19 17:53:59: Genome: hg38
+2024-06-19 17:53:59: Mode: 1
+2024-06-19 17:53:59: Mode min: 1
+2024-06-19 17:53:59: Mode max: 1
+2024-06-19 17:53:59: Trim tool: skewer
+2024-06-19 17:53:59: Map tool: hisat2
+2024-06-19 17:53:59: Design formula: 1
+2024-06-19 17:53:59: Metadata file: NA
+2024-06-19 17:53:59: Input file (MACS3): NA
+2024-06-19 17:53:59: Input file (HOMER): NA
+2024-06-19 17:53:59: Broad peaks: NA
+2024-06-19 17:53:59: Peak style: factor
+2024-06-19 17:53:59: HOMER peaksize: 500
+2024-06-19 17:53:59: HOMER minDist: 2000
+2024-06-19 17:53:59: 250000M HEAP init
+2024-06-19 17:53:59: 500000M memory per sample
+2024-06-19 17:53:59: Hub type field: 1
+2024-06-19 17:53:59: Hub name field: 1,2,8
+2024-06-19 17:53:59: Hub col field: 2
+2024-06-19 17:53:59: Hub separator: _
+2024-06-19 17:53:59: Hub appendix: hub
+2024-06-19 17:53:59: Hub overlay: transparentOverlay
+2024-06-19 17:53:59: Hub coldata folder: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/bin/color_data_for_hubs
+2024-06-19 17:53:59: Hub color table: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/bin/color_data_for_hubs/gray.tint.color.table
+2024-06-19 17:53:59: Hub mail: m.dewinther@amsterdamumc.nl
+FASTQ
+.fastq.gz
+FASTQ/*.fastq.gz
+['FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R1.fastq.gz']
+['human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002']
+['human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002']
+NUMBER OF SAMPLES = 1
+{'1': 32, '2': 16, '3': 32, '4': 128, '5': 16, '6': 1, '7': 1, '8': 1, '9': 1, '10': 128, '11': 128, '12': 128, '13': 128}
+2024-06-19 17:53:59: Checking snake rule functions...
+2024-06-19 17:53:59: Workflow Snake rules Good!
+[1]
+trimmed_FASTQ
+.trimmed.fastq.gz
+['trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed.fastq.gz']
+2024-06-19 17:53:59: Trimming reads...
+2024-06-19 17:53:59: Input folder: FASTQ
+2024-06-19 17:53:59: Output folder: trimmed_FASTQ
+2024-06-19 17:53:59: Trim Tool: skewer
+2024-06-19 17:53:59: 
+	skewer version: 0.2.2
+	Author: Hongshan Jiang
+	Last update: April 4, 2016
+
+2024-06-19 17:53:59: Sanity check completed
+2024-06-19 17:53:59: Running skewer in Single End mode.
+2024-06-19 18:10:36: Renaming trimmed results...

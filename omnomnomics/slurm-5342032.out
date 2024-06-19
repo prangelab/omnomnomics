@@ -1,0 +1,101 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-19.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 128
+Rules claiming more threads will be scaled down.
+Provided resources: mem_mb=128000, mem_mib=122071, disk_mb=2216, disk_mib=2114
+Select jobs to execute...
+
+[Wed Jun 19 23:07:45 2024]
+rule run_star:
+    input: trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.trimmed.fastq.gz
+    output: BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.bam, BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.STAR_stats.txt, BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.extra_3.tmp
+    jobid: 0
+    benchmark: BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_star_benchmark.tsv
+    reason: Missing output files: BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.bam, BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.extra_3.tmp, BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.STAR_stats.txt, BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_star_benchmark.tsv
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004
+    threads: 128
+    resources: mem_mb=128000, mem_mib=122071, disk_mb=2216, disk_mib=2114, tmpdir=/tmp/kcarroll.5342032
+
+	STAR --runThreadN 128 --genomeDir /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/genomes/STAR/hg38 --readFilesIn trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.trimmed.fastq.gz --readFilesCommand zcat --outFileNamePrefix BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004. --outSAMtype BAM Unsorted --outBAMcompression -1 --genomeLoad NoSharedMemory --outSAMstrandField intronMotif --twopassMode Basic
+	STAR version: 2.7.10b   compiled: 2023-04-25T11:10:35+02:00 controller1:/trinity/shared/apps/easybuild/build/STAR/2.7.10b/GCC-11.3.0/STAR-2.7.10b/source
+Jun 19 23:07:45 ..... started STAR run
+Jun 19 23:07:45 ..... loading genome
+Jun 19 23:08:06 ..... started 1st pass mapping
+Jun 19 23:09:23 ..... finished 1st pass mapping
+Jun 19 23:09:24 ..... inserting junctions into the genome indices
+Jun 19 23:10:43 ..... started mapping
+Jun 19 23:12:05 ..... finished mapping
+Jun 19 23:12:08 ..... finished successfully
+[Wed Jun 19 23:12:09 2024]
+Finished job 0.
+1 of 1 steps (100%) done
+2024-06-19 23:07:44: JOB DISPATCHED!
+2024-06-19 23:07:44: Moved color table to experiment dir: gray.tint.color.table
+2024-06-19 23:07:44: Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+Updated logfile path: omnomnomics.run.2024-06-19.log
+2024-06-19 23:07:44: Experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+2024-06-19 23:07:44: Run date: 2024-06-19
+2024-06-19 23:07:44: Log file: omnomnomics.run.2024-06-19.log
+2024-06-19 23:07:44: Files: 2
+2024-06-19 23:07:44: Pairs: 2
+2024-06-19 23:07:44: Paired run: False
+2024-06-19 23:07:44: Type: RNA
+2024-06-19 23:07:44: Genome: hg38
+2024-06-19 23:07:44: Mode: 1 2 3
+2024-06-19 23:07:44: Mode min: 1
+2024-06-19 23:07:44: Mode max: 3
+2024-06-19 23:07:44: Trim tool: trimmomatic
+2024-06-19 23:07:44: Map tool: star
+2024-06-19 23:07:44: Design formula: 1
+2024-06-19 23:07:44: Metadata file: NA
+2024-06-19 23:07:44: Input file (MACS3): NA
+2024-06-19 23:07:44: Input file (HOMER): NA
+2024-06-19 23:07:44: Broad peaks: NA
+2024-06-19 23:07:44: Peak style: factor
+2024-06-19 23:07:44: HOMER peaksize: 500
+2024-06-19 23:07:44: HOMER minDist: 2000
+2024-06-19 23:07:44: 125000M HEAP init
+2024-06-19 23:07:44: 250000M memory per sample
+2024-06-19 23:07:44: Hub type field: 1
+2024-06-19 23:07:44: Hub name field: 1,2,8
+2024-06-19 23:07:44: Hub col field: 2
+2024-06-19 23:07:44: Hub separator: _
+2024-06-19 23:07:44: Hub appendix: hub
+2024-06-19 23:07:44: Hub overlay: transparentOverlay
+2024-06-19 23:07:44: Hub coldata folder: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/bin/color_data_for_hubs
+2024-06-19 23:07:44: Hub color table: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/bin/color_data_for_hubs/gray.tint.color.table
+2024-06-19 23:07:44: Hub mail: m.dewinther@amsterdamumc.nl
+FASTQ
+.fastq.gz
+FASTQ/*.fastq.gz
+['FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.fastq.gz', 'FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.fastq.gz']
+['mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004', 'mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004']
+['mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004', 'mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004']
+NUMBER OF SAMPLES = 2
+{'1': 128, '2': 128, '3': 128, '4': 128, '5': 128, '6': 1, '7': 1, '8': 1, '9': 1, '10': 128, '11': 128, '12': 128, '13': 128}
+2024-06-19 23:07:44: Checking snake rule functions...
+2024-06-19 23:07:44: Workflow Snake rules Good!
+[1, 2, 3]
+trimmed_FASTQ
+.trimmed.fastq.gz
+['trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.trimmed.fastq.gz', 'trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.trimmed.fastq.gz']
+fastqc_reports
+['.trimmed_fastqc.html', '.trimmed_fastqc.zip']
+['trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.trimmed.fastq.gz', 'trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.trimmed.fastq.gz', 'fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.trimmed_fastqc.html', 'fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.trimmed_fastqc.html', 'fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.trimmed_fastqc.zip', 'fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.trimmed_fastqc.zip']
+BAM
+.bam
+['trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.trimmed.fastq.gz', 'trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.trimmed.fastq.gz', 'fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.trimmed_fastqc.html', 'fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.trimmed_fastqc.html', 'fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.trimmed_fastqc.zip', 'fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.trimmed_fastqc.zip', 'BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.bam', 'BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.bam', 'BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.extra_3.tmp', 'BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.extra_3.tmp', 'BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.STAR_stats.txt', 'BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.STAR_stats.txt']
+2024-06-19 23:07:45: Mapping reads...
+2024-06-19 23:07:45: Input folder: trimmed_FASTQ
+2024-06-19 23:07:45: Output folder: BAM
+2024-06-19 23:07:45: 
+2.7.10b
+
+2.7.10b
+
+2024-06-19 23:07:45: Sanity check completed
+2024-06-19 23:07:45: Running STAR in Single End mode
+2024-06-19 23:07:45: Launching: mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.trimmed.fastq.gz...
+[]

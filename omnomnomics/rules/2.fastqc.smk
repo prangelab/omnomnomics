@@ -33,14 +33,14 @@ rule run_fastqc:
         # fastq2=f"{master_config['input_folders'][master_config['qc_rule_num']-1]}/{{sample}}_R2.fastq.gz" if config["PAIRED"] else None
         # get_fastqc_input
         trimmed_fastq1= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R1.trimmed.fastq.gz" if config["PAIRED"] else f"{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}.trimmed.fastq.gz",
-        trimmed_fastq2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2.trimmed.fastq.gz" if config['PAIRED'] else None
+        trimmed_fastq2= f"{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2.trimmed.fastq.gz" if config['PAIRED'] else []
     output:
     #    report1="fastqc_reports/{sample}_R1_fastqc.html",
     #    report2="fastqc_reports/{sample}_R2_fastqc.html" if config["PAIRED"] else None
         report1=f"{master_config['output_folders'][master_config['qc_rule_num']-1]}/{{sample}}_R1.trimmed_fastqc.html" if config["PAIRED"] else f"{master_config['output_folders'][master_config['qc_rule_num']-1]}/{{sample}}.trimmed_fastqc.html",
-        report2=f"{master_config['output_folders'][master_config['qc_rule_num']-1]}/{{sample}}_R2.trimmed_fastqc.html" if config["PAIRED"] else None,
+        report2=f"{master_config['output_folders'][master_config['qc_rule_num']-1]}/{{sample}}_R2.trimmed_fastqc.html" if config["PAIRED"] else [],
         report3=f"{master_config['output_folders'][master_config['qc_rule_num']-1]}/{{sample}}_R1.trimmed_fastqc.zip" if config["PAIRED"] else f"{master_config['output_folders'][master_config['qc_rule_num']-1]}/{{sample}}.trimmed_fastqc.zip",
-        report4=f"{master_config['output_folders'][master_config['qc_rule_num']-1]}/{{sample}}_R2.trimmed_fastqc.zip" if config["PAIRED"] else None
+        report4=f"{master_config['output_folders'][master_config['qc_rule_num']-1]}/{{sample}}_R2.trimmed_fastqc.zip" if config["PAIRED"] else []
 
     params:
         inputfolder = master_config['input_folders'][master_config['qc_rule_num']-1],
@@ -59,7 +59,7 @@ rule run_fastqc:
 
             fastqc_version = subprocess.check_output("module load fastqc && fastqc --version", shell=True, executable='/bin/bash')
             log_it(logfile, "\n"+fastqc_version.decode("utf-8"), "FASTQC VERSION")
-            print(fastqc_version.decode("utf-8"))
+
             sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['qc_rule_num']-1])
 
             if config['PAIRED']:

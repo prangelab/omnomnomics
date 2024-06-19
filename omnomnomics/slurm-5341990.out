@@ -1,0 +1,100 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-19.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 32
+Rules claiming more threads will be scaled down.
+Provided resources: mem_mb=128000, mem_mib=122071, disk_mb=3848, disk_mib=3670
+Select jobs to execute...
+
+[Wed Jun 19 18:25:14 2024]
+rule run_hisat2:
+    input: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed.fastq.gz
+    output: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.HISAT2_stats.txt, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra_3.tmp
+    jobid: 0
+    benchmark: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_hisat2_benchmark.tsv
+    reason: Missing output files: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra_3.tmp, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.HISAT2_stats.txt, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_hisat2_benchmark.tsv
+    wildcards: sample1=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002
+    threads: 32
+    resources: mem_mb=128000, mem_mib=122071, disk_mb=3848, disk_mib=3670, tmpdir=/tmp/kcarroll.5341990
+
+/usr/bin/bash: -c: line 1: unexpected EOF while looking for matching `"'
+[Wed Jun 19 18:25:14 2024]
+Error in rule run_hisat2:
+    jobid: 0
+    input: trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed.fastq.gz
+    output: BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.bam, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.HISAT2_stats.txt, BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra_3.tmp
+
+RuleException:
+CalledProcessError in file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/rules/3.align_reads_hisat2.smk, line 115:
+Command 'set -euo pipefail;  
+                    module load samtools &&                     hisat2 -p 32 -x /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/genomes/HISAT2/hg38                     -U trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed.fastq.gz --mm --add-chrname --new-summary --no-spliced-alignment                     | samtools view -b - 1> "BAM"/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.bam" 2> "BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.HISAT2_stats.txt"' returned non-zero exit status 2.
+  File "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/rules/3.align_reads_hisat2.smk", line 129, in __rule_run_hisat2
+  File "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/rules/3.align_reads_hisat2.smk", line 115, in run_hisat2
+  File "/trinity/shared/apps/snakemake/lib/python3.11/concurrent/futures/thread.py", line 58, in run
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+2024-06-19 18:25:13: JOB DISPATCHED!
+2024-06-19 18:25:13: Moved color table to experiment dir: gray.tint.color.table
+2024-06-19 18:25:13: Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+Changed directory to experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+Updated logfile path: omnomnomics.run.2024-06-19.log
+2024-06-19 18:25:13: Experiment dir: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+2024-06-19 18:25:13: Run date: 2024-06-19
+2024-06-19 18:25:13: Log file: omnomnomics.run.2024-06-19.log
+2024-06-19 18:25:13: Files: 1
+2024-06-19 18:25:13: Pairs: 1
+2024-06-19 18:25:13: Paired run: False
+2024-06-19 18:25:13: Type: CHIP
+2024-06-19 18:25:13: Genome: hg38
+2024-06-19 18:25:13: Mode: 3
+2024-06-19 18:25:13: Mode min: 3
+2024-06-19 18:25:13: Mode max: 3
+2024-06-19 18:25:13: Trim tool: skewer
+2024-06-19 18:25:13: Map tool: hisat2
+2024-06-19 18:25:13: Design formula: 1
+2024-06-19 18:25:13: Metadata file: NA
+2024-06-19 18:25:13: Input file (MACS3): NA
+2024-06-19 18:25:13: Input file (HOMER): NA
+2024-06-19 18:25:13: Broad peaks: NA
+2024-06-19 18:25:13: Peak style: factor
+2024-06-19 18:25:13: HOMER peaksize: 500
+2024-06-19 18:25:13: HOMER minDist: 2000
+2024-06-19 18:25:13: 250000M HEAP init
+2024-06-19 18:25:13: 500000M memory per sample
+2024-06-19 18:25:13: Hub type field: 1
+2024-06-19 18:25:13: Hub name field: 1,2,8
+2024-06-19 18:25:13: Hub col field: 2
+2024-06-19 18:25:13: Hub separator: _
+2024-06-19 18:25:13: Hub appendix: hub
+2024-06-19 18:25:13: Hub overlay: transparentOverlay
+2024-06-19 18:25:13: Hub coldata folder: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/bin/color_data_for_hubs
+2024-06-19 18:25:13: Hub color table: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/bin/color_data_for_hubs/gray.tint.color.table
+2024-06-19 18:25:13: Hub mail: m.dewinther@amsterdamumc.nl
+trimmed_FASTQ
+.trimmed.fastq.gz
+trimmed_FASTQ/*.trimmed.fastq.gz
+['trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed.fastq.gz']
+['human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002']
+['human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002']
+NUMBER OF SAMPLES = 1
+{'1': 32, '2': 16, '3': 32, '4': 128, '5': 16, '6': 1, '7': 1, '8': 1, '9': 1, '10': 128, '11': 128, '12': 128, '13': 128}
+2024-06-19 18:25:13: Checking snake rule functions...
+2024-06-19 18:25:13: Workflow Snake rules Good!
+[3]
+BAM
+.bam
+['BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.bam', 'BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra_3.tmp', 'BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.HISAT2_stats.txt']
+2024-06-19 18:25:14: Mapping reads...
+2024-06-19 18:25:14: Input folder: trimmed_FASTQ
+2024-06-19 18:25:14: Output folder: BAM
+2024-06-19 18:25:14: 
+/net/beegfs/cfg/projects/dewintherlab/bin/hisat2-2.1.0/hisat2-align-s version 2.1.0
+64-bit
+Built on login-node03
+Wed Jun  7 15:53:42 EDT 2017
+Compiler: gcc version 4.8.2 (GCC) 
+Options: -O3 -m64 -msse2 -funroll-loops -g3 -DPOPCNT_CAPABILITY
+Sizeof {int, long, long long, void*, size_t, off_t}: {4, 8, 8, 8, 8, 8}
+
+2024-06-19 18:25:14: Sanity check completed
+2024-06-19 18:25:14: Running HISAT2 in Single End mode  on ChIP or ATAC data.

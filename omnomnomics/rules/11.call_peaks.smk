@@ -15,14 +15,16 @@ def input_function(wildcards):
             input_files.append(f"{input_folder1}/{sample}.filtered.bam")
             input_files.append(f"{input_folder2}/{sample}.filtered.HOMER_tagDir.tar.gz")
     else:
-        input_files.append(f"{input_folder1}/{sample}.sorted.dups_marked.filtered.bam")
+        for sample in samples2:
+            input_files.append(f"{input_folder1}/{sample}.sorted.dups_marked.filtered.bam")
     return input_files
 
 rule call_peaks:
     input:
-        input_function, #possibly leave this out? or keep it for readability? and makes sure that there is input, although there is also a sanitycheck
-        extra_input_rule_11_1 = expand(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1][0]}/{{sample}}.extra_5.tmp", sample = samples2) if 5 in themode else [],
-        extra_input_rule_11_2 = expand(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1][1]}/{{sample}}.extra_8.tmp", sample = samples2) if 8 in themode else []
+        input_function #possibly leave this out? or keep it for readability? and makes sure that there is input, although there is also a sanitycheck
+        #extra_input_rule_11_1 = expand(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1][0]}/{{sample}}.extra_5.tmp", sample = samples2) if 5 in themode else [],
+        #extra_input_rule_11_2 = expand(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1][1]}/{{sample}}.extra_8.tmp", sample = samples2) if 8 in themode else []
+       
         #expand(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1][0]}/{{sample}}.extra_5.tmp", sample = samples2) if 5 in themode else None, 
         #expand(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1][1]}/{{sample}}.extra_8.tmp", sample = samples2) if 8 in themode else None
        #( expand(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1][0]}/{{sample}}.sorted.dups_marked.filtered.bam", sample = samples2) ) if config['THETYPE'] != "CHIP" else ( expand(f"{master_config['input_folders'][master_config['callpeaks_rule_num']-1][0]}/{{sample}}.filtered.bam", sample = samples2) ),
@@ -68,17 +70,20 @@ rule call_peaks:
         log_it(logfile, f"Output folder: {params.outputfolder}")
 
         def get_name_from_bam(inputfolder, group, name_fields, separator):
-            pattern = group.replace(separator, ".*")
-            cmd = f'$(echo $(basename $(ls "{inputfolder}" | grep $(echo {group} | sed "s|{separator}|.*|g") - | grep ".bam$" | head -n1)) | cut -f{name_fields} -d {separator})'
+            group_escaped = group.replace(separator, '.*')
+            cmd = f'basename "$(ls "{inputfolder}" | grep "{group_escaped}" - | grep ".bam$" | head -n1)" | cut -f{name_fields} -d{separator}'
+            #cmd = f'$(echo $(basename $(ls "{inputfolder}" | grep $(echo {group} | sed "s|{separator}|.*|g") - | grep ".bam$" | head -n1)) | cut -f{name_fields} -d {separator})'
             try:
                 result = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
                 return result
             except subprocess.CalledProcessError:
                 return None
+        
 
-        def get_name_from_bam(inputfolder, group, name_fields, separator):
-            pattern = group.replace(separator, ".*")
-            cmd = f'$(echo $(basename $(ls "{inputfolder}" | grep $(echo {group} | sed "s|{separator}|.*|g") - | grep ".HOMER_tagDir$" | head -n1)) | cut -f{name_fields} -d {separator})'
+        def get_name_from_homer(inputfolder, group, name_fields, separator):
+            group_escaped = group.replace(separator, '.*')
+            cmd = f'basename "$(ls "{inputfolder}" | grep "{group_escaped}" - | grep ".HOMER_tagDir$" | head -n1)" | cut -f{name_fields} -d{separator}'
+            #cmd = f'$(echo $(ls "{inputfolder}" | grep $(echo {group} | sed "s|{separator}|.*|g") - | grep ".HOMER_tagDir$" | head -n1) | cut -f{name_fields} -d {separator})'
             try:
                 result = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
                 return result
@@ -167,8 +172,13 @@ rule call_peaks:
                                 shell(f""" eval "$(micromamba shell hook --shell=bash)" && micromamba activate macs3 && \
                                 macs3 callpeak -t {' '.join(bams)} -c {input_sample} --outdir {outputfolder} -n {the_name}.MACS3.{ext} -{'q' if ext.startswith('q') else 'p'} {'1e-9' if ext.endswith('9') else '1e-6'} --verbose 0""")
                 # Clean up the output
+                print(os.listdir(outputfolder))
+
+                log_it(logfile, "Cleaning up MACS3 output (keeping only narrowPeak and broadPeak files)...")
                 for group in chip_groups: 
+                    print(f" group = {group}")
                     the_name = get_name_from_bam(inputfolder1, group, name_fields, separator)
+                    print(f"the_name = {the_name}")
                     # the_name = os.path.basename(
                     #     next(bam for bam in os.listdir(inputfolder1) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.bam$", bam))
                     # ).split(separator)[name_fields - 1] ##### why -1? # Set group name
@@ -176,16 +186,18 @@ rule call_peaks:
                     #     if not re.search(r"(broadPeak|narrowPeak)$", file): 
                     #         os.remove(file) 
                     shell(f"find {outputfolder} -type f -name {the_name}.MACS3* ! \( -name *broadPeak -o -name *narrowPeak \) -delete ") # Delete all redundant MACS3 output
-
-
-                log_it(logfile, "Cleaning up MACS3 output (keeping only narrowPeak and broadPeak files)...")
+                
+                print(os.listdir(outputfolder))
 
                 log_it(logfile, "Converting to a clean 3 column BED format...")
                 for file in glob.glob(f"{outputfolder}/*{'narrowPeak' if broad != '1' else 'broadPeak'}"):
-                    sorted_bed = f"{outputfolder}/{os.path.basename(file).replace('narrowPeak', '').replace('broadPeak', '')}.bed"
+                    print(f"file = {file}")
+                    sorted_bed = f"{outputfolder}/{os.path.basename(file).replace('.narrowPeak', '').replace('.broadPeak', '')}.bed"
+                    print(f"sorted_bed = {sorted_bed}")
                     shell(f"cut -f1-3 {file} | sort -k1,1 -k2,2n -k3,3n > {sorted_bed}")
                     os.remove(file)
-
+                
+                print(os.listdir(outputfolder))
                 # Call peaks using HOMER
                 #inputfolder = "HOMER_tagDirs"
                 log_it(logfile, "Calling peaks with HOMER...")
@@ -197,33 +209,36 @@ rule call_peaks:
                 # See if we need to unpack the tag dirs
                 if glob.glob(f"{inputfolder2}/*tagDir.tar.gz"):
                     for tagdir in glob.glob(f"{inputfolder2}/*tagDir.tar.gz"):
+                        print(f"tagdir = {tagdir}")
                         tagdir_basename = os.path.basename(tagdir)
                         shell(f"cd {inputfolder2} && tar --strip-components=1 -xzf {tagdir_basename}")
                 # Fetch tagdirs
                 tagdirs = glob.glob(f"{inputfolder2}/*.HOMER_tagDir")
+                print(f"tagdirs = {tagdirs}")
                 
+                print(f"homer_input = {homer_input}")
                 if homer_input == "NA": # No input sample was provided
                     if broad == "1": # Check if we should call broad peaks
                         log_it(logfile, "Calling broad peaks with HOMER...") 
                         for tagdir in tagdirs:
-                            log_it(logfile, "findPeaks {tagdir} -style {thestyle} -size {homer_size} -minDist {homer_mindist} -region -o auto")
+                            log_it(logfile, f"findPeaks {tagdir} -style {thestyle} -size {homer_size} -minDist {homer_mindist} -region -o auto")
                             shell(f"findPeaks {tagdir} -style {thestyle} -size {homer_size} -minDist {homer_mindist} -region -o auto")
                     else:
                         log_it(logfile, "Calling peaks with HOMER...")
                         for tagdir in tagdirs:
-                            log_it(logfile, "findPeaks {tagdir} -style {thestyle} -o auto")
+                            log_it(logfile, f"findPeaks {tagdir} -style {thestyle} -o auto")
                             shell(f"findPeaks {tagdir} -style {thestyle} -o auto")
                 else:  # We have input!
                     if broad == "1": # Check if we should call broad peaks
                         log_it(logfile, "Calling broad peaks with HOMER...")
                         for tagdir in tagdirs:
-                            log_it(logfile, "findPeaks {tagdir} -i {os.getenv('HOMERINPUT')} -style {thestyle} -size {homer_size} -minDist {homer_mindist} -region -o auto")
-                            shell(f"findPeaks {tagdir} -i {os.getenv('HOMERINPUT')} -style {thestyle} -size {homer_size} -minDist {homer_mindist} -region -o auto")
+                            log_it(logfile, f"findPeaks {tagdir} -i {homer_input} -style {thestyle} -size {homer_size} -minDist {homer_mindist} -region -o auto")
+                            shell(f"findPeaks {tagdir} -i {homer_input} -style {thestyle} -size {homer_size} -minDist {homer_mindist} -region -o auto")
                     else:
                         log_it(logfile, "Calling peaks with HOMER...")
                         for tagdir in tagdirs:
-                            log_it(logfile, "findPeaks {tagdir} -i {os.getenv('HOMERINPUT')} -style {thestyle} -o auto")
-                            shell(f"findPeaks {tagdir} -i {os.getenv('HOMERINPUT')} -style {thestyle} -o auto")
+                            log_it(logfile, f"findPeaks {tagdir} -i {homer_input} -style {thestyle} -o auto")
+                            shell(f"findPeaks {tagdir} -i {homer_input} -style {thestyle} -o auto")
                 
                 # Convert peaks to BED format and clean up unwanted contigs (chrUn | alt | random)
                 log_it(logfile, "Converting peaks to BED format and cleaning up unwanted contigs (chrUn | alt | random)...")
@@ -243,24 +258,32 @@ rule call_peaks:
                 tagdirs2 = [os.path.basename(tagdir).split(separator)[thetype_field - 1] for tagdir in tagdirs]
                 chip_groups = sorted(set(tagdirs2))
 
+                print(f"chip_groups = {chip_groups}")
+
                 # Iterate over the groups to merge the BED files
                 for group in chip_groups:
-                    log_it(logfile, f"Merging peaks for: {group}...")
-                    log_it(logfile, f"Samples in group: {', '.join(beds)}")
+                    print(f"group = {group}")
                     # Fetch samples
                     beds = [os.path.join(inputfolder2, bed) for bed in os.listdir(inputfolder2) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.HOMER_tagDir$", bed)]
+                    print(f"beds = {beds}")
                     if thestyle == "factor":
                         beds = [f"{bed}/peaks.bed" for bed in beds]
                     elif thestyle == "histone":
                         beds = [f"{bed}/regions.bed" for bed in beds]
+                    print(f"new beds = {beds}")
+                    log_it(logfile, f"Merging peaks for: {group}...")
+                    log_it(logfile, f"Samples in group: {', '.join(beds)}")
                     
                     the_name = get_name_from_homer(inputfolder2, group, name_fields, separator)
+                    print(f"the_name = {the_name}")
                     # the_name = os.path.basename(
                     #     next(bed for bed in os.listdir(inputfolder2) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.HOMER_tagDir$", bed))
                     # ).split(separator)[name_fields - 1]
 
                     sorted_bed = f"{outputfolder}/{the_name}.HOMER.merged_peaks.bed"
-                    shell(f"cat {' '.join(beds)} | sort -k1,1 -k2,2n -k3,3n | bedtools merge -i - > {sorted_bed}")
+                    print(f"sorted_bed = {sorted_bed}")
+                    log_it(logfile, f"module load bedtools && cat {' '.join(beds)} | sort -k1,1 -k2,2n -k3,3n | bedtools merge -i - > {sorted_bed}")
+                    shell(f"""module load bedtools && cat {' '.join(beds)} | sort -k1,1 -k2,2n -k3,3n | bedtools merge -i - > {sorted_bed}""")
             else:
                 # If ATAC, call open regions
                 log_it(logfile, "Calling open regions...")
@@ -292,7 +315,7 @@ rule call_peaks:
 
                     log_it(logfile, "Calling peaks with MACS3, q value 1e-9...")
                     log_it(logfile, f"macs3 callpeak -t {' '.join(bams)} --outdir {outputfolder} -n {the_name}.MACS3.q-9 -q 1e-9 --verbose 0" )
-                    shell(f""" micromamba activate macs3 && \
+                    shell(f"""eval "$(micromamba shell hook --shell=bash)" && micromamba activate macs3 && \
                         macs3 callpeak -t {' '.join(bams)} --outdir {outputfolder} -n {the_name}.MACS3.q-9 -q 1e-9 --verbose 0 """)
 
                 log_it(logfile, "Cleaning up MACS3 output (keeping only narrowPeak files)...")
@@ -313,7 +336,7 @@ rule call_peaks:
                     os.remove(file)
 
                 # Concatenate the peak files
-                shell(f"cat {outputfolder}/*.bed | sort -k1,1 -k2,2n -k3,3n | mergeBed -i - > {outputfolder}/all_groups.merged_peaks.bed")
+                shell(f"""module load bedtools && cat {outputfolder}/*.bed | sort -k1,1 -k2,2n -k3,3n | mergeBed -i - > {outputfolder}/all_groups.merged_peaks.bed """)
                 log_it(logfile, f"Total merged peaks: {subprocess.getoutput(f'wc -l {outputfolder}/all_groups.merged_peaks.bed').strip().split()[0]}")
             
             shell(f"""echo "necessity file for callpeaks. can delete this." > {outputfolder}/extra_11.tmp""")
