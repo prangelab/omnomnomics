@@ -278,6 +278,7 @@ Some job mode examples:
                                     Default: m.dewinther@amsterdamumc.nl
 
     -h:                     Print elaborate usage information
+    -k: 		    Keep output of HISAT2 unpaired or not
 
 ## Logs
 To ensure proper logging, multiple logs can be found. Inside the run_logs folder in your EXPERIMENT_DIR, a run log can be found created by _Omnomnomics_ which logs a lot of information about the current run and settings of the pipeline. In addition, slurm keeps a log of every submitted job which can be found inside the slurm_logs folder in your EXPERIMENT_DIR, and then inside its rule name folder. Here information about every submitted job can be found and potential errors while executing will be directed towards. Lastly, Snakemake also provides a log in the .snakemake folder. 
@@ -286,7 +287,7 @@ To ensure proper logging, multiple logs can be found. Inside the run_logs folder
 Every submitted job is benchmarked. The benchmarking ```.tsv``` file can be found inside the output folder of the job. Here there is a 'Benchmarks' folder, in which the benchmarks with differents stats of all the jobs of that step can be found. 
 
 ## Config files
-For a run of _Omnomnomics_, three different config files will be used. Firstly the master config file 'config.yaml' in the bin folder in OMNOM_HOME, which contains all the user-defined variables. During a run, the wrapper script builds a run config to pass appropriate variables from the wrapper script to the Snakefiles. This can be found in the 'run_configs' folder inside EXPERIMENT_DIR. Lastly, inside OMNOM_HOME, inside the 'slurm_profile' folder, there is another 'config.yaml' file, which contains the setup for job submission to SLURM on the HPC. This is where the default partition to submit jobs to can be specified.
+For a run of _Omnomnomics_, three different config files will be used. Firstly the master config file 'config.yaml' in the bin folder in OMNOM_HOME, which contains all the user-defined variables. During a run, the wrapper script builds a run config to pass appropriate variables from the wrapper script to the Snakefiles. This can be found in the 'run_configs' folder inside EXPERIMENT_DIR. Lastly, inside OMNOM_HOME, inside the 'slurm_profile' folder, there is another 'config.yaml' file, which contains the setup for job submission to SLURM on the HPC. This is where the default partition to submit jobs to can be specified. **NOTE:** if the user wants to specify a custom partition for a particular rule, this can be done by adding ```partition = "parition_name"``` in the resources section in the that rule, and then adding ```--partition={resources.partition}``` (note that no spaces between the names and '=' is important here) to the sbtach command in the config.yaml in the slurm_profile folder.
 
 ## Requirements:
 - User must have Snakemake version 7.25.4 installed (current version installed as module on Ares server)
@@ -315,6 +316,9 @@ For a run of _Omnomnomics_, three different config files will be used. Firstly t
   	- samtools
   	- fastqc
   	- macs3 (in micromamba)
+  	- bed2pos.pl
+  	- analyzeRepeats.pl
+  	- GCC
 - A valid sequence of steps should be included on the command line, if any. This should be 'valid' in the sense that the input/output of the included steps should 'fit' together. For every specified step, the input must already be present at the start OR it must be created by another specified steps. If intermediate steps are left out, Snakemake will attempt to run extra rules to create the necesarry inputs, but due to the complex naming schemes of input/output files, success is not guaranteed.
 - Only one type of data should be present at the same time. This type must be specified on the command line. **Important**: Ensure that if intermediate inputs are given, that those are also not given on mixed type data. Example: ATAC & RNA data will yield filtered BAM files of name filtered_BAM/"sample_name".sorted.dups_marked.filtered.bam while CHIP data will yield filtered BAM files of name filtered_BAM/"sample_name".filtered.bam. If starting the pipeline from here, make sure to not give mixed time filtered BAM files.
   
