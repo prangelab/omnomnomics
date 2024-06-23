@@ -156,7 +156,7 @@ EXPERIMENT_DIR
      |-
 |- merged_hubs
      |- Benchmarks
-     |- {group_name}.hub
+     |- {group_name}.hub (iig for ATAC en ChIP, also like this for rna??)
 		|- hg38
 		     |- {sample}.sorted.dups_marked.filtered.bw
 		     |- trackDb.txt
@@ -170,6 +170,11 @@ EXPERIMENT_DIR
      |- Benchmarks
      |- {sample}.MACS3.q-9_peaks.bed (if the data type = ATAC, from call_peaks)
      |- all_groups.merged_peaks.bed (if the data type = ATAC, from call_peaks)
+     |- THENAME.HOMER.merged_peaks.bed (if the data type = ChIP, from call_peaks)
+     |- THENAME.MACS3.p-6_peaks.bed (if the data type = ChIP, from call_peaks)
+     |- THENAME.MACS3.p-9_peaks.bed (if the data type = ChIP, from call_peaks)
+     |- THENAME.MACS3.q-6_peaks.bed (if the data type = ChIP, from call_peaks)
+     |- THENAME.MACS3.q-9_peaks.bed (if the data type = ChIP, from call_peaks)
 |- DE_calling
      |- Benchmarks
      |- basename.EXPERIMENT_DIR.raw_read_quant.table.txt (from count_reads)
