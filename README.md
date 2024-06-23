@@ -34,48 +34,133 @@ Lastly, the folder peak_calling contains peak files for ChIP and ATAC epxeriment
 
 ## Installation
 
-## Directory Structure
-
+## Directory Structures
+```
 OMNOM_HOME
 |
 |- bin
+     |- color_data_for_hubs
+		|- all color tables...
+     |- homer
+	   |- configureHomer.pl
+     |- scripts 
+  	    |- createTrackColorTable.sh  (used in merge wiggles)
+  	    |- displayTrackColorTable.sh (used in merge wiggles)
+  	    |- fix_HOMER_bigwig.sh 	 (used in create wiggles)
+  	    |- fix_HOMER_trackHub.sh	 (used in create wiggles)
+  	    |- generate_header.sh	 (used in count reads)
+  	    |- run_quant_peaks.sh	 (used in peak calling)
+      |- Trimmomatic-0.39 (used in trimmomatic trimmer)
+		|- adapters
+			|- adapter files...
+		|- LICENSE
+		|- trimmomatic-0.39.jar
+      |- config.yaml (master config file for user defined variables)
+	    
 |- genomes
       |- STAR
       	   |-(list the genomes you need)
       |- HISAT2 
            |- (list the genomes you need)
 |- rules
+     |- 1.trim_skewer.smk
+     |- 1.trim_trimmomatic.smk
+     |- 2.fastqc.smk
+     |- 3.align_reads_hisat2.smk
+     |- 3.align_reads_STAR.smk
+     |- 3.align_reads_STAR_TE.smk
+     |- 4.merge_lanes_and_clean_names.smk
+     |- 5.touchup_bam.smk
+     |- 6.index_bam.smk
+     |- 7.bam_stats.smk
+     |- 8.make_HOMER_tagDIR.smk
+     |- 9.create_wiggles.smk
+     |- 10.merge_wiggles.smk
+     |- 11.call_peaks.smk
+     |- 12.count_reads.smk
+     |- 13.call_DE.smk
 |- slurm_profile
 	|- config.yaml (slurm config file)
 |- run_omnomnomics.py (wrapper script)
 |- Snakefile.py	 (main Snakefile)
 
+
+
 EXPERIMENT_DIR
 |
 |- run_configs
+	|- omnomnomics.run."run_date".config.yaml
+	|- any backups with random numbers if multiple runs were made on same day
 |- slurm_logs
+	|- "rule_name1"
+		|- "rule_name1".job_ID.out
+		|- .... 
+	|- "rule_name2"
+		|- "rule_name2".job_ID.out
+		|- .... 
+	|- "rule_name3"
+		|- "rule_name3".job_ID.out
+		|- ....
+	|- ....
 |- run_logs
+	|- omnomnomics.run."run_date".log
+	|- any backups with random numbers if multiple runs were made on same day
 |- FASTQ
      |- Benchmarks
+     |- {sample}_R1.fastq.gz
+     |- {sample}_R2.fastq.gz (if paired)
 |- trimmed_FASTQ
      |- Benchmarks
+     |- {sample}_R1.trimmed.fastq.gz (if paired else {sample}.trimmed.fastq.gz)
+     |- {sample}_R2.trimmed.fastq.gz (if paired else None)
 |- fastqc_reports
      |- Benchmarks
+     |- {sample}_R1.trimmed_fastqc.html (if paired else {sample}.trimmed_fastqc.html)
+     |- {sample}_R2.trimmed_fastqc.html (if paired else None)
+     |- {sample}_R1.trimmed_fastqc.zip  (if paired else {sample}.trimmed_fastqc.zip)
+     |- {sample}_R2.trimmed_fastqc.zip  (if paired else None)
 |- BAM
      |- Benchmarks
+     |- {sample}.bam (from aligners)
+     |- {sample}.unpaired.aligned.bam   (from hisat2 if keepunpaired = True
+     |- {sample}.unpaired.unaligned.bam (from hisat2 if keepunpaired = True
+     |- {sample}.bam 			(after lane numbers are merged)
+     |- {sample).HISAT2_stats.txt 	(if map tool = hisat2)
+     |- {sample).STAR_TE_stats.txt 	(if map tool = star_te)
+     |- {sample).STAR_stats.txt 	(if map tool = star)
 |- filtered_BAM
      |- Benchmarks
+     |- {sample}.sorted.dups_marked.filtered.bam (if the type of data = ATAC or RNA, from touchup_bam)
+     |- {sample}.filtered.bam (if the type of data = ChIP, from touchup_bam)
+     |- {sample}.sorted.dups_marked.filtered.bam.bai (if the type of data = ATAC or RNA, from index_bam)
+     |- {sample}.filtered.bam.bai (if the type of data = ChIP, from index_bam)
+     |- {sample}.sorted.dups_marked.filtered.bam.stats.txt (if the type of data = ATAC or RNA, from bam_stats)
+     |- {sample}.filtered.bam.stats.txt (if the type of data = ChIP, from bam_stats)
 |- HOMER_tagDirs
      |- Benchmarks
+     |- {sample}.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz (if the type of data = ATAC or RNA, from make_HOMER_tagDIR)
+     |- {sample}.filtered.HOMER_tagDir.tar.gz (if the type of data = ChIP, from make_HOMER_tagDIR)
 |- BigWigs
      |- Benchmarks
+     |-
+     |-
+     |-
+     |-
 |- merged_hubs
      |- Benchmarks
+     |-
+     |-
+     |-
+     |-
+     |-
 |- peak_calling
      |- Benchmarks
+     |-
 |- DE_calling
      |- Benchmarks
+     |- basename.EXPERIMENT_DIR.raw_read_quant.table.txt (from count_reads)
 
+```
 ## Workflow:
 ```
 Pre-processing steps:
