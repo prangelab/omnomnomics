@@ -1,6 +1,13 @@
-# ***OMNOMNOMICS***
+<p align="center">
+	<img src="https://github.com/prangelab/omnomnomics/assets/157825254/f8f83873-7c53-495e-9c54-33eece99a8db" width="700" alt="DALL·E 2024-06-23 12 04 41 - A futuristic character resembling the Cookie Monster, eating a double-stranded DNA helix  The background is high-tech, with neon lights and circuit pa">
+</p>
+<div align="center">
 
-_Omnomnomics is an A-Z processing of RNA-, ChIP-, or ATAC-seq data. Trim FASTQ files, run FASTQC, map to the genome, and post-process the BAM files._
+# <center>***OMNOMNOMICS***</center>
+
+</div>
+
+_Omnomnomics is an A-Z processing NGS pipeline of RNA-, ChIP-, or ATAC-seq data. Trim FASTQ files, run FASTQC, map to different genomes, and post-process the the BAM files with many different options._
 
 TOC 
 
@@ -132,6 +139,7 @@ EXPERIMENT_DIR
      |- Benchmarks
      |- {sample}.sorted.dups_marked.filtered.bam (if the type of data = ATAC or RNA, from touchup_bam)
      |- {sample}.filtered.bam (if the type of data = ChIP, from touchup_bam)
+     |- {sample}.ATAC_stats.txt (if the type of data = ATAC, from touchup_bam)
      |- {sample}.sorted.dups_marked.filtered.bam.bai (if the type of data = ATAC or RNA, from index_bam)
      |- {sample}.filtered.bam.bai (if the type of data = ChIP, from index_bam)
      |- {sample}.sorted.dups_marked.filtered.bam.stats.txt (if the type of data = ATAC or RNA, from bam_stats)
@@ -142,20 +150,26 @@ EXPERIMENT_DIR
      |- {sample}.filtered.HOMER_tagDir.tar.gz (if the type of data = ChIP, from make_HOMER_tagDIR)
 |- BigWigs
      |- Benchmarks
-     |-
-     |-
+     |- {sample}.sorted.dups_marked.filtered.bw (if the type of data = ATAC or ChIP, from create_wiggles)
+     |- 
      |-
      |-
 |- merged_hubs
      |- Benchmarks
-     |-
+     |- {group_name}.hub
+		|- hg38
+		     |- {sample}.sorted.dups_marked.filtered.bw
+		     |- trackDb.txt
+		|- genomes.txt
+		|- hub.txt
      |-
      |-
      |-
      |-
 |- peak_calling
      |- Benchmarks
-     |-
+     |- {sample}.MACS3.q-9_peaks.bed (if the data type = ATAC, from call_peaks)
+     |- all_groups.merged_peaks.bed (if the data type = ATAC, from call_peaks)
 |- DE_calling
      |- Benchmarks
      |- basename.EXPERIMENT_DIR.raw_read_quant.table.txt (from count_reads)
