@@ -36,6 +36,45 @@ Lastly, the folder peak_calling contains peak files for ChIP and ATAC epxeriment
 
 ## Directory Structure
 
+OMNOM_HOME
+|
+|- bin
+|- genomes
+      |- STAR
+      	   |-(list the genomes you need)
+      |- HISAT2 
+           |- (list the genomes you need)
+|- rules
+|- slurm_profile
+	|- config.yaml (slurm config file)
+|- run_omnomnomics.py (wrapper script)
+|- Snakefile.py	 (main Snakefile)
+
+EXPERIMENT_DIR
+|
+|- run_configs
+|- slurm_logs
+|- run_logs
+|- FASTQ
+     |- Benchmarks
+|- trimmed_FASTQ
+     |- Benchmarks
+|- fastqc_reports
+     |- Benchmarks
+|- BAM
+     |- Benchmarks
+|- filtered_BAM
+     |- Benchmarks
+|- HOMER_tagDirs
+     |- Benchmarks
+|- BigWigs
+     |- Benchmarks
+|- merged_hubs
+     |- Benchmarks
+|- peak_calling
+     |- Benchmarks
+|- DE_calling
+     |- Benchmarks
 
 ## Workflow:
 ```
