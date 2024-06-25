@@ -21,7 +21,7 @@ python(3) run_omnomnomics.py -i path/to/your/experiment_dir -t type_of_your_expe
 For more information about how to use Omnomnomics, see the usage section down below. 
 
 ## Usage: 
-_Omnomnomics_ is a snakemake python pipeline comprised of three main parts: a python wrapper script; ```run_omnomnomics.py```, which performs safety checks, sets up variables and from which the main Snakefile; ```Snakefile.smk``` is called, and lastly the pipeline master config file; ```config.yaml```. The main Snakefile prepares threads and memory requirements for the rules, includes all rules and sets up the workflow. The master config file is where the user can specify necesarry variables for the pipeline to use. 
+_Omnomnomics_ is a snakemake python pipeline comprised of four main parts: a python wrapper script; ```run_omnomnomics.py```, which performs safety checks, sets up variables and from which the main Snakefile; ```Snakefile.smk``` is called, the pipeline master config file; ```config.yaml```, and last but not least all the rules. The main Snakefile prepares threads and memory requirements for the rules, includes all rules and sets up the workflow. The master config file is where the user can specify necessary variables for the pipeline to use. All the rules are where the actual tools are run and the data is processed.
 
 To run _Omnomnomics_ on our HPC, you must have Snakemake verison 7.25.4 installed. As of June 2024, this can be done by simply loading the Snakemake module: ```module load snakemake```. If 7.25.4 is ever not the default version of the module anymore, you can load it via ```module load snakemake/7.25.4```. 
 
@@ -307,6 +307,9 @@ Every submitted job is benchmarked. The benchmarking ```.tsv``` file can be foun
 
 ## Config files
 For a run of _Omnomnomics_, three different config files will be used. Firstly the master config file 'config.yaml' in the bin folder in OMNOM_HOME, which contains all the user-defined variables. During a run, the wrapper script builds a run config to pass appropriate variables from the wrapper script to the Snakefiles. This can be found in the 'run_configs' folder inside EXPERIMENT_DIR. Lastly, inside OMNOM_HOME, inside the 'slurm_profile' folder, there is another 'config.yaml' file, which contains the setup for job submission to SLURM on the HPC. This is where the default partition to submit jobs to can be specified. **NOTE:** if the user wants to specify a custom partition for a particular rule, this can be done by adding ```partition = "parition_name"``` in the resources section in the that rule, and then adding ```--partition={resources.partition}``` (note that no spaces between the names and '=' is important here) to the sbtach command in the config.yaml in the slurm_profile folder.
+
+## MultiQC
+After completion of a run of _Omnomnomics_, MultiQC is used to parse and combine the results from the different bioinformatics tools. This helps to summarize the experiments that were run by giving a holistic view of all the samples and their results. In addition, it provides visual representation of the data to facilitate better interpretation. When running the full pipeline, MultiQC will generally produce a summarize html report, as well as data reports and plot reports. 
 
 ## Requirements:
 - User must have Snakemake version 7.25.4 installed (current version installed as module on Ares server)
