@@ -1,0 +1,53 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/run_configs/omnomnomics.run.2024-06-26.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job            count    min threads    max threads
+-----------  -------  -------------  -------------
+all                1              1              1
+merge_bam          2            128            128
+run_star           2            128            128
+touchup_bam        2            128            128
+total              7              1            128
+
+Select jobs to execute...
+
+[Wed Jun 26 14:13:45 2024]
+rule run_star:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.trimmed.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.STAR_stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.extra_3.tmp
+    jobid: 3
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_star_benchmark.tsv
+    reason: Forced execution
+    wildcards: sample3=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=2526, disk_mib=2409, tmpdir=<TBD>, partition=defq
+
+Submitted job 3 with external jobid 'Submitted batch job 5357833'.
+
+[Wed Jun 26 14:13:45 2024]
+rule run_star:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.trimmed.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.STAR_stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.extra_3.tmp
+    jobid: 1
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_star_benchmark.tsv
+    reason: Forced execution
+    wildcards: sample3=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=2370, disk_mib=2261, tmpdir=<TBD>, partition=defq
+
+Submitted job 1 with external jobid 'Submitted batch job 5357834'.
+[Wed Jun 26 14:18:26 2024]
+Error in rule run_star:
+    jobid: 1
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.trimmed.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.STAR_stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.extra_3.tmp
+    cluster_jobid: Submitted batch job 5357834
+
+Error executing rule run_star on cluster (jobid: 1, external: Submitted batch job 5357834, jobscript: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.s9tzg98x/snakejob.run_star.1.sh). For error details see the cluster log and the log files of the involved rule(s).
+[Wed Jun 26 14:18:26 2024]
+Finished job 3.
+1 of 7 steps (14%) done
+Exiting because a job execution failed. Look above for error message
+Complete log: ../.snakemake/log/2024-06-26T141342.154073.snakemake.log

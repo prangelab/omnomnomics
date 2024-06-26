@@ -1,0 +1,374 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/run_configs/omnomnomics.run.2024-06-25.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job                    count    min threads    max threads
+-------------------  -------  -------------  -------------
+all                        1              1              1
+bam_stats                  2              1              1
+call_peaks                 1            128            128
+count_reads                1            128            128
+create_homer_tagDir        2              1              1
+create_wiggles             2              1              1
+index_bam                  2              1              1
+merge_bam                  2            128            128
+merge_wiggles              1            128            128
+run_fastqc                 2            128            128
+run_hisat2                 2            128            128
+run_trimmomatic            2            128            128
+touchup_bam                2            128            128
+total                     22              1            128
+
+Select jobs to execute...
+
+[Tue Jun 25 07:46:07 2024]
+rule run_trimmomatic:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_R1.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed.fastq.gz
+    jobid: 5
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_trimmomatic_benchmark.tsv
+    reason: Forced execution
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=4741, disk_mib=4522, tmpdir=<TBD>, partition=defq
+
+Submitted job 5 with external jobid 'Submitted batch job 5354687'.
+
+[Tue Jun 25 07:46:07 2024]
+rule run_trimmomatic:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002_R1.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.trimmed.fastq.gz
+    jobid: 7
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002_trimmomatic_benchmark.tsv
+    reason: Forced execution
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=5052, disk_mib=4818, tmpdir=<TBD>, partition=defq
+
+Submitted job 7 with external jobid 'Submitted batch job 5354688'.
+[Tue Jun 25 08:02:24 2024]
+Finished job 5.
+1 of 22 steps (5%) done
+Select jobs to execute...
+
+[Tue Jun 25 08:02:24 2024]
+rule run_fastqc:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed_fastqc.html, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed_fastqc.zip
+    jobid: 15
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_fastqc_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed_fastqc.zip, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed_fastqc.html; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed.fastq.gz
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=3642, disk_mib=3474, tmpdir=<TBD>, partition=defq
+
+Submitted job 15 with external jobid 'Submitted batch job 5354689'.
+
+[Tue Jun 25 08:02:24 2024]
+rule run_hisat2:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.HISAT2_stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra_3.tmp
+    jobid: 4
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002_hisat2_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.bam; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed.fastq.gz
+    wildcards: sample3=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=3642, disk_mib=3474, tmpdir=<TBD>, partition=defq
+
+Submitted job 4 with external jobid 'Submitted batch job 5354690'.
+[Tue Jun 25 08:03:19 2024]
+Finished job 7.
+2 of 22 steps (9%) done
+Select jobs to execute...
+
+[Tue Jun 25 08:03:19 2024]
+rule run_hisat2:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.trimmed.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.HISAT2_stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.extra_3.tmp
+    jobid: 6
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002_hisat2_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.bam; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.trimmed.fastq.gz
+    wildcards: sample3=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=3866, disk_mib=3687, tmpdir=<TBD>, partition=defq
+
+Submitted job 6 with external jobid 'Submitted batch job 5354691'.
+
+[Tue Jun 25 08:03:19 2024]
+rule run_fastqc:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.trimmed.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.trimmed_fastqc.html, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.trimmed_fastqc.zip
+    jobid: 16
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002_fastqc_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.trimmed_fastqc.zip, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.trimmed_fastqc.html; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.trimmed.fastq.gz
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=3866, disk_mib=3687, tmpdir=<TBD>, partition=defq
+
+Submitted job 16 with external jobid 'Submitted batch job 5354692'.
+[Tue Jun 25 08:05:50 2024]
+Finished job 15.
+3 of 22 steps (14%) done
+[Tue Jun 25 08:07:00 2024]
+Finished job 16.
+4 of 22 steps (18%) done
+[Tue Jun 25 08:12:05 2024]
+Finished job 4.
+5 of 22 steps (23%) done
+[Tue Jun 25 08:13:31 2024]
+Finished job 6.
+6 of 22 steps (27%) done
+Select jobs to execute...
+
+[Tue Jun 25 08:13:36 2024]
+rule merge_bam:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra_3.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.extra_3.tmp
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_4.tmp
+    jobid: 3
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_mergebam_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.bam; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra_3.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.extra_3.tmp
+    wildcards: sample4=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954, tmpdir=<TBD>, partition=defq
+
+Submitted job 3 with external jobid 'Submitted batch job 5354693'.
+
+[Tue Jun 25 08:13:41 2024]
+rule merge_bam:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra_3.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.extra_3.tmp
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_4.tmp
+    jobid: 9
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_mergebam_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.bam; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra_3.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.extra_3.tmp
+    wildcards: sample4=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954, tmpdir=<TBD>, partition=defq
+
+Submitted job 9 with external jobid 'Submitted batch job 5354694'.
+[Tue Jun 25 08:13:51 2024]
+Finished job 3.
+7 of 22 steps (32%) done
+Select jobs to execute...
+
+[Tue Jun 25 08:13:51 2024]
+rule touchup_bam:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_4.tmp
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_5.tmp
+    jobid: 2
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_touchupbam_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_4.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.bam
+    wildcards: sample5=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=5099, disk_mib=4863, tmpdir=<TBD>, partition=defq
+
+Submitted job 2 with external jobid 'Submitted batch job 5354695'.
+[Tue Jun 25 08:13:51 2024]
+Finished job 9.
+8 of 22 steps (36%) done
+Select jobs to execute...
+
+[Tue Jun 25 08:13:51 2024]
+rule touchup_bam:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_4.tmp
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_5.tmp
+    jobid: 8
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_touchupbam_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_4.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.bam
+    wildcards: sample5=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=4800, disk_mib=4578, tmpdir=<TBD>, partition=defq
+
+Submitted job 8 with external jobid 'Submitted batch job 5354696'.
+[Tue Jun 25 08:16:21 2024]
+Finished job 8.
+9 of 22 steps (41%) done
+Select jobs to execute...
+
+[Tue Jun 25 08:16:21 2024]
+rule index_bam:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam.bai
+    jobid: 13
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_bamindex_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam.bai; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209
+    resources: mem_mb=4000, mem_mib=3815, disk_mb=3262, disk_mib=3111, tmpdir=<TBD>, partition=defq
+
+Submitted job 13 with external jobid 'Submitted batch job 5354697'.
+[Tue Jun 25 08:16:31 2024]
+Finished job 2.
+10 of 22 steps (45%) done
+Select jobs to execute...
+
+[Tue Jun 25 08:16:31 2024]
+rule call_peaks:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/peak_calling/extra_11.tmp
+    jobid: 1
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/peak_calling/benchmarks/call_peaks_benchmark.tsv
+    reason: Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=6534, disk_mib=6232, tmpdir=<TBD>, partition=defq
+
+Submitted job 1 with external jobid 'Submitted batch job 5354698'.
+
+[Tue Jun 25 08:16:31 2024]
+rule index_bam:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam.bai
+    jobid: 11
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_bamindex_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam.bai; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209
+    resources: mem_mb=4000, mem_mib=3815, disk_mb=3272, disk_mib=3121, tmpdir=<TBD>, partition=defq
+
+Submitted job 11 with external jobid 'Submitted batch job 5354699'.
+[Tue Jun 25 08:17:01 2024]
+Finished job 13.
+11 of 22 steps (50%) done
+Select jobs to execute...
+
+[Tue Jun 25 08:17:01 2024]
+rule bam_stats:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam.bai
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam.stats.txt
+    jobid: 18
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_bamstats_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam.stats.txt; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam.bai
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209
+    resources: mem_mb=4000, mem_mib=3815, disk_mb=3266, disk_mib=3115, tmpdir=<TBD>, partition=defq
+
+Submitted job 18 with external jobid 'Submitted batch job 5354700'.
+
+[Tue Jun 25 08:17:01 2024]
+rule create_homer_tagDir:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam.bai
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_8.tmp
+    jobid: 12
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_make_homer_tagdirs_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam.bai
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209
+    resources: mem_mb=4000, mem_mib=3815, disk_mb=3266, disk_mib=3115, tmpdir=<TBD>, partition=defq
+
+Submitted job 12 with external jobid 'Submitted batch job 5354701'.
+[Tue Jun 25 08:17:11 2024]
+Finished job 11.
+12 of 22 steps (55%) done
+Select jobs to execute...
+
+[Tue Jun 25 08:17:11 2024]
+rule bam_stats:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam.bai
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam.stats.txt
+    jobid: 17
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_bamstats_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam.stats.txt; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam.bai, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209
+    resources: mem_mb=4000, mem_mib=3815, disk_mb=3277, disk_mib=3126, tmpdir=<TBD>, partition=defq
+
+Submitted job 17 with external jobid 'Submitted batch job 5354702'.
+
+[Tue Jun 25 08:17:11 2024]
+rule create_homer_tagDir:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam.bai
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_8.tmp
+    jobid: 10
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_make_homer_tagdirs_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam.bai, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209
+    resources: mem_mb=4000, mem_mib=3815, disk_mb=3277, disk_mib=3126, tmpdir=<TBD>, partition=defq
+
+Submitted job 10 with external jobid 'Submitted batch job 5354703'.
+[Tue Jun 25 08:17:41 2024]
+Finished job 18.
+13 of 22 steps (59%) done
+[Tue Jun 25 08:17:51 2024]
+Finished job 17.
+14 of 22 steps (64%) done
+[Tue Jun 25 08:21:21 2024]
+Finished job 12.
+15 of 22 steps (68%) done
+Select jobs to execute...
+
+[Tue Jun 25 08:21:21 2024]
+rule create_wiggles:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BigWigs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_9.tmp
+    jobid: 20
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BigWigs/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_create_wiggles_benchmark.tsv
+    reason: Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209
+    resources: mem_mb=4000, mem_mib=3815, disk_mb=1000, disk_mib=954, tmpdir=<TBD>, partition=defq
+
+Submitted job 20 with external jobid 'Submitted batch job 5354704'.
+[Tue Jun 25 08:21:27 2024]
+Finished job 10.
+16 of 22 steps (73%) done
+Select jobs to execute...
+
+[Tue Jun 25 08:21:27 2024]
+rule create_wiggles:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BigWigs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_9.tmp
+    jobid: 19
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BigWigs/benchmarks/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_create_wiggles_benchmark.tsv
+    reason: Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz
+    wildcards: sample=human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209
+    resources: mem_mb=4000, mem_mib=3815, disk_mb=1000, disk_mib=954, tmpdir=<TBD>, partition=defq
+
+Submitted job 19 with external jobid 'Submitted batch job 5354705'.
+[Tue Jun 25 08:22:26 2024]
+Finished job 1.
+17 of 22 steps (77%) done
+Select jobs to execute...
+
+[Tue Jun 25 08:22:26 2024]
+rule count_reads:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/peak_calling/extra_11.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/DE_calling/extra_12.tmp
+    jobid: 0
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/DE_calling/benchmarks/counts_reads_benchmark.tsv
+    reason: Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/peak_calling/extra_11.tmp
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954, tmpdir=<TBD>, partition=defq
+
+Submitted job 0 with external jobid 'Submitted batch job 5354706'.
+[Tue Jun 25 08:23:01 2024]
+Finished job 20.
+18 of 22 steps (82%) done
+[Tue Jun 25 08:23:01 2024]
+Finished job 19.
+19 of 22 steps (86%) done
+Select jobs to execute...
+
+[Tue Jun 25 08:23:01 2024]
+rule merge_wiggles:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BigWigs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_9.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BigWigs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_9.tmp
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/merged_hubs/extra_10.tmp
+    jobid: 21
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/merged_hubs/benchmarks/merge_wiggles_benchmark.tsv
+    reason: Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BigWigs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_9.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BigWigs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_9.tmp
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954, tmpdir=<TBD>, partition=defq
+
+Submitted job 21 with external jobid 'Submitted batch job 5354707'.
+[Tue Jun 25 08:23:17 2024]
+Finished job 21.
+20 of 22 steps (91%) done
+[Tue Jun 25 08:24:42 2024]
+Finished job 0.
+21 of 22 steps (95%) done
+Select jobs to execute...
+
+[Tue Jun 25 08:24:42 2024]
+localrule all:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed_fastqc.html, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.trimmed_fastqc.html, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed_fastqc.zip, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.trimmed_fastqc.zip, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra_3.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.extra_3.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.HISAT2_stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.HISAT2_stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_4.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_4.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_5.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_5.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam.bai, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam.bai, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam.stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam.stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_8.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_8.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BigWigs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_9.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BigWigs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_9.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/merged_hubs/extra_10.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/peak_calling/extra_11.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/DE_calling/extra_12.tmp
+    jobid: 14
+    reason: Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/DE_calling/extra_12.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.trimmed_fastqc.zip, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_5.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed_fastqc.html, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.trimmed_fastqc.html, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam.bai, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_8.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.trimmed_fastqc.zip, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam.stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_8.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_4.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/merged_hubs/extra_10.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/peak_calling/extra_11.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.HISAT2_stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.bam.bai, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.HISAT2_stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_5.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BigWigs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_9.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209_L002.extra_3.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209_L002.extra_3.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.sorted.dups_marked.filtered.bam.stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d285_RK_I20221209.extra_4.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BigWigs/human_MDM_DNA_H3K27Me3_Ctr_DMSO_F_d284_RK_I20221209.extra_9.tmp
+    resources: mem_mb=34185, mem_mib=32602, disk_mb=34185, disk_mib=32602, tmpdir=/tmp, partition=defq
+
+[Tue Jun 25 08:24:42 2024]
+Finished job 14.
+22 of 22 steps (100%) done
+Complete log: ../.snakemake/log/2024-06-25T074605.957845.snakemake.log

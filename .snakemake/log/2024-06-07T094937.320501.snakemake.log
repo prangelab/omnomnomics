@@ -1,5 +1,0 @@
-Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-07.config.yaml is extended by additional config specified via the command line.
-SystemExit in file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/Snakefile.smk, line 489:
-1
-  File "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/Snakefile.smk", line 497, in <module>
-  File "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/Snakefile.smk", line 489, in check_and_include_rules

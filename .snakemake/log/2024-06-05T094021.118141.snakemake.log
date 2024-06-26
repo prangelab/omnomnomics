@@ -1,9 +1,0 @@
-Config file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/omnomnomics.run.2024-06-05.config.yaml is extended by additional config specified via the command line.
-Building DAG of jobs...
-InputFunctionException in rule rule1 in file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/rules/rule1.smk, line 13:
-Error:
-  NameError: name 'resources' is not defined
-Wildcards:
-  sample=test_test_test
-Traceback:
-  File "/net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/rules/rule1.smk", line 25, in <lambda>

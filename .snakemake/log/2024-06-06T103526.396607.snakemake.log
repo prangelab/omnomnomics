@@ -1,9 +1,0 @@
-Config file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/omnomnomics.run.2024-06-06.config.yaml is extended by additional config specified via the command line.
-Building DAG of jobs...
-MissingInputException in rule all in file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/Snakefile.smk, line 564:
-Missing input files for rule all:
-    affected files:
-        fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.trimmed_R1.trimmed_fastqctrimmed_fastqc.zip
-        fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.trimmed_R2.trimmed_fastqctrimmed_fastqc.zip
-        fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.trimmed_R2.trimmed_fastqc.trimmed_fastqc.html
-        fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.trimmed_R1.trimmed_fastqc.trimmed_fastqc.html

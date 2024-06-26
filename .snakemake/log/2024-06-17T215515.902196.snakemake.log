@@ -1,5 +1,0 @@
-Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-17.config.yaml is extended by additional config specified via the command line.
-Building DAG of jobs...
-WildcardError in rule touchup_bam in file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/rules/touchup_bam.smk, line 6:
-Wildcards in input files cannot be determined from output files:
-'sample2'

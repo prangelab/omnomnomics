@@ -1,4 +1,0 @@
-Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-14.config.yaml is extended by additional config specified via the command line.
-SyntaxError in file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/rules/call_peaks.smk, line 14:
-expected 'else' after 'if' expression
-  File "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/Snakefile.smk", line 535, in <module>

@@ -1,4 +1,0 @@
-Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-12.config.yaml is extended by additional config specified via the command line.
-Building DAG of jobs...
-MissingRuleException:
-No rule to produce run_skewer  (if you use input functions make sure that they don't raise unexpected exceptions).

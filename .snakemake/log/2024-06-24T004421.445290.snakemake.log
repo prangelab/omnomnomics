@@ -1,0 +1,255 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/run_configs/omnomnomics.run.2024-06-24.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job                    count    min threads    max threads
+-------------------  -------  -------------  -------------
+all                        1              1              1
+bam_stats                  2              1              1
+call_peaks                 1            128            128
+count_reads                1            128            128
+create_homer_tagDir        2              1              1
+create_wiggles             2              1              1
+index_bam                  2              1              1
+merge_bam                  2            128            128
+merge_wiggles              1            128            128
+run_fastqc                 2            128            128
+run_hisat2                 2            128            128
+run_skewer                 2            128            128
+touchup_bam                2            128            128
+total                     22              1            128
+
+Select jobs to execute...
+
+[Mon Jun 24 00:44:23 2024]
+rule run_skewer:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed.fastq.gz
+    jobid: 6
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_skewer_benchmark.tsv
+    reason: Forced execution
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=5899, disk_mib=5626, tmpdir=<TBD>, partition=defq
+
+Submitted job 6 with external jobid 'Submitted batch job 5350157'.
+
+[Mon Jun 24 00:44:23 2024]
+rule run_skewer:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R2.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R2.trimmed.fastq.gz
+    jobid: 8
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_skewer_benchmark.tsv
+    reason: Forced execution
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=6293, disk_mib=6002, tmpdir=<TBD>, partition=defq
+
+Submitted job 8 with external jobid 'Submitted batch job 5350158'.
+
+[Mon Jun 24 00:44:23 2024]
+rule call_peaks:
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/peak_calling/extra_11.tmp
+    jobid: 15
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/peak_calling/benchmarks/call_peaks_benchmark.tsv
+    reason: Forced execution
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954, tmpdir=<TBD>, partition=defq
+
+Submitted job 15 with external jobid 'Submitted batch job 5350159'.
+[Mon Jun 24 00:44:33 2024]
+Finished job 15.
+1 of 22 steps (5%) done
+[Mon Jun 24 00:54:34 2024]
+Finished job 6.
+2 of 22 steps (9%) done
+Select jobs to execute...
+
+[Mon Jun 24 00:54:34 2024]
+rule run_hisat2:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.HISAT2_stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.extra_3.tmp
+    jobid: 5
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_hisat2_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.extra_3.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.HISAT2_stats.txt; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed.fastq.gz
+    wildcards: sample1=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=4815, disk_mib=4592, tmpdir=<TBD>, partition=defq
+
+Submitted job 5 with external jobid 'Submitted batch job 5350160'.
+
+[Mon Jun 24 00:54:34 2024]
+rule run_fastqc:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed_fastqc.html, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed_fastqc.html, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed_fastqc.zip, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed_fastqc.zip
+    jobid: 18
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_fastqc_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed_fastqc.zip, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed_fastqc.zip, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed_fastqc.html, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed_fastqc.html; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed.fastq.gz
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=4815, disk_mib=4592, tmpdir=<TBD>, partition=defq
+
+Submitted job 18 with external jobid 'Submitted batch job 5350161'.
+[Mon Jun 24 00:55:24 2024]
+Finished job 8.
+3 of 22 steps (14%) done
+Select jobs to execute...
+
+[Mon Jun 24 00:55:24 2024]
+rule run_hisat2:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R2.trimmed.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.HISAT2_stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.extra_3.tmp
+    jobid: 7
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_hisat2_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.extra_3.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.HISAT2_stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.bam; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R2.trimmed.fastq.gz
+    wildcards: sample1=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=5129, disk_mib=4892, tmpdir=<TBD>, partition=defq
+
+Submitted job 7 with external jobid 'Submitted batch job 5350162'.
+
+[Mon Jun 24 00:55:24 2024]
+rule run_fastqc:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R2.trimmed.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.trimmed_fastqc.html, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R2.trimmed_fastqc.html, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.trimmed_fastqc.zip, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R2.trimmed_fastqc.zip
+    jobid: 19
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_fastqc_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.trimmed_fastqc.html, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R2.trimmed_fastqc.html, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.trimmed_fastqc.zip, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/fastqc_reports/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R2.trimmed_fastqc.zip; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R2.trimmed.fastq.gz
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=5129, disk_mib=4892, tmpdir=<TBD>, partition=defq
+
+Submitted job 19 with external jobid 'Submitted batch job 5350163'.
+[Mon Jun 24 00:57:34 2024]
+Finished job 18.
+4 of 22 steps (18%) done
+[Mon Jun 24 00:58:24 2024]
+Finished job 19.
+5 of 22 steps (23%) done
+[Mon Jun 24 01:09:45 2024]
+Finished job 5.
+6 of 22 steps (27%) done
+[Mon Jun 24 01:10:55 2024]
+Finished job 7.
+7 of 22 steps (32%) done
+Select jobs to execute...
+
+[Mon Jun 24 01:10:55 2024]
+rule merge_bam:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.extra_3.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.extra_3.tmp
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.extra_4.tmp
+    jobid: 4
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_mergebam_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.extra_4.tmp; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.extra_3.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.extra_3.tmp
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954, tmpdir=<TBD>, partition=defq
+
+Submitted job 4 with external jobid 'Submitted batch job 5350164'.
+
+[Mon Jun 24 01:10:55 2024]
+rule merge_bam:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.extra_3.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.extra_3.tmp
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.extra_4.tmp
+    jobid: 13
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_mergebam_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.extra_4.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.bam; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.extra_3.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.extra_3.tmp
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954, tmpdir=<TBD>, partition=defq
+
+Submitted job 13 with external jobid 'Submitted batch job 5350165'.
+[Mon Jun 24 01:11:05 2024]
+Error in rule merge_bam:
+    jobid: 13
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.extra_3.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.extra_3.tmp
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.extra_4.tmp
+    cluster_jobid: Submitted batch job 5350165
+
+Error executing rule merge_bam on cluster (jobid: 13, external: Submitted batch job 5350165, jobscript: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.2rsorfhw/snakejob.merge_bam.13.sh). For error details see the cluster log and the log files of the involved rule(s).
+[Mon Jun 24 01:11:05 2024]
+Finished job 4.
+8 of 22 steps (36%) done
+Select jobs to execute...
+
+[Mon Jun 24 01:11:05 2024]
+rule touchup_bam:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.extra_4.tmp
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.extra_5.tmp
+    jobid: 3
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_touchupbam_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.extra_5.tmp; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.extra_4.tmp
+    wildcards: sample2=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=5839, disk_mib=5569, tmpdir=<TBD>, partition=defq
+
+Submitted job 3 with external jobid 'Submitted batch job 5350166'.
+[Mon Jun 24 01:13:02 2024]
+Finished job 3.
+9 of 22 steps (41%) done
+Select jobs to execute...
+
+[Mon Jun 24 01:13:02 2024]
+rule index_bam:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.bam
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.bam.bai
+    jobid: 9
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_bamindex_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.bam.bai; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.bam
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020
+    resources: mem_mb=4000, mem_mib=3815, disk_mb=1000, disk_mib=954, tmpdir=<TBD>, partition=defq
+
+Submitted job 9 with external jobid 'Submitted batch job 5350167'.
+[Mon Jun 24 01:13:12 2024]
+Finished job 9.
+10 of 22 steps (45%) done
+Select jobs to execute...
+
+[Mon Jun 24 01:13:12 2024]
+rule create_homer_tagDir:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.bam.bai
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.extra_8.tmp
+    jobid: 2
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_make_homer_tagdirs_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.extra_8.tmp, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.bam.bai, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.bam
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020
+    resources: mem_mb=4000, mem_mib=3815, disk_mb=1000, disk_mib=954, tmpdir=<TBD>, partition=defq
+
+Submitted job 2 with external jobid 'Submitted batch job 5350168'.
+
+[Mon Jun 24 01:13:12 2024]
+rule bam_stats:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.bam.bai
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.bam.stats.txt
+    jobid: 20
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_bamstats_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.bam.stats.txt; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.bam.bai, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.bam
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020
+    resources: mem_mb=4000, mem_mib=3815, disk_mb=1000, disk_mib=954, tmpdir=<TBD>, partition=defq
+
+Submitted job 20 with external jobid 'Submitted batch job 5350169'.
+[Mon Jun 24 01:13:27 2024]
+Finished job 2.
+11 of 22 steps (50%) done
+Select jobs to execute...
+
+[Mon Jun 24 01:13:37 2024]
+rule create_wiggles:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BigWigs/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.extra_9.tmp
+    jobid: 1
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BigWigs/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_create_wiggles_benchmark.tsv
+    reason: Missing output files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BigWigs/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.extra_9.tmp; Input files updated by another job: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020
+    resources: mem_mb=4000, mem_mib=3815, disk_mb=1000, disk_mib=954, tmpdir=<TBD>, partition=defq
+
+Submitted job 1 with external jobid 'Submitted batch job 5350170'.
+[Mon Jun 24 01:13:37 2024]
+Finished job 20.
+12 of 22 steps (55%) done
+[Mon Jun 24 01:13:47 2024]
+Finished job 1.
+13 of 22 steps (59%) done
+Exiting because a job execution failed. Look above for error message
+Complete log: ../.snakemake/log/2024-06-24T004421.445290.snakemake.log

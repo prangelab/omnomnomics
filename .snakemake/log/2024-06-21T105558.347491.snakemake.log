@@ -1,0 +1,91 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-21.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job                    count    min threads    max threads
+-------------------  -------  -------------  -------------
+all                        1              1              1
+bam_stats                  2              1              1
+call_peaks                 1            128            128
+create_homer_tagDir        2              1              1
+create_wiggles             2              1              1
+index_bam                  2              1              1
+merge_bam                  2            128            128
+merge_wiggles              1            128            128
+run_fastqc                 2            128            128
+run_hisat2                 2            128            128
+run_skewer                 2            128            128
+touchup_bam                2            128            128
+total                     21              1            128
+
+Resources before job selection: {'_cores': 9223372036854775807, '_nodes': 1000}
+Ready jobs (3)
+Select jobs to execute...
+Selected jobs (3)
+Resources after job selection: {'_cores': 9223372036854775423, '_nodes': 997}
+
+[Fri Jun 21 10:55:59 2024]
+rule call_peaks:
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/peak_calling/extra_11.tmp
+    jobid: 0
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/peak_calling/benchmarks/call_peaks_benchmark.tsv
+    reason: Forced execution
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954, tmpdir=<TBD>, partition=defq
+
+Jobscript:
+#!/bin/sh
+# properties = {"type": "single", "rule": "call_peaks", "local": false, "input": [], "output": ["/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/peak_calling/extra_11.tmp"], "wildcards": {}, "params": {"thetype": "RNA", "broad": "NA", "input_sample": "NA", "homer_input": "NA", "genome": "hg38", "experiment_dir": "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics", "name_fields": "1,2,8", "separator": "_", "thetype_field": "1", "style": "factor", "homersize": 500, "homermindist": 2000, "inputfolder1": "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/filtered_BAM", "inputfolder2": "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/HOMER_tagDirs", "outputfolder": "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/peak_calling"}, "log": [], "threads": 128, "resources": {"mem_mb": 512000, "mem_mib": 488282, "disk_mb": 1000, "disk_mib": 954, "tmpdir": "<TBD>", "partition": "defq"}, "jobid": 0, "cluster": {}}
+cd '/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship' && /trinity/shared/apps/snakemake/bin/export/python3.11 -m snakemake --snakefile '/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/Snakefile.smk' --target-jobs 'call_peaks:' --allowed-rules 'call_peaks' --cores 'all' --attempt 1 --force-use-threads  --resources 'mem_mb=512000' 'mem_mib=488282' 'disk_mb=1000' 'disk_mib=954' --wait-for-files '/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.ls73hd41' --force --keep-target-files --keep-remote --max-inventory-time 0 --nocolor --notemp --no-hooks --nolock --ignore-incomplete --rerun-triggers 'mtime' --skip-script-cleanup  --conda-frontend 'mamba' --wrapper-prefix 'https://github.com/snakemake/snakemake-wrappers/raw/' --config 'config_file=/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-21.config.yaml' --latency-wait 5 --scheduler 'greedy' --scheduler-solver-path '/trinity/shared/apps/snakemake/bin/export' --default-resources 'mem_mb=max(2*input.size_mb, 1000)' 'disk_mb=max(2*input.size_mb, 1000)' 'tmpdir=system_tmpdir' 'partition="defq"' --mode 2 && touch '/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.ls73hd41/0.jobfinished' || (touch '/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.ls73hd41/0.jobfailed'; exit 1)
+
+Submitted job 0 with external jobid 'Submitted batch job 5346598'.
+
+[Fri Jun 21 10:55:59 2024]
+rule run_skewer:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.trimmed.fastq.gz
+    jobid: 2
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_skewer_benchmark.tsv
+    reason: Forced execution
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=2907, disk_mib=2773, tmpdir=<TBD>, partition=defq
+
+Jobscript:
+#!/bin/sh
+# properties = {"type": "single", "rule": "run_skewer", "local": false, "input": ["/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.fastq.gz"], "output": ["/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.trimmed.fastq.gz"], "wildcards": {"sample": "mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004"}, "params": {"seq_type": "RNA", "inputfolder": "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/FASTQ", "outputfolder": "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ"}, "log": [], "threads": 128, "resources": {"mem_mb": 512000, "mem_mib": 488282, "disk_mb": 2907, "disk_mib": 2773, "tmpdir": "<TBD>", "partition": "defq"}, "jobid": 2, "cluster": {}}
+cd '/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship' && /trinity/shared/apps/snakemake/bin/export/python3.11 -m snakemake --snakefile '/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/Snakefile.smk' --target-jobs 'run_skewer:sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004' --allowed-rules 'run_skewer' --cores 'all' --attempt 1 --force-use-threads  --resources 'mem_mb=512000' 'mem_mib=488282' 'disk_mb=2907' 'disk_mib=2773' --wait-for-files '/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.ls73hd41' '/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.fastq.gz' --force --keep-target-files --keep-remote --max-inventory-time 0 --nocolor --notemp --no-hooks --nolock --ignore-incomplete --rerun-triggers 'mtime' --skip-script-cleanup  --conda-frontend 'mamba' --wrapper-prefix 'https://github.com/snakemake/snakemake-wrappers/raw/' --config 'config_file=/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-21.config.yaml' --latency-wait 5 --scheduler 'greedy' --scheduler-solver-path '/trinity/shared/apps/snakemake/bin/export' --default-resources 'mem_mb=max(2*input.size_mb, 1000)' 'disk_mb=max(2*input.size_mb, 1000)' 'tmpdir=system_tmpdir' 'partition="defq"' --mode 2 && touch '/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.ls73hd41/2.jobfinished' || (touch '/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.ls73hd41/2.jobfailed'; exit 1)
+
+Submitted job 2 with external jobid 'Submitted batch job 5346599'.
+
+[Fri Jun 21 10:55:59 2024]
+rule run_skewer:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.trimmed.fastq.gz
+    jobid: 3
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_skewer_benchmark.tsv
+    reason: Forced execution
+    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=3099, disk_mib=2956, tmpdir=<TBD>, partition=defq
+
+Jobscript:
+#!/bin/sh
+# properties = {"type": "single", "rule": "run_skewer", "local": false, "input": ["/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.fastq.gz"], "output": ["/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.trimmed.fastq.gz"], "wildcards": {"sample": "mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004"}, "params": {"seq_type": "RNA", "inputfolder": "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/FASTQ", "outputfolder": "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ"}, "log": [], "threads": 128, "resources": {"mem_mb": 512000, "mem_mib": 488282, "disk_mb": 3099, "disk_mib": 2956, "tmpdir": "<TBD>", "partition": "defq"}, "jobid": 3, "cluster": {}}
+cd '/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship' && /trinity/shared/apps/snakemake/bin/export/python3.11 -m snakemake --snakefile '/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/Snakefile.smk' --target-jobs 'run_skewer:sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004' --allowed-rules 'run_skewer' --cores 'all' --attempt 1 --force-use-threads  --resources 'mem_mb=512000' 'mem_mib=488282' 'disk_mb=3099' 'disk_mib=2956' --wait-for-files '/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.ls73hd41' '/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.fastq.gz' --force --keep-target-files --keep-remote --max-inventory-time 0 --nocolor --notemp --no-hooks --nolock --ignore-incomplete --rerun-triggers 'mtime' --skip-script-cleanup  --conda-frontend 'mamba' --wrapper-prefix 'https://github.com/snakemake/snakemake-wrappers/raw/' --config 'config_file=/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-21.config.yaml' --latency-wait 5 --scheduler 'greedy' --scheduler-solver-path '/trinity/shared/apps/snakemake/bin/export' --default-resources 'mem_mb=max(2*input.size_mb, 1000)' 'disk_mb=max(2*input.size_mb, 1000)' 'tmpdir=system_tmpdir' 'partition="defq"' --mode 2 && touch '/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.ls73hd41/3.jobfinished' || (touch '/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.ls73hd41/3.jobfailed'; exit 1)
+
+Submitted job 3 with external jobid 'Submitted batch job 5346600'.
+[Fri Jun 21 10:56:09 2024]
+Error in rule run_skewer:
+    jobid: 3
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.trimmed.fastq.gz
+    cluster_jobid: Submitted batch job 5346600
+
+Error executing rule run_skewer on cluster (jobid: 3, external: Submitted batch job 5346600, jobscript: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.ls73hd41/snakejob.run_skewer.3.sh). For error details see the cluster log and the log files of the involved rule(s).
+[Fri Jun 21 10:56:09 2024]
+Finished job 0.
+1 of 21 steps (5%) done
+Cleanup job metadata.
+Cleanup failed jobs output files.

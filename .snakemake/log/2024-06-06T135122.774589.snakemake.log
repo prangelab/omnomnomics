@@ -1,4 +1,0 @@
-Config file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/omnomnomics.run.2024-06-06.config.yaml is extended by additional config specified via the command line.
-WildcardError in file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/Snakefile.smk, line 570:
-No values given for wildcard 'sample'.
-  File "/net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/Snakefile.smk", line 570, in <module>

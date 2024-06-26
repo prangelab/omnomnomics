@@ -1,0 +1,20 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-21.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Full Traceback (most recent call last):
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/__init__.py", line 757, in snakemake
+    success = workflow.execute(
+              ^^^^^^^^^^^^^^^^^
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/workflow.py", line 751, in execute
+    self.persistence.lock()
+  File "/trinity/shared/apps/snakemake/lib/python3.11/site-packages/snakemake/persistence.py", line 182, in lock
+    raise snakemake.exceptions.LockException()
+snakemake.exceptions.LockException: Error: Directory cannot be locked. Please make sure that no other Snakemake process is trying to create the same files in the following directory:
+/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+If you are sure that no other instances of snakemake are running on this directory, the remaining lock was likely caused by a kill signal or a power loss. It can be removed with the --unlock argument.
+
+LockException:
+Error: Directory cannot be locked. Please make sure that no other Snakemake process is trying to create the same files in the following directory:
+/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics
+If you are sure that no other instances of snakemake are running on this directory, the remaining lock was likely caused by a kill signal or a power loss. It can be removed with the --unlock argument.
+unlocking
+removed all locks

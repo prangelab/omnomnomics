@@ -1,4 +1,0 @@
-Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-13.config.yaml is extended by additional config specified via the command line.
-SyntaxError in file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/rules/merge_lanes_and_clean_names.smk, line 43:
-invalid syntax. Perhaps you forgot a comma?
-  File "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/Snakefile.smk", line 518, in <module>

@@ -1,5 +1,0 @@
-Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-18.config.yaml is extended by additional config specified via the command line.
-SyntaxError:
-Not all output, log and benchmark files of rule touchup_bam contain the same wildcards. This is crucial though, in order to avoid that two or more jobs write to the same file.
-  File "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/Snakefile.smk", line 547, in <module>
-  File "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/rules/touchup_bam.smk", line 6, in <module>

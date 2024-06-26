@@ -1,4 +1,0 @@
-Config file /net/beegfs/scratch/kcarroll/Amsterdam UMC Klinische Genetica Internship/omnomnomics/omnomnomics.run.2024-06-05.config.yaml is extended by additional config specified via the command line.
-Building DAG of jobs...
-Nothing to be done (all requested files are present and up to date).
-Complete log: ../.snakemake/log/2024-06-05T121342.866764.snakemake.log

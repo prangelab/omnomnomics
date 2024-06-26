@@ -1,9 +1,9 @@
-
-#--partition = {resources.partition}
-
+default-resources:
+  - partition="defq"
+  
 cluster:
+  mkdir -p slurm_logs/{rule} &&
   sbatch
     --cpus-per-task={threads}
     --mem={resources.mem_mb}
-
-
+    --output=slurm_logs/{rule}/{rule}.%j.out

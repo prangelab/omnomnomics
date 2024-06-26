@@ -1,0 +1,83 @@
+Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/run_configs/omnomnomics.run.2024-06-24.config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 1000
+Job stats:
+job                    count    min threads    max threads
+-------------------  -------  -------------  -------------
+all                        1              1              1
+bam_stats                  2              1              1
+call_peaks                 1            128            128
+count_reads                1            128            128
+create_homer_tagDir        2              1              1
+create_wiggles             2              1              1
+index_bam                  2              1              1
+merge_bam                  2            128            128
+merge_wiggles              1            128            128
+run_hisat2                 2            128            128
+touchup_bam                2            128            128
+total                     18              1            128
+
+Select jobs to execute...
+
+[Mon Jun 24 09:47:53 2024]
+rule call_peaks:
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/peak_calling/extra_11.tmp
+    jobid: 15
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/peak_calling/benchmarks/call_peaks_benchmark.tsv
+    reason: Forced execution
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=1000, disk_mib=954, tmpdir=<TBD>, partition=defq
+
+Submitted job 15 with external jobid 'Submitted batch job 5350181'.
+
+[Mon Jun 24 09:47:53 2024]
+rule run_hisat2:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R2.trimmed.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.HISAT2_stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.extra_3.tmp
+    jobid: 12
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_hisat2_benchmark.tsv
+    reason: Updated input files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R2.trimmed.fastq.gz
+    wildcards: sample1=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=5129, disk_mib=4892, tmpdir=<TBD>, partition=defq
+
+Submitted job 12 with external jobid 'Submitted batch job 5350182'.
+
+[Mon Jun 24 09:47:53 2024]
+rule run_hisat2:
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.HISAT2_stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.extra_3.tmp
+    jobid: 5
+    benchmark: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/benchmarks/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_hisat2_benchmark.tsv
+    reason: Updated input files: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed.fastq.gz
+    wildcards: sample1=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004
+    threads: 128
+    resources: mem_mb=512000, mem_mib=488282, disk_mb=4815, disk_mib=4592, tmpdir=<TBD>, partition=defq
+
+Submitted job 5 with external jobid 'Submitted batch job 5350183'.
+[Mon Jun 24 09:48:03 2024]
+Error in rule call_peaks:
+    jobid: 15
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/peak_calling/extra_11.tmp
+    cluster_jobid: Submitted batch job 5350181
+
+Error executing rule call_peaks on cluster (jobid: 15, external: Submitted batch job 5350181, jobscript: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.nhq2o1w7/snakejob.call_peaks.15.sh). For error details see the cluster log and the log files of the involved rule(s).
+[Mon Jun 24 09:48:03 2024]
+Error in rule run_hisat2:
+    jobid: 12
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R1.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004_R2.trimmed.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.HISAT2_stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolB_RK_I20231020_L004.extra_3.tmp
+    cluster_jobid: Submitted batch job 5350182
+
+Error executing rule run_hisat2 on cluster (jobid: 12, external: Submitted batch job 5350182, jobscript: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.nhq2o1w7/snakejob.run_hisat2.12.sh). For error details see the cluster log and the log files of the involved rule(s).
+[Mon Jun 24 09:48:03 2024]
+Error in rule run_hisat2:
+    jobid: 5
+    input: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R1.trimmed.fastq.gz, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/trimmed_FASTQ/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004_R2.trimmed.fastq.gz
+    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.bam, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.HISAT2_stats.txt, /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020_L004.extra_3.tmp
+    cluster_jobid: Submitted batch job 5350183
+
+Error executing rule run_hisat2 on cluster (jobid: 5, external: Submitted batch job 5350183, jobscript: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/.snakemake/tmp.nhq2o1w7/snakejob.run_hisat2.5.sh). For error details see the cluster log and the log files of the involved rule(s).
+Exiting because a job execution failed. Look above for error message
+Complete log: ../.snakemake/log/2024-06-24T094750.983790.snakemake.log

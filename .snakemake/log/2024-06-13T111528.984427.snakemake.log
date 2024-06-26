@@ -1,8 +1,0 @@
-Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-13.config.yaml is extended by additional config specified via the command line.
-Building DAG of jobs...
-MissingInputException in rule index_bam in file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/rules/index_bam.smk, line 5:
-Missing input files for rule index_bam:
-    output: filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.sorted.dups_marked.filtered.filtered.bam.bai
-    wildcards: sample=mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.sorted.dups_marked.filtered
-    affected files:
-        filtered_BAM/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.sorted.dups_marked.filtered.filtered.bam
