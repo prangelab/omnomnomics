@@ -112,6 +112,8 @@ EXPERIMENT_DIR
 |- run_logs
 	|- omnomnomics.run."run_date".log
 	|- any backups with random numbers if multiple runs were made on same day
+|- MultiQC
+	|- omnomnomics.run.{run_date}.multiqc_report.html
 |- FASTQ
      |- Benchmarks
      |- {sample}_R1.fastq.gz
@@ -150,22 +152,26 @@ EXPERIMENT_DIR
      |- {sample}.filtered.HOMER_tagDir.tar.gz (if the type of data = ChIP, from make_HOMER_tagDIR)
 |- BigWigs
      |- Benchmarks
-     |- {sample}.sorted.dups_marked.filtered.bw (if the type of data = ATAC or ChIP, from create_wiggles)
-     |- 
-     |-
-     |-
+     |- {sample}.sorted.dups_marked.filtered.bw (if the type of data = ATAC, from create_wiggles)
+     |- {sample}.filtered.bw (if the type of data = ChIP, from create_wiggles)
+     |- {sample}.sorted.dups_marked.filtered.hub (if the type of data = RNA, from create_wiggles)
+						|- "genome used"
+							|- {sample}.sorted.dups_marked.filtered.HOMER_tagDirpos.ucsc.bigWig
+							|- {sample}.sorted.dups_marked.filtered.HOMER_tagDirneg.ucsc.bigWig
+							|- trackDb.txt
+						|- genomes.txt
+						|- hub.txt
+						|- washU.hub.txt
 |- merged_hubs
      |- Benchmarks
-     |- {group_name}.hub (iig for ATAC en ChIP, also like this for rna??)
-		|- hg38
-		     |- {sample}.sorted.dups_marked.filtered.bw
+     |- {group_name}.hub 
+		|- "genome used"
+		     |- {sample}.sorted.dups_marked.filtered.bw (for ATAC en ChIP)
+		     |- {sample}.sorted.dups_marked.filtered.HOMER_tagDirpos.ucsc.bigWig (for rna)
+		     |- {sample}.sorted.dups_marked.filtered.HOMER_tagDirned.ucsc.bigWig (for rna)
 		     |- trackDb.txt
 		|- genomes.txt
 		|- hub.txt
-     |-
-     |-
-     |-
-     |-
 |- peak_calling
      |- Benchmarks
      |- {sample}.MACS3.q-9_peaks.bed (if the data type = ATAC, from call_peaks)
