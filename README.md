@@ -169,8 +169,8 @@ EXPERIMENT_DIR
      |- {group_name}.hub 
 		|- "genome used"
 		     |- {sample}.sorted.dups_marked.filtered.bw (for ATAC en ChIP)
-		     |- {sample}.sorted.dups_marked.filtered.HOMER_tagDirpos.ucsc.bigWig (for rna)
-		     |- {sample}.sorted.dups_marked.filtered.HOMER_tagDirned.ucsc.bigWig (for rna)
+		     |- {sample}.sorted.dups_marked.filtered.HOMER_tagDirpos.ucsc.bigWig (for RNA)
+		     |- {sample}.sorted.dups_marked.filtered.HOMER_tagDirned.ucsc.bigWig (for RNA)
 		     |- trackDb.txt
 		|- genomes.txt
 		|- hub.txt
