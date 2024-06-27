@@ -21,6 +21,7 @@ For more information about how to use Omnomnomics, see the usage section down be
 To install Omnomnomics, you only have to perform 2 easy steps.
 As a prerequisite you should have git installed in your terminal. Determine the folder on your server account where you want to install Omnomnomics (NOTE: this is OMNOM_HOME). Now you can install Omnomnomics from Github by running this command: ```git clone  https://github.com/prangelab/omnomnomics.git path/to/where/you/want/to/install/omnomomics```
 As a second step, navigate to your OMNOM_HOME, open run_omnomnomics and put in path/to/where/you/want/to/install/omnomomics for OMNOM_HOME on the second line of the main() function. 
+If you want to run a tool where you need a genome (such as the aligners) then you will have to place your genome inside the "genomes" folder in OMNOM_HOME. Place it inside the tool and type of genome subfolders. As an example; if you want to run hisat2 with a hg38 genome, then you will place the genome inside bin/genomes/HISAT2/hg38/.
 Now you are all done and you can run Omnomnomics with the usual command: ```python(3) path/to/where/you/want/to/install/omnomomics/run_omnomonics.py  -i path/to/your/experiment/dir -t thedatatype -g thegenometype```
 
 ## Overview of Omnomnomics
