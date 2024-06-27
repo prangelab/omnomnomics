@@ -1,0 +1,1 @@
+In this directory you can put your genometype folder and in there your genome!
