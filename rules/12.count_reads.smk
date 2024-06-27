@@ -1,6 +1,11 @@
 # Rule 12: Count Reads
 
-## Omnomnomics Snake Rule  ##
+## Omnomnomics Snake Rule ##
+#=============================================
+# Author: Kieran Carroll
+# Affiliation: Prangelab AMC / Amsterdam UMC's Core Facility Genomics
+# Copyright PrangeLab 2024 ##
+#=============================================
 import os
 
 def input_function(wilcards):
@@ -20,7 +25,7 @@ def input_function(wilcards):
 
 rule count_reads:
     input:
-        input_function #possibly leave this out? or keep it for readability? and makes sure that there is input, although there is also a sanitycheck
+        input_function
     output:
         #f"{master_config['output_folders'][master_config['countreads_rule_num']-1]}/{os.path.basename(config['EXPERIMENT_DIR'])}.raw_read_quant.table.txt" will get produced if type is RNA or ATAC
         f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num']-1]}/extra_12.tmp" #must specify this so that it always performs this rule if asked for, also vor CHIP.
@@ -56,13 +61,9 @@ rule count_reads:
                 log_it(logfile, "Unpacking HOMER tagDir tar balls...")
 
                 for file in tagdir_files:
-                    print(f"file = {file}")
                     basename = os.path.basename(file)
-                    print(f"basename = {basename}")
                     tag_dir = os.path.join(input_folder, basename.replace(".tar.gz", ""))
-                    print(f"tag_dir = {tag_dir}")
                     tag_dir_short = basename.replace(".tar.gz", "")
-                    print(f"tag_dir_short = {tag_dir_short}")
 
                     # unpack the tar.gz file
                     log_it(logfile, f"Unpacking {basename} in {input_folder}")
@@ -71,13 +72,6 @@ rule count_reads:
                         cd {input_folder} && \
                         tar --strip-components=1 -xzf {basename} -C {tag_dir_short}
                         """)
-
-                # shell(f"""
-                #     cd {input_folder} &&
-                #     for TAGDIR in *tagDir.tar.gz; do
-                #         tar --strip-components=1 -xzf $TAGDIR &
-                #     done
-                # """)
 
             shell(f"ls -d {input_folder}/*tagDir/ > TAGDIRlist.txt") # Make a list of tag dirs
             log_it(logfile, "Counting reads with analyzeRepeats.pl...")
@@ -88,9 +82,7 @@ rule count_reads:
             #Command in script works better: cat TAGDIRlist.txt | xargs -l basename | cut -f {namefields} -d '{separator}' | awk 'BEGIN{{ORS="\t"}}{{print $0}}' > clean.header.tmp
             shell(f"""{OMNOM_HOME}/bin/scripts/generate_header.sh {params.namefields} '{params.separator}' """)
 
-
             shell(f"""sed "1iRefSeq_ID\\t$(cat clean.header.tmp)" clean.tmp > {output_folder}/{os.path.basename(params.experiment_dir)}.raw_read_quant.table.txt""")
-
 
             shell("rm TAGDIRlist.txt clean.header.tmp clean.tmp")
 
@@ -99,11 +91,16 @@ rule count_reads:
                 # Remove the uncompressed tag directory
                 log_it(logfile, f"Removing uncompressed tag directory {tag_dir_folder}")
                 shell(f"rm -r {tag_dir_folder}")
-            shell(f"rm {input_folder}/genome.tags.tsv")
-            shell(f"rm {input_folder}/tagAutocorrelation.txt")
-            shell(f"rm {input_folder}/tagCountDistribution.txt")
-            shell(f"rm {input_folder}/tagInfo.txt")
-            shell(f"rm {input_folder}/tagLengthDistribution.txt")
+            if os.path.isfile(f"{input_folder1}/genome.tags.tsv"):
+                shell(f"rm {input_folder1}/genome.tags.tsv")
+            if os.path.isfile(f"{input_folder1}/tagAutocorrelation.txt"):
+                shell(f"rm {input_folder1}/tagAutocorrelation.txt")
+            if os.path.isfile(f"{input_folder1}/tagCountDistribution.txt"):
+                shell(f"rm {input_folder1}/tagCountDistribution.txt")
+            if os.path.isfile(f"{input_folder1}/tagInfo.txt"):
+                shell(f"rm {input_folder1}/tagInfo.txt")
+            if os.path.isfile(f"{input_folder1}/tagLengthDistribution.txt"):
+                shell(f"rm {input_folder1}/tagLengthDistribution.txt")
 
 
         def count_reads_atac(input_folder1, input_folder2, output_folder, genome, namefields, separator):
@@ -115,13 +112,9 @@ rule count_reads:
                 log_it(logfile, "Unpacking HOMER tagDir tar balls...")
 
                 for file in tagdir_files:
-                    print(f"file = {file}")
                     basename = os.path.basename(file)
-                    print(f"basename = {basename}")
                     tag_dir = os.path.join(input_folder1, basename.replace(".tar.gz", ""))
-                    print(f"tag_dir = {tag_dir}")
                     tag_dir_short = basename.replace(".tar.gz", "")
-                    print(f"tag_dir_short = {tag_dir_short}")
 
                     # unpack the tar.gz file
                     log_it(logfile, f"Unpacking {basename} in {input_folder1}")
@@ -130,13 +123,6 @@ rule count_reads:
                         cd {input_folder1} && \
                         tar --strip-components=1 -xzf {basename} -C {tag_dir_short}
                         """)
-
-                # shell(f"""
-                #     cd {input_folder1} &&
-                #     for TAGDIR in *tagDir.tar.gz; do
-                #         tar --strip-components=1 -xzf $TAGDIR &
-                #     done
-                # """)
 
             shell(f"ls -d {input_folder1}/*tagDir/ > TAGDIRlist.txt") # Make a list of tag dirs
 
@@ -165,11 +151,16 @@ rule count_reads:
                 # Remove the uncompressed tag directory
                 log_it(logfile, f"Removing uncompressed tag directory {tag_dir_folder}")
                 shell(f"rm -r {tag_dir_folder}")
-            shell(f"rm {input_folder1}/genome.tags.tsv")
-            shell(f"rm {input_folder1}/tagAutocorrelation.txt")
-            shell(f"rm {input_folder1}/tagCountDistribution.txt")
-            shell(f"rm {input_folder1}/tagInfo.txt")
-            shell(f"rm {input_folder1}/tagLengthDistribution.txt")
+            if os.path.isfile(f"{input_folder1}/genome.tags.tsv"):
+                shell(f"rm {input_folder1}/genome.tags.tsv")
+            if os.path.isfile(f"{input_folder1}/tagAutocorrelation.txt"):
+                shell(f"rm {input_folder1}/tagAutocorrelation.txt")
+            if os.path.isfile(f"{input_folder1}/tagCountDistribution.txt"):
+                shell(f"rm {input_folder1}/tagCountDistribution.txt")
+            if os.path.isfile(f"{input_folder1}/tagInfo.txt"):
+                shell(f"rm {input_folder1}/tagInfo.txt")
+            if os.path.isfile(f"{input_folder1}/tagLengthDistribution.txt"):
+                shell(f"rm {input_folder1}/tagLengthDistribution.txt")
 
         if params.thetype == "RNA":
             count_reads_rna(params.inputfolder1, params.outputfolder, params.genome, params.namefields, params.separator)

@@ -1,6 +1,11 @@
 #Rule 3 option STAR TE
 
-## Omnomnomics Snake Rule  ##
+## Omnomnomics Snake Rule ##
+#=============================================
+# Author: Kieran Carroll
+# Affiliation: Prangelab AMC / Amsterdam UMC's Core Facility Genomics
+# Copyright PrangeLab 2024 ##
+#=============================================
 import os
 import subprocess
 rule run_star_te:

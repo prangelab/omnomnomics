@@ -1,4 +1,0 @@
-Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/run_configs/omnomnomics.run.2024-06-24.config.yaml is extended by additional config specified via the command line.
-ZeroDivisionError in file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/Snakefile.smk, line 350:
-division by zero
-  File "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/Snakefile.smk", line 350, in <module>

@@ -1,6 +1,11 @@
 # Rule 1 option skewer
 
-## Omnomnomics Snake Rule  ##
+## Omnomnomics Snake Rule ##
+#=============================================
+# Author: Kieran Carroll
+# Affiliation: Prangelab AMC / Amsterdam UMC's Core Facility Genomics
+# Copyright PrangeLab 2024 ##
+#=============================================
 import os
 import glob
 import subprocess

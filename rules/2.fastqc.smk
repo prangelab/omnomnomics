@@ -1,6 +1,11 @@
 # Rule 2 fastqc
 
-## Omnomnomics Snake Rule  ##
+## Omnomnomics Snake Rule ##
+#=============================================
+# Author: Kieran Carroll
+# Affiliation: Prangelab AMC / Amsterdam UMC's Core Facility Genomics
+# Copyright PrangeLab 2024 ##
+#=============================================
 import os
 
 rule run_fastqc:

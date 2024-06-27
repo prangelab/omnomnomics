@@ -1,3 +1,11 @@
+##############################################
+### NGS PIPELINE FOR RNA, ATAC & CHIP DATA ###
+##############################################
+#=============================================
+# Author: Kieran Carroll
+# Affiliation: Prangelab AMC / Amsterdam UMC's Core Facility Genomics
+# Copyright PrangeLab 2024 ##
+#=============================================
 #Main Snakefile
 import os
 import sys
@@ -29,11 +37,13 @@ def log_it(logfile, message, heading=None):
     print(f"{timestamp}: {message}")
 
 onstart:
+    # Upon start, log the start time of the pipeline
     global start_time
     start_time = time.time()
     log_it(logfile, "Pipeline started at {}\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")), "PIPELINE START TIME")
 
 onerror:
+    # Upon error, log the error time of the pipeline and the elapsed time
     end_time = time.time()
     elapsed_time = end_time - start_time
     log_it(logfile, "Pipeline failed at {}\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")), "PIPELINE RUN TIME")
@@ -43,13 +53,13 @@ onerror:
 def sanity_check_dir(logfile, input_directory, file_ext):
     #check if input directiory exists
     if not os.path.isdir(input_directory):
-        log_it(logfile, f"{file_ext} files should be contained in a {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir})!", "ERROR")
+        log_it(logfile, f"{file_ext} files should be contained in a {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir})! Aborting...", "ERROR")
         log_it(logfile, "Aborting...")
         print(f"{file_ext} files should be contained in a {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir})! Aborting...")
         sys.exit(1)
     #check if input directory contains input files
     if len([f for f in os.listdir(input_directory) if f.endswith(file_ext)]) == 0:
-        log_it(logfile, f"The {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir}) does not contain any {file_ext} files!", "ERROR")
+        log_it(logfile, f"The {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir}) does not contain any {file_ext} files! Aborting...", "ERROR")
         log_it(logfile, "Aborting...")
         print(f"The {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir}) does not contain any {file_ext} files! Aborting...")
         sys.exit(1)
@@ -93,140 +103,19 @@ if not os.path.isfile(CONFIG_FILE):
 
 master_config = load_and_validate_yaml(logfile, CONFIG_FILE, "## Omnomnomics pipeline config ##")
 
-
-##--------------------------------------------------------------------------------------------------------------
-## Check if we are requeued or a fresh run
-##---------------------------------------------------------------------------------------------------------------
-# def check_if_requeued(logfile, experiment_dir, max_step, themode):
-#     log_it(logfile, "Checking if we are requeued...", "Run START")
-
-#     semaphore_path = os.path.join(experiment_dir, "omnomnomics.semaphore")
-#     if os.path.isfile(semaphore_path):
-#         log_it(logfile, "Requeued run found!")
-
-#         ## Sanity check the semaphore file
-#         # Check if number of lines is within range of job types
-#         with open(semaphore_path, 'r') as sem_file:
-#             sem_lines = sem_file.readlines()
-
-#         semlen = len(sem_lines)
-#         log_it(logfile, f"Testing number of steps in semaphore file: {semlen}")
-
-#         if 1 <= semlen <= (max_step + 1):
-#             log_it(logfile, "Number of lines is within range of job types")
-#             print("Number of lines is within range of job types")
-#             log_it(logfile, "Testing job ranges in semaphore file...")
-#             print("Testing job ranges in semaphore file...")
-#             malsem = False
-#             for line in sem_lines:
-#                 # Check if this line is within range of job types
-#                 theline = int(line.strip())
-#                 log_it(logfile, f"Testing job range for line: {theline}")
-#                 print(f"Testing job range for line: {theline}")
-#                 if not (1 <= theline <= max_step):
-#                     log_it(logfile, "Malformed line found in aborted run log!")
-#                     print("Malformed line found in aborted run log!")
-#                     log_it(logfile, semaphore_path)
-#                     malsem = True
-#                     break
-#                 log_it(logfile, "Line is within range of job types")
-#                 print("Line is within range of job types")
-#         else:
-#             log_it(logfile, "Malformed semaphore file! (too many lines)")
-#             print("Malformed semaphore file! (too many lines)")
-#             log_it(logfile, semaphore_path)
-#             malsem = True
-
-
-#         # Check if final step doesn't overflow the workflow
-#         if int(sem_lines[-1].strip()) >= max(themode) or int(sem_lines[-1].strip()) >= int(sem_lines[0].strip()):
-#             log_it(logfile, "Final recorded step in requeued run log implies a finished run, so we cannot resume this run!")
-#             malsem = True
-
-
-#         # Check the malformed semaphore file flag and act accordingly
-#         if malsem:
-#             log_it(logfile, "Cancelling run... Clear the experiment dir of cruft (e.g., the semaphore, unfinished steps, old logs, etc.) and resubmit!")
-#             print("Cancelling run... Clear the experiment dir of cruft (e.g., the semaphore, unfinished steps, old logs, etc.) and resubmit!")
-#     #       os.remove(os.path.join(experiment_dir, "omnomnomics.run_in_progress"))
-#             sys.exit(1)
-
-
-#         else:
-#             # Semaphore file is ok: continue using it
-#             #check if the aborted run ever completed single step
-#             if semlen == 1:
-#                 log_it(logfile, "The requeued run log shows this run of the job has never actually completed a single step, therefore we will continue using the job mode specified in the config file!")
-#                 log_it(logfile, f"Job mode set to: {themode}")
-#                 log_it(logfile, "Starting a fresh run...")
-#                 log_it(logfile, "Getting ready...")
-#                 return themode
-#             else:
-#                 # Aborted run completed steps so check where we left off
-#                 finalstep = int(sem_lines[0].strip())
-#                 laststep = int(sem_lines[-1].strip())
-
-
-#                 # Resume from the next step
-#                 nextstep = laststep + 1
-#                 log_it(logfile, f"Resuming requeued run from step: {nextstep}")
-#                 log_it(logfile, f"Previously set end point: {finalstep}")
-#                 print(logfile, f"Resuming requeued run from step: {nextstep}")
-#                 print(logfile, f"Previously set end point: {finalstep}")
-
-
-#                 # Set the correct mode (need to overwrite previous config)
-#                 themode = list(range(nextstep, finalstep + 1))
-#                 themode_range_min = nextstep
-#                 themode_range_max = finalstep
-#                 log_it(logfile, f"Job mode set to: {themode}")
-#                 log_it(logfile, "Starting a fresh run...")
-#                 log_it(logfile, "Getting ready...")
-#                 return themode
-
-
-#     else:
-#         # We are not requeued! Let's start fresh!
-#         log_it(logfile, "Starting a fresh run...")
-#         #log_it(f"omnomnomics run started on {os.environ.get('SLURMD_NODENAME', 'unknown node')}!")######################### not access this here?
-#         log_it(logfile, "Getting ready...")
-#         print("Starting a fresh run...")
-#         #print(f"omnomnomics run started on {os.environ.get('SLURMD_NODENAME', 'unknown node')}!")##########################can't access this here?
-#         print("Getting ready...")
-
-
-#         # Initialise semaphore file with the desired end step to keep track of progress
-#         with open(semaphore_path, 'w') as sem_file:
-#             sem_file.write(f"{max(themode)}\n")
-#         return themode
-
-
-
-
-#themode = check_if_requeued(logfile, experiment_dir, master_config['max_step'], config['THEMODE'])
 themode = config['THEMODE']
 
 ##---------------------------------------------------------------------------------------------------------------
 ## Final housekeeping
 ##---------------------------------------------------------------------------------------------------------------
 def final_housekeeping(logfile, thecoltable, experiment_dir):
-    # Move color table to experiment dir if it exists
-    #if os.path.isfile(thecoltable):
-        #shutil.copy(thecoltable, experiment_dir)
-        #thecoltable = os.path.basename(thecoltable)
-        #log_it(logfile, f"Moved color table to experiment dir: {thecoltable}")
-
-
     # Move our camp to the experiment directory
     os.chdir(experiment_dir)
-    #logfile = os.path.basename(logfile)
-    #log_it(logfile, f"Changed directory to experiment dir: {experiment_dir}")
+    log_it(logfile, f"Changed directory to experiment dir: {experiment_dir}" )
     print(f"Changed directory to experiment dir: {experiment_dir}")
-    #print(f"Updated logfile path: {logfile}")
-    return #thecoltable, logfile
+    return 
 
 final_housekeeping(logfile, config['THECOLTABLE'], experiment_dir)
-
 
 ##---------------------------------------------------------------------------------------------------------------
 ## Report some basic stats
@@ -277,9 +166,7 @@ routines = []
 THEMODERANGEMIN = config['THEMODERANGEMIN']
 
 input_folder = master_config['input_folders'][THEMODERANGEMIN-1]
-print(input_folder)
 input_file_type =  master_config['input_file_types'][THEMODERANGEMIN-1]
-print(input_file_type)
 if THEMODERANGEMIN == 10:
     if config['THETYPE'] == "RNA":
         input_file_type = input_file_type[0]
@@ -291,22 +178,20 @@ if THEMODERANGEMIN == 11:
 if THEMODERANGEMIN == 12:
     input_file_type = input_file_type[0]
     input_folder = input_folder[0]
-    
+
 input_pattern = os.path.join(input_folder, f"*{input_file_type}")
-print(input_pattern)
 input_files = glob.glob(input_pattern)
-print(input_files)
+
+# Obtain all the sample names
 samples = [os.path.basename(f).replace(input_file_type, "") for f in input_files]
 samples = [f.replace("_R1", "") for f in samples]
 samples = [f.replace("_R2", "") for f in samples]
 samples = [f.replace(".filtered", "") for f in samples]
 samples = [f.replace(".sorted.dups_marked", "") for f in samples]
-samples2 = [re.sub(r'_L00.', '', string) for string in samples]
-print(samples)
+samples2 = [re.sub(r'_L00.', '', string) for string in samples] #From step 4 on, the lane number is not in the sample name anymore
 
 samples = list(set(samples))
 samples2 = list(set(samples2))
-print(samples)
 
 if config['PAIRED'] == 1 and THEMODERANGEMIN < 4: 
     num_samples = len(samples) / 2
@@ -319,7 +204,6 @@ max_nodes = master_config.get('max_nodes', f"{master_config['nodes_in_partition'
 ##--------------------------------------------------------------------------------------------------------------
 # Obtain Threads and Memory per rule
 ##--------------------------------------------------------------------------------------------------------------
-
 Threads_Per_Rule = {}
 for i in range(1,master_config['max_step']+1):
     rule_num = i
@@ -339,7 +223,6 @@ for i in range(1,master_config['max_step']+1):
                                     and isinstance(master_config['maxcores_single_sample_step1_9'][i - 1], int)
                                     and master_config['maxcores_single_sample_step1_9'][i - 1] < master_config['cores_per_node']
                                     else master_config['cores_per_node']), ((max_nodes*master_config['cores_per_node'])/num_samples)) ) )
-print(Threads_Per_Rule)
 Memory_Per_Rule = {}
 for i in range(1,master_config['max_step']+1):
     rule_num = i
@@ -358,30 +241,6 @@ for i in range(1,master_config['max_step']+1):
         else:
             Memory_Per_Rule[f'{rule_num}']= (master_config['min_slice_mem'])
 
-    # Memory_Per_Rule[f'{rule_num}'] =  (master_config['min_mem_mb'][i - 1]
-    #                                 if 'min_mem_mb' in master_config
-    #                                 and isinstance(master_config['min_mem_mb'], list)
-    #                                 and len(master_config['min_mem_mb']) > (i - 1)
-    #                                 and master_config['min_mem_mb'][i - 1] is not None
-    #                                 and isinstance(master_config['min_mem_mb'][i - 1], int)
-    #                                 and master_config['min_mem_mb'][i - 1] > master_config['min_slice_mem']
-    #                                 else (master_config['min_slice_mem'] 
-    #                                     if('min_mem_mb' in master_config
-    #                                         and isinstance(master_config['min_mem_mb'], list)
-    #                                         and len(master_config['min_mem_mb']) > (i - 1)
-    #                                         and master_config['min_mem_mb'][i - 1] is not None
-    #                                         and isinstance(master_config['min_mem_mb'][i - 1], int)
-    #                                         and master_config['min_mem_mb'][i - 1] <= master_config['min_slice_mem'])
-    #                                     else Threads_Per_Rule[f'{rule_num}'] * master_config['max_mem_per_core_mb']))
-
-                                        # else (master_config['mincores_single_sample_step1_9'][i - 1]
-                                        # if 'mincores_single_sample_step1_9' in master_config
-                                        # and isinstance(master_config['mincores_single_sample_step1_9'], list)
-                                        # and len(master_config['mincores_single_sample_step1_9']) > (i - 1)
-                                        # and master_config['mincores_single_sample_step1_9'][i - 1] is not None
-                                        # and isinstance(master_config['mincores_single_sample_step1_9'][i - 1], int)
-                                        # and master_config['mincores_single_sample_step1_9'][i - 1] > master_config['min_slice_cores']
-                                        # else master_config['min_slice_cores'])* master_config['max_mem_per_core_mb']))
 ##--------------------------------------------------------------------------------------------------------------
 # Include Snakemake rules for your actual data processing pipeline
 ##--------------------------------------------------------------------------------------------------------------
@@ -413,7 +272,7 @@ def check_and_include_rules(logfile, omnom_home, experiment_dir):
     for smk_file in smk_files:
         with open(smk_file, 'r') as file:
             lines = file.readlines()
-            if len(lines) < 3 or lines[2].strip() != "## Omnomnomics Snake Rule  ##":
+            if len(lines) < 3 or lines[2].strip() != "## Omnomnomics Snake Rule ##":
                 log_it(logfile, f"Workflow step dir contains a malformed .smk file: {smk_file}", "WORKLFLOW SNAKE RULE CHECK")
                 log_it(logfile, f"Aborting...")
                 print(f"Workflow step dir contains a malformed .smk file: {smk_file}")
@@ -429,47 +288,15 @@ valid_smk_files = check_and_include_rules(logfile, OMNOM_HOME, experiment_dir)
 # Include snake rules in the main Snakefile
 for smk_file in valid_smk_files:
     include: smk_file
-# include: "rules/1.trim_skewer.smk"
-
-# include: "rules/1.trim_trimmomatic.smk"
-
-# include: "rules/2.fastqc.smk"
-
-# include: "rules/3.align_reads_hisat2.smk"
-
-# include: "rules/3.align_reads_STAR.smk"
-
-# include: "rules/3.align_reads_STAR_TE.smk"
-
-# include: "rules/4.merge_lanes_and_clean_names.smk"
-
-# include: "rules/5.touchup_bam.smk"
-
-# include: "rules/6.index_bam.smk"
-
-# include: "rules/7.bam_stats.smk"
-
-# include: "rules/8.make_HOMER_tagDIR.smk"
-
-# include: "rules/9.create_wiggles.smk"
-
-# include: "rules/10.merge_wiggles.smk"
-
-# include: "rules/11.call_peaks.smk"
-
-# include: "rules/12.count_reads.smk"
-
-# include: "rules/13.call_DE.smk"
 
 ##--------------------------------------------------------------------------------------------------------------
 # Execute the desired rules
 ##--------------------------------------------------------------------------------------------------------------
-print(themode)
 for rule_num in themode:
 
     output_folder = master_config['output_folders'][rule_num-1]
     output_file_type =  master_config['output_file_types'][rule_num-1]
-
+    # For all of the specified rules, add its output to input of rule all so that the rule is run
     if rule_num == 1:
         if config['THETRIMTOOL'] == 'skewer':
             if config['PAIRED']: 
@@ -545,8 +372,9 @@ for rule_num in themode:
         all_outputs.append( f"{experiment_dir}/{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.results.zip")
     
 
-print('\n'.join(all_outputs))
+log_it(logfile, '\n'.join(all_outputs), 'ALL OUTPUTS')
 
+# Determine rule priority to resolve any rule ambuigity
 if config['THETRIMTOOL'] == "skewer" and config['THEMAPTOOL'] == "star":
     ruleorder: run_skewer > run_trimmomatic > run_star > run_star_te > run_hisat2 > merge_bam 
 elif config['THETRIMTOOL'] == "skewer" and config['THEMAPTOOL'] == "star_te":
@@ -560,14 +388,16 @@ elif config['THETRIMTOOL'] == "trimmomatic" and config['THEMAPTOOL'] == "star_te
 elif config['THETRIMTOOL'] == "trimmomatic" and config['THEMAPTOOL'] == "hisat2":
     ruleorder: run_trimmomatic > run_skewer > run_hisat2 > run_star_te > run_star > merge_bam 
 
-
+#---------------------------------------------------------------------------------------------------------------
+# Three line heart of the pipeline to set up the workflow
+#---------------------------------------------------------------------------------------------------------------
 rule all:
     input:
         all_outputs
 
 
 onsuccess:
-    #Final things:
+    ##Final things:
     #---------------------------------------------------------------------------------------------------------------
     # Run multiqc to gather all stats
     #---------------------------------------------------------------------------------------------------------------
@@ -617,8 +447,9 @@ onsuccess:
     # Remove old BAM files with lane info
     #---------------------------------------------------------------------------------------------------------------
     ## Note that I had to do that here since if I do it before completion rule_all would error that not all of it input files are present
-    for bam_file in glob.glob(f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/*_L00*.bam"):
-        os.remove(bam_file)
+    if 4 in themode:
+        for bam_file in glob.glob(f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/*_L00*.bam"):
+            os.remove(bam_file)
     
     #---------------------------------------------------------------------------------------------------------------
     # Log elapsed time and completion

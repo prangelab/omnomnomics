@@ -212,8 +212,6 @@ max_mem_per_core_mb: 4000
 min_slice_cores: 1
 min_slice_mem: 4000
 
-
-omnom_home: "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship"
 trim_tool: "skewer"
 map_tool: "hisat2"
 omnomnomics: 0.4

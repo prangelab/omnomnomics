@@ -1,6 +1,11 @@
 # Rule 8: Create HOMER tag directories
 
-## Omnomnomics Snake Rule  ##
+## Omnomnomics Snake Rule ##
+#=============================================
+# Author: Kieran Carroll
+# Affiliation: Prangelab AMC / Amsterdam UMC's Core Facility Genomics
+# Copyright PrangeLab 2024 ##
+#=============================================
 import os
 import glob
 import pysam
@@ -80,9 +85,9 @@ rule create_homer_tagDir:
             log_it(logfile, f"Compressing {os.path.basename(tag_dir)} into {tag_dir}.tar.gz")
             shell(f"cd {outputfolder} && tar czf {sample_name}.HOMER_tagDir.tar.gz  {sample_name}.HOMER_tagDir")
             
-            # # Remove the uncompressed tag directory
-            # log_it(logfile, f"Removing uncompressed tag directory {tag_dir}")
-            # shell(f"rm -r {tag_dir}")
+            # Remove the uncompressed tag directory
+            log_it(logfile, f"Removing uncompressed tag directory {tag_dir}")
+            shell(f"rm -r {tag_dir}")
 
             shell(f"""echo "necessity file for touchup_bam. can delete this." > {outputfolder}/{wildcards.sample}.extra_8.tmp""")
 

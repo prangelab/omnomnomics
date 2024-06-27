@@ -1,3 +1,0 @@
-Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/omnomnomics.run.2024-06-20.config.yaml is extended by additional config specified via the command line.
-UnknownRuleException:
-Error in ruleorder definition. There is no rule named run_skewer.

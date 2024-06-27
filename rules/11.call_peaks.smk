@@ -1,6 +1,11 @@
 # Rule 11: Call Peaks
 
-## Omnomnomics Snake Rule  ##
+## Omnomnomics Snake Rule ##
+#=============================================
+# Author: Kieran Carroll
+# Affiliation: Prangelab AMC / Amsterdam UMC's Core Facility Genomics
+# Copyright PrangeLab 2024 ##
+#=============================================
 import os
 import re
 import glob
@@ -21,8 +26,7 @@ def input_function(wildcards):
 
 rule call_peaks:
     input:
-        input_function #possibly leave this out? or keep it for readability? and makes sure that there is input, although there is also a sanitycheck
-
+        input_function
     output:
         f"{experiment_dir}/{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/extra_11.tmp"
     params:
@@ -55,7 +59,6 @@ rule call_peaks:
         def get_name_from_bam(inputfolder, group, name_fields, separator):
             group_escaped = group.replace(separator, '.*')
             cmd = f'basename "$(ls "{inputfolder}" | grep "{group_escaped}" - | grep ".bam$" | head -n1)" | cut -f{name_fields} -d{separator}'
-            #cmd = f'$(echo $(basename $(ls "{inputfolder}" | grep $(echo {group} | sed "s|{separator}|.*|g") - | grep ".bam$" | head -n1)) | cut -f{name_fields} -d {separator})'
             try:
                 result = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
                 return result
@@ -83,12 +86,10 @@ rule call_peaks:
             # Report version
             macs3_version = subprocess.check_output(""" eval "$(micromamba shell hook --shell=bash)" && micromamba activate macs3 && macs3 --version""", shell=True, executable='/bin/bash')
             log_it(logfile, "\n"+macs3_version.decode("utf-8"), "FASTQC VERSION")
-            print(macs3_version.decode("utf-8"))
 
             # path = os.path.join(OMNOM_HOME, "bin", "homer", "configureHomer.pl")
             # version = subprocess.check_output("perl {path} -list 2> /dev/null | grep homer",  shell=True, executable='/bin/bash')
             # log_it(logfile, "\n"+version.decode("utf-8"), "VERSION")
-            # print(version.decode("utf-8"))
 
             if thetype == "CHIP":
                 #If ChIP, call peaks
@@ -151,26 +152,19 @@ rule call_peaks:
                                 shell(f""" eval "$(micromamba shell hook --shell=bash)" && micromamba activate macs3 && \
                                 macs3 callpeak -t {' '.join(bams)} -c {input_sample} --outdir {outputfolder} -n {the_name}.MACS3.{ext} -{'q' if ext.startswith('q') else 'p'} {'1e-9' if ext.endswith('9') else '1e-6'} --verbose 0""")
                 # Clean up the output
-                print(os.listdir(outputfolder))
-
                 log_it(logfile, "Cleaning up MACS3 output (keeping only narrowPeak and broadPeak files)...")
                 for group in chip_groups: 
-                    print(f" group = {group}")
                     the_name = get_name_from_bam(inputfolder1, group, name_fields, separator)
-                    print(f"the_name = {the_name}")
+                    log_it(logfile, f"find {outputfolder} -type f -name {the_name}.MACS3* ! \( -name *broadPeak -o -name *narrowPeak \) -delete")
                     shell(f"find {outputfolder} -type f -name {the_name}.MACS3* ! \( -name *broadPeak -o -name *narrowPeak \) -delete ") # Delete all redundant MACS3 output
-                
-                print(os.listdir(outputfolder))
 
                 log_it(logfile, "Converting to a clean 3 column BED format...")
                 for file in glob.glob(f"{outputfolder}/*{'narrowPeak' if broad != '1' else 'broadPeak'}"):
-                    print(f"file = {file}")
                     sorted_bed = f"{outputfolder}/{os.path.basename(file).replace('.narrowPeak', '').replace('.broadPeak', '')}.bed"
-                    print(f"sorted_bed = {sorted_bed}")
+                    log_it(logfile, f"cut -f1-3 {file} | sort -k1,1 -k2,2n -k3,3n > {sorted_bed}" )
                     shell(f"cut -f1-3 {file} | sort -k1,1 -k2,2n -k3,3n > {sorted_bed}")
                     os.remove(file)
                 
-                print(os.listdir(outputfolder))
                 # Call peaks using HOMER
                 log_it(logfile, "Calling peaks with HOMER...")
                 log_it(logfile, f"Input folder: {inputfolder2}")
@@ -181,14 +175,12 @@ rule call_peaks:
                 # See if we need to unpack the tag dirs
                 if glob.glob(f"{inputfolder2}/*tagDir.tar.gz"):
                     for tagdir in glob.glob(f"{inputfolder2}/*tagDir.tar.gz"):
-                        print(f"tagdir = {tagdir}")
                         tagdir_basename = os.path.basename(tagdir)
+                        log_it(logfile, f"cd {inputfolder2} && tar --strip-components=1 -xzf {tagdir_basename}")
                         shell(f"cd {inputfolder2} && tar --strip-components=1 -xzf {tagdir_basename}")
                 # Fetch tagdirs
                 tagdirs = glob.glob(f"{inputfolder2}/*.HOMER_tagDir")
-                print(f"tagdirs = {tagdirs}")
                 
-                print(f"homer_input = {homer_input}")
                 if homer_input == "NA": # No input sample was provided
                     if broad == "1": # Check if we should call broad peaks
                         log_it(logfile, "Calling broad peaks with HOMER...") 
@@ -226,30 +218,21 @@ rule call_peaks:
                 tagdirs2 = [os.path.basename(tagdir).split(separator)[thetype_field - 1] for tagdir in tagdirs]
                 chip_groups = sorted(set(tagdirs2))
 
-                print(f"chip_groups = {chip_groups}")
+                log_it(logfile, f"chip_groups = {chip_groups}")
 
                 # Iterate over the groups to merge the BED files
                 for group in chip_groups:
-                    print(f"group = {group}")
                     # Fetch samples
                     beds = [os.path.join(inputfolder2, bed) for bed in os.listdir(inputfolder2) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.HOMER_tagDir$", bed)]
-                    print(f"beds = {beds}")
                     if thestyle == "factor":
                         beds = [f"{bed}/peaks.bed" for bed in beds]
                     elif thestyle == "histone":
                         beds = [f"{bed}/regions.bed" for bed in beds]
-                    print(f"new beds = {beds}")
                     log_it(logfile, f"Merging peaks for: {group}...")
                     log_it(logfile, f"Samples in group: {', '.join(beds)}")
                     
                     the_name = get_name_from_homer(inputfolder2, group, name_fields, separator)
-                    print(f"the_name = {the_name}")
-                    # the_name = os.path.basename(
-                    #     next(bed for bed in os.listdir(inputfolder2) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.HOMER_tagDir$", bed))
-                    # ).split(separator)[name_fields - 1]
-
                     sorted_bed = f"{outputfolder}/{the_name}.HOMER.merged_peaks.bed"
-                    print(f"sorted_bed = {sorted_bed}")
                     log_it(logfile, f"module load bedtools && cat {' '.join(beds)} | sort -k1,1 -k2,2n -k3,3n | bedtools merge -i - > {sorted_bed}")
                     shell(f"""module load bedtools && cat {' '.join(beds)} | sort -k1,1 -k2,2n -k3,3n | bedtools merge -i - > {sorted_bed}""")
             else:
@@ -271,9 +254,6 @@ rule call_peaks:
                     log_it(logfile, f"Files in group: {', '.join(bams)}")
                     # Set group name
                     the_name = get_name_from_bam(inputfolder1, group, name_fields, separator)
-                    # the_name = os.path.basename(
-                    #     next(bam for bam in os.listdir(inputfolder1) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.bam$", bam))
-                    # ).split(separator)[name_fields - 1]
 
                     # Call open regions with MACS3 hmmr
                     # Turns out this MACS subroutine is till buggy and not functining prooerply, check back with it later but for now just call as ChIP peaks
@@ -290,10 +270,6 @@ rule call_peaks:
                 for group in atac_groups: ## Clean up the output
                     # Set group name
                     the_name = get_name_from_bam(inputfolder1, group, name_fields, separator)
-                    # the_name = os.path.basename(
-                    #     next(bam for bam in os.listdir(inputfolder1) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.bam$", bam))
-                    # ).split(separator)[name_fields - 1]
-                    # Delete all redundant MACS3 output
                     shell(f"find {outputfolder} -type f -name {the_name}.MACS3* ! -name *narrowPeak -delete")
                 
                 # Create clean BED files

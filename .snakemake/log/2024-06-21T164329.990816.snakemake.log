@@ -1,7 +1,0 @@
-Config file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/run_configs/omnomnomics.run.2024-06-21.config.yaml is extended by additional config specified via the command line.
-Building DAG of jobs...
-MissingInputException in rule merge_wiggles in file /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/rules/10.merge_wiggles.smk, line 17:
-Missing input files for rule merge_wiggles:
-    output: /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/merged_hubs/extra_10.tmp
-    affected files:
-        /net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship/omnomnomics/BigWigs/mouse_F_ldlr_PlaqueMacrophages_RNA_2301_DMSO_poolA_RK_I20231020.extra_9.tmp

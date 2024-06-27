@@ -1,30 +1,17 @@
 #Rule 4 merge lanes and clean names
 
-## Omnomnomics Snake Rule  ##
+## Omnomnomics Snake Rule ##
+#=============================================
+# Author: Kieran Carroll
+# Affiliation: Prangelab AMC / Amsterdam UMC's Core Facility Genomics
+# Copyright PrangeLab 2024 ##
+#=============================================
 import os
 import glob
 
-def input_function(wildcards):
-    input_folder = f"{experiment_dir}/{master_config['input_folders'][master_config['merge_rule_num']-1]}"
-    
-    #input_files = [f"{input_folder}/{sample4}_L0{i:02}.bam" for i in range(1, 100) if os.path.exists(f"{input_folder}/{sample4}_L0{i:02}.bam")]
-
-    # Use glob.glob to list all files matching the pattern
-    input_files = glob.glob(f"{input_folder}/{wildcards.sample4}_L*.bam")
-    
-    return input_files
-
 rule merge_bam:
     input:
-        # bam_files = glob.glob(f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample4}}_L00{{num}}.bam")
-        #bam_files = input_function,
         extra_files = expand(f"{experiment_dir}/{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample1}}.extra_3.tmp", sample1 = samples) if 3 in themode else []
-        #extra_files = expand(f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample4}}.extra_3.tmp", sample4 = samples) if 3 in themode else None
-        #extra_file = f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample4}}.HISAT2_stats.txt"
-        #extra_files = f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample4}}.HISAT2_stats.txt" if config['THEMAPTOOL'] == "HISAT2" else f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample4}}.STAR_stats.txt"
-        #bam_files =  glob.glob(f"{input_folder}/{{sample4}}_L00*.bam")
-        #bam_files = f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample4}}_L004.bam"
-        #bam_files = [f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample4}}_L0{i:02}.bam" for i in range(1, 100) if os.path.exists(f"{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample4}}_L00{i:02}.bam")]
     output:
         f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/{{sample4}}.bam",
         f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/{{sample4}}.extra_4.tmp"
@@ -38,8 +25,6 @@ rule merge_bam:
     benchmark:
         f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/benchmarks/{{sample4}}_mergebam_benchmark.tsv"
     run:
-        print(f"WILDCARDS = {wildcards}")
-        print(f"sample4 = {wildcards.sample4}")
         log_it(logfile, "Merging lanes...", f"EXECUTING STEP {master_config['merge_rule_num']}")
         log_it(logfile, f"Input folder: {params.inputfolder}")
         log_it(logfile, f"Output folder: {params.outputfolder}")
@@ -50,10 +35,8 @@ rule merge_bam:
         sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['merge_rule_num']-1])
 
         def merge_bam_files(threads, inputfolder, sample4):
-            print(f"sample4 = {sample4}")
             # Check if we have lane info
             input_bamfiles = glob.glob(f"{inputfolder}/{sample4}_L*.bam")
-            print(f"INPUT BAM MERGE FILES: {input_bamfiles}")
             if input_bamfiles:
                 # Initialize a dictionary to store sample4 names and their associated lane numbers with aligner extensions
                 sample_lane_dict = {}

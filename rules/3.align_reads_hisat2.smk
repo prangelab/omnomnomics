@@ -1,44 +1,22 @@
 #Rule 3 option HISAT2
 
-## Omnomnomics Snake Rule  ##
+## Omnomnomics Snake Rule ##
+#=============================================
+# Author: Kieran Carroll
+# Affiliation: Prangelab AMC / Amsterdam UMC's Core Facility Genomics
+# Copyright PrangeLab 2024 ##
+#=============================================
 import os
-
-# def get_hisat2_input(wildcards):
-#     input_folder = master_config['input_folders'][master_config['map_rule_num']-1]
-#     sample = wildcards.sample
-#     semaphore_path = os.path.join(experiment_dir, "omnomnomics.semaphore")
-
-#     with open(semaphore_path, 'r') as file:
-#         lines = file.readlines()
-#         if len(lines) < 2 or lines[1].strip() != "1":
-#             suffix = ''
-            
-#         elif config['THEMAPTOOL'] == 'skewer':
-#             suffix = '_Skewer'
-#         elif config['THEMAPTOOL'] == 'trimmomatic':
-#             suffix = '_Trimmomatic'
-
-#     if config['PAIRED']:
-#         fastq1 = f"{input_folder}/{sample}_R1{suffix}.trimmed.fastq.gz"
-#         fastq2 = f"{input_folder}/{sample}_R2{suffix}.trimmed.fastq.gz"
-#         return fastq1, fastq2
-#     else:
-#         fastq = f"{input_folder}/{sample}{suffix}.trimmed.fastq.gz"
-#         return fastq
 
 rule run_hisat2:
     input:
-        # get_hisat2_input
-        # fastq1=f"{experiment_dir}/{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R1_Skewer.fastq.gz" if config["PAIRED"] else None,
-        # fastq2=f"{experiment_dir}/{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2.fastq.gz" if config["PAIRED"] else None,
-        # fastq3 = f"{experiment_dir}/{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample}}_R2.fastq.gz" if not config["PAIRED"] else None
         trimmed_fastq1= f"{experiment_dir}/{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample3}}_R1.trimmed.fastq.gz" if config["PAIRED"] else f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample3}}.trimmed.fastq.gz",
         trimmed_fastq2= f"{experiment_dir}/{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample3}}_R2.trimmed.fastq.gz" if config['PAIRED'] else []
     output:
         bam=f"{experiment_dir}/{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample3}}.bam",
         stats=f"{experiment_dir}/{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample3}}.HISAT2_stats.txt",
         extra=f"{experiment_dir}/{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample3}}.extra_3.tmp"
-        #two extra  output files are create if keepunpaired = 1, but not necesarry to specify bbecause will be made then automatically
+        #two extra  output files are create if keepunpaired = 1, but not necesarry to specify because will be made then automatically
     params:
         genome_path=os.path.join(f"{config['OMNOM_HOME']}", "genomes", "HISAT2", f"{config['THEGENOME']}"), 
         keepunpaired=config.get("KEEPUNPAIRED", "0"),
@@ -68,7 +46,6 @@ rule run_hisat2:
                     MYNAME = os.path.basename(fastq1)
                     log_it(logfile, f"Launching: {MYNAME}...")
                     if keepunpaired:
-                        print("YESYESYESSSS")
                         shell(f"""
                         module load samtools && \
                         hisat2 -p {threads} -x {genome_path} \
@@ -84,7 +61,7 @@ rule run_hisat2:
                         -1 {fastq1} -2 {fastq2} --mm --add-chrname --new-summary --dta-cufflinks \
                         --summary-file "{outputfolder}/{sample}.HISAT2_stats.txt" \
                         | samtools view -b - 1> "{outputfolder}/{sample}.bam" 
-                        """) #2> "{outputfolder}/{sample}.HISAT2_stats.txt"
+                        """) 
                 else:
                     log_it(logfile, f"Running HISAT2 in Single End mode on RNA data.")
                     shell(f"""
@@ -93,7 +70,7 @@ rule run_hisat2:
                     -U {fastq1} --mm --add-chrname --new-summary --dta-cufflinks \
                     --summary-file "{outputfolder}/{sample}.HISAT2_stats.txt" \
                     | samtools view -b - 1> "{outputfolder}/{sample}.bam" 
-                    """) #2> "{outputfolder}/{sample}.HISAT2_stats.txt"
+                    """)
             else: #if ChIP- or ATAC data
                 if config["PAIRED"]:
                     log_it(logfile, f"Running HISAT2 in Paired End mode  on ChIP or ATAC data.")
@@ -107,7 +84,7 @@ rule run_hisat2:
                         --un-gz "BAM/{sample}.unpaired.unaligned.bam" --al-gz "BAM/{sample}.unpaired.aligned.bam"\
                         --summary-file "{outputfolder}/{sample}.HISAT2_stats.txt" \
                         | samtools view -b - 1> "{outputfolder}/{sample}.bam" 
-                        """) #2> "{outputfolder}/{sample}.HISAT2_stats.txt"
+                        """) 
                     else:
                         shell(f"""
                         module load samtools && \
@@ -115,7 +92,7 @@ rule run_hisat2:
                         -1 {fastq1} -2 {fastq2} --mm --add-chrname --new-summary --no-spliced-alignment \
                         --summary-file "{outputfolder}/{sample}.HISAT2_stats.txt" \
                         | samtools view -b - 1> "{outputfolder}/{sample}.bam" 
-                        """) #2> "{outputfolder}/{sample}.HISAT2_stats.txt"
+                        """)
                 else:
                     log_it(logfile, f"Running HISAT2 in Single End mode  on ChIP or ATAC data.")
                     shell(f"""
@@ -124,12 +101,7 @@ rule run_hisat2:
                     -U {fastq1} --mm --add-chrname --new-summary --no-spliced-alignment \
                     --summary-file "{outputfolder}/{sample}.HISAT2_stats.txt" \
                     | samtools view -b - 1> "{outputfolder}/{sample}.bam" 
-                    """) #2> "{outputfolder}/{sample}.HISAT2_stats.txt"
-            # file = f"{outputfolder}/{sample}.HISAT2_stats.txt"
-            # for i in range(1,100):
-            #     file.replace("_L0{i:02}", "")
-            # if len(glob.glob(f"{outputfolder}/*.bam")) == num_samples:
-            #     shell(f"""echo "necessity file for next step. can delete this." > BAM/extra_wait.tmp""")
+                    """) 
             shell(f"""echo "necessity file for aligners. can delete this." > {outputfolder}/{sample}.extra_3.tmp""")
         # Call the function with parameters
         run_hisat2(params.seq_type, threads, params.genome_path, input.trimmed_fastq1, input.trimmed_fastq2, params.keepunpaired, params.inputfolder, params.outputfolder, wildcards.sample3)

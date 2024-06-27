@@ -1,6 +1,11 @@
 # Rule 9 Create Wiggles
 
-## Omnomnomics Snake Rule  ##
+## Omnomnomics Snake Rule ##
+#=============================================
+# Author: Kieran Carroll
+# Affiliation: Prangelab AMC / Amsterdam UMC's Core Facility Genomics
+# Copyright PrangeLab 2024 ##
+#=============================================
 import os
 import glob
 
@@ -34,7 +39,6 @@ rule create_wiggles:
             basename = os.path.basename(input_tar_gz_file)
             tag_dir = os.path.join(inputfolder, basename.replace(".tar.gz", ""))
             tag_dir_short = basename.replace(".tar.gz", "")
-            print(f"tag dir short = {tag_dir_short}")
             
             # unpack the tar.gz file
             log_it(logfile, f"Unpacking {basename} in {inputfolder}")
@@ -43,16 +47,12 @@ rule create_wiggles:
                     cd {inputfolder} && \
                     tar --strip-components=1 -xzf {basename} -C {tag_dir_short}
                     
-            """) #cd {inputfolder} && \
-            #tar --strip-components=1 -xzf HOMER_tagDirs/{basename}
+            """)
             
             if os.path.exists(tag_dir):
-                print("TARGZ UNPACKED SUCCESSFULLY")
                 log_it(logfile, f"Unpacked {basename} successfully")
             else:
-                print("DIDN'T UNPACK SUCCESSFULLY")
                 log_it(logfile, f"Failed to unpack {basename}")
-            print(f"TAGDIR IS {tag_dir}")
 
             if thetype == "RNA": 
                 log_it(logfile, f"Creating trackhub from {tag_dir}")
