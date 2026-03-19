@@ -32,7 +32,8 @@ rule merge_wiggles:
     threads:
         lambda wildcards: Threads_Per_Rule['10']
     resources:
-      mem_mb=lambda wildcards: Memory_Per_Rule['10']
+      mem_mb=lambda wildcards: Memory_Per_Rule['10'],
+      partition=lambda wildcards: master_config['partition']
     benchmark:
         f"{experiment_dir}/{master_config['output_folders'][master_config['mergewig_rule_num']-1]}/benchmarks/merge_wiggles_benchmark.tsv"
     run:

@@ -265,42 +265,54 @@ max_nodes = master_config.get('max_nodes', f"{master_config['nodes_in_partition'
 ##--------------------------------------------------------------------------------------------------------------
 # Obtain Threads and Memory per rule
 ##--------------------------------------------------------------------------------------------------------------
-Threads_Per_Rule = {}
-for i in range(1,master_config['max_step']+1):
-    rule_num = i
-    Threads_Per_Rule[f'{rule_num}'] = (max((master_config['mincores_single_sample_step1_9'][i - 1]
-                                    if 'mincores_single_sample_step1_9' in master_config
-                                    and isinstance(master_config['mincores_single_sample_step1_9'], list)
-                                    and len(master_config['mincores_single_sample_step1_9']) > (i - 1)
-                                    and master_config['mincores_single_sample_step1_9'][i - 1] is not None
-                                    and isinstance(master_config['mincores_single_sample_step1_9'][i - 1], int)
-                                    and master_config['mincores_single_sample_step1_9'][i - 1] > master_config['min_slice_cores']
-                                    else master_config['min_slice_cores']),
-                                    min((master_config['maxcores_single_sample_step1_9'][i - 1]
-                                    if 'maxcores_single_sample_step1_9' in master_config
-                                    and isinstance(master_config['maxcores_single_sample_step1_9'], list)
-                                    and len(master_config['maxcores_single_sample_step1_9']) > (i - 1)
-                                    and master_config['maxcores_single_sample_step1_9'][i - 1] is not None
-                                    and isinstance(master_config['maxcores_single_sample_step1_9'][i - 1], int)
-                                    and master_config['maxcores_single_sample_step1_9'][i - 1] < master_config['cores_per_node']
-                                    else master_config['cores_per_node']), ((max_nodes*master_config['cores_per_node'])/num_samples)) ) )
-Memory_Per_Rule = {}
-for i in range(1,master_config['max_step']+1):
-    rule_num = i
-    if ('min_mem_mb' in master_config
-    and isinstance(master_config['min_mem_mb'], list)
-    and len(master_config['min_mem_mb']) > (i - 1)
-    and master_config['min_mem_mb'][i - 1] is not None
-    and isinstance(master_config['min_mem_mb'][i - 1], int)
-    and master_config['min_mem_mb'][i - 1] > master_config['min_slice_mem']
-    and master_config['min_mem_mb'][i - 1] > Threads_Per_Rule[f'{rule_num}'] * master_config['max_mem_per_core_mb']):
-        log_it(logfile, "ERROR! minimum memory needed is greater than the amount of memory available from cores. Aborting...")
-        sys.exit(1)
+def get_rule_core_limits(rule_num):
+    if rule_num <= 9:
+        min_cores = master_config['mincores_single_sample_step1_9'][rule_num - 1]
+        max_cores = master_config['maxcores_single_sample_step1_9'][rule_num - 1]
     else:
-        if (Threads_Per_Rule[f'{rule_num}'] * master_config['max_mem_per_core_mb'] >= master_config['min_slice_mem'] ):
-            Memory_Per_Rule[f'{rule_num}']= (Threads_Per_Rule[f'{rule_num}'] * master_config['max_mem_per_core_mb'] )
-        else:
-            Memory_Per_Rule[f'{rule_num}']= (master_config['min_slice_mem'])
+        offset = rule_num - 10
+        min_cores = master_config['mincores_per_rule_run_step10_13'][offset]
+        max_cores = master_config['maxcores_per_rule_run_step10_13'][offset]
+
+    min_cores = (
+        min_cores
+        if isinstance(min_cores, int) and min_cores > 0
+        else master_config['min_slice_cores']
+    )
+    max_cores = (
+        max_cores
+        if isinstance(max_cores, int) and max_cores > 0
+        else master_config['cores_per_node']
+    )
+
+    min_cores = max(min_cores, master_config['min_slice_cores'])
+    max_cores = min(max_cores, master_config['cores_per_node'])
+    return min_cores, max(max_cores, min_cores)
+
+
+Threads_Per_Rule = {}
+for rule_num in range(1, master_config['max_step'] + 1):
+    min_cores, max_cores = get_rule_core_limits(rule_num)
+    Threads_Per_Rule[f'{rule_num}'] = min_cores if rule_num <= 9 else max_cores
+
+Memory_Per_Rule = {}
+for rule_num in range(1, master_config['max_step'] + 1):
+    min_mem_mb = None
+    if (
+        'min_mem_mb' in master_config
+        and isinstance(master_config['min_mem_mb'], list)
+        and len(master_config['min_mem_mb']) > (rule_num - 1)
+        and master_config['min_mem_mb'][rule_num - 1] is not None
+        and isinstance(master_config['min_mem_mb'][rule_num - 1], int)
+    ):
+        min_mem_mb = master_config['min_mem_mb'][rule_num - 1]
+
+    default_mem_mb = max(
+        master_config['min_slice_mem'],
+        Threads_Per_Rule[f'{rule_num}'] * master_config['max_mem_per_core_mb'],
+        min_mem_mb if min_mem_mb is not None else 0,
+    )
+    Memory_Per_Rule[f'{rule_num}'] = default_mem_mb
 
 ##--------------------------------------------------------------------------------------------------------------
 # Include Snakemake rules for your actual data processing pipeline

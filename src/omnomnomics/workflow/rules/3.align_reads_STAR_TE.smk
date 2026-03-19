@@ -24,7 +24,8 @@ rule run_star_te:
     threads:
         Threads_Per_Rule['3']
     resources:
-        mem_mb = Memory_Per_Rule['3']
+        mem_mb = Memory_Per_Rule['3'],
+        partition = master_config['partition']
     benchmark:
         f"{experiment_dir}/{master_config['output_folders'][master_config['map_rule_num']-1]}/benchmarks/{{sample3}}_star_te_benchmark.tsv"
     run:
@@ -111,7 +112,6 @@ rule run_star_te:
             shell(f"""echo "necessity file for aligners. can delete this." > {outputfolder}/{sample3}.extra_3.tmp""")
 
         run_star_te(params.genome_path, input.trimmed_fastq1, input.trimmed_fastq2, params.paired, threads, params.inputfolder, params.outputfolder, wildcards.sample3)
-
 
 
 

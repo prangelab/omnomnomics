@@ -21,7 +21,8 @@ rule merge_bam:
     threads:
         Threads_Per_Rule['4']
     resources:
-        mem_mb = Memory_Per_Rule['4']
+        mem_mb = Memory_Per_Rule['4'],
+        partition = master_config['partition']
     benchmark:
         f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/benchmarks/{{sample4}}_mergebam_benchmark.tsv"
     run:

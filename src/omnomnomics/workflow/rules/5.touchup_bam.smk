@@ -22,7 +22,8 @@ rule touchup_bam:
     threads:
         Threads_Per_Rule['5']
     resources:
-        mem_mb = Memory_Per_Rule['5']
+        mem_mb = Memory_Per_Rule['5'],
+        partition = master_config['partition']
     benchmark:
         f"{experiment_dir}/{master_config['output_folders'][master_config['touchup_rule_num']-1]}/benchmarks/{{sample5}}_touchupbam_benchmark.tsv"
     run:

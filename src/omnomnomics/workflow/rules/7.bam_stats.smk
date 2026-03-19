@@ -21,7 +21,8 @@ rule bam_stats:
     threads:
         Threads_Per_Rule['7']
     resources:
-        mem_mb = Memory_Per_Rule['7']
+        mem_mb = Memory_Per_Rule['7'],
+        partition = master_config['partition']
     benchmark:
         f"{experiment_dir}/{master_config['output_folders'][master_config['stats_rule_num']-1]}/benchmarks/{{sample}}_bamstats_benchmark.tsv"
     run:

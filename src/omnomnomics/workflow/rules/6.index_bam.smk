@@ -18,7 +18,8 @@ rule index_bam:
         inputfolder = f"{experiment_dir}/{master_config['input_folders'][master_config['index_rule_num']-1]}",
         outputfolder = f"{experiment_dir}/{master_config['output_folders'][master_config['index_rule_num']-1]}"     
     resources:
-        mem_mb = Memory_Per_Rule['6']
+        mem_mb = Memory_Per_Rule['6'],
+        partition = master_config['partition']
     benchmark:
         f"{experiment_dir}/{master_config['output_folders'][master_config['index_rule_num']-1]}/benchmarks/{{sample}}_bamindex_benchmark.tsv"
     run:

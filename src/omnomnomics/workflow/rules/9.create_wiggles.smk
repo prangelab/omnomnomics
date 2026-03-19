@@ -22,7 +22,8 @@ rule create_wiggles:
     threads:
         Threads_Per_Rule['9']
     resources:
-        mem_mb = Memory_Per_Rule['9']
+        mem_mb = Memory_Per_Rule['9'],
+        partition = master_config['partition']
     benchmark:
         f"{experiment_dir}/{master_config['output_folders'][master_config['wig_rule_num']-1]}/benchmarks/{{sample}}_create_wiggles_benchmark.tsv"
     run:

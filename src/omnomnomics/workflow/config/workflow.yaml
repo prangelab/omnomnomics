@@ -143,38 +143,38 @@ output_file_types:
   - ".results.zip"
 
 mincores_single_sample_step1_9:
-  - 8
-  - 1
-  - 8
-  - 1
-  - 5
-  - 1
-  - 1
-  - 1
-  - 1
+  - 16
+  - 16
+  - 48
+  - 16
+  - 32
+  - 16
+  - 16
+  - 16
+  - 16
 
 maxcores_single_sample_step1_9:
-  - 128
-  - 128
-  - 128
-  - 128
-  - 128
-  - 1
-  - 1
-  - 1
-  - 1
+  - 16
+  - 16
+  - 48
+  - 16
+  - 32
+  - 16
+  - 16
+  - 16
+  - 16
 
 mincores_per_rule_run_step10_13:
-  - 1
-  - 1
-  - 1
-  - 1
+  - 16
+  - 16
+  - 16
+  - 16
 
 maxcores_per_rule_run_step10_13:
-  - 1
-  - 128
-  - 1
-  - 1
+  - 16
+  - 16
+  - 16
+  - 16
 
 min_mem_mb:
   - 32000

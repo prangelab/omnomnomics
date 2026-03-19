@@ -41,7 +41,8 @@ rule count_reads:
     threads:
         Threads_Per_Rule['12']
     resources:
-        mem_mb = Memory_Per_Rule['12']
+        mem_mb = Memory_Per_Rule['12'],
+        partition = master_config['partition']
     benchmark:
         f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num']-1]}/benchmarks/counts_reads_benchmark.tsv"
     run:
