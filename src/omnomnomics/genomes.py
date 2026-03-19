@@ -62,7 +62,7 @@ def parse_genomes_arguments(argv):
 
     list_parser = subparsers.add_parser("list", help="List available assemblies for a species")
     list_parser.add_argument("--species", default="homo sapiens", help="Species search term")
-    list_parser.add_argument("--provider", default="Ensembl", help="Provider name for genomepy search")
+    list_parser.add_argument("--provider", default="GENCODE", help="Provider name for genomepy search")
     list_parser.add_argument("--limit", type=int, default=25, help="Maximum number of rows to show")
 
     install_parser = subparsers.add_parser("install", help="Download and normalize one or more assemblies")
@@ -73,7 +73,7 @@ def parse_genomes_arguments(argv):
         default=[],
         help="Assembly name to install. Repeatable. If omitted, resolves the latest matching assembly for the species",
     )
-    install_parser.add_argument("--provider", default="Ensembl", help="Provider name for genomepy install/search")
+    install_parser.add_argument("--provider", default="GENCODE", help="Provider name for genomepy install/search")
     install_parser.add_argument("--threads", type=int, default=8, help="Threads for index creation")
     install_parser.add_argument("--force", action="store_true", help="Overwrite an existing normalized assembly")
     install_parser.add_argument("--keep-alt", action="store_true", help="Keep alternative contigs if supported by provider")

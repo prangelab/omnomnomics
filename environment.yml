@@ -20,6 +20,12 @@ dependencies:
   - samtools
   - bedtools
   - bamtools
+  - ucsc-bedgraphtobigwig
+  - ucsc-genepredtobed
+  - ucsc-genepredtogtf
+  - ucsc-bedtogenepred
+  - ucsc-gtftogenepred
+  - ucsc-gff3togenepred
   - deeptools
   - subread
   - macs3
