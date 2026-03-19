@@ -49,10 +49,6 @@ rule count_reads:
         log_it(logfile, f"Input folder: {params.inputfolder1} and also {params.inputfolder2} for ATAC data")
         log_it(logfile, f"Output folder: {params.outputfolder}")
         
-        # path = os.path.join(OMNOM_HOME, "bin", "homer", "configureHomer.pl")
-        # version = subprocess.check_output("perl {path} -list 2> /dev/null | grep homer",  shell=True, executable='/bin/bash')
-        # log_it(logfile, "\n"+version.decode("utf-8"), "VERSION")
-
         def count_reads_rna(input_folder, output_folder, genome, namefields, separator): 
             sanity_check_dir(logfile, input_folder,  master_config['input_file_types'][master_config['countreads_rule_num']-1][0]) 
 
@@ -80,7 +76,7 @@ rule count_reads:
             shell(f"""sed '1d' {output_folder}/{os.path.basename(params.experiment_dir)}.raw_read_quant.table.txt | cut -f1,9- | sort -k1,1 | sed 's/ \\+/\\t/g' > clean.tmp""")
             
             #Command in script works better: cat TAGDIRlist.txt | xargs -l basename | cut -f {namefields} -d '{separator}' | awk 'BEGIN{{ORS="\t"}}{{print $0}}' > clean.header.tmp
-            shell(f"""{OMNOM_HOME}/bin/scripts/generate_header.sh {params.namefields} '{params.separator}' """)
+            shell(f"""{config['SCRIPT_DIR']}/generate_header.sh {params.namefields} '{params.separator}' """)
 
             shell(f"""sed "1iRefSeq_ID\\t$(cat clean.header.tmp)" clean.tmp > {output_folder}/{os.path.basename(params.experiment_dir)}.raw_read_quant.table.txt""")
 
@@ -138,7 +134,7 @@ rule count_reads:
             shell(f"""sed '1d' {output_folder}/{os.path.basename(params.experiment_dir)}.raw_read_quant.table.txt | cut -f2-4,9- | sort -k1,1 -k2,2n -k3,3n | sed 's/ \\t/_/;s/\\t/_/' | sed 's/ \+/\t/g' > clean.tmp""")
 
             #cat TAGDIRlist.txt | xargs -l basename | cut -f {namefields} -d '{separator}' | awk 'BEGIN{{ORS="\t"}}{{print $0}}' > clean.header.tmp
-            shell(f"""{OMNOM_HOME}/bin/scripts/generate_header.sh {params.namefields} '{params.separator}'""")
+            shell(f"""{config['SCRIPT_DIR']}/generate_header.sh {params.namefields} '{params.separator}'""")
 
 
             shell(f"""sed "1iPeak\\t$(cat clean.header.tmp)" clean.tmp > {output_folder}/{os.path.basename(params.experiment_dir)}.raw_read_quant.table.txt""")

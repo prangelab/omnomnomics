@@ -33,10 +33,6 @@ rule create_homer_tagDir:
         log_it(logfile, f"Input folder: {params.inputfolder}")
         log_it(logfile, f"Output folder: {params.outputfolder}")
 
-        # path = os.path.join(OMNOM_HOME, "bin", "homer", "configureHomer.pl")
-        # version = subprocess.check_output("perl {path} -list 2> /dev/null | grep homer",  shell=True, executable='/bin/bash')
-        # log_it(logfile, "\n"+version.decode("utf-8"), "VERSION")
-
         samtools_version = subprocess.check_output("module load samtools && samtools --version | head -n2", shell=True, executable='/bin/bash')
         log_it(logfile, "\n"+samtools_version.decode("utf-8"), "SAMTOOLS VERSION")
 

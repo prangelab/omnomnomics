@@ -122,7 +122,9 @@ fi
 
 if [ -z "$THEFOLDER" ]
 then
-	THEFOLDER="$OMNOM_HOME/bin/color_data_for_hubs"
+	SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	WORKFLOW_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+	THEFOLDER="$WORKFLOW_ROOT/bin/color_data_for_hubs"
 	echo $THEFOLDER
 fi
 
@@ -175,7 +177,9 @@ fi
 
 #Check for valid color
 #Set color table file path
-R_COLOR_TABLE="$OMNOM_HOME/bin/R.color.table"
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+WORKFLOW_ROOT="${WORKFLOW_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+R_COLOR_TABLE="$WORKFLOW_ROOT/bin/R.color.table"
 
 #If we have an RGB color, do nothing
 if [[ !($THECOL =~ ^([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]),([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]),([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])$) ]]

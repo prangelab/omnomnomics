@@ -13,6 +13,7 @@ authors = [
   { name = "Koen Prange", email = "info@prangelab.org" }
 ]
 dependencies = [
+  "genomepy>=0.16",
   "PyYAML>=6.0",
 ]
 
@@ -36,7 +37,4 @@ omnomnomics = [
   "workflow/bin/color_data_for_hubs/*",
   "workflow/rules/*.smk",
   "workflow/slurm_profile/*.yaml",
-  "workflow/genomes/*",
-  "workflow/genomes/HISAT2/*",
-  "workflow/genomes/STAR/*",
 ]

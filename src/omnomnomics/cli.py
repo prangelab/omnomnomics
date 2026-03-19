@@ -21,6 +21,8 @@ import shutil
 from pathlib import Path
 from datetime import date, datetime
 
+from omnomnomics.genomes import genomes_main
+
 PACKAGE_ROOT = Path(__file__).resolve().parent
 WORKFLOW_ROOT = PACKAGE_ROOT / "workflow"
 DEFAULT_WORKFLOW_CONFIG = WORKFLOW_ROOT / "config" / "workflow.yaml"
@@ -36,7 +38,7 @@ def parse_arguments():
    # Define command-line options
    parser.add_argument('-i', '--experiment-dir', help='Path to the experiment directory')
    parser.add_argument('-t', '--type', help='Type of experiment: RNA, ChIP, ATAC')
-   parser.add_argument('-g', '--genome', help='Genome version. Avaliable versions: \n \t UCSC/RefSeq/NCBI: mm10, mm39, hg38. \n" "\t ENSMBL/GenBank: GRCh38.p14, GRCm39')
+   parser.add_argument('-g', '--genome', help='Genome assembly name. Must match an available directory under the configured genome assembly root')
    parser.add_argument('-j', '--mode', help='Job mode. Can be auto, all or a range of jobs. See readme for some examples. \n \t Default: auto')
    parser.add_argument('-T', '--trim-tool', help='Trimming tool choice. can be Skewer or Trimmomatic \n \t Default: Skewer')
    parser.add_argument('-M', '--map-tool', help='Mapping tool choice. Can be HISAT2, STAR, or STAR_TE. STAR(_TE) can only be used for RNA-seq data. \n \t Default: HISAT2')
@@ -103,10 +105,26 @@ def merge_configs(base_config, override_config):
    merged_config.update(override_config)
    return merged_config
 
+def resolve_config_path(path_value, workflow_root):
+   resolved = str(path_value)
+   resolved = resolved.replace("{WORKFLOW_ROOT}", str(workflow_root))
+   resolved = resolved.replace("{HOME}", str(Path.home()))
+   return str(Path(resolved).expanduser().resolve())
+
+def genome_subdir(assembly_root, genome_name, subdir_name):
+   return str(Path(assembly_root) / genome_name / subdir_name)
+
+def list_available_genomes(assembly_root):
+   assembly_root_path = Path(assembly_root)
+   if not assembly_root_path.is_dir():
+       print(f"Genome assembly root '{assembly_root_path}' does not exist. Aborting...", file=sys.stderr)
+       sys.exit(1)
+   return sorted(path.name for path in assembly_root_path.iterdir() if path.is_dir())
+
 ##---------------------------------------------------------------------------------------------------------------
 ## Set required vars or die
 ##---------------------------------------------------------------------------------------------------------------
-def check_required_vars(the_type, experiment_dir, genome, config):
+def check_required_vars(the_type, experiment_dir, genome, available_genomes, config):
    #Check if required variables are set and valid
    print("Checking experiment dir...")
    if not experiment_dir:
@@ -131,8 +149,8 @@ def check_required_vars(the_type, experiment_dir, genome, config):
        print("No GENOME VERSION (-g) specified! Aborting...", file=sys.stderr)
        sys.exit(1)
    else:
-       if genome not in config['GENOMES']:
-           print(f"Genome (-g) should be one of: {', '.join(config['GENOMES'])}. Aborting...", file=sys.stderr)
+       if genome not in available_genomes:
+           print(f"Genome (-g) should be one of: {', '.join(available_genomes)}. Aborting...", file=sys.stderr)
            sys.exit(1)
 
 ##---------------------------------------------------------------------------------------------------------------
@@ -168,7 +186,7 @@ def set_user_subroutine_choices(trim_tool, map_tool, config):
 ##---------------------------------------------------------------------------------------------------------------
 ## Validate user defined variables
 ##---------------------------------------------------------------------------------------------------------------
-def validate_user_defined_vars(OMNOM_HOME, metadata, experiment_dir, INPUT, the_style, color_data_folder, col_table, overlay, the_type, map_tool, homer_size, homer_mindist, config):
+def validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, the_style, color_data_folder, col_table, overlay, the_type, map_tool, homer_size, homer_mindist, config):
     #Validate user-defined variables
     print("Validating options...")
 
@@ -183,7 +201,7 @@ def validate_user_defined_vars(OMNOM_HOME, metadata, experiment_dir, INPUT, the_
             sys.exit(1)
         elif not metadata.startswith(experiment_dir):
             print("Please place your metadata file in your experiment dir!", file=sys.stderr)
-            print(f"e.g., -m {os.path.join(f'{OMNOM_HOME}', 'data', 'me', 'my_fantastic_experiment', 'my_mindboggling_metadata.txt')}. Aborting...", file=sys.stderr)
+            print(f"e.g., -m {os.path.join(str(workflow_root), 'data', 'me', 'my_fantastic_experiment', 'my_mindboggling_metadata.txt')}. Aborting...", file=sys.stderr)
             sys.exit(1)
 
 
@@ -197,7 +215,7 @@ def validate_user_defined_vars(OMNOM_HOME, metadata, experiment_dir, INPUT, the_
             sys.exit(1)
         elif not os.path.isabs(INPUT):
             print("Please provide the full (absolute) path to your input file!", file=sys.stderr)
-            print(f"e.g., -I {os.path.join(f'{OMNOM_HOME}', 'genomes', 'input_ChIP', 'my_awesome_input.bam')}. Aborting...", file=sys.stderr)
+            print(f"e.g., -I {os.path.join(str(Path.home()), 'genomes', 'input_ChIP', 'my_awesome_input.bam')}. Aborting...", file=sys.stderr)
             sys.exit(1)
 
         if not os.path.isdir(os.path.join(os.path.dirname(INPUT), f"{os.path.basename(INPUT).replace('.bam', '')}.HOMER_tagDir")):
@@ -634,8 +652,12 @@ def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
 # Main function
 ##--------------------------------------------------------------------------------------------------------------
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "genomes":
+        genomes_main(sys.argv[2:], WORKFLOW_ROOT, DEFAULT_WORKFLOW_CONFIG, DEFAULT_SITE_CONFIG)
+        return
+
     # Define variables for packaged workflow paths
-    OMNOM_HOME = str(WORKFLOW_ROOT)
+    workflow_root = WORKFLOW_ROOT
     workflow_config_file = DEFAULT_WORKFLOW_CONFIG
 
     #Check if packaged workflow root exists
@@ -662,6 +684,10 @@ def main():
     workflow_config = load_and_validate_yaml(workflow_config_file, "## Omnomnomics pipeline config ##")
     site_config = load_and_validate_yaml(site_config_file, "## Omnomnomics pipeline config ##")
     config = merge_configs(workflow_config, site_config)
+    config['WORKFLOW_ROOT'] = str(workflow_root)
+    config['genome_assembly_dir'] = resolve_config_path(config['genome_assembly_dir'], workflow_root)
+    config['cellranger_reference_dir'] = resolve_config_path(config['cellranger_reference_dir'], workflow_root)
+    available_genomes = list_available_genomes(config['genome_assembly_dir'])
 
     # Access parsed arguments
     experiment_dir = args.experiment_dir
@@ -675,8 +701,8 @@ def main():
     INPUT = args.input if args.input else config.get('input',"NA")
     metadata = args.metadata if args.metadata else config.get('metadata', "NA")
     style = args.style if args.style else config.get('the_style', "factor")
-    col_table = args.col_table.replace("{OMNOM_HOME}", OMNOM_HOME) if args.col_table else config.get('color_table', f"{OMNOM_HOME}/bin/color_data_for_hubs/gray.tint.color.table").replace("{OMNOM_HOME}", OMNOM_HOME)
-    color_data_folder = args.color_data_folder.replace("{OMNOM_HOME}", OMNOM_HOME) if args.color_data_folder else config.get('color_data_folder', f"{OMNOM_HOME}/bin/color_data_for_hubs").replace("{OMNOM_HOME}", OMNOM_HOME)
+    col_table = resolve_config_path(args.col_table, workflow_root) if args.col_table else resolve_config_path(config.get('color_table', f"{workflow_root}/bin/color_data_for_hubs/gray.tint.color.table"), workflow_root)
+    color_data_folder = resolve_config_path(args.color_data_folder, workflow_root) if args.color_data_folder else resolve_config_path(config.get('color_data_folder', f"{workflow_root}/bin/color_data_for_hubs"), workflow_root)
     overlay = args.overlay if args.overlay else config.get('overlay', "transparentOverlay")
     hub_mail = args.hub_mail if args.hub_mail else config.get('hub_mail', "m.dewinther@amsterdamumc.nl")
     no_multiqc = args.no_multiqc if args.no_multiqc else config.get('no_multiqc', 0)
@@ -691,7 +717,7 @@ def main():
     dry_run = args.dry_run
 
     # Check required variables
-    check_required_vars(the_type, experiment_dir, genome, config)
+    check_required_vars(the_type, experiment_dir, genome, available_genomes, config)
 
     # Set user subroutine choices
     selected_routine_trim, selected_routine_map = set_user_subroutine_choices(trim_tool, map_tool, config)
@@ -711,7 +737,7 @@ def main():
     selected_routines['selected_routine_de'] = config['selected_routine_de']
 
     # Validate user-defined variables
-    homer_input = validate_user_defined_vars(OMNOM_HOME, metadata, experiment_dir, INPUT, style, color_data_folder, col_table, overlay, the_type, map_tool, homer_size, homer_mindist, config)
+    homer_input = validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, style, color_data_folder, col_table, overlay, the_type, map_tool, homer_size, homer_mindist, config)
 
     # Setup variables
     run_date = setup_variables(experiment_dir, config)
@@ -753,9 +779,16 @@ def main():
 
     ## Run configuration for omnomnomics run
     run_config_data = {
-        'OMNOM_HOME': OMNOM_HOME,
         'WORKFLOW_CONFIG_FILE': str(workflow_config_file),
         'SITE_CONFIG_FILE': str(site_config_file),
+        'WORKFLOW_ROOT': str(workflow_root),
+        'SCRIPT_DIR': str(workflow_root / "bin" / "scripts"),
+        'COLOR_DATA_FOLDER_DEFAULT': str(workflow_root / "bin" / "color_data_for_hubs"),
+        'GENOME_ASSEMBLY_DIR': config['genome_assembly_dir'],
+        'CELLRANGER_REFERENCE_DIR': config['cellranger_reference_dir'],
+        'HISAT2_GENOME_DIR': genome_subdir(config['genome_assembly_dir'], genome, "hisat2"),
+        'STAR_GENOME_DIR': genome_subdir(config['genome_assembly_dir'], genome, "star"),
+        'GENOME_AUX_DIR': genome_subdir(config['genome_assembly_dir'], genome, "aux"),
         'EXPERIMENT_DIR': experiment_dir,
         'RUNDATE': run_date,
         'INPUT_FOLDER': input_folder_mod_range_min,
@@ -828,7 +861,7 @@ def main():
         log.write("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
 
     # Call to snakemake!!
-    cmd = [ "snakemake",  "--profile", os.path.join(OMNOM_HOME, "slurm_profile"), "--snakefile", f"{OMNOM_HOME}/Snakefile.smk",
+    cmd = [ "snakemake",  "--profile", os.path.join(str(workflow_root), "slurm_profile"), "--snakefile", f"{workflow_root}/Snakefile.smk",
         "--config", "config_file="+os.path.join(experiment_dir, "run_configs", f'omnomnomics.run.{run_date}.config.yaml'), "--jobs", "1000", 
         "--cores", "1280", "--rerun-triggers", "mtime", "--keep-going"
     ] 

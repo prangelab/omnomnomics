@@ -10,12 +10,14 @@
 # Usage function
 function display_help {
 	echo ""
-	echo "Usage: $0 -i <.bw> -g GENOME -h"
+	echo "Usage: $0 -i <.bw> -g GENOME -c <chrom_size_dir> -h"
 	echo ""
 	echo "	-i:			Input bigWig file"
 	echo "				Required argument."
 	echo "	-g:			Genome"
 	echo "				Default: hg38"
+	echo "	-c:			Directory containing <genome>_chrom_sizes.2_column"
+	echo "				Required argument."
 	echo ""
 	echo "	-h:			Print this help message"
 	echo ""
@@ -33,13 +35,16 @@ fi
 #--------------------------------------------------------------------------------------------------------------
 # Define options
 
-while getopts ":i:g:h" opt; do
+while getopts ":i:g:c:h" opt; do
   case $opt in
 	i)
 		MYBW=$OPTARG
 		;;
 	g)
 		MYGENOME=$OPTARG
+		;;
+	c)
+		CHROMDIR=$OPTARG
 		;;
 	h)
 		display_help
@@ -68,7 +73,13 @@ then
 	exit 2
 fi
 
-if [ ! -f  $OMNOM_HOME/genomes/$MYGENOME"_chrom_sizes.2_column" ]
+if [ -z "$CHROMDIR" ]
+then
+	echo "Option -c is required!"
+	exit 2
+fi
+
+if [ ! -f  $CHROMDIR/$MYGENOME"_chrom_sizes.2_column" ]
 then
 	echo "Genome $MYGENOME is not supported! (Add a chrom size file)"
 	exit 3
@@ -94,7 +105,7 @@ then
 	sort -k1,1 -k2,2n -k3,3n tmp.$MYRND.bg > tmp.sorted.$MYRND.bg
 
 	# Make bigwig
-	bedGraphToBigWig tmp.sorted.$MYRND.bg $OMNOM_HOME/genomes/$MYGENOME"_chrom_sizes.2_column" $MYBW
+	bedGraphToBigWig tmp.sorted.$MYRND.bg $CHROMDIR/$MYGENOME"_chrom_sizes.2_column" $MYBW
 
 	# Clean up
 	rm tmp.$MYRND.bg

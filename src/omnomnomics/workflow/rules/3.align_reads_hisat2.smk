@@ -18,7 +18,7 @@ rule run_hisat2:
         extra=f"{experiment_dir}/{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample3}}.extra_3.tmp"
         #two extra  output files are create if keepunpaired = 1, but not necesarry to specify because will be made then automatically
     params:
-        genome_path=os.path.join(f"{config['OMNOM_HOME']}", "genomes", "HISAT2", f"{config['THEGENOME']}"), 
+        genome_path=os.path.join(config['HISAT2_GENOME_DIR'], f"{config['THEGENOME']}"),
         keepunpaired=config.get("KEEPUNPAIRED", "0"),
         seq_type=config["THETYPE"],
         inputfolder = f"{experiment_dir}/{master_config['input_folders'][master_config['map_rule_num']-1]}",

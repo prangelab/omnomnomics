@@ -7,12 +7,14 @@
 # Usage function
 function display_help {
 	echo ""
-	echo "Usage: $0 -i <TRACKHUB_DIR> -g GENOME -h"
+	echo "Usage: $0 -i <TRACKHUB_DIR> -g GENOME -c <chrom_size_dir> -h"
 	echo ""
 	echo "	-i <DIR>:		Input trackhub"
 	echo "				Required argument."
 	echo "	-g <DIR>:		Genome"
 	echo "				Default: hg38"
+	echo "	-c <DIR>:		Directory containing <genome>_chrom_sizes.2_column"
+	echo "				Required argument."
 	echo ""
 	echo "	-h:			Print this help message"
 	echo ""
@@ -30,13 +32,16 @@ fi
 #--------------------------------------------------------------------------------------------------------------
 # Define options
 
-while getopts ":i:g:h" opt; do
+while getopts ":i:g:c:h" opt; do
   case $opt in
 	i)
 		MYHUB=$OPTARG
 		;;
 	g)
 		MYGENOME=$OPTARG
+		;;
+	c)
+		CHROMDIR=$OPTARG
 		;;
 	h)
 		display_help
@@ -65,7 +70,13 @@ then
 	exit 2
 fi
 
-if [ ! -f  $OMNOM_HOME/genomes/$MYGENOME"_chrom_sizes.2_column" ]
+if [ -z "$CHROMDIR" ]
+then
+	echo "Option -c is required!"
+	exit 2
+fi
+
+if [ ! -f  $CHROMDIR/$MYGENOME"_chrom_sizes.2_column" ]
 then
 	echo "Genome $MYGENOME is not supported! (Add a chrom size file)"
 	exit 3
@@ -94,8 +105,8 @@ then
 	sort -k1,1 -k2,2n -k3,3n neg_tmp.$MYRND.bg > neg_tmp.sorted.$MYRND.bg
 
 	# Make bigwigs
-	bedGraphToBigWig pos_tmp.sorted.$MYRND.bg $OMNOM_HOME/genomes/$MYGENOME"_chrom_sizes.2_column" $MYHUB/$MYGENOME/$(basename $MYHUB .hub).HOMER_tagDirpos.ucsc.bigWig &
-	bedGraphToBigWig neg_tmp.sorted.$MYRND.bg $OMNOM_HOME/genomes/$MYGENOME"_chrom_sizes.2_column" $MYHUB/$MYGENOME/$(basename $MYHUB .hub).HOMER_tagDirneg.ucsc.bigWig &
+	bedGraphToBigWig pos_tmp.sorted.$MYRND.bg $CHROMDIR/$MYGENOME"_chrom_sizes.2_column" $MYHUB/$MYGENOME/$(basename $MYHUB .hub).HOMER_tagDirpos.ucsc.bigWig &
+	bedGraphToBigWig neg_tmp.sorted.$MYRND.bg $CHROMDIR/$MYGENOME"_chrom_sizes.2_column" $MYHUB/$MYGENOME/$(basename $MYHUB .hub).HOMER_tagDirneg.ucsc.bigWig &
 	wait
 
 	# Set vars as we like them
@@ -114,4 +125,3 @@ else
 	echo "Already not a bedGraph file! (well, not a text file at least... Is it already a bigwig?)"
   	echo "Assuming we have a working HOMER installation, the file $FILE_PATH is already of type $FILE_OUTPUT. No need to do anything."
 fi
-

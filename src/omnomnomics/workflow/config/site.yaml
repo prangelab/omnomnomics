@@ -11,3 +11,7 @@ cores_per_node: 128
 max_mem_per_core_mb: 2048
 min_slice_cores: 16
 min_slice_mem: 32768
+
+# External genome resources
+genome_assembly_dir: "{HOME}/genomes/assemblies"
+cellranger_reference_dir: "{HOME}/genomes/cellranger"

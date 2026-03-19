@@ -215,8 +215,8 @@ col_field: "2"
 separator: "_"
 appendix: "hub"
 overlay: "transparentOverlay"
-color_data_folder: "{OMNOM_HOME}/bin/color_data_for_hubs"
-color_table: "{OMNOM_HOME}/bin/color_data_for_hubs/gray.tint.color.table"
+color_data_folder: "{WORKFLOW_ROOT}/bin/color_data_for_hubs"
+color_table: "{WORKFLOW_ROOT}/bin/color_data_for_hubs/gray.tint.color.table"
 hub_mail: "m.dewinther@amsterdamumc.nl"
 no_multiqc: False
 keep_unpaired: False

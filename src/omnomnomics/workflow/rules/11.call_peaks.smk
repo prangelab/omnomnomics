@@ -87,10 +87,6 @@ rule call_peaks:
             macs3_version = subprocess.check_output(""" eval "$(micromamba shell hook --shell=bash)" && micromamba activate macs3 && macs3 --version""", shell=True, executable='/bin/bash')
             log_it(logfile, "\n"+macs3_version.decode("utf-8"), "FASTQC VERSION")
 
-            # path = os.path.join(OMNOM_HOME, "bin", "homer", "configureHomer.pl")
-            # version = subprocess.check_output("perl {path} -list 2> /dev/null | grep homer",  shell=True, executable='/bin/bash')
-            # log_it(logfile, "\n"+version.decode("utf-8"), "VERSION")
-
             if thetype == "CHIP":
                 #If ChIP, call peaks
                 log_it(logfile, "Finding ChIP enriched regions...")

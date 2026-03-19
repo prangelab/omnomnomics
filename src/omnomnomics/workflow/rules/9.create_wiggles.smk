@@ -31,10 +31,6 @@ rule create_wiggles:
             log_it(logfile, f"Input folder: {params.inputfolder}")
             log_it(logfile, f"Output folder: {params.outputfolder}")
 
-            # path = os.path.join(OMNOM_HOME, "bin", "homer", "configureHomer.pl")
-            # version = subprocess.check_output("perl {path} -list 2> /dev/null | grep homer",  shell=True, executable='/bin/bash')
-            # log_it(logfile, "\n"+version.decode("utf-8"), "VERSION")
-
             sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['wig_rule_num']-1])
             basename = os.path.basename(input_tar_gz_file)
             tag_dir = os.path.join(inputfolder, basename.replace(".tar.gz", ""))
@@ -70,14 +66,14 @@ rule create_wiggles:
             for hub_file in glob.glob(os.path.join(outputfolder, "*.hub")):
                 log_it(logfile, f"Fixing trackhub {hub_file}...")
                 log_it(logfile, f"fix_HOMER_trackHub.sh -i {hub_file} -g {genome}")
-                path = os.path.join(OMNOM_HOME, "bin", "scripts", "fix_HOMER_trackHub.sh") 
-                shell(f"{path} -i {hub_file} -g {genome}")
+                path = os.path.join(config['SCRIPT_DIR'], "fix_HOMER_trackHub.sh")
+                shell(f"{path} -i {hub_file} -g {genome} -c {config['GENOME_AUX_DIR']}")
 
             for bw_file in glob.glob(os.path.join(outputfolder, "*.bw")):
                 log_it(logfile, f"Fixing bigwig {bw_file}...")
                 log_it(logfile, f"fix_HOMER_bigwig.sh -i {bw_file} -g {genome}")
-                path = os.path.join(OMNOM_HOME, "bin", "scripts", "fix_HOMER_bigwig.sh") 
-                shell(f"{path} -i {bw_file} -g {genome}")
+                path = os.path.join(config['SCRIPT_DIR'], "fix_HOMER_bigwig.sh")
+                shell(f"{path} -i {bw_file} -g {genome} -c {config['GENOME_AUX_DIR']}")
 
             # Remove the uncompressed tag directory
             log_it(logfile, f"Removing uncompressed tag directory {tag_dir}")

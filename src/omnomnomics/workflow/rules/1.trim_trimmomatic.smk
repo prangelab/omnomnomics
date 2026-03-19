@@ -38,7 +38,7 @@ rule run_trimmomatic:
             log_it(logfile, f"Trim Heap: {trim_heap}")
             log_it(logfile, f"Trim Mem: {trim_mem}")
 
-            path = os.path.join(OMNOM_HOME, "bin", "Trimmomatic-0.39", "trimmomatic-0.39.jar")
+            path = os.path.join(config['WORKFLOW_ROOT'], "bin", "Trimmomatic-0.39", "trimmomatic-0.39.jar")
             trimmomatic_version = subprocess.check_output(f"module load java && java -jar {path} -version",  shell=True, executable='/bin/bash')
             log_it(logfile, "\n"+trimmomatic_version.decode("utf-8"), "trimmomatic VERSION")
 
@@ -54,9 +54,9 @@ rule run_trimmomatic:
                 out_base = f"{outputfolder}/{sample}.trimmed.fastq.gz"
                 java_command = f"""
                     module load java && \
-                    java -Xms{trim_heap} -Xmx{trim_mem} -jar $OMNOM_HOME/bin/Trimmomatic-0.39/trimmomatic-0.39.jar PE \
+                    java -Xms{trim_heap} -Xmx{trim_mem} -jar "{config['WORKFLOW_ROOT']}/bin/Trimmomatic-0.39/trimmomatic-0.39.jar" PE \
                     -threads {threads} -baseout {out_base} {fastq1} {fastq2} \
-                    ILLUMINACLIP:$OMNOM_HOME/bin/Trimmomatic-0.39/adapters/{adapter_file}:2:30:10:2:True \
+                    ILLUMINACLIP:{config['WORKFLOW_ROOT']}/bin/Trimmomatic-0.39/adapters/{adapter_file}:2:30:10:2:True \
                     LEADING:3 TRAILING:3 MINLEN:36
                 """
             else:
@@ -64,9 +64,9 @@ rule run_trimmomatic:
                 out_base = f"{outputfolder}/{sample}.trimmed.fastq.gz"
                 java_command = f"""
                     module load java && \
-                    java -Xms{trim_heap} -Xmx{trim_mem} -jar $OMNOM_HOME/bin/Trimmomatic-0.39/trimmomatic-0.39.jar SE \
+                    java -Xms{trim_heap} -Xmx{trim_mem} -jar "{config['WORKFLOW_ROOT']}/bin/Trimmomatic-0.39/trimmomatic-0.39.jar" SE \
                     -threads {threads} {fastq1} {out_base} \
-                    ILLUMINACLIP:$OMNOM_HOME/bin/Trimmomatic-0.39/adapters/{adapter_file}:2:30:10 \
+                    ILLUMINACLIP:{config['WORKFLOW_ROOT']}/bin/Trimmomatic-0.39/adapters/{adapter_file}:2:30:10 \
                     LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
                 """
             

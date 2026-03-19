@@ -22,7 +22,7 @@ configfile: config['config_file']
 
 
 # Set global variables from the configuration file
-OMNOM_HOME = config['OMNOM_HOME']
+workflow_root = config['WORKFLOW_ROOT']
 experiment_dir = config["EXPERIMENT_DIR"]
 run_date = config["RUNDATE"]
 logfile = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.log")
@@ -298,7 +298,7 @@ def check_and_include_rules(logfile, omnom_home, experiment_dir):
     log_it(logfile, "Workflow Snake rules Good!", "WORKLFLOW SNAKE RULES CHECK")
     return valid_smk_files
 
-valid_smk_files = check_and_include_rules(logfile, OMNOM_HOME, experiment_dir)
+valid_smk_files = check_and_include_rules(logfile, workflow_root, experiment_dir)
 # Include snake rules in the main Snakefile
 for smk_file in valid_smk_files:
     include: smk_file

@@ -17,7 +17,7 @@ rule run_star_te:
         stats=f"{experiment_dir}/{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample3}}.STAR_TE_stats.txt",
         extra=f"{experiment_dir}/{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample3}}.extra_3.tmp"
     params:
-        genome_path=os.path.join(f"{config['OMNOM_HOME']}", "genomes", "STAR", f"{config['THEGENOME']}"),
+        genome_path=os.path.join(config['STAR_GENOME_DIR'], f"{config['THEGENOME']}"),
         inputfolder = f"{experiment_dir}/{master_config['input_folders'][master_config['map_rule_num']-1]}",
         outputfolder = f"{experiment_dir}/{master_config['output_folders'][master_config['map_rule_num']-1]}",
         paired = config['PAIRED']
@@ -111,7 +111,6 @@ rule run_star_te:
             shell(f"""echo "necessity file for aligners. can delete this." > {outputfolder}/{sample3}.extra_3.tmp""")
 
         run_star_te(params.genome_path, input.trimmed_fastq1, input.trimmed_fastq2, params.paired, threads, params.inputfolder, params.outputfolder, wildcards.sample3)
-
 
 
 

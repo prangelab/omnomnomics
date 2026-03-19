@@ -117,7 +117,9 @@ fi
 MYCORES=16
 
 #Set job
-THEJOB="$OMNOM_HOME/jobs/quant_peaks.job"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKFLOW_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+THEJOB="$WORKFLOW_ROOT/jobs/quant_peaks.job"
 
 #Set extension
 MYEXT="tagDir"

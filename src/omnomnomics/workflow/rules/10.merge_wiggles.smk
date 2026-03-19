@@ -70,10 +70,10 @@ rule merge_wiggles:
                 ))
 
                 # Set colors
-                with open(os.path.join(f"{OMNOM_HOME}", "bin/color_data_for_hubs/poscols.hub")) as f: 
+                with open(os.path.join(config['COLOR_DATA_FOLDER_DEFAULT'], "poscols.hub")) as f:
                     poscols = f.read().splitlines()
 
-                with open(os.path.join(f"{OMNOM_HOME}", "bin/color_data_for_hubs/negcols.hub")) as f: 
+                with open(os.path.join(config['COLOR_DATA_FOLDER_DEFAULT'], "negcols.hub")) as f:
                     negcols = f.read().splitlines()
 
                 # Iterate over the hub types
