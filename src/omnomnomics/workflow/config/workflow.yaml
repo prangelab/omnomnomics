@@ -1,9 +1,9 @@
 
 
 ## Omnomnomics pipeline config ##
-##Master config
+## Workflow defaults config ##
 #set step indices
-trim_rule_num: 1 
+trim_rule_num: 1
 qc_rule_num: 2
 map_rule_num: 3
 merge_rule_num: 4
@@ -82,7 +82,6 @@ routines:
   - de
 
 
-
 input_folders:
   - "FASTQ"
   - "trimmed_FASTQ"
@@ -113,7 +112,7 @@ output_folders:
   - "DE_calling"
   - "DE_calling"
 
-input_file_types: ####update this by looking at rules
+input_file_types:
   - ".fastq.gz"
   - ".trimmed.fastq.gz"
   - ".trimmed.fastq.gz"
@@ -128,8 +127,7 @@ input_file_types: ####update this by looking at rules
   - [".HOMER_tagDir.tar.gz", ".bed"]
   - ".raw_read_quant.table.txt"
 
-### added output file types
-output_file_types: 
+output_file_types:
   - ".trimmed.fastq.gz"
   - [".trimmed_fastqc.html", ".trimmed_fastqc.zip"]
   - ".bam"
@@ -156,11 +154,11 @@ mincores_single_sample_step1_9:
   - 1
 
 maxcores_single_sample_step1_9:
-  - 128 
-  - 128 
-  - 128 
-  - 128 
-  - 128 
+  - 128
+  - 128
+  - 128
+  - 128
+  - 128
   - 1
   - 1
   - 1
@@ -179,38 +177,25 @@ maxcores_per_rule_run_step10_13:
   - 1
 
 min_mem_mb:
-  - 32000 
-  -  
   - 32000
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
+  -
+  - 32000
   -
   -
-  - 
-  
-
+  -
+  -
+  -
+  -
+  -
+  -
+  -
+  -
 
 
 MAPPERS: ["hisat2", "star", "star_te"]
 TRIMMERS: ["skewer", "trimmomatic"]
 TYPES: ["RNA", "CHIP", "ATAC"]
 GENOMES: ["hg38", "mm10", "mm39", "GRCh38.p14", "GRCm39"]
-
-partition: "defq"
-max_nodes: 10
-
-
-#slurm config, get from sinfo or obligate to fill out
-nodes_in_partition: 10 
-cores_per_node: 128
-max_mem_per_core_mb: 4000
-min_slice_cores: 1
-min_slice_mem: 4000
 
 trim_tool: "skewer"
 map_tool: "hisat2"
@@ -242,5 +227,4 @@ homernegcol: "255,180,180"
 altposcol: "255,128,0"
 altnegcol: "0,128,255"
 
-#overlay type command line options
 overlaytypes: ["transparentOverlay", "stacked", "solidOverlay", "none"]

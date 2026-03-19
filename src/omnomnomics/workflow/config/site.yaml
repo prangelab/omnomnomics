@@ -1,0 +1,13 @@
+
+
+## Omnomnomics pipeline config ##
+## Site defaults config ##
+partition: "rome"
+max_nodes: 504
+
+# Snellius Rome thin-node defaults
+nodes_in_partition: 504
+cores_per_node: 128
+max_mem_per_core_mb: 2048
+min_slice_cores: 16
+min_slice_mem: 32768

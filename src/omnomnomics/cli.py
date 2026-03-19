@@ -23,10 +23,15 @@ from datetime import date, datetime
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
 WORKFLOW_ROOT = PACKAGE_ROOT / "workflow"
+DEFAULT_WORKFLOW_CONFIG = WORKFLOW_ROOT / "config" / "workflow.yaml"
+DEFAULT_SITE_CONFIG = WORKFLOW_ROOT / "config" / "site.yaml"
 
 def parse_arguments():
    #Parse command-line arguments
-   parser = argparse.ArgumentParser(description='Description of your script', allow_abbrev=False)
+   parser = argparse.ArgumentParser(
+       description="Modular HPC pipeline for RNA-seq, ATAC-seq, and ChIP-seq processing.",
+       allow_abbrev=False,
+   )
 
    # Define command-line options
    parser.add_argument('-i', '--experiment-dir', help='Path to the experiment directory')
@@ -53,6 +58,7 @@ def parse_arguments():
    parser.add_argument('-d', '--homer-mindist', help='Minimum distance bewteen peaks. Used for merging regions in HOMER broad peak calling mode. \n \t Default: 2000')
    parser.add_argument('-z', '--homer-size', help='Minimum peak size. Used for defining peaks in HOMER broad peak calling mode. \n \t Default: 500')
    parser.add_argument('-k', '--keepunpaired', action='store_true', help='Keep unpaired or not in HISAT2')
+   parser.add_argument('--site-config', help='Optional path to a site-specific config YAML. Default: packaged site config')
 
    args, unknown = parser.parse_known_args()
    # Check if any unknown arguments are provided
@@ -90,6 +96,11 @@ def load_and_validate_yaml(config_file_path, expected_header):
            sys.exit(1)
   
    return config_content
+
+def merge_configs(base_config, override_config):
+   merged_config = dict(base_config)
+   merged_config.update(override_config)
+   return merged_config
 
 ##---------------------------------------------------------------------------------------------------------------
 ## Set required vars or die
@@ -624,25 +635,32 @@ def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
 def main():
     # Define variables for packaged workflow paths
     OMNOM_HOME = str(WORKFLOW_ROOT)
-    CONFIG_FILE = os.path.join(OMNOM_HOME, "bin", "config.yaml")
+    workflow_config_file = DEFAULT_WORKFLOW_CONFIG
 
     #Check if packaged workflow root exists
     if not WORKFLOW_ROOT.is_dir():
         print(f"Packaged workflow directory '{WORKFLOW_ROOT}' does not exist. Aborting...")
         sys.exit(1)
 
-    # Check if CONFIG_FILE exists
-    if not os.path.isfile(CONFIG_FILE):
-        print(f"Master config file '{CONFIG_FILE}' does not exist. Please make sure it exists. Aborting...")
+    # Check if packaged workflow config exists
+    if not workflow_config_file.is_file():
+        print(f"Workflow config file '{workflow_config_file}' does not exist. Please make sure it exists. Aborting...")
         sys.exit(1)
-    #load and validate the config file
-    config = load_and_validate_yaml(CONFIG_FILE, "## Omnomnomics pipeline config ##")
 
     # Capture command line invocation
     the_command = ' '.join(sys.argv)
         
     # Parse command-line arguments
     args = parse_arguments()
+
+    site_config_file = Path(args.site_config).expanduser().resolve() if args.site_config else DEFAULT_SITE_CONFIG
+    if not site_config_file.is_file():
+        print(f"Site config file '{site_config_file}' does not exist. Please make sure it exists. Aborting...")
+        sys.exit(1)
+
+    workflow_config = load_and_validate_yaml(workflow_config_file, "## Omnomnomics pipeline config ##")
+    site_config = load_and_validate_yaml(site_config_file, "## Omnomnomics pipeline config ##")
+    config = merge_configs(workflow_config, site_config)
 
     # Access parsed arguments
     experiment_dir = args.experiment_dir
@@ -734,6 +752,8 @@ def main():
     ## Run configuration for omnomnomics run
     run_config_data = {
         'OMNOM_HOME': OMNOM_HOME,
+        'WORKFLOW_CONFIG_FILE': str(workflow_config_file),
+        'SITE_CONFIG_FILE': str(site_config_file),
         'EXPERIMENT_DIR': experiment_dir,
         'RUNDATE': run_date,
         'INPUT_FOLDER': input_folder_mod_range_min,

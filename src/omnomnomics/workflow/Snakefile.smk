@@ -94,14 +94,28 @@ def load_and_validate_yaml(logfile, config_file_path, expected_header):
             log_it(logfile, f"Error parsing YAML file: {exc}", "ERROR")
             sys.exit(1)
     return config_content
-CONFIG_FILE = os.path.join(f"{OMNOM_HOME}", "bin", "config.yaml")
-# Check if CONFIG_FILE exists
-if not os.path.isfile(CONFIG_FILE):
-    log_it(logfile, "Master config file  does not exist! Aborting...", "ERROR")
-    print(f"Master config file '{CONFIG_FILE}' does not exist. Please make sure it exists. Aborting...")
+
+def merge_configs(base_config, override_config):
+    merged_config = dict(base_config)
+    merged_config.update(override_config)
+    return merged_config
+
+workflow_config_file = config['WORKFLOW_CONFIG_FILE']
+site_config_file = config['SITE_CONFIG_FILE']
+
+if not os.path.isfile(workflow_config_file):
+    log_it(logfile, "Workflow config file does not exist! Aborting...", "ERROR")
+    print(f"Workflow config file '{workflow_config_file}' does not exist. Please make sure it exists. Aborting...")
     sys.exit(1)
 
-master_config = load_and_validate_yaml(logfile, CONFIG_FILE, "## Omnomnomics pipeline config ##")
+if not os.path.isfile(site_config_file):
+    log_it(logfile, "Site config file does not exist! Aborting...", "ERROR")
+    print(f"Site config file '{site_config_file}' does not exist. Please make sure it exists. Aborting...")
+    sys.exit(1)
+
+workflow_config = load_and_validate_yaml(logfile, workflow_config_file, "## Omnomnomics pipeline config ##")
+site_config = load_and_validate_yaml(logfile, site_config_file, "## Omnomnomics pipeline config ##")
+master_config = merge_configs(workflow_config, site_config)
 
 themode = config['THEMODE']
 

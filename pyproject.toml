@@ -28,7 +28,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 omnomnomics = [
   "workflow/Snakefile.smk",
-  "workflow/bin/config.yaml",
+  "workflow/config/*.yaml",
   "workflow/bin/scripts/*.sh",
   "workflow/bin/homer/*",
   "workflow/bin/Trimmomatic-0.39/*",
