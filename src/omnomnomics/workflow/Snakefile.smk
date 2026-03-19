@@ -196,12 +196,59 @@ if THEMODERANGEMIN == 12:
 input_pattern = os.path.join(input_folder, f"*{input_file_type}")
 input_files = glob.glob(input_pattern)
 
+FASTQ_EXTENSIONS = (".fastq.gz", ".fq.gz", ".fastq", ".fq")
+FASTQ_READ_SUFFIX_RE = re.compile(r'_(?:R)?[12](?:_[0-9]{3})?$')
+
+
+def strip_fastq_read_suffix(sample_name):
+    return FASTQ_READ_SUFFIX_RE.sub('', sample_name)
+
+
+def normalize_sample_name(file_path, file_type):
+    sample_name = os.path.basename(file_path).replace(file_type, "")
+    if "fastq" in file_type or file_type.endswith(".fq.gz") or file_type.endswith(".fq"):
+        sample_name = strip_fastq_read_suffix(sample_name)
+    sample_name = sample_name.replace(".filtered", "")
+    sample_name = sample_name.replace(".sorted.dups_marked", "")
+    return sample_name
+
+
+def fastq_candidate_names(sample, read_label):
+    read_number = read_label.replace("R", "")
+    suffixes = (
+        f"_{read_label}_001",
+        f"_{read_label}",
+        f"_{read_number}_001",
+        f"_{read_number}",
+    )
+    for suffix in suffixes:
+        for extension in FASTQ_EXTENSIONS:
+            yield f"{sample}{suffix}{extension}"
+
+
+def resolve_fastq_input(sample, read_label, input_subdir):
+    input_dir = os.path.join(experiment_dir, input_subdir)
+    matches = []
+    for candidate in fastq_candidate_names(sample, read_label):
+        candidate_path = os.path.join(input_dir, candidate)
+        if os.path.exists(candidate_path):
+            matches.append(candidate_path)
+    matches = sorted(set(matches))
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
+        raise FileNotFoundError(
+            f"No FASTQ found for sample '{sample}' read '{read_label}' in {input_dir}. "
+            f"Tried common suffixes for Illumina-style FASTQ names."
+        )
+    raise ValueError(
+        f"Multiple FASTQs found for sample '{sample}' read '{read_label}' in {input_dir}: "
+        + ", ".join(matches)
+    )
+
+
 # Obtain all the sample names
-samples = [os.path.basename(f).replace(input_file_type, "") for f in input_files]
-samples = [f.replace("_R1", "") for f in samples]
-samples = [f.replace("_R2", "") for f in samples]
-samples = [f.replace(".filtered", "") for f in samples]
-samples = [f.replace(".sorted.dups_marked", "") for f in samples]
+samples = [normalize_sample_name(f, input_file_type) for f in input_files]
 samples2 = [re.sub(r'_L00.', '', string) for string in samples] #From step 4 on, the lane number is not in the sample name anymore
 
 samples = list(set(samples))

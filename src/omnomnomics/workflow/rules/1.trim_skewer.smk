@@ -12,8 +12,18 @@ import subprocess
 
 rule run_skewer:
     input:
-        fastq1=f"{experiment_dir}/{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.fastq.gz",
-        fastq2=f"{experiment_dir}/{master_config['input_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.fastq.gz" if config["PAIRED"] else []
+        fastq1=lambda wildcards: resolve_fastq_input(
+            wildcards.sample,
+            "R1",
+            master_config['input_folders'][master_config['trim_rule_num'] - 1],
+        ),
+        fastq2=(
+            lambda wildcards: resolve_fastq_input(
+                wildcards.sample,
+                "R2",
+                master_config['input_folders'][master_config['trim_rule_num'] - 1],
+            )
+        ) if config["PAIRED"] else []
     output:
         trimmed_fastq1=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.trimmed.fastq.gz" if config["PAIRED"] else f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}.trimmed.fastq.gz",
         trimmed_fastq2=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.trimmed.fastq.gz" if config["PAIRED"] else []
