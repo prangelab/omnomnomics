@@ -18,7 +18,11 @@ import glob
 import random
 import math
 import shutil
+from pathlib import Path
 from datetime import date, datetime
+
+PACKAGE_ROOT = Path(__file__).resolve().parent
+WORKFLOW_ROOT = PACKAGE_ROOT / "workflow"
 
 def parse_arguments():
    #Parse command-line arguments
@@ -618,13 +622,13 @@ def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
 # Main function
 ##--------------------------------------------------------------------------------------------------------------
 def main():
-    # Define variables for paths
-    OMNOM_HOME = "/net/beegfs/scratch/kcarroll/Amsterdam_UMC_Klinische_Genetica_Internship"
-    CONFIG_FILE = os.path.join(f"{OMNOM_HOME}", "bin", "config.yaml")
+    # Define variables for packaged workflow paths
+    OMNOM_HOME = str(WORKFLOW_ROOT)
+    CONFIG_FILE = os.path.join(OMNOM_HOME, "bin", "config.yaml")
 
-    #Check if OMNOM_HOME exists
-    if not os.path.isdir(OMNOM_HOME):
-        print(f"OMNOM_HOME directory '{OMNOM_HOME}' does not exist. Please set it correctly. Aborting...")
+    #Check if packaged workflow root exists
+    if not WORKFLOW_ROOT.is_dir():
+        print(f"Packaged workflow directory '{WORKFLOW_ROOT}' does not exist. Aborting...")
         sys.exit(1)
 
     # Check if CONFIG_FILE exists

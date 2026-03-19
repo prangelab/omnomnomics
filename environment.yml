@@ -1,0 +1,27 @@
+name: omnomnomics
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pyyaml
+  - pysam
+  - snakemake=7.25.4
+  - multiqc
+  - fastqc
+  - fastp
+  - skewer
+  - trimmomatic
+  - hisat2
+  - star
+  - samtools
+  - bedtools
+  - bamtools
+  - deeptools
+  - subread
+  - macs3
+  - homer
+  - openjdk
+  - perl

@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "omnomnomics"
+version = "0.4.0"
+description = "Installable Snakemake application for modular RNA-seq, ATAC-seq, and ChIP-seq processing on HPC systems."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "Koen Prange", email = "info@prangelab.org" }
+]
+dependencies = [
+  "PyYAML>=6.0",
+]
+
+[project.scripts]
+omnomnomics = "omnomnomics.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+omnomnomics = [
+  "workflow/Snakefile.smk",
+  "workflow/bin/config.yaml",
+  "workflow/bin/scripts/*.sh",
+  "workflow/bin/homer/*",
+  "workflow/bin/Trimmomatic-0.39/*",
+  "workflow/bin/Trimmomatic-0.39/adapters/*",
+  "workflow/bin/color_data_for_hubs/*",
+  "workflow/rules/*.smk",
+  "workflow/slurm_profile/*.yaml",
+  "workflow/genomes/*",
+  "workflow/genomes/HISAT2/*",
+  "workflow/genomes/STAR/*",
+]
