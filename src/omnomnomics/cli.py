@@ -690,7 +690,7 @@ def main():
     available_genomes = list_available_genomes(config['genome_assembly_dir'])
 
     # Access parsed arguments
-    experiment_dir = args.experiment_dir
+    experiment_dir = str(Path(args.experiment_dir).expanduser().resolve()) if args.experiment_dir else args.experiment_dir
     the_type = args.type.upper()
     genome = args.genome
     trim_tool = args.trim_tool.lower() if args.trim_tool else config.get("trim_tool","skewer").lower()
