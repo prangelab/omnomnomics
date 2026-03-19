@@ -78,6 +78,13 @@ def parse_genomes_arguments(argv):
     install_parser.add_argument("--force", action="store_true", help="Overwrite an existing normalized assembly")
     install_parser.add_argument("--keep-alt", action="store_true", help="Keep alternative contigs if supported by provider")
     install_parser.add_argument(
+        "--indexers",
+        nargs="+",
+        default=["hisat2", "star"],
+        choices=["hisat2", "star"],
+        help="Which aligner indexes to require and normalize",
+    )
+    install_parser.add_argument(
         "--mask",
         default="soft",
         choices=["soft", "hard", "none"],
@@ -248,6 +255,19 @@ def genome_install_root(genome):
     return Path(genome.filename).resolve().parent
 
 
+def has_complete_star_index(index_dir):
+    required = ["Genome", "SA", "SAindex", "genomeParameters.txt", "chrLength.txt", "chrName.txt"]
+    index_path = Path(index_dir)
+    return index_path.is_dir() and all((index_path / name).exists() for name in required)
+
+
+def has_complete_hisat2_index(index_dir, assembly_name):
+    index_path = Path(index_dir)
+    required = [index_path / f"{assembly_name}.{i}.ht2" for i in range(1, 9)]
+    no_intermediates = not any(index_path.glob("*.rf"))
+    return index_path.is_dir() and all(path.exists() for path in required) and no_intermediates
+
+
 def find_star_dir(genome_dir):
     markers = {"Genome", "SA", "SAindex", "genomeParameters.txt"}
     candidates = []
@@ -273,12 +293,15 @@ def find_hisat2_dir(genome_dir):
     return sorted(candidates, key=lambda path: (len(path.parts), str(path)))[0]
 
 
-def normalize_genome_install(genome, assembly_name, assembly_root, force):
+def normalize_genome_install(genome, assembly_name, assembly_root, force, indexers):
     final_root = Path(assembly_root) / assembly_name
     if final_root.exists():
         if not force:
-            print(f"Assembly '{assembly_name}' already exists at {final_root}. Use --force to overwrite.")
-            return final_root
+            print(
+                f"Assembly '{assembly_name}' already exists at {final_root}. Use --force to overwrite.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         shutil.rmtree(final_root)
 
     fasta_dir = final_root / "fasta"
@@ -304,22 +327,24 @@ def normalize_genome_install(genome, assembly_name, assembly_root, force):
 
     install_root = genome_install_root(genome)
 
-    star_source = find_star_dir(install_root)
-    if star_source is not None:
+    if "star" in indexers:
+        star_source = find_star_dir(install_root)
+        if star_source is None or not has_complete_star_index(star_source):
+            print(f"Incomplete STAR index for '{assembly_name}' under {install_root}", file=sys.stderr)
+            sys.exit(1)
         shutil.copytree(star_source, star_dir, dirs_exist_ok=True)
-    else:
-        print(f"Warning: no STAR index found for '{assembly_name}' under {install_root}", file=sys.stderr)
 
-    hisat2_source = find_hisat2_dir(install_root)
-    if hisat2_source is not None:
+    if "hisat2" in indexers:
+        hisat2_source = find_hisat2_dir(install_root)
+        if hisat2_source is None or not has_complete_hisat2_index(hisat2_source, assembly_name):
+            print(f"Incomplete HISAT2 index for '{assembly_name}' under {install_root}", file=sys.stderr)
+            sys.exit(1)
         shutil.copytree(hisat2_source, hisat2_dir, dirs_exist_ok=True)
-    else:
-        print(f"Warning: no HISAT2 index found for '{assembly_name}' under {install_root}", file=sys.stderr)
 
     return final_root
 
 
-def install_assembly(genomepy, assembly_name, provider, assembly_root, threads, force, keep_alt, mask, ucsc_annotation):
+def install_assembly(genomepy, assembly_name, provider, assembly_root, threads, force, keep_alt, mask, ucsc_annotation, indexers):
     assembly_root = Path(assembly_root)
     assembly_root.mkdir(parents=True, exist_ok=True)
     tmp_root = assembly_root / ".genomepy_tmp"
@@ -338,8 +363,16 @@ def install_assembly(genomepy, assembly_name, provider, assembly_root, threads, 
     if ucsc_annotation:
         install_kwargs["ucsc_annotation"] = ucsc_annotation
 
+    ensure_plugins(genomepy)
+    wanted_indexers = set(indexers)
+    for plugin_name in ["hisat2", "star"]:
+        if plugin_name in wanted_indexers:
+            genomepy.manage_plugins("enable", [plugin_name])
+        else:
+            genomepy.manage_plugins("disable", [plugin_name])
+
     genome = genomepy.install_genome(assembly_name, **install_kwargs)
-    normalized_root = normalize_genome_install(genome, assembly_name, assembly_root, force)
+    normalized_root = normalize_genome_install(genome, assembly_name, assembly_root, force, indexers)
 
     tmp_assembly_root = tmp_root / assembly_name
     if tmp_assembly_root.exists():
@@ -358,8 +391,6 @@ def genomes_main(argv, workflow_root, workflow_config_file, default_site_config)
         rows = search_rows(genomepy, args.species, args.provider)
         print_rows(rows, args.limit)
         return
-
-    ensure_plugins(genomepy)
 
     targets = list(args.assembly)
     if not targets:
@@ -383,6 +414,7 @@ def genomes_main(argv, workflow_root, workflow_config_file, default_site_config)
             threads=args.threads,
             force=args.force,
             keep_alt=args.keep_alt,
+            indexers=args.indexers,
             mask=args.mask,
             ucsc_annotation=args.ucsc_annotation,
         )
