@@ -58,6 +58,7 @@ def parse_arguments():
    parser.add_argument('-d', '--homer-mindist', help='Minimum distance bewteen peaks. Used for merging regions in HOMER broad peak calling mode. \n \t Default: 2000')
    parser.add_argument('-z', '--homer-size', help='Minimum peak size. Used for defining peaks in HOMER broad peak calling mode. \n \t Default: 500')
    parser.add_argument('-k', '--keepunpaired', action='store_true', help='Keep unpaired or not in HISAT2')
+   parser.add_argument('--dry-run', action='store_true', help='Validate the workflow and build the Snakemake DAG without executing jobs')
    parser.add_argument('--site-config', help='Optional path to a site-specific config YAML. Default: packaged site config')
 
    args, unknown = parser.parse_known_args()
@@ -687,6 +688,7 @@ def main():
     homer_mindist = args.homer_mindist if args.homer_mindist else config.get('homer_mindist', 2000)
     homer_size = args.homer_size if args.homer_size else config.get('homer_size', 500)
     keep_unpaired = args.keepunpaired if args.keepunpaired else config.get('keep_unpaired', False)
+    dry_run = args.dry_run
 
     # Check required variables
     check_required_vars(the_type, experiment_dir, genome, config)
@@ -830,6 +832,9 @@ def main():
         "--config", "config_file="+os.path.join(experiment_dir, "run_configs", f'omnomnomics.run.{run_date}.config.yaml'), "--jobs", "1000", 
         "--cores", "1280", "--rerun-triggers", "mtime", "--keep-going"
     ] 
+
+    if dry_run:
+        cmd.append("--dry-run")
 
     # For all the specified steps to run, add them to --forcerun so that they are always specified regardless 
     # from if the output is already present or not
