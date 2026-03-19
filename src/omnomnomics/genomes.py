@@ -38,6 +38,12 @@ def resolve_config_path(path_value, workflow_root):
     return Path(resolved).expanduser().resolve()
 
 
+SPECIES_ALIASES = {
+    "human": "homo sapiens",
+    "mouse": "mus musculus",
+}
+
+
 def load_site_settings(workflow_root, workflow_config_file, site_config_file):
     workflow_config = load_and_validate_yaml(workflow_config_file, "## Omnomnomics pipeline config ##")
     site_config = load_and_validate_yaml(site_config_file, "## Omnomnomics pipeline config ##")
@@ -97,6 +103,10 @@ def parse_genomes_arguments(argv):
     install_parser.add_argument("--dry-run", action="store_true", help="Resolve targets and print actions without downloading")
 
     return parser.parse_args(argv)
+
+
+def normalize_species_name(species):
+    return SPECIES_ALIASES.get(species.strip().lower(), species)
 
 
 def import_genomepy():
@@ -170,10 +180,6 @@ def validate_requested_assemblies(genomepy, assembly_names, provider):
             file=sys.stderr,
         )
         sys.exit(1)
-
-
-def ensure_plugins(genomepy):
-    genomepy.manage_plugins("enable", ["star", "hisat2"])
 
 
 def copy_text_file(src, dst):
@@ -363,13 +369,14 @@ def install_assembly(genomepy, assembly_name, provider, assembly_root, threads, 
     if ucsc_annotation:
         install_kwargs["ucsc_annotation"] = ucsc_annotation
 
-    ensure_plugins(genomepy)
     wanted_indexers = set(indexers)
-    for plugin_name in ["hisat2", "star"]:
-        if plugin_name in wanted_indexers:
-            genomepy.manage_plugins("enable", [plugin_name])
-        else:
-            genomepy.manage_plugins("disable", [plugin_name])
+    enabled_plugins = [plugin_name for plugin_name in ["hisat2", "star"] if plugin_name in wanted_indexers]
+    disabled_plugins = [plugin_name for plugin_name in ["hisat2", "star"] if plugin_name not in wanted_indexers]
+
+    if enabled_plugins:
+        genomepy.manage_plugins("enable", enabled_plugins)
+    if disabled_plugins:
+        genomepy.manage_plugins("disable", disabled_plugins)
 
     genome = genomepy.install_genome(assembly_name, **install_kwargs)
     normalized_root = normalize_genome_install(genome, assembly_name, assembly_root, force, indexers)
@@ -386,6 +393,7 @@ def genomes_main(argv, workflow_root, workflow_config_file, default_site_config)
     site_config_file = Path(args.site_config).expanduser().resolve() if args.site_config else default_site_config
     config = load_site_settings(workflow_root, workflow_config_file, site_config_file)
     genomepy = import_genomepy()
+    args.species = normalize_species_name(args.species)
 
     if args.genomes_command == "list":
         rows = search_rows(genomepy, args.species, args.provider)
