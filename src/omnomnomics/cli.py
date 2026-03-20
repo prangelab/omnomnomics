@@ -13,6 +13,7 @@ import sys
 import subprocess
 import yaml
 import argparse
+import shlex
 import re
 import glob
 import random
@@ -113,6 +114,16 @@ def resolve_config_path(path_value, workflow_root):
 
 def genome_subdir(assembly_root, genome_name, subdir_name):
    return str(Path(assembly_root) / genome_name / subdir_name)
+
+def write_controller_script(script_path, experiment_dir, snakemake_cmd):
+   script_lines = [
+       "#!/bin/bash",
+       "set -euo pipefail",
+       f"cd {shlex.quote(str(experiment_dir))}",
+       shlex.join(snakemake_cmd),
+   ]
+   script_path.write_text("\n".join(script_lines) + "\n")
+   script_path.chmod(0o755)
 
 def list_available_genomes(assembly_root):
    assembly_root_path = Path(assembly_root)
@@ -573,6 +584,7 @@ def setup_runtime_parameters(num_pairs, experiment_dir):
 
     # Make directories for slurm logs, run logs, run configs and MultiQC in experiment directory
     subprocess.run(f"mkdir -p {experiment_dir}/slurm_logs", shell=True, check=True)
+    subprocess.run(f"mkdir -p {experiment_dir}/slurm_logs/controller", shell=True, check=True)
     subprocess.run(f"mkdir -p {experiment_dir}/run_logs", shell=True, check=True)
     subprocess.run(f"mkdir -p {experiment_dir}/run_configs", shell=True, check=True)
     subprocess.run(f"mkdir -p {experiment_dir}/MultiQC", shell=True, check=True)
@@ -845,7 +857,7 @@ def main():
     print("")
 
     #Dispatch the job using Snakemake
-    print("Dispatching job...")
+    print("Dispatching controller job...")
 
     sub_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -855,10 +867,7 @@ def main():
 
     with open(log_file, 'a') as log:
         log.write(f"Invocation:\t{the_command}\n")
-        log.write(f"Snakemake Job submitted at:\t{sub_time}\n")
-        log.write(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
-        log.write("WAITING FOR SNAKEMAKE & SLURM TO COMPLETE...\n")
-        log.write("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+        log.write(f"Controller submission at:\t{sub_time}\n")
 
     # Call to snakemake!!
     max_cores = str(config.get("max_nodes", 1) * config.get("cores_per_node", 1))
@@ -877,14 +886,64 @@ def main():
         routine = config['routines'][i-1]
         cmd.append(config[routine][selected_routines[f'selected_routine_{routine}']])
 
-    # Executre the Snakemake command
+    controller_script = Path(experiment_dir) / "run_configs" / f"omnomnomics.run.{run_date}.controller.sh"
+    write_controller_script(controller_script, experiment_dir, cmd)
+
+    controller_job_name = f"omnomnomics-{Path(experiment_dir).name}"
+    controller_log = Path(experiment_dir) / "slurm_logs" / "controller" / "controller.%j.out"
+    sbatch_cmd = [
+        "sbatch",
+        "--parsable",
+        "--export=ALL",
+        "--chdir",
+        str(experiment_dir),
+        "--job-name",
+        controller_job_name,
+        "--partition",
+        str(config.get("controller_partition", config["partition"])),
+        "--cpus-per-task",
+        str(config.get("controller_cores", 1)),
+        "--mem",
+        str(config.get("controller_mem_mb", 8192)),
+        "--time",
+        str(config.get("controller_runtime", 1440)),
+        "--output",
+        str(controller_log),
+        "--error",
+        str(controller_log),
+    ]
+    if config.get("controller_constraint"):
+        sbatch_cmd.extend(["--constraint", str(config["controller_constraint"])])
+    sbatch_cmd.append(str(controller_script))
+
     try:
-        subprocess.run(cmd, check=True)
+        submission = subprocess.run(
+            sbatch_cmd,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
     except subprocess.CalledProcessError as e:
         print(f"Error: {e}", file=sys.stderr)
+        if e.stderr:
+            print(e.stderr, file=sys.stderr)
         sys.exit(1)
 
-    print("All done!")
+    controller_job_id = submission.stdout.strip().split(";")[0]
+    controller_log_path = str(controller_log).replace("%j", controller_job_id)
+
+    with open(log_file, 'a') as log:
+        log.write(f"Controller job ID:\t{controller_job_id}\n")
+        log.write(f"Controller script:\t{controller_script}\n")
+        log.write(f"Controller log:\t{controller_log_path}\n")
+        log.write(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
+        log.write("CONTROLLER JOB SUBMITTED TO SLURM.\n")
+        log.write("CHECK THE CONTROLLER LOG AND RUN LOG FOR PROGRESS.\n")
+        log.write("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+
+    print(f"Controller job ID:\t{controller_job_id}")
+    print(f"Controller log:\t{controller_log_path}")
+    print("CLI finished after successful controller submission.")
 
 if __name__ == "__main__":
    main()

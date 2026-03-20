@@ -12,6 +12,11 @@ max_mem_per_core_mb: 1792
 min_slice_cores: 16
 min_slice_mem: 32768
 default_runtime: 120
+controller_partition: "rome"
+controller_cores: 1
+controller_mem_mb: 8192
+controller_runtime: 1440
+controller_constraint:
 
 # External genome resources
 genome_assembly_dir: "{HOME}/genomes/assemblies"
