@@ -67,6 +67,9 @@ rule run_skewer:
                     skewer --quiet {adapter_option} -m any -q 15 -Q 15 -z -t {threads} -o "{outputfolder}/{sample}" {fastq1}
                 """
 
+            skewer_command = " ".join(skewer_command.split())
+            log_it(logfile, skewer_command, "SKEWER COMMAND")
+
             # Run the skewer command
             shell(skewer_command, bench_record=bench_record)
 
