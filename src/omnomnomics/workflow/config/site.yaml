@@ -11,7 +11,7 @@ cores_per_node: 128
 max_mem_per_core_mb: 1792
 min_slice_cores: 16
 min_slice_mem: 32768
-default_runtime: "02:00:00"
+default_runtime: 120
 
 # External genome resources
 genome_assembly_dir: "{HOME}/genomes/assemblies"
