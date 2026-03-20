@@ -9,6 +9,10 @@
 import os
 import glob
 import pysam
+import shlex
+import shutil
+import subprocess
+import tempfile
 
 rule create_homer_tagDir:
     input:
@@ -35,58 +39,71 @@ rule create_homer_tagDir:
         log_it(logfile, f"Input folder: {params.inputfolder}")
         log_it(logfile, f"Output folder: {params.outputfolder}")
 
-        samtools_version = subprocess.check_output("module load samtools && samtools --version | head -n2", shell=True, executable='/bin/bash')
+        samtools_version = subprocess.check_output("samtools --version | head -n2", shell=True, executable='/bin/bash')
         log_it(logfile, "\n"+samtools_version.decode("utf-8"), "SAMTOOLS VERSION")
 
         sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['tagdir_rule_num']-1])
 
         # Function to create HOMER tag directories
         def create_homer_tagDir(filepath, outputfolder, genome, thetype):
+            tmpdir_root = os.environ.get("TMPDIR")
+            local_workdir = tempfile.mkdtemp(prefix=f"{wildcards.sample}.", dir=tmpdir_root if tmpdir_root else None)
+            log_it(logfile, f"Scratch directory: {local_workdir}")
+
+            def quote(path):
+                return shlex.quote(path)
+
             basename = os.path.basename(filepath)
             sample_name = basename.replace('.bam', '')
-            tag_dir = os.path.join(outputfolder, f"{sample_name}.HOMER_tagDir")
+            local_bam = os.path.join(local_workdir, basename)
+            local_bai = os.path.join(local_workdir, os.path.basename(input.bai_BAM))
+            stage_bam_command = f'cp {quote(filepath)} {quote(local_bam)}'
+            stage_bai_command = f'cp {quote(input.bai_BAM)} {quote(local_bai)}'
+            log_it(logfile, stage_bam_command, "STAGE INPUT COMMAND")
+            shell(stage_bam_command)
+            log_it(logfile, stage_bai_command, "STAGE INPUT COMMAND")
+            shell(stage_bai_command)
+
+            tag_dir = os.path.join(local_workdir, f"{sample_name}.HOMER_tagDir")
             tar_gz_path = f"{tag_dir}.tar.gz"
 
-            # Remove existing output files if they exist
-            if os.path.exists(tar_gz_path):
-                log_it(logfile, f"Removing existing compressed tag directory {tar_gz_path}")
-                os.remove(tar_gz_path)
-            if os.path.exists(tag_dir):
-                log_it(logfile, f"Removing existing uncompressed tag directory {tag_dir}")
-                shell(f"rm -r {tag_dir}")
+            try:
+                # Remove existing output files if they exist
+                if os.path.exists(tar_gz_path):
+                    log_it(logfile, f"Removing existing compressed tag directory {tar_gz_path}")
+                    os.remove(tar_gz_path)
+                if os.path.exists(tag_dir):
+                    log_it(logfile, f"Removing existing uncompressed tag directory {tag_dir}")
+                    shell(f"rm -r {quote(tag_dir)}")
 
-            if thetype == "RNA":
-                with pysam.AlignmentFile(filepath, "rb") as bamfile:
-                    paired_end_count = 0
-                    for read in bamfile.fetch():
-                        if read.is_paired:
-                            paired_end_count += 1
-                            break
+                if thetype == "RNA":
+                    with pysam.AlignmentFile(local_bam, "rb") as bamfile:
+                        paired_end_count = 0
+                        for read in bamfile.fetch():
+                            if read.is_paired:
+                                paired_end_count += 1
+                                break
 
-                if paired_end_count > 0:
-                    log_it(logfile, f"Running makeTagDirectory on paired-end RNA sample {filepath}")
-                    shell(f"""
-                        module load samtools && \
-                        makeTagDirectory {tag_dir} {filepath} -genome {genome} -sspe -single """)
+                    if paired_end_count > 0:
+                        log_it(logfile, f"Running makeTagDirectory on paired-end RNA sample {filepath}")
+                        command = f"makeTagDirectory {quote(tag_dir)} {quote(local_bam)} -genome {genome} -sspe -single"
+                    else:
+                        log_it(logfile, f"Running makeTagDirectory on {filepath}")
+                        command = f"makeTagDirectory {quote(tag_dir)} {quote(local_bam)} -genome {genome} -single"
                 else:
                     log_it(logfile, f"Running makeTagDirectory on {filepath}")
-                    shell(f"""
-                        module load samtools && \
-                        makeTagDirectory {tag_dir} {filepath} -genome {genome} -single """)
-            else:
-                log_it(logfile, f"Running makeTagDirectory on {filepath}")
-                shell(f"""
-                    module load samtools && \
-                    makeTagDirectory {tag_dir} {filepath} -genome {genome} -single""")
+                    command = f"makeTagDirectory {quote(tag_dir)} {quote(local_bam)} -genome {genome} -single"
 
-            # Compress the tag directory
-            log_it(logfile, f"Compressing {os.path.basename(tag_dir)} into {tag_dir}.tar.gz")
-            shell(f"cd {outputfolder} && tar czf {sample_name}.HOMER_tagDir.tar.gz  {sample_name}.HOMER_tagDir")
-            
-            # Remove the uncompressed tag directory
-            log_it(logfile, f"Removing uncompressed tag directory {tag_dir}")
-            shell(f"rm -r {tag_dir}")
+                log_it(logfile, command, "HOMER TAGDIR COMMAND")
+                shell(command)
 
-            shell(f"""echo "necessity file for touchup_bam. can delete this." > {outputfolder}/{wildcards.sample}.extra_8.tmp""")
+                # Compress the tag directory
+                log_it(logfile, f"Compressing {os.path.basename(tag_dir)} into {tag_dir}.tar.gz")
+                shell(f"cd {quote(local_workdir)} && tar czf {quote(os.path.basename(tar_gz_path))} {quote(os.path.basename(tag_dir))}")
+
+                shell(f'cp {quote(tar_gz_path)} {quote(os.path.join(outputfolder, os.path.basename(tar_gz_path)))}')
+                shell(f"""echo "necessity file for touchup_bam. can delete this." > {quote(os.path.join(outputfolder, f"{wildcards.sample}.extra_8.tmp"))}""")
+            finally:
+                shutil.rmtree(local_workdir, ignore_errors=True)
 
         create_homer_tagDir(input.filtered_BAM, params.outputfolder, params.genome, params.thetype)

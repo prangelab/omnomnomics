@@ -15,6 +15,7 @@ import yaml
 import shutil
 import glob
 import random
+import re
 
 
 # Load the configuration file from command line arguments
@@ -26,6 +27,7 @@ workflow_root = config['WORKFLOW_ROOT']
 experiment_dir = config["EXPERIMENT_DIR"]
 run_date = config["RUNDATE"]
 logfile = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.log")
+is_worker_job = "--target-jobs" in sys.argv
 
 # Function to log messages
 def log_it(logfile, message, heading=None):
@@ -40,14 +42,16 @@ onstart:
     # Upon start, log the start time of the pipeline
     global start_time
     start_time = time.time()
-    log_it(logfile, "Pipeline started at {}\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")), "PIPELINE START TIME")
+    if not is_worker_job:
+        log_it(logfile, "Pipeline started at {}\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")), "PIPELINE START TIME")
 
 onerror:
     # Upon error, log the error time of the pipeline and the elapsed time
     end_time = time.time()
     elapsed_time = end_time - start_time
-    log_it(logfile, "Pipeline failed at {}\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")), "PIPELINE RUN TIME")
-    log_it(logfile, "Total elapsed time: {:.2f} seconds\n".format(elapsed_time))
+    if not is_worker_job:
+        log_it(logfile, "Pipeline failed at {}\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")), "PIPELINE RUN TIME")
+        log_it(logfile, "Total elapsed time: {:.2f} seconds\n".format(elapsed_time))
 
 # Function for sanity check on directory
 def sanity_check_dir(logfile, input_directory, file_ext):
@@ -68,7 +72,8 @@ def sanity_check_dir(logfile, input_directory, file_ext):
 # Hold our horses for a little while to ensure all files are up to date
 time.sleep(0.1)
 
-log_it(logfile,"JOB DISPATCHED!", "INITIALIZATION")
+if not is_worker_job:
+    log_it(logfile,"JOB DISPATCHED!", "INITIALIZATION")
 ##---------------------------------------------------------------------------------------------------------------
 ## Read defaults from config file or die
 ##---------------------------------------------------------------------------------------------------------------
@@ -125,51 +130,53 @@ themode = config['THEMODE']
 def final_housekeeping(logfile, thecoltable, experiment_dir):
     # Move our camp to the experiment directory
     os.chdir(experiment_dir)
-    log_it(logfile, f"Changed directory to experiment dir: {experiment_dir}" )
-    print(f"Changed directory to experiment dir: {experiment_dir}")
-    return 
+    if not is_worker_job:
+        log_it(logfile, f"Changed directory to experiment dir: {experiment_dir}" )
+        print(f"Changed directory to experiment dir: {experiment_dir}")
+    return
 
 final_housekeeping(logfile, config['THECOLTABLE'], experiment_dir)
 
 ##---------------------------------------------------------------------------------------------------------------
 ## Report some basic stats
 ##---------------------------------------------------------------------------------------------------------------
-log_it(logfile, f"Experiment dir: {experiment_dir}")
-log_it(logfile, f"Run date: {run_date}")
-log_it(logfile, f"Log file: {logfile}")
-log_it(logfile, f"Files: {config['NUMFILES']}")
-log_it(logfile, f"Pairs: {config['NUMPAIRS']}")
-log_it(logfile, f"Paired run: {config['PAIRED']}")
-log_it(logfile, f"Type: {config['THETYPE']}")
-log_it(logfile, f"Genome: {config['THEGENOME']}")
-log_it(logfile, f"Mode: {' '.join(map(str, themode))}")
-log_it(logfile, f"Mode min: {min(themode)}")
-log_it(logfile, f"Mode max: {max(themode)}")
-log_it(logfile, f"Trim tool: {config['THETRIMTOOL']}")
-log_it(logfile, f"Map tool: {config['THEMAPTOOL']}")
+if not is_worker_job:
+    log_it(logfile, f"Experiment dir: {experiment_dir}")
+    log_it(logfile, f"Run date: {run_date}")
+    log_it(logfile, f"Log file: {logfile}")
+    log_it(logfile, f"Files: {config['NUMFILES']}")
+    log_it(logfile, f"Pairs: {config['NUMPAIRS']}")
+    log_it(logfile, f"Paired run: {config['PAIRED']}")
+    log_it(logfile, f"Type: {config['THETYPE']}")
+    log_it(logfile, f"Genome: {config['THEGENOME']}")
+    log_it(logfile, f"Mode: {' '.join(map(str, themode))}")
+    log_it(logfile, f"Mode min: {min(themode)}")
+    log_it(logfile, f"Mode max: {max(themode)}")
+    log_it(logfile, f"Trim tool: {config['THETRIMTOOL']}")
+    log_it(logfile, f"Map tool: {config['THEMAPTOOL']}")
 
-log_it(logfile, f"Design formula: {config['MYFORMULA']}", "READ COUNTING SETTINGS")
-log_it(logfile, f"Metadata file: {config['MYMETADATA']}")
+    log_it(logfile, f"Design formula: {config['MYFORMULA']}", "READ COUNTING SETTINGS")
+    log_it(logfile, f"Metadata file: {config['MYMETADATA']}")
 
-log_it(logfile, f"Input file (MACS3): {config['INPUT']}", "PEAK CALLING SETTINGS")
-log_it(logfile, f"Input file (HOMER): {config['HOMERINPUT']}")
-log_it(logfile, f"Broad peaks: {config['BROAD']}")
-log_it(logfile, f"Peak style: {config['THESTYLE']}")
-log_it(logfile, f"HOMER peaksize: {config['HOMERSIZE']}")
-log_it(logfile, f"HOMER minDist: {config['HOMERMINDIST']}")
+    log_it(logfile, f"Input file (MACS3): {config['INPUT']}", "PEAK CALLING SETTINGS")
+    log_it(logfile, f"Input file (HOMER): {config['HOMERINPUT']}")
+    log_it(logfile, f"Broad peaks: {config['BROAD']}")
+    log_it(logfile, f"Peak style: {config['THESTYLE']}")
+    log_it(logfile, f"HOMER peaksize: {config['HOMERSIZE']}")
+    log_it(logfile, f"HOMER minDist: {config['HOMERMINDIST']}")
 
-log_it(logfile, f"{config['THEHEAPINIT']} HEAP init", "JAVA MEMORY SETTINGS")
-log_it(logfile, f"{config['THEMEM']} memory per sample") 
+    log_it(logfile, f"{config['THEHEAPINIT']} HEAP init", "JAVA MEMORY SETTINGS")
+    log_it(logfile, f"{config['THEMEM']} memory per sample")
 
-log_it(logfile, f"Hub type field: {config['THETYPEFIELD']}", "TRACKHUB SETTINGS")
-log_it(logfile, f"Hub name field: {config['NAMEFIELDS']}")
-log_it(logfile, f"Hub col field: {config['THECOLFIELD']}")
-log_it(logfile, f"Hub separator: {config['THESEPARATOR']}")
-log_it(logfile, f"Hub appendix: {config['THEAPPENDIX']}")
-log_it(logfile, f"Hub overlay: {config['THEOVERLAY']}")
-log_it(logfile, f"Hub coldata folder: {config['THECOLORDATAFOLDER']}")
-log_it(logfile, f"Hub color table: {config['THECOLTABLE']}")
-log_it(logfile, f"Hub mail: {config['THEHUBMAIL']}")
+    log_it(logfile, f"Hub type field: {config['THETYPEFIELD']}", "TRACKHUB SETTINGS")
+    log_it(logfile, f"Hub name field: {config['NAMEFIELDS']}")
+    log_it(logfile, f"Hub col field: {config['THECOLFIELD']}")
+    log_it(logfile, f"Hub separator: {config['THESEPARATOR']}")
+    log_it(logfile, f"Hub appendix: {config['THEAPPENDIX']}")
+    log_it(logfile, f"Hub overlay: {config['THEOVERLAY']}")
+    log_it(logfile, f"Hub coldata folder: {config['THECOLORDATAFOLDER']}")
+    log_it(logfile, f"Hub color table: {config['THECOLTABLE']}")
+    log_it(logfile, f"Hub mail: {config['THEHUBMAIL']}")
 
 ##--------------------------------------------------------------------------------------------------------------
 # Obtain Sample Names and Number of Samples
@@ -332,7 +339,8 @@ for rule_num in range(1, master_config['max_step'] + 1):
 ##--------------------------------------------------------------------------------------------------------------
 
 def check_and_include_rules(logfile, omnom_home, experiment_dir):
-    log_it(logfile, "Checking snake rule functions...", "PREFLIGHT")
+    if not is_worker_job:
+        log_it(logfile, "Checking snake rule functions...", "PREFLIGHT")
 
     rules_dir = os.path.join(omnom_home, "rules")
 
@@ -367,7 +375,8 @@ def check_and_include_rules(logfile, omnom_home, experiment_dir):
             valid_smk_files.append(smk_file)
 
 
-    log_it(logfile, "Workflow Snake rules Good!", "WORKLFLOW SNAKE RULES CHECK")
+    if not is_worker_job:
+        log_it(logfile, "Workflow Snake rules Good!", "WORKLFLOW SNAKE RULES CHECK")
     return valid_smk_files
 
 valid_smk_files = check_and_include_rules(logfile, workflow_root, experiment_dir)
@@ -458,7 +467,8 @@ for rule_num in themode:
         all_outputs.append( f"{experiment_dir}/{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.results.zip")
     
 
-log_it(logfile, '\n'.join(all_outputs), 'ALL OUTPUTS')
+if not is_worker_job:
+    log_it(logfile, '\n'.join(all_outputs), 'ALL OUTPUTS')
 
 # Determine rule priority to resolve any rule ambuigity
 if config['THETRIMTOOL'] == "skewer" and config['THEMAPTOOL'] == "star":
@@ -483,67 +493,68 @@ rule all:
 
 
 onsuccess:
-    ##Final things:
-    #---------------------------------------------------------------------------------------------------------------
-    # Run multiqc to gather all stats
-    #---------------------------------------------------------------------------------------------------------------
-    if not config['NO_MULTIQC']:
-        log_it(logfile, "Running multiQC...", "STATS")
-        shell(f"""
-            eval "$(micromamba shell hook --shell=bash)" && micromamba activate multiqc && \
-            multiqc --filename MultiQC/omnomnomics.run.{run_date}.multiqc_report.html --dirs --export .
-        """)
-    #---------------------------------------------------------------------------------------------------------------
-    # Clean up tmp files for workflow
-    #---------------------------------------------------------------------------------------------------------------
-    if 3 in themode:
-        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['merge_rule_num']-1]}/*.extra_3.tmp")
-        for file in list_of_extra_files:
-            os.remove(file)
-    if 4 in themode:
-        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['merge_rule_num']-1]}/*.extra_4.tmp")
-        for file in list_of_extra_files:
-            os.remove(file)
-    if 5 in themode:
-        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['touchup_rule_num']-1]}/*.extra_5.tmp")
-        for file in list_of_extra_files:
-            os.remove(file)
-    if 8 in themode:
-        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['tagdir_rule_num']-1]}/*.extra_8.tmp")
-        for file in list_of_extra_files:
-            os.remove(file) 
-    if 9 in themode:
-        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['wig_rule_num']-1]}/*.extra_9.tmp")
-        for file in list_of_extra_files:
-            os.remove(file)
-    if 10 in themode:
-        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['mergewig_rule_num']-1]}/extra_10.tmp")
-        for file in list_of_extra_files:
-            os.remove(file)
-    if 11 in themode:
-        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/extra_11.tmp")
-        for file in list_of_extra_files:
-            os.remove(file)
-    if 12 in themode:
-        list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/extra_11.tmp")
-        for file in list_of_extra_files:
-            os.remove(file)
+    if not is_worker_job:
+        ##Final things:
+        #---------------------------------------------------------------------------------------------------------------
+        # Run multiqc to gather all stats
+        #---------------------------------------------------------------------------------------------------------------
+        if not config['NO_MULTIQC']:
+            log_it(logfile, "Running multiQC...", "STATS")
+            shell(f"""
+                eval "$(micromamba shell hook --shell=bash)" && micromamba activate multiqc && \
+                multiqc --filename MultiQC/omnomnomics.run.{run_date}.multiqc_report.html --dirs --export .
+            """)
+        #---------------------------------------------------------------------------------------------------------------
+        # Clean up tmp files for workflow
+        #---------------------------------------------------------------------------------------------------------------
+        if 3 in themode:
+            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['merge_rule_num']-1]}/*.extra_3.tmp")
+            for file in list_of_extra_files:
+                os.remove(file)
+        if 4 in themode:
+            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['merge_rule_num']-1]}/*.extra_4.tmp")
+            for file in list_of_extra_files:
+                os.remove(file)
+        if 5 in themode:
+            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['touchup_rule_num']-1]}/*.extra_5.tmp")
+            for file in list_of_extra_files:
+                os.remove(file)
+        if 8 in themode:
+            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['tagdir_rule_num']-1]}/*.extra_8.tmp")
+            for file in list_of_extra_files:
+                os.remove(file)
+        if 9 in themode:
+            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['wig_rule_num']-1]}/*.extra_9.tmp")
+            for file in list_of_extra_files:
+                os.remove(file)
+        if 10 in themode:
+            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['mergewig_rule_num']-1]}/extra_10.tmp")
+            for file in list_of_extra_files:
+                os.remove(file)
+        if 11 in themode:
+            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/extra_11.tmp")
+            for file in list_of_extra_files:
+                os.remove(file)
+        if 12 in themode:
+            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/extra_11.tmp")
+            for file in list_of_extra_files:
+                os.remove(file)
 
-    #---------------------------------------------------------------------------------------------------------------
-    # Remove old BAM files with lane info
-    #---------------------------------------------------------------------------------------------------------------
-    ## Note that I had to do that here since if I do it before completion rule_all would error that not all of it input files are present
-    if 4 in themode:
-        for bam_file in glob.glob(f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/*_L00*.bam"):
-            os.remove(bam_file)
-    
-    #---------------------------------------------------------------------------------------------------------------
-    # Log elapsed time and completion
-    #---------------------------------------------------------------------------------------------------------------
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    log_it(logfile, "Pipeline finished at {}\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")), "PIPELINE RUN TIME")
-    log_it(logfile, "Total elapsed time: {:.2f} seconds\n".format(elapsed_time))
+        #---------------------------------------------------------------------------------------------------------------
+        # Remove old BAM files with lane info
+        #---------------------------------------------------------------------------------------------------------------
+        ## Note that I had to do that here since if I do it before completion rule_all would error that not all of it input files are present
+        if 4 in themode:
+            for bam_file in glob.glob(f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/*_L00*.bam"):
+                os.remove(bam_file)
 
-    log_it(logfile, "All done!" ,"FINAL REMARKS")
-    log_it(logfile, "Good luck with your downstream analyses!")
+        #---------------------------------------------------------------------------------------------------------------
+        # Log elapsed time and completion
+        #---------------------------------------------------------------------------------------------------------------
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        log_it(logfile, "Pipeline finished at {}\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")), "PIPELINE RUN TIME")
+        log_it(logfile, "Total elapsed time: {:.2f} seconds\n".format(elapsed_time))
+
+        log_it(logfile, "All done!" ,"FINAL REMARKS")
+        log_it(logfile, "Good luck with your downstream analyses!")

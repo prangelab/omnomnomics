@@ -77,16 +77,19 @@ rule run_skewer:
                 command = f'pigz -p {threads} -c {quote(source_path)} > {quote(target_path)}'
                 log_it(logfile, command, "PIGZ COMPRESS COMMAND")
                 shell(command)
+                log_it(logfile, f"Compressed {source_path} to {target_path}")
 
             try:
                 local_fastq1_gz, local_fastq1 = local_fastq_path(fastq1)
                 stage_fastq1_command = f'cp {quote(fastq1)} {quote(local_fastq1_gz)}'
                 log_it(logfile, stage_fastq1_command, "STAGE INPUT COMMAND")
                 shell(stage_fastq1_command)
+                log_it(logfile, f"Staged {fastq1} to {local_fastq1_gz}")
 
                 decompress_fastq1_command = f'pigz -d -p {threads} -c {quote(local_fastq1_gz)} > {quote(local_fastq1)}'
                 log_it(logfile, decompress_fastq1_command, "PIGZ DECOMPRESS COMMAND")
                 shell(decompress_fastq1_command)
+                log_it(logfile, f"Decompressed {local_fastq1_gz} to {local_fastq1}")
 
                 local_fastq2 = ""
                 if fastq2:
@@ -94,10 +97,12 @@ rule run_skewer:
                     stage_fastq2_command = f'cp {quote(fastq2)} {quote(local_fastq2_gz)}'
                     log_it(logfile, stage_fastq2_command, "STAGE INPUT COMMAND")
                     shell(stage_fastq2_command)
+                    log_it(logfile, f"Staged {fastq2} to {local_fastq2_gz}")
 
                     decompress_fastq2_command = f'pigz -d -p {threads} -c {quote(local_fastq2_gz)} > {quote(local_fastq2)}'
                     log_it(logfile, decompress_fastq2_command, "PIGZ DECOMPRESS COMMAND")
                     shell(decompress_fastq2_command)
+                    log_it(logfile, f"Decompressed {local_fastq2_gz} to {local_fastq2}")
 
                 sample_prefix = os.path.join(local_workdir, sample)
 
@@ -117,6 +122,7 @@ rule run_skewer:
 
                 # Run the skewer command
                 shell(skewer_command, bench_record=bench_record)
+                log_it(logfile, f"Skewer completed for {sample}")
 
                 log_it(logfile, "Compressing and staging trimmed results...")
 

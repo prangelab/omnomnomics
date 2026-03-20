@@ -7,6 +7,7 @@
 # Copyright PrangeLab 2024 ##
 #=============================================
 import os
+import subprocess
 
 rule run_fastqc:
     input:
@@ -34,7 +35,7 @@ rule run_fastqc:
             log_it(logfile, f"Input folder: {params.inputfolder}")
             log_it(logfile, f"Output folder: {params.outputfolder}")
 
-            fastqc_version = subprocess.check_output("module load fastqc && fastqc --version", shell=True, executable='/bin/bash')
+            fastqc_version = subprocess.check_output(["fastqc", "--version"])
             log_it(logfile, "\n"+fastqc_version.decode("utf-8"), "FASTQC VERSION")
 
             sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['qc_rule_num']-1])
@@ -42,15 +43,16 @@ rule run_fastqc:
             if config['PAIRED']:
                 log_it(logfile, "Running FastQC in paired end mode...")
                 fastqc_command = f"""
-                    module load fastqc && \
                     fastqc -t {threads} -o {outputfolder} {input.trimmed_fastq1} {input.trimmed_fastq2}
                 """
             else:
                 log_it(logfile, "Running FastQC in single end mode...")
                 fastqc_command = f"""
-                    module load fastqc && \
                     fastqc -t {threads} -o {outputfolder} {input.trimmed_fastq1}
                 """
+
+            fastqc_command = " ".join(fastqc_command.split())
+            log_it(logfile, fastqc_command, "FASTQC COMMAND")
 
             # Run the FastQC command
             shell(fastqc_command)
