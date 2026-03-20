@@ -44,17 +44,18 @@ rule run_skewer:
         f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/benchmarks/{{sample}}_skewer_benchmark.tsv"
     run:
         def run_skewer(logfile, trim_tool, seq_type, threads, fastq1, fastq2, inputfolder, outputfolder, sample, trimmed_fastq1, trimmed_fastq2):
-            log_it(logfile, "Trimming reads...", f"EXECUTING STEP {master_config['trim_rule_num']}")
-            log_it(logfile, f"Input folder: {inputfolder}")
-            log_it(logfile, f"Output folder: {outputfolder}")
-            log_it(logfile, f"Trim Tool: {trim_tool}")
+            log_once(logfile, "step1.header", "Trimming reads...", f"EXECUTING STEP {master_config['trim_rule_num']}")
+            log_once(logfile, "step1.inputfolder", f"Input folder: {inputfolder}")
+            log_once(logfile, "step1.outputfolder", f"Output folder: {outputfolder}")
+            log_once(logfile, "step1.trimtool", f"Trim Tool: {trim_tool}")
+            log_it(logfile, f"Sample {sample}: trimming reads...")
 
             skewer_version = subprocess.check_output(["skewer", "--version"])
-            log_it(logfile, "\n"+skewer_version.decode("utf-8"), "SKEWER VERSION")
+            log_once(logfile, "step1.skewer_version", "\n"+skewer_version.decode("utf-8"), "SKEWER VERSION")
             pigz_version = subprocess.check_output(["pigz", "--version"], stderr=subprocess.STDOUT)
-            log_it(logfile, "\n"+pigz_version.decode("utf-8"), "PIGZ VERSION")
+            log_once(logfile, "step1.pigz_version", "\n"+pigz_version.decode("utf-8"), "PIGZ VERSION")
 
-            sanity_check_dir(logfile, inputfolder,  master_config['input_file_types'][master_config['trim_rule_num']-1])
+            sanity_check_dir(logfile, inputfolder,  master_config['input_file_types'][master_config['trim_rule_num']-1], "step1.sanity")
 
             if seq_type == "ATAC":
                 adapter_option = "-x CTGTCTCTTATACACATCT -y AGATGTGTATAAGAGACAG" if config["PAIRED"] else "-x CTGTCTCTTATACACATCT"

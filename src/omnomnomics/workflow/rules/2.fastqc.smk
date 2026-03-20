@@ -31,14 +31,15 @@ rule run_fastqc:
         f"{experiment_dir}/{master_config['output_folders'][master_config['qc_rule_num']-1]}/benchmarks/{{sample}}_fastqc_benchmark.tsv"
     run:
         def run_fastqc(threads, input, outputfolder):
-            log_it(logfile, "Generating FastQC reports...", f"EXECUTING STEP {master_config['qc']}")
-            log_it(logfile, f"Input folder: {params.inputfolder}")
-            log_it(logfile, f"Output folder: {params.outputfolder}")
+            log_once(logfile, "step2.header", "Generating FastQC reports...", f"EXECUTING STEP {master_config['qc']}")
+            log_once(logfile, "step2.inputfolder", f"Input folder: {params.inputfolder}")
+            log_once(logfile, "step2.outputfolder", f"Output folder: {params.outputfolder}")
+            log_it(logfile, f"Sample {wildcards.sample}: generating FastQC reports...")
 
             fastqc_version = subprocess.check_output(["fastqc", "--version"])
-            log_it(logfile, "\n"+fastqc_version.decode("utf-8"), "FASTQC VERSION")
+            log_once(logfile, "step2.fastqc_version", "\n"+fastqc_version.decode("utf-8"), "FASTQC VERSION")
 
-            sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['qc_rule_num']-1])
+            sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['qc_rule_num']-1], "step2.sanity")
 
             if config['PAIRED']:
                 log_it(logfile, "Running FastQC in paired end mode...")

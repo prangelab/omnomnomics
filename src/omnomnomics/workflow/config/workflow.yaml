@@ -22,6 +22,7 @@ max_step: 13
 
 
 trim:
+  - "run_fastp"
   - "run_skewer"
   - "run_trimmomatic"
 qc:
@@ -208,11 +209,11 @@ rule_runtime:
 
 
 MAPPERS: ["hisat2", "star", "star_te"]
-TRIMMERS: ["skewer", "trimmomatic"]
+TRIMMERS: ["fastp", "skewer", "trimmomatic"]
 TYPES: ["RNA", "CHIP", "ATAC"]
 GENOMES: ["hg38", "mm10", "mm39", "GRCh38.p14", "GRCm39"]
 
-trim_tool: "skewer"
+trim_tool: "fastp"
 map_tool: "hisat2"
 omnomnomics: 0.4
 mode: "auto"

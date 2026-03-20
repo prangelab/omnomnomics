@@ -705,7 +705,7 @@ def main():
     experiment_dir = str(Path(args.experiment_dir).expanduser().resolve()) if args.experiment_dir else args.experiment_dir
     the_type = args.type.upper()
     genome = args.genome
-    trim_tool = args.trim_tool.lower() if args.trim_tool else config.get("trim_tool","skewer").lower()
+    trim_tool = args.trim_tool.lower() if args.trim_tool else config.get("trim_tool","fastp").lower()
     map_tool = args.map_tool.lower() if args.map_tool else config.get('map_tool', "hisat2").lower()
     mode = args.mode.lower() if args.mode else config.get('mode', "auto")
     formula = args.formula if args.formula else config.get('formula', "1")

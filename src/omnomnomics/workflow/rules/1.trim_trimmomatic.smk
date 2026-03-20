@@ -7,7 +7,10 @@
 # Copyright PrangeLab 2024 ##
 #=============================================
 import os
-import glob
+import shlex
+import shutil
+import subprocess
+import tempfile
 
 rule run_trimmomatic:
     input:
@@ -31,78 +34,119 @@ rule run_trimmomatic:
         trim_heap=config["THEHEAPINIT"],
         trim_mem=config["THEMEM"],
         seq_type=config["THETYPE"],
-        inputfolder =f"{experiment_dir}/{master_config['input_folders'][master_config['trim_rule_num']-1]}",
-        outputfolder = f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}"
+        inputfolder=f"{experiment_dir}/{master_config['input_folders'][master_config['trim_rule_num']-1]}",
+        outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}"
     threads:
         Threads_Per_Rule['1']
     resources:
-        mem_mb = Memory_Per_Rule['1'],
-        partition = master_config['partition'],
-        runtime = Runtime_Per_Rule['1']
+        mem_mb=Memory_Per_Rule['1'],
+        partition=master_config['partition'],
+        runtime=Runtime_Per_Rule['1']
     benchmark:
         f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/benchmarks/{{sample}}_trimmomatic_benchmark.tsv"
     run:
-        def run_trimmomatic(trim_tool, trim_heap, trim_mem, seq_type, threads, fastq1, fastq2, inputfolder, outputfolder, sample):
-            log_it(logfile, "Trimming Reads...", f"EXECUTING STEP {master_config['trim_rule_num']}")
-            log_it(logfile, f"Input folder: {inputfolder}")
-            log_it(logfile, f"Output folder: {outputfolder}")
-            log_it(logfile, f"Trim Tool: {trim_tool}")
-            log_it(logfile, f"Trim Heap: {trim_heap}")
-            log_it(logfile, f"Trim Mem: {trim_mem}")
+        def run_trimmomatic(logfile, trim_tool, trim_heap, trim_mem, seq_type, threads, fastq1, fastq2, inputfolder, outputfolder, sample, trimmed_fastq1, trimmed_fastq2):
+            log_once(logfile, "step1.header", "Trimming reads...", f"EXECUTING STEP {master_config['trim_rule_num']}")
+            log_once(logfile, "step1.inputfolder", f"Input folder: {inputfolder}")
+            log_once(logfile, "step1.outputfolder", f"Output folder: {outputfolder}")
+            log_once(logfile, "step1.trimtool", f"Trim Tool: {trim_tool}")
+            log_once(logfile, "step1.trimheap", f"Trim Heap: {trim_heap}")
+            log_once(logfile, "step1.trimmem", f"Trim Mem: {trim_mem}")
+            log_it(logfile, f"Sample {sample}: trimming reads...")
 
             path = os.path.join(config['WORKFLOW_ROOT'], "bin", "Trimmomatic-0.39", "trimmomatic-0.39.jar")
-            trimmomatic_version = subprocess.check_output(f"module load java && java -jar {path} -version",  shell=True, executable='/bin/bash')
-            log_it(logfile, "\n"+trimmomatic_version.decode("utf-8"), "trimmomatic VERSION")
+            trimmomatic_version = subprocess.check_output(["java", "-jar", path, "-version"], stderr=subprocess.STDOUT)
+            log_once(logfile, "step1.trimmomatic_version", "\n" + trimmomatic_version.decode("utf-8"), "TRIMMOMATIC VERSION")
 
-            sanity_check_dir(logfile, inputfolder, master_config['input_file_types'][master_config['trim_rule_num']-1])
+            sanity_check_dir(logfile, inputfolder, master_config['input_file_types'][master_config['trim_rule_num'] - 1], "step1.sanity")
 
             if seq_type == "ATAC":
                 adapter_file = "NexteraPE-PE.fa" if config["PAIRED"] else "Nextera-SE.fa"
             else:
                 adapter_file = "TruSeq3-PE.fa" if config["PAIRED"] else "TruSeq3-SE.fa"
 
-            if fastq2:
-                log_it(logfile, f"Running {trim_tool} in Paired End mode.")
-                out_base = f"{outputfolder}/{sample}.trimmed.fastq.gz"
-                java_command = f"""
-                    module load java && \
-                    java -Xms{trim_heap} -Xmx{trim_mem} -jar "{config['WORKFLOW_ROOT']}/bin/Trimmomatic-0.39/trimmomatic-0.39.jar" PE \
-                    -threads {threads} -baseout {out_base} {fastq1} {fastq2} \
-                    ILLUMINACLIP:{config['WORKFLOW_ROOT']}/bin/Trimmomatic-0.39/adapters/{adapter_file}:2:30:10:2:True \
-                    LEADING:3 TRAILING:3 MINLEN:36
-                """
-            else:
-                log_it(logfile, f"Running {trim_tool} in Single End mode.")
-                out_base = f"{outputfolder}/{sample}.trimmed.fastq.gz"
-                java_command = f"""
-                    module load java && \
-                    java -Xms{trim_heap} -Xmx{trim_mem} -jar "{config['WORKFLOW_ROOT']}/bin/Trimmomatic-0.39/trimmomatic-0.39.jar" SE \
-                    -threads {threads} {fastq1} {out_base} \
-                    ILLUMINACLIP:{config['WORKFLOW_ROOT']}/bin/Trimmomatic-0.39/adapters/{adapter_file}:2:30:10 \
-                    LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
-                """
-            
-            # Run the trimmomatic command
-            shell(java_command)
+            tmpdir_root = os.environ.get("TMPDIR")
+            local_workdir = tempfile.mkdtemp(prefix=f"{sample}.", dir=tmpdir_root if tmpdir_root else None)
+            log_it(logfile, f"Scratch directory: {local_workdir}")
 
-            # Rename R1 trimmed files
-            log_it(logfile, "Renaming trimmed results ...")
-            for file_path in glob.glob(os.path.join(f"{outputfolder}", '*1P.fastq.gz')):
-                base_name = os.path.basename(file_path)
-                new_name = os.path.join(f"{outputfolder}", base_name.replace('.trimmed_1P.fastq.gz', '_R1.trimmed.fastq.gz'))
-                os.rename(file_path, new_name)
+            def quote(path):
+                return shlex.quote(path)
 
-            # Rename R2 trimmed files
-            for file_path in glob.glob(os.path.join(f"{outputfolder}", '*2P.fastq.gz')):
-                base_name = os.path.basename(file_path)
-                new_name = os.path.join(f"{outputfolder}", base_name.replace('.trimmed_2P.fastq.gz', '_R2.trimmed.fastq.gz'))
-                os.rename(file_path, new_name)
+            def stage_input(path):
+                local_path = os.path.join(local_workdir, os.path.basename(path))
+                stage_command = f"cp {quote(path)} {quote(local_path)}"
+                log_it(logfile, stage_command, "STAGE INPUT COMMAND")
+                shell(stage_command)
+                log_it(logfile, f"Staged {path} to {local_path}")
+                return local_path
 
-            # Remove unpaired files if PAIRED is 1
-            if config['PAIRED']:
-                log_it(logfile, "Removing unpaired files")
-                for file_path in glob.glob(os.path.join(f"{outputfolder}", '*U.fastq.gz')):
-                    os.remove(file_path)
+            try:
+                local_fastq1 = stage_input(fastq1)
+                local_fastq2 = stage_input(fastq2) if fastq2 else ""
+                local_out_base = os.path.join(local_workdir, f"{sample}.trimmed.fastq.gz")
+                adapter_path = os.path.join(config['WORKFLOW_ROOT'], "bin", "Trimmomatic-0.39", "adapters", adapter_file)
 
-        # Call the function with parameters
-        run_trimmomatic(params.trim_tool, (str(int(params.trim_heap[:-1])//2)+'M'), (str(int(params.trim_mem[:-1])//2)+'M'), params.seq_type, threads, input.fastq1, input.fastq2, params.inputfolder, params.outputfolder, wildcards.sample)
+                if fastq2:
+                    log_it(logfile, f"Running {trim_tool} in Paired End mode.")
+                    trimmomatic_command = f"""
+                        java -Xms{trim_heap} -Xmx{trim_mem} -jar {quote(path)} PE \
+                        -threads {threads} -baseout {quote(local_out_base)} {quote(local_fastq1)} {quote(local_fastq2)} \
+                        ILLUMINACLIP:{quote(adapter_path)}:2:30:10:2:True \
+                        LEADING:3 TRAILING:3 MINLEN:36
+                    """
+                else:
+                    log_it(logfile, f"Running {trim_tool} in Single End mode.")
+                    trimmomatic_command = f"""
+                        java -Xms{trim_heap} -Xmx{trim_mem} -jar {quote(path)} SE \
+                        -threads {threads} {quote(local_fastq1)} {quote(local_out_base)} \
+                        ILLUMINACLIP:{quote(adapter_path)}:2:30:10 \
+                        LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
+                    """
+
+                trimmomatic_command = " ".join(trimmomatic_command.split())
+                log_it(logfile, trimmomatic_command, "TRIMMOMATIC COMMAND")
+                shell(trimmomatic_command, bench_record=bench_record)
+                log_it(logfile, f"Trimmomatic completed for {sample}")
+
+                if fastq2:
+                    local_pair1 = local_out_base.replace(".trimmed.fastq.gz", ".trimmed_1P.fastq.gz")
+                    local_pair2 = local_out_base.replace(".trimmed.fastq.gz", ".trimmed_2P.fastq.gz")
+                    if not os.path.exists(local_pair1):
+                        raise FileNotFoundError(f"Expected paired-end R1 output for {sample} at {local_pair1}")
+                    if not os.path.exists(local_pair2):
+                        raise FileNotFoundError(f"Expected paired-end R2 output for {sample} at {local_pair2}")
+
+                    copy_fastq1_command = f"cp {quote(local_pair1)} {quote(trimmed_fastq1)}"
+                    log_it(logfile, copy_fastq1_command, "STAGE OUTPUT COMMAND")
+                    shell(copy_fastq1_command)
+                    log_it(logfile, f"Copied {local_pair1} to {trimmed_fastq1}")
+
+                    copy_fastq2_command = f"cp {quote(local_pair2)} {quote(trimmed_fastq2)}"
+                    log_it(logfile, copy_fastq2_command, "STAGE OUTPUT COMMAND")
+                    shell(copy_fastq2_command)
+                    log_it(logfile, f"Copied {local_pair2} to {trimmed_fastq2}")
+                else:
+                    if not os.path.exists(local_out_base):
+                        raise FileNotFoundError(f"Expected single-end output for {sample} at {local_out_base}")
+                    copy_fastq_command = f"cp {quote(local_out_base)} {quote(trimmed_fastq1)}"
+                    log_it(logfile, copy_fastq_command, "STAGE OUTPUT COMMAND")
+                    shell(copy_fastq_command)
+                    log_it(logfile, f"Copied {local_out_base} to {trimmed_fastq1}")
+            finally:
+                shutil.rmtree(local_workdir, ignore_errors=True)
+
+        run_trimmomatic(
+            logfile,
+            params.trim_tool,
+            str(int(params.trim_heap[:-1]) // 2) + 'M',
+            str(int(params.trim_mem[:-1]) // 2) + 'M',
+            params.seq_type,
+            threads,
+            input.fastq1,
+            input.fastq2,
+            params.inputfolder,
+            params.outputfolder,
+            wildcards.sample,
+            output.trimmed_fastq1,
+            output.trimmed_fastq2,
+        )

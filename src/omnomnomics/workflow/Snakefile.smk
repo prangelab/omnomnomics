@@ -27,7 +27,9 @@ workflow_root = config['WORKFLOW_ROOT']
 experiment_dir = config["EXPERIMENT_DIR"]
 run_date = config["RUNDATE"]
 logfile = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.log")
+log_marker_dir = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.markers")
 is_worker_job = "--target-jobs" in sys.argv
+os.makedirs(log_marker_dir, exist_ok=True)
 
 # Function to log messages
 def log_it(logfile, message, heading=None):
@@ -37,6 +39,15 @@ def log_it(logfile, message, heading=None):
             log.write("\n{}\n\n".format(heading))
         log.write(f"{timestamp}: {message}\n") #write to log
     print(f"{timestamp}: {message}")
+
+def log_once(logfile, marker_name, message, heading=None):
+    marker_path = os.path.join(log_marker_dir, marker_name)
+    try:
+        fd = os.open(marker_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.close(fd)
+    except FileExistsError:
+        return
+    log_it(logfile, message, heading)
 
 onstart:
     # Upon start, log the start time of the pipeline
@@ -54,7 +65,7 @@ onerror:
         log_it(logfile, "Total elapsed time: {:.2f} seconds\n".format(elapsed_time))
 
 # Function for sanity check on directory
-def sanity_check_dir(logfile, input_directory, file_ext):
+def sanity_check_dir(logfile, input_directory, file_ext, marker_name=None):
     #check if input directiory exists
     if not os.path.isdir(input_directory):
         log_it(logfile, f"{file_ext} files should be contained in a {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir})! Aborting...", "ERROR")
@@ -67,7 +78,10 @@ def sanity_check_dir(logfile, input_directory, file_ext):
         log_it(logfile, "Aborting...")
         print(f"The {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir}) does not contain any {file_ext} files! Aborting...")
         sys.exit(1)
-    log_it(logfile, "Sanity check completed", "SANITY CHECK")
+    if marker_name:
+        log_once(logfile, marker_name, "Sanity check completed", "SANITY CHECK")
+    else:
+        log_it(logfile, "Sanity check completed", "SANITY CHECK")
 
 # Hold our horses for a little while to ensure all files are up to date
 time.sleep(0.1)
@@ -393,18 +407,11 @@ for rule_num in themode:
     output_file_type =  master_config['output_file_types'][rule_num-1]
     # For all of the specified rules, add its output to input of rule all so that the rule is run
     if rule_num == 1:
-        if config['THETRIMTOOL'] == 'skewer':
-            if config['PAIRED']: 
-                all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}_R1{output_file_type}", sample = samples)
-                all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}_R2{output_file_type}", sample = samples)
-            else: 
-                all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}{output_file_type}", sample = samples)
+        if config['PAIRED']: 
+            all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}_R1{output_file_type}", sample = samples)
+            all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}_R2{output_file_type}", sample = samples)
         else:
-            if config['PAIRED']: 
-                all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}_R1{output_file_type}", sample = samples)
-                all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}_R2{output_file_type}", sample = samples)
-            else:
-                all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}{output_file_type}", sample = samples)
+            all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}{output_file_type}", sample = samples)
     if rule_num == 2:
         if config['PAIRED']: 
             all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}_R1{output_file_type[0]}", sample = samples)
@@ -471,18 +478,24 @@ if not is_worker_job:
     log_it(logfile, '\n'.join(all_outputs), 'ALL OUTPUTS')
 
 # Determine rule priority to resolve any rule ambuigity
-if config['THETRIMTOOL'] == "skewer" and config['THEMAPTOOL'] == "star":
-    ruleorder: run_skewer > run_trimmomatic > run_star > run_star_te > run_hisat2 > merge_bam 
+if config['THETRIMTOOL'] == "fastp" and config['THEMAPTOOL'] == "star":
+    ruleorder: run_fastp > run_skewer > run_trimmomatic > run_star > run_star_te > run_hisat2 > merge_bam
+elif config['THETRIMTOOL'] == "fastp" and config['THEMAPTOOL'] == "star_te":
+    ruleorder: run_fastp > run_skewer > run_trimmomatic > run_star_te > run_star > run_hisat2 > merge_bam
+elif config['THETRIMTOOL'] == "fastp" and config['THEMAPTOOL'] == "hisat2":
+    ruleorder: run_fastp > run_skewer > run_trimmomatic > run_hisat2 > run_star_te > run_star > merge_bam
+elif config['THETRIMTOOL'] == "skewer" and config['THEMAPTOOL'] == "star":
+    ruleorder: run_skewer > run_fastp > run_trimmomatic > run_star > run_star_te > run_hisat2 > merge_bam 
 elif config['THETRIMTOOL'] == "skewer" and config['THEMAPTOOL'] == "star_te":
-    ruleorder: run_skewer > run_trimmomatic > run_star_te > run_star > run_hisat2 > merge_bam 
+    ruleorder: run_skewer > run_fastp > run_trimmomatic > run_star_te > run_star > run_hisat2 > merge_bam 
 elif config['THETRIMTOOL'] == "skewer" and config['THEMAPTOOL'] == "hisat2":
-    ruleorder: run_skewer > run_trimmomatic > run_hisat2 > run_star_te > run_star > merge_bam 
+    ruleorder: run_skewer > run_fastp > run_trimmomatic > run_hisat2 > run_star_te > run_star > merge_bam 
 elif config['THETRIMTOOL'] == "trimmomatic" and config['THEMAPTOOL'] == "star":
-    ruleorder: run_trimmomatic > run_skewer > run_star > run_star_te > run_hisat2 > merge_bam 
+    ruleorder: run_trimmomatic > run_fastp > run_skewer > run_star > run_star_te > run_hisat2 > merge_bam 
 elif config['THETRIMTOOL'] == "trimmomatic" and config['THEMAPTOOL'] == "star_te":
-    ruleorder: run_trimmomatic > run_skewer > run_star_te > run_star > run_hisat2 > merge_bam 
+    ruleorder: run_trimmomatic > run_fastp > run_skewer > run_star_te > run_star > run_hisat2 > merge_bam 
 elif config['THETRIMTOOL'] == "trimmomatic" and config['THEMAPTOOL'] == "hisat2":
-    ruleorder: run_trimmomatic > run_skewer > run_hisat2 > run_star_te > run_star > merge_bam 
+    ruleorder: run_trimmomatic > run_fastp > run_skewer > run_hisat2 > run_star_te > run_star > merge_bam 
 
 #---------------------------------------------------------------------------------------------------------------
 # Three line heart of the pipeline to set up the workflow

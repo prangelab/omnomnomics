@@ -36,16 +36,17 @@ rule run_hisat2:
     benchmark:
         f"{experiment_dir}/{master_config['output_folders'][master_config['map_rule_num']-1]}/benchmarks/{{sample3}}_hisat2_benchmark.tsv"
     run:
-        log_it(logfile, "Mapping reads...", f"EXECUTING STEP {master_config['map_rule_num']}")
-        log_it(logfile, f"Input folder: {params.inputfolder}")
-        log_it(logfile, f"Output folder: {params.outputfolder}")
+        log_once(logfile, "step3.header", "Mapping reads...", f"EXECUTING STEP {master_config['map_rule_num']}")
+        log_once(logfile, "step3.inputfolder", f"Input folder: {params.inputfolder}")
+        log_once(logfile, "step3.outputfolder", f"Output folder: {params.outputfolder}")
 
         hisat2_version = subprocess.check_output(["hisat2", "--version"])
-        log_it(logfile, "\n"+hisat2_version.decode("utf-8"), "HISAT2 VERSION")
+        log_once(logfile, "step3.hisat2_version", "\n"+hisat2_version.decode("utf-8"), "HISAT2 VERSION")
         
-        sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['map_rule_num']-1])
+        sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['map_rule_num']-1], "step3.sanity")
 
         def run_hisat2(seq_type, threads, genome_path, fastq1, fastq2, keepunpaired, inputfolder, outputfolder, sample):
+            log_it(logfile, f"Sample {sample}: mapping reads...")
             tmpdir_root = os.environ.get("TMPDIR")
             local_workdir = tempfile.mkdtemp(prefix=f"{sample}.", dir=tmpdir_root if tmpdir_root else None)
             log_it(logfile, f"Scratch directory: {local_workdir}")
