@@ -314,6 +314,19 @@ for rule_num in range(1, master_config['max_step'] + 1):
     )
     Memory_Per_Rule[f'{rule_num}'] = default_mem_mb
 
+Runtime_Per_Rule = {}
+for rule_num in range(1, master_config['max_step'] + 1):
+    runtime = master_config.get('default_runtime', "02:00:00")
+    if (
+        'rule_runtime' in master_config
+        and isinstance(master_config['rule_runtime'], list)
+        and len(master_config['rule_runtime']) > (rule_num - 1)
+        and isinstance(master_config['rule_runtime'][rule_num - 1], str)
+        and master_config['rule_runtime'][rule_num - 1].strip()
+    ):
+        runtime = master_config['rule_runtime'][rule_num - 1]
+    Runtime_Per_Rule[f'{rule_num}'] = runtime
+
 ##--------------------------------------------------------------------------------------------------------------
 # Include Snakemake rules for your actual data processing pipeline
 ##--------------------------------------------------------------------------------------------------------------

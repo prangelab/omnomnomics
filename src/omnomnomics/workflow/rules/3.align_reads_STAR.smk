@@ -26,7 +26,8 @@ rule run_star:
         Threads_Per_Rule['3']
     resources:
         mem_mb = Memory_Per_Rule['3'],
-        partition = master_config['partition']
+        partition = master_config['partition'],
+        runtime = Runtime_Per_Rule['3']
     benchmark:
         f"{experiment_dir}/{master_config['output_folders'][master_config['map_rule_num']-1]}/benchmarks/{{sample3}}_star_benchmark.tsv"
     run:

@@ -24,7 +24,8 @@ rule run_fastqc:
         Threads_Per_Rule['2']
     resources:
         mem_mb = Memory_Per_Rule['2'],
-        partition = master_config['partition']
+        partition = master_config['partition'],
+        runtime = Runtime_Per_Rule['2']
     benchmark:
         f"{experiment_dir}/{master_config['output_folders'][master_config['qc_rule_num']-1]}/benchmarks/{{sample}}_fastqc_benchmark.tsv"
     run:

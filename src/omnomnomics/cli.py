@@ -864,7 +864,7 @@ def main():
     max_cores = str(config.get("max_nodes", 1) * config.get("cores_per_node", 1))
     cmd = [ "snakemake",  "--profile", os.path.join(str(workflow_root), "slurm_profile"), "--snakefile", f"{workflow_root}/Snakefile.smk",
         "--config", "config_file="+os.path.join(experiment_dir, "run_configs", f'omnomnomics.run.{run_date}.config.yaml'), "--jobs", "1000",
-        "--cores", max_cores, "--default-resources", f"partition={config['partition']}", "--rerun-triggers", "mtime", "--keep-going"
+        "--cores", max_cores, "--default-resources", f"partition={config['partition']}", f"runtime={config['default_runtime']}", "--rerun-triggers", "mtime", "--keep-going"
     ]
 
     if dry_run:

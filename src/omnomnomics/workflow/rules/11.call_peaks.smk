@@ -49,7 +49,8 @@ rule call_peaks:
         lambda wildcards: Threads_Per_Rule['11']
     resources:
         mem_mb = lambda wildcards: Memory_Per_Rule['11'],
-        partition = lambda wildcards: master_config['partition']
+        partition = lambda wildcards: master_config['partition'],
+        runtime = lambda wildcards: Runtime_Per_Rule['11']
     benchmark:
         f"{experiment_dir}/{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/benchmarks/call_peaks_benchmark.tsv"
     run: 

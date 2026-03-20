@@ -37,7 +37,8 @@ rule run_trimmomatic:
         Threads_Per_Rule['1']
     resources:
         mem_mb = Memory_Per_Rule['1'],
-        partition = master_config['partition']
+        partition = master_config['partition'],
+        runtime = Runtime_Per_Rule['1']
     benchmark:
         f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/benchmarks/{{sample}}_trimmomatic_benchmark.tsv"
     run:

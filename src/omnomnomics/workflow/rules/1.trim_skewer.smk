@@ -35,7 +35,8 @@ rule run_skewer:
         Threads_Per_Rule['1']
     resources:
         mem_mb = Memory_Per_Rule['1'],
-        partition = master_config['partition']
+        partition = master_config['partition'],
+        runtime = Runtime_Per_Rule['1']
     benchmark:
         f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/benchmarks/{{sample}}_skewer_benchmark.tsv"
     run:
@@ -69,21 +70,23 @@ rule run_skewer:
             # Run the skewer command
             shell(skewer_command, bench_record=bench_record)
 
+            sample_prefix = os.path.join(outputfolder, sample)
+
             # Rename R1 trimmed files
             log_it(logfile, "Renaming trimmed results...")
-            for file_path in glob.glob(os.path.join(f"{outputfolder}", '*pair1.fastq.gz')):
+            for file_path in glob.glob(sample_prefix + '*pair1.fastq.gz'):
                 base_name = os.path.basename(file_path)
                 new_name = os.path.join(f"{outputfolder}", base_name.replace('-trimmed-pair1.fastq.gz', '_R1.trimmed.fastq.gz')) 
                 os.rename(file_path, new_name)
 
             # Rename R2 trimmed files
-            for file_path in glob.glob(os.path.join(f"{outputfolder}", '*pair2.fastq.gz')):
+            for file_path in glob.glob(sample_prefix + '*pair2.fastq.gz'):
                 base_name = os.path.basename(file_path)
                 new_name = os.path.join(f"{outputfolder}", base_name.replace('-trimmed-pair2.fastq.gz', '_R2.trimmed.fastq.gz'))
                 os.rename(file_path, new_name)
 
             # Rename unpaired trimmed files
-            for file_path in glob.glob(os.path.join(f"{outputfolder}", '*-trimmed.fastq.gz')):
+            for file_path in glob.glob(sample_prefix + '*-trimmed.fastq.gz'):
                 base_name = os.path.basename(file_path)
                 new_name = os.path.join(f"{outputfolder}", base_name.replace('-trimmed.fastq.gz', '.trimmed.fastq.gz'))
                 os.rename(file_path, new_name)
