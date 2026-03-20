@@ -500,10 +500,13 @@ onsuccess:
         #---------------------------------------------------------------------------------------------------------------
         if not config['NO_MULTIQC']:
             log_it(logfile, "Running multiQC...", "STATS")
-            shell(f"""
-                eval "$(micromamba shell hook --shell=bash)" && micromamba activate multiqc && \
-                multiqc --filename MultiQC/omnomnomics.run.{run_date}.multiqc_report.html --dirs --export .
-            """)
+            multiqc_version = subprocess.check_output(["multiqc", "--version"])
+            log_it(logfile, "\n" + multiqc_version.decode("utf-8"), "MULTIQC VERSION")
+            multiqc_command = (
+                f"multiqc --filename MultiQC/omnomnomics.run.{run_date}.multiqc_report.html --dirs --export ."
+            )
+            log_it(logfile, multiqc_command, "MULTIQC COMMAND")
+            shell(multiqc_command)
         #---------------------------------------------------------------------------------------------------------------
         # Clean up tmp files for workflow
         #---------------------------------------------------------------------------------------------------------------
