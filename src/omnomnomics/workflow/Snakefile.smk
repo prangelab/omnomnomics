@@ -479,23 +479,17 @@ if not is_worker_job:
 
 # Determine rule priority to resolve any rule ambuigity
 if config['THETRIMTOOL'] == "fastp" and config['THEMAPTOOL'] == "star":
-    ruleorder: run_fastp > run_skewer > run_trimmomatic > run_star > run_star_te > run_hisat2 > merge_bam
+    ruleorder: run_fastp > run_skewer > run_star > run_star_te > run_hisat2 > merge_bam
 elif config['THETRIMTOOL'] == "fastp" and config['THEMAPTOOL'] == "star_te":
-    ruleorder: run_fastp > run_skewer > run_trimmomatic > run_star_te > run_star > run_hisat2 > merge_bam
+    ruleorder: run_fastp > run_skewer > run_star_te > run_star > run_hisat2 > merge_bam
 elif config['THETRIMTOOL'] == "fastp" and config['THEMAPTOOL'] == "hisat2":
-    ruleorder: run_fastp > run_skewer > run_trimmomatic > run_hisat2 > run_star_te > run_star > merge_bam
+    ruleorder: run_fastp > run_skewer > run_hisat2 > run_star_te > run_star > merge_bam
 elif config['THETRIMTOOL'] == "skewer" and config['THEMAPTOOL'] == "star":
-    ruleorder: run_skewer > run_fastp > run_trimmomatic > run_star > run_star_te > run_hisat2 > merge_bam 
+    ruleorder: run_skewer > run_fastp > run_star > run_star_te > run_hisat2 > merge_bam 
 elif config['THETRIMTOOL'] == "skewer" and config['THEMAPTOOL'] == "star_te":
-    ruleorder: run_skewer > run_fastp > run_trimmomatic > run_star_te > run_star > run_hisat2 > merge_bam 
+    ruleorder: run_skewer > run_fastp > run_star_te > run_star > run_hisat2 > merge_bam 
 elif config['THETRIMTOOL'] == "skewer" and config['THEMAPTOOL'] == "hisat2":
-    ruleorder: run_skewer > run_fastp > run_trimmomatic > run_hisat2 > run_star_te > run_star > merge_bam 
-elif config['THETRIMTOOL'] == "trimmomatic" and config['THEMAPTOOL'] == "star":
-    ruleorder: run_trimmomatic > run_fastp > run_skewer > run_star > run_star_te > run_hisat2 > merge_bam 
-elif config['THETRIMTOOL'] == "trimmomatic" and config['THEMAPTOOL'] == "star_te":
-    ruleorder: run_trimmomatic > run_fastp > run_skewer > run_star_te > run_star > run_hisat2 > merge_bam 
-elif config['THETRIMTOOL'] == "trimmomatic" and config['THEMAPTOOL'] == "hisat2":
-    ruleorder: run_trimmomatic > run_fastp > run_skewer > run_hisat2 > run_star_te > run_star > merge_bam 
+    ruleorder: run_skewer > run_fastp > run_hisat2 > run_star_te > run_star > merge_bam 
 
 #---------------------------------------------------------------------------------------------------------------
 # Three line heart of the pipeline to set up the workflow

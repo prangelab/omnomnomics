@@ -14,7 +14,6 @@ dependencies:
   - fastqc
   - fastp
   - skewer
-  - trimmomatic
   - hisat2
   - star
   - samtools

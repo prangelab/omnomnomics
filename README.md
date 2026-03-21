@@ -59,11 +59,6 @@ OMNOM_HOME
   	    |- fix_HOMER_trackHub.sh	 (used in create wiggles)
   	    |- generate_header.sh	 (used in count reads)
   	    |- run_quant_peaks.sh	 (used in peak calling)
-      |- Trimmomatic-0.39 (used in trimmomatic trimmer)
-		|- adapters
-			|- adapter files...
-		|- LICENSE
-		|- trimmomatic-0.39.jar
       |- config.yaml (master config file for user defined variables)
 	    
 |- genomes
@@ -73,7 +68,6 @@ OMNOM_HOME
            |- (list the genomes you need)
 |- rules
      |- 1.trim_skewer.smk
-     |- 1.trim_trimmomatic.smk
      |- 2.fastqc.smk
      |- 3.align_reads_hisat2.smk
      |- 3.align_reads_STAR.smk
