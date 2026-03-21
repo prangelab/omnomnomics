@@ -31,8 +31,6 @@ rule run_trimmomatic:
         trimmed_fastq2=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.trimmed.fastq.gz" if config["PAIRED"] else []
     params:
         trim_tool=config["THETRIMTOOL"],
-        trim_heap=config["THEHEAPINIT"],
-        trim_mem=config["THEMEM"],
         seq_type=config["THETYPE"],
         inputfolder=f"{experiment_dir}/{master_config['input_folders'][master_config['trim_rule_num']-1]}",
         outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}"
@@ -43,7 +41,9 @@ rule run_trimmomatic:
         partition=master_config['partition'],
         runtime=Runtime_Per_Rule['1']
     run:
-        def run_trimmomatic(logfile, trim_tool, trim_heap, trim_mem, seq_type, threads, fastq1, fastq2, inputfolder, outputfolder, sample, trimmed_fastq1, trimmed_fastq2):
+        def run_trimmomatic(logfile, trim_tool, trim_mem_mb, seq_type, threads, fastq1, fastq2, inputfolder, outputfolder, sample, trimmed_fastq1, trimmed_fastq2):
+            trim_mem = f"{max(2048, int(trim_mem_mb * 0.8))}M"
+            trim_heap = f"{max(1024, int(trim_mem_mb * 0.4))}M"
             log_once(logfile, "step1.header", "Trimming reads...", f"EXECUTING STEP {master_config['trim_rule_num']}")
             log_once(logfile, "step1.inputfolder", f"Input folder: {inputfolder}")
             log_once(logfile, "step1.outputfolder", f"Output folder: {outputfolder}")
@@ -132,8 +132,7 @@ rule run_trimmomatic:
         run_trimmomatic(
             logfile,
             params.trim_tool,
-            str(int(params.trim_heap[:-1]) // 2) + 'M',
-            str(int(params.trim_mem[:-1]) // 2) + 'M',
+            resources.mem_mb,
             params.seq_type,
             threads,
             input.fastq1,
