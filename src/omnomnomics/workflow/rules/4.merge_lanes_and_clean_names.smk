@@ -28,8 +28,6 @@ rule merge_bam:
         mem_mb = Memory_Per_Rule['4'],
         partition = master_config['partition'],
         runtime = Runtime_Per_Rule['4']
-    benchmark:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/benchmarks/{{sample4}}_mergebam_benchmark.tsv"
     run:
         log_it(logfile, "Merging lanes...", f"EXECUTING STEP {master_config['merge_rule_num']}")
         log_it(logfile, f"Input folder: {params.inputfolder}")

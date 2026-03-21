@@ -35,8 +35,6 @@ rule merge_wiggles:
       mem_mb=lambda wildcards: Memory_Per_Rule['10'],
       partition=lambda wildcards: master_config['partition'],
       runtime=lambda wildcards: Runtime_Per_Rule['10']
-    benchmark:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['mergewig_rule_num']-1]}/benchmarks/merge_wiggles_benchmark.tsv"
     run:
         log_it(logfile, "Merging Wiggles and TrackHubs...", f"EXECUTING STEP {master_config['mergewig_rule_num']}")
         log_it(logfile, f"Input folder: {params.inputfolder}")

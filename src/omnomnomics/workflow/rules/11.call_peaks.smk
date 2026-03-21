@@ -51,9 +51,7 @@ rule call_peaks:
         mem_mb = lambda wildcards: Memory_Per_Rule['11'],
         partition = lambda wildcards: master_config['partition'],
         runtime = lambda wildcards: Runtime_Per_Rule['11']
-    benchmark:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/benchmarks/call_peaks_benchmark.tsv"
-    run: 
+    run:
         log_it(logfile, "Calling Peaks...", f"EXECUTING STEP {master_config['callpeaks_rule_num']}")
         log_it(logfile, f"Input folders: {params.inputfolder1} and {params.inputfolder2}")
         log_it(logfile, f"Output folder: {params.outputfolder}")

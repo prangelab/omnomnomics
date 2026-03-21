@@ -32,8 +32,6 @@ rule create_homer_tagDir:
         mem_mb = Memory_Per_Rule['8'],
         partition = master_config['partition'],
         runtime = Runtime_Per_Rule['8']
-    benchmark:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['tagdir_rule_num']-1]}/benchmarks/{{sample}}_make_homer_tagdirs_benchmark.tsv"
     run:
         log_it(logfile, f"Creating HOMER tag directories...", f"EXECUTING STEP {master_config['tagdir']}")
         log_it(logfile, f"Input folder: {params.inputfolder}")

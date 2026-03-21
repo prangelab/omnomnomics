@@ -42,8 +42,6 @@ rule run_trimmomatic:
         mem_mb=Memory_Per_Rule['1'],
         partition=master_config['partition'],
         runtime=Runtime_Per_Rule['1']
-    benchmark:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/benchmarks/{{sample}}_trimmomatic_benchmark.tsv"
     run:
         def run_trimmomatic(logfile, trim_tool, trim_heap, trim_mem, seq_type, threads, fastq1, fastq2, inputfolder, outputfolder, sample, trimmed_fastq1, trimmed_fastq2):
             log_once(logfile, "step1.header", "Trimming reads...", f"EXECUTING STEP {master_config['trim_rule_num']}")
@@ -77,7 +75,6 @@ rule run_trimmomatic:
                 stage_command = f"cp {quote(path)} {quote(local_path)}"
                 log_it(logfile, f"Staging {os.path.basename(path)} to scratch...")
                 shell(stage_command)
-                log_it(logfile, f"Staged {path} to {local_path}")
                 return local_path
 
             try:
@@ -105,7 +102,7 @@ rule run_trimmomatic:
 
                 trimmomatic_command = " ".join(trimmomatic_command.split())
                 log_it(logfile, trimmomatic_command, "TRIMMOMATIC COMMAND")
-                shell(trimmomatic_command, bench_record=bench_record)
+                shell(trimmomatic_command)
                 log_it(logfile, f"Trimmomatic completed for {sample}")
 
                 if fastq2:
@@ -119,19 +116,16 @@ rule run_trimmomatic:
                     copy_fastq1_command = f"cp {quote(local_pair1)} {quote(trimmed_fastq1)}"
                     log_it(logfile, f"Copying trimmed R1 for {sample} back to project space...")
                     shell(copy_fastq1_command)
-                    log_it(logfile, f"Copied {local_pair1} to {trimmed_fastq1}")
 
                     copy_fastq2_command = f"cp {quote(local_pair2)} {quote(trimmed_fastq2)}"
                     log_it(logfile, f"Copying trimmed R2 for {sample} back to project space...")
                     shell(copy_fastq2_command)
-                    log_it(logfile, f"Copied {local_pair2} to {trimmed_fastq2}")
                 else:
                     if not os.path.exists(local_out_base):
                         raise FileNotFoundError(f"Expected single-end output for {sample} at {local_out_base}")
                     copy_fastq_command = f"cp {quote(local_out_base)} {quote(trimmed_fastq1)}"
                     log_it(logfile, f"Copying trimmed FASTQ for {sample} back to project space...")
                     shell(copy_fastq_command)
-                    log_it(logfile, f"Copied {local_out_base} to {trimmed_fastq1}")
             finally:
                 shutil.rmtree(local_workdir, ignore_errors=True)
 

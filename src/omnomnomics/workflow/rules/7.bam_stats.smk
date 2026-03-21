@@ -24,8 +24,6 @@ rule bam_stats:
         mem_mb = Memory_Per_Rule['7'],
         partition = master_config['partition'],
         runtime = Runtime_Per_Rule['7']
-    benchmark:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['stats_rule_num']-1]}/benchmarks/{{sample}}_bamstats_benchmark.tsv"
     run:
         log_it(logfile, f"Getting BAM file statistics...",f"EXECUTING STEP {master_config['stats_rule_num']}")
         log_it(logfile, f"Input folder: {params.inputfolder}")

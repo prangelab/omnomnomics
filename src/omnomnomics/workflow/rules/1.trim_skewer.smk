@@ -40,8 +40,6 @@ rule run_skewer:
         mem_mb = Memory_Per_Rule['1'],
         partition = master_config['partition'],
         runtime = Runtime_Per_Rule['1']
-    benchmark:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/benchmarks/{{sample}}_skewer_benchmark.tsv"
     run:
         def run_skewer(logfile, trim_tool, seq_type, threads, fastq1, fastq2, inputfolder, outputfolder, sample, trimmed_fastq1, trimmed_fastq2):
             log_once(logfile, "step1.header", "Trimming reads...", f"EXECUTING STEP {master_config['trim_rule_num']}")
@@ -78,19 +76,16 @@ rule run_skewer:
                 command = f'pigz -p {threads} -c {quote(source_path)} > {quote(target_path)}'
                 log_it(logfile, f"Compressing {os.path.basename(source_path)} back to project space...")
                 shell(command)
-                log_it(logfile, f"Compressed {source_path} to {target_path}")
 
             try:
                 local_fastq1_gz, local_fastq1 = local_fastq_path(fastq1)
                 stage_fastq1_command = f'cp {quote(fastq1)} {quote(local_fastq1_gz)}'
                 log_it(logfile, f"Staging {os.path.basename(fastq1)} to scratch...")
                 shell(stage_fastq1_command)
-                log_it(logfile, f"Staged {fastq1} to {local_fastq1_gz}")
 
                 decompress_fastq1_command = f'pigz -d -p {threads} -c {quote(local_fastq1_gz)} > {quote(local_fastq1)}'
                 log_it(logfile, f"Decompressing {os.path.basename(local_fastq1_gz)} on scratch...")
                 shell(decompress_fastq1_command)
-                log_it(logfile, f"Decompressed {local_fastq1_gz} to {local_fastq1}")
 
                 local_fastq2 = ""
                 if fastq2:
@@ -98,12 +93,10 @@ rule run_skewer:
                     stage_fastq2_command = f'cp {quote(fastq2)} {quote(local_fastq2_gz)}'
                     log_it(logfile, f"Staging {os.path.basename(fastq2)} to scratch...")
                     shell(stage_fastq2_command)
-                    log_it(logfile, f"Staged {fastq2} to {local_fastq2_gz}")
 
                     decompress_fastq2_command = f'pigz -d -p {threads} -c {quote(local_fastq2_gz)} > {quote(local_fastq2)}'
                     log_it(logfile, f"Decompressing {os.path.basename(local_fastq2_gz)} on scratch...")
                     shell(decompress_fastq2_command)
-                    log_it(logfile, f"Decompressed {local_fastq2_gz} to {local_fastq2}")
 
                 sample_prefix = os.path.join(local_workdir, sample)
 
@@ -122,7 +115,7 @@ rule run_skewer:
                 log_it(logfile, skewer_command, "SKEWER COMMAND")
 
                 # Run the skewer command
-                shell(skewer_command, bench_record=bench_record)
+                shell(skewer_command)
                 log_it(logfile, f"Skewer completed for {sample}")
 
                 log_it(logfile, "Compressing and staging trimmed results...")

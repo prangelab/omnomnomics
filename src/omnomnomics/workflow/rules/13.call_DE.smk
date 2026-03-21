@@ -21,8 +21,6 @@ rule call_DE:
         mem_mb = Memory_Per_Rule['13'],
         partition = master_config['partition'],
         runtime = Runtime_Per_Rule['13']
-    benchmark:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['de_rule_num']-1]}/benchmarks/call_DE_benchmark.tsv"
     run:
         def calling_DE(logfile, thetype, inputfolder, outputfolder):
             if thetype == "RNA":

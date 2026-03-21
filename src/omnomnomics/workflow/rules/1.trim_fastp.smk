@@ -39,8 +39,6 @@ rule run_fastp:
         mem_mb=Memory_Per_Rule['1'],
         partition=master_config['partition'],
         runtime=Runtime_Per_Rule['1']
-    benchmark:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/benchmarks/{{sample}}_fastp_benchmark.tsv"
     run:
         def run_fastp(logfile, trim_tool, seq_type, threads, fastq1, fastq2, inputfolder, outputfolder, sample, trimmed_fastq1, trimmed_fastq2):
             log_once(logfile, "step1.header", "Trimming reads...", f"EXECUTING STEP {master_config['trim_rule_num']}")
@@ -66,7 +64,6 @@ rule run_fastp:
                 stage_command = f"cp {quote(path)} {quote(local_path)}"
                 log_it(logfile, f"Staging {os.path.basename(path)} to scratch...")
                 shell(stage_command)
-                log_it(logfile, f"Staged {path} to {local_path}")
                 return local_path
 
             try:
@@ -95,19 +92,17 @@ rule run_fastp:
 
                 fastp_command = " ".join(fastp_command.split())
                 log_it(logfile, fastp_command, "FASTP COMMAND")
-                shell(fastp_command, bench_record=bench_record)
+                shell(fastp_command)
                 log_it(logfile, f"fastp completed for {sample}")
 
                 copy_fastq1_command = f"cp {quote(local_trimmed_fastq1)} {quote(trimmed_fastq1)}"
                 log_it(logfile, f"Copying trimmed R1 for {sample} back to project space...")
                 shell(copy_fastq1_command)
-                log_it(logfile, f"Copied {local_trimmed_fastq1} to {trimmed_fastq1}")
 
                 if fastq2 and trimmed_fastq2:
                     copy_fastq2_command = f"cp {quote(local_trimmed_fastq2)} {quote(trimmed_fastq2)}"
                     log_it(logfile, f"Copying trimmed R2 for {sample} back to project space...")
                     shell(copy_fastq2_command)
-                    log_it(logfile, f"Copied {local_trimmed_fastq2} to {trimmed_fastq2}")
             finally:
                 shutil.rmtree(local_workdir, ignore_errors=True)
 

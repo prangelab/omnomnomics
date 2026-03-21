@@ -31,8 +31,6 @@ rule run_star:
         mem_mb=Memory_Per_Rule['3'],
         partition=master_config['partition'],
         runtime=Runtime_Per_Rule['3']
-    benchmark:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['map_rule_num']-1]}/benchmarks/{{sample3}}_star_benchmark.tsv"
     run:
         log_once(logfile, "step3.header", "Mapping reads...", f"EXECUTING STEP {master_config['map_rule_num']}")
         log_once(logfile, "step3.inputfolder", f"Input folder: {params.inputfolder}")
@@ -56,7 +54,6 @@ rule run_star:
                 command = f"cp {quote(path)} {quote(local_path)}"
                 log_it(logfile, f"Staging {os.path.basename(path)} to scratch...")
                 shell(command)
-                log_it(logfile, f"Staged {path} to {local_path}")
                 return local_path
 
             def reheader_bam(local_bam_path):
@@ -102,7 +99,7 @@ rule run_star:
 
                 star_command = " ".join(star_command.split())
                 log_it(logfile, star_command, "STAR COMMAND")
-                shell(star_command, bench_record=bench_record)
+                shell(star_command)
 
                 local_aligned_bam = f"{local_prefix}Aligned.out.bam"
                 local_final_bam = os.path.join(local_workdir, f"{sample}.bam")

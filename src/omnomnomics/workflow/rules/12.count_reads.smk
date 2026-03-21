@@ -44,8 +44,6 @@ rule count_reads:
         mem_mb = Memory_Per_Rule['12'],
         partition = master_config['partition'],
         runtime = Runtime_Per_Rule['12']
-    benchmark:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num']-1]}/benchmarks/counts_reads_benchmark.tsv"
     run:
         log_it(logfile, "Counting Reads...", f"EXECUTING STEP {master_config['countreads_rule_num']}")
         log_it(logfile, f"Input folder: {params.inputfolder1} and also {params.inputfolder2} for ATAC data")

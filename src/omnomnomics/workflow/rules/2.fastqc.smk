@@ -27,8 +27,6 @@ rule run_fastqc:
         mem_mb = Memory_Per_Rule['2'],
         partition = master_config['partition'],
         runtime = Runtime_Per_Rule['2']
-    benchmark:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['qc_rule_num']-1]}/benchmarks/{{sample}}_fastqc_benchmark.tsv"
     run:
         def run_fastqc(threads, input, outputfolder):
             log_once(logfile, "step2.header", "Generating FastQC reports...", f"EXECUTING STEP {master_config['qc']}")
