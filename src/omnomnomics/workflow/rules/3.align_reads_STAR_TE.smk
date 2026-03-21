@@ -21,7 +21,7 @@ rule run_star_te:
         stats=f"{experiment_dir}/{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample3}}.STAR_TE_stats.txt",
         extra=f"{experiment_dir}/{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample3}}.extra_3.tmp"
     params:
-        genome_path=os.path.join(config['STAR_GENOME_DIR'], f"{config['THEGENOME']}"),
+        genome_path=config['STAR_GENOME_DIR'],
         inputfolder=f"{experiment_dir}/{master_config['input_folders'][master_config['map_rule_num']-1]}",
         outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['map_rule_num']-1]}",
         paired=config['PAIRED']
@@ -54,7 +54,7 @@ rule run_star_te:
             def stage_input(path):
                 local_path = os.path.join(local_workdir, os.path.basename(path))
                 command = f"cp {quote(path)} {quote(local_path)}"
-                log_it(logfile, command, "STAGE INPUT COMMAND")
+                log_it(logfile, f"Staging {os.path.basename(path)} to scratch...")
                 shell(command)
                 log_it(logfile, f"Staged {path} to {local_path}")
                 return local_path
@@ -121,11 +121,11 @@ rule run_star_te:
                 os.replace(local_star_stats, local_final_stats)
 
                 copy_bam_command = f"cp {quote(local_final_bam)} {quote(os.path.join(outputfolder, f'{sample}.bam'))}"
-                log_it(logfile, copy_bam_command, "STAGE OUTPUT COMMAND")
+                log_it(logfile, f"Copying BAM for {sample} back to project space...")
                 shell(copy_bam_command)
 
                 copy_stats_command = f"cp {quote(local_final_stats)} {quote(os.path.join(outputfolder, f'{sample}.STAR_TE_stats.txt'))}"
-                log_it(logfile, copy_stats_command, "STAGE OUTPUT COMMAND")
+                log_it(logfile, f"Copying STAR TE stats for {sample} back to project space...")
                 shell(copy_stats_command)
             finally:
                 shutil.rmtree(local_workdir, ignore_errors=True)

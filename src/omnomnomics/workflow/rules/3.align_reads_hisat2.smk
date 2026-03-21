@@ -57,8 +57,9 @@ rule run_hisat2:
             def stage_input(path):
                 local_path = os.path.join(local_workdir, os.path.basename(path))
                 command = f'cp {quote(path)} {quote(local_path)}'
-                log_it(logfile, command, "STAGE INPUT COMMAND")
+                log_it(logfile, f"Staging {os.path.basename(path)} to scratch...")
                 shell(command)
+                log_it(logfile, f"Staged {path} to {local_path}")
                 return local_path
 
             if seq_type == "RNA":

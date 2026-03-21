@@ -76,19 +76,19 @@ rule run_skewer:
 
             def compress_to_output(source_path, target_path):
                 command = f'pigz -p {threads} -c {quote(source_path)} > {quote(target_path)}'
-                log_it(logfile, command, "PIGZ COMPRESS COMMAND")
+                log_it(logfile, f"Compressing {os.path.basename(source_path)} back to project space...")
                 shell(command)
                 log_it(logfile, f"Compressed {source_path} to {target_path}")
 
             try:
                 local_fastq1_gz, local_fastq1 = local_fastq_path(fastq1)
                 stage_fastq1_command = f'cp {quote(fastq1)} {quote(local_fastq1_gz)}'
-                log_it(logfile, stage_fastq1_command, "STAGE INPUT COMMAND")
+                log_it(logfile, f"Staging {os.path.basename(fastq1)} to scratch...")
                 shell(stage_fastq1_command)
                 log_it(logfile, f"Staged {fastq1} to {local_fastq1_gz}")
 
                 decompress_fastq1_command = f'pigz -d -p {threads} -c {quote(local_fastq1_gz)} > {quote(local_fastq1)}'
-                log_it(logfile, decompress_fastq1_command, "PIGZ DECOMPRESS COMMAND")
+                log_it(logfile, f"Decompressing {os.path.basename(local_fastq1_gz)} on scratch...")
                 shell(decompress_fastq1_command)
                 log_it(logfile, f"Decompressed {local_fastq1_gz} to {local_fastq1}")
 
@@ -96,12 +96,12 @@ rule run_skewer:
                 if fastq2:
                     local_fastq2_gz, local_fastq2 = local_fastq_path(fastq2)
                     stage_fastq2_command = f'cp {quote(fastq2)} {quote(local_fastq2_gz)}'
-                    log_it(logfile, stage_fastq2_command, "STAGE INPUT COMMAND")
+                    log_it(logfile, f"Staging {os.path.basename(fastq2)} to scratch...")
                     shell(stage_fastq2_command)
                     log_it(logfile, f"Staged {fastq2} to {local_fastq2_gz}")
 
                     decompress_fastq2_command = f'pigz -d -p {threads} -c {quote(local_fastq2_gz)} > {quote(local_fastq2)}'
-                    log_it(logfile, decompress_fastq2_command, "PIGZ DECOMPRESS COMMAND")
+                    log_it(logfile, f"Decompressing {os.path.basename(local_fastq2_gz)} on scratch...")
                     shell(decompress_fastq2_command)
                     log_it(logfile, f"Decompressed {local_fastq2_gz} to {local_fastq2}")
 

@@ -64,7 +64,7 @@ rule run_fastp:
             def stage_input(path):
                 local_path = os.path.join(local_workdir, os.path.basename(path))
                 stage_command = f"cp {quote(path)} {quote(local_path)}"
-                log_it(logfile, stage_command, "STAGE INPUT COMMAND")
+                log_it(logfile, f"Staging {os.path.basename(path)} to scratch...")
                 shell(stage_command)
                 log_it(logfile, f"Staged {path} to {local_path}")
                 return local_path
@@ -99,13 +99,13 @@ rule run_fastp:
                 log_it(logfile, f"fastp completed for {sample}")
 
                 copy_fastq1_command = f"cp {quote(local_trimmed_fastq1)} {quote(trimmed_fastq1)}"
-                log_it(logfile, copy_fastq1_command, "STAGE OUTPUT COMMAND")
+                log_it(logfile, f"Copying trimmed R1 for {sample} back to project space...")
                 shell(copy_fastq1_command)
                 log_it(logfile, f"Copied {local_trimmed_fastq1} to {trimmed_fastq1}")
 
                 if fastq2 and trimmed_fastq2:
                     copy_fastq2_command = f"cp {quote(local_trimmed_fastq2)} {quote(trimmed_fastq2)}"
-                    log_it(logfile, copy_fastq2_command, "STAGE OUTPUT COMMAND")
+                    log_it(logfile, f"Copying trimmed R2 for {sample} back to project space...")
                     shell(copy_fastq2_command)
                     log_it(logfile, f"Copied {local_trimmed_fastq2} to {trimmed_fastq2}")
             finally:
