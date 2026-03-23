@@ -81,9 +81,8 @@ def parse_arguments():
 # Function to check if the configuration file contains the proper header
 def check_config_file_header(config_file_path, expected_header):
    with open(config_file_path, 'r') as config_file:
-      
-       lines = config_file.readlines()
-       if len(lines) < 3 or expected_header not in lines[2]:
+       header_lines = [line.strip() for line in config_file if line.strip()]
+       if len(header_lines) < 1 or expected_header not in header_lines[0]:
            print("Config file does not contain right header. Aborting...")
            sys.exit(1)
 
