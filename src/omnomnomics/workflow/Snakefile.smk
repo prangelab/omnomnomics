@@ -16,13 +16,6 @@ import shutil
 import glob
 import random
 import re
-import csv
-import gzip
-import statistics
-import subprocess
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 
 
 # Load the configuration file from command line arguments
@@ -510,6 +503,14 @@ onsuccess:
         # Run multiqc to gather all stats
         #---------------------------------------------------------------------------------------------------------------
         if not config['NO_MULTIQC']:
+            import csv
+            import gzip
+            import statistics
+            import subprocess
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+
             def normalize_numeric_string(value):
                 return value.replace(",", "").replace("%", "").strip()
 
