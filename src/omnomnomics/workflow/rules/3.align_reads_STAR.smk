@@ -43,10 +43,10 @@ rule run_star:
         sanity_check_dir(logfile, params.inputfolder, master_config['input_file_types'][master_config['map_rule_num'] - 1], "step3.sanity")
 
         def run_star(genome_path, fastq1, fastq2, paired, threads, outputfolder, sample):
-            log_it(logfile, f"Sample {sample}: mapping reads...")
+            tracking = begin_step_sample(master_config['map_rule_num'], sample, "run_star")
             tmpdir_root = os.environ.get("TMPDIR")
             local_workdir = tempfile.mkdtemp(prefix=f"{sample}.", dir=tmpdir_root if tmpdir_root else None)
-            log_it(logfile, f"Scratch directory: {local_workdir}")
+            record_step_note(master_config['map_rule_num'], sample, f"scratch_dir={local_workdir}")
 
             def quote(path):
                 return shlex.quote(path)
@@ -54,7 +54,7 @@ rule run_star:
             def stage_input(path):
                 local_path = os.path.join(local_workdir, os.path.basename(path))
                 command = f"cp {quote(path)} {quote(local_path)}"
-                log_it(logfile, f"Staging {os.path.basename(path)} to scratch...")
+                record_step_note(master_config['map_rule_num'], sample, f"staging {os.path.basename(path)}")
                 shell(command)
                 return local_path
 
@@ -83,7 +83,7 @@ rule run_star:
                 local_prefix = os.path.join(local_workdir, f"{sample}.")
 
                 if paired:
-                    log_it(logfile, "Running STAR in Paired End mode")
+                    record_step_note(master_config['map_rule_num'], sample, "running_star_paired_end")
                     star_command = f"""
                         STAR --runThreadN {threads} --genomeDir {quote(genome_path)} \
                         --readFilesIn {quote(local_fastq1)} {quote(local_fastq2)} --readFilesCommand zcat \
@@ -91,7 +91,7 @@ rule run_star:
                         --outBAMcompression -1 --genomeLoad NoSharedMemory --twopassMode Basic
                     """
                 else:
-                    log_it(logfile, "Running STAR in Single End mode")
+                    record_step_note(master_config['map_rule_num'], sample, "running_star_single_end")
                     star_command = f"""
                         STAR --runThreadN {threads} --genomeDir {quote(genome_path)} \
                         --readFilesIn {quote(local_fastq1)} --readFilesCommand zcat \
@@ -100,7 +100,7 @@ rule run_star:
                     """
 
                 star_command = " ".join(star_command.split())
-                log_it(logfile, star_command, "STAR COMMAND")
+                record_step_command(master_config['map_rule_num'], sample, star_command)
                 shell(star_command)
 
                 local_aligned_bam = f"{local_prefix}Aligned.out.bam"
@@ -118,12 +118,16 @@ rule run_star:
                 os.replace(local_star_stats, local_final_stats)
 
                 copy_bam_command = f"cp {quote(local_final_bam)} {quote(os.path.join(outputfolder, f'{sample}.bam'))}"
-                log_it(logfile, f"Copying BAM for {sample} back to project space...")
+                record_step_note(master_config['map_rule_num'], sample, "copying_bam_back")
                 shell(copy_bam_command)
 
                 copy_stats_command = f"cp {quote(local_final_stats)} {quote(os.path.join(outputfolder, f'{sample}.STAR_stats.txt'))}"
-                log_it(logfile, f"Copying STAR stats for {sample} back to project space...")
+                record_step_note(master_config['map_rule_num'], sample, "copying_star_stats_back")
                 shell(copy_stats_command)
+                finish_step_sample(master_config['map_rule_num'], sample, "run_star", tracking["start_time"], "OK")
+            except Exception:
+                finish_step_sample(master_config['map_rule_num'], sample, "run_star", tracking["start_time"], "FAIL")
+                raise
             finally:
                 shutil.rmtree(local_workdir, ignore_errors=True)
 

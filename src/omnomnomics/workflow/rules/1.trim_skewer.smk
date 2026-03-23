@@ -48,7 +48,7 @@ rule run_skewer:
             log_once(logfile, "step1.inputfolder", f"Input folder: {inputfolder}")
             log_once(logfile, "step1.outputfolder", f"Output folder: {outputfolder}")
             log_once(logfile, "step1.trimtool", f"Trim Tool: {trim_tool}")
-            log_it(logfile, f"Sample {sample}: trimming reads...")
+            tracking = begin_step_sample(master_config['trim_rule_num'], sample, "run_skewer")
 
             skewer_version = subprocess.check_output(["skewer", "--version"])
             log_once(logfile, "step1.skewer_version", "\n"+skewer_version.decode("utf-8"), "SKEWER VERSION")
@@ -64,7 +64,7 @@ rule run_skewer:
 
             tmpdir_root = os.environ.get("TMPDIR")
             local_workdir = tempfile.mkdtemp(prefix=f"{sample}.", dir=tmpdir_root if tmpdir_root else None)
-            log_it(logfile, f"Scratch directory: {local_workdir}")
+            record_step_note(master_config['trim_rule_num'], sample, f"scratch_dir={local_workdir}")
 
             def quote(path):
                 return shlex.quote(path)
@@ -76,51 +76,49 @@ rule run_skewer:
 
             def compress_to_output(source_path, target_path):
                 command = f'pigz -p {threads} -c {quote(source_path)} > {quote(target_path)}'
-                log_it(logfile, f"Compressing {os.path.basename(source_path)} back to project space...")
+                record_step_note(master_config['trim_rule_num'], sample, f"compressing {os.path.basename(source_path)}")
                 shell(command)
 
             try:
                 local_fastq1_gz, local_fastq1 = local_fastq_path(fastq1)
                 stage_fastq1_command = f'cp {quote(fastq1)} {quote(local_fastq1_gz)}'
-                log_it(logfile, f"Staging {os.path.basename(fastq1)} to scratch...")
+                record_step_note(master_config['trim_rule_num'], sample, f"staging {os.path.basename(fastq1)}")
                 shell(stage_fastq1_command)
 
                 decompress_fastq1_command = f'pigz -d -p {threads} -c {quote(local_fastq1_gz)} > {quote(local_fastq1)}'
-                log_it(logfile, f"Decompressing {os.path.basename(local_fastq1_gz)} on scratch...")
+                record_step_note(master_config['trim_rule_num'], sample, f"decompressing {os.path.basename(local_fastq1_gz)}")
                 shell(decompress_fastq1_command)
 
                 local_fastq2 = ""
                 if fastq2:
                     local_fastq2_gz, local_fastq2 = local_fastq_path(fastq2)
                     stage_fastq2_command = f'cp {quote(fastq2)} {quote(local_fastq2_gz)}'
-                    log_it(logfile, f"Staging {os.path.basename(fastq2)} to scratch...")
+                    record_step_note(master_config['trim_rule_num'], sample, f"staging {os.path.basename(fastq2)}")
                     shell(stage_fastq2_command)
 
                     decompress_fastq2_command = f'pigz -d -p {threads} -c {quote(local_fastq2_gz)} > {quote(local_fastq2)}'
-                    log_it(logfile, f"Decompressing {os.path.basename(local_fastq2_gz)} on scratch...")
+                    record_step_note(master_config['trim_rule_num'], sample, f"decompressing {os.path.basename(local_fastq2_gz)}")
                     shell(decompress_fastq2_command)
 
                 sample_prefix = os.path.join(local_workdir, sample)
 
                 if fastq2:
-                    log_it(logfile, "Running skewer in Paired End mode.")
+                    record_step_note(master_config['trim_rule_num'], sample, "running_skewer_paired_end")
                     skewer_command = f"""
                         skewer --quiet {adapter_option} -m pe -q 15 -Q 15 -t {threads} -o "{sample_prefix}" {local_fastq1} {local_fastq2}
                     """
                 else:
-                    log_it(logfile, "Running skewer in Single End mode.")
+                    record_step_note(master_config['trim_rule_num'], sample, "running_skewer_single_end")
                     skewer_command = f"""
                         skewer --quiet {adapter_option} -m any -q 15 -Q 15 -t {threads} -o "{sample_prefix}" {local_fastq1}
                     """
 
                 skewer_command = " ".join(skewer_command.split())
-                log_it(logfile, skewer_command, "SKEWER COMMAND")
+                record_step_command(master_config['trim_rule_num'], sample, skewer_command)
 
                 # Run the skewer command
                 shell(skewer_command)
-                log_it(logfile, f"Skewer completed for {sample}")
-
-                log_it(logfile, "Compressing and staging trimmed results...")
+                record_step_note(master_config['trim_rule_num'], sample, "compressing_and_staging_trimmed_results")
 
                 pair1_files = glob.glob(sample_prefix + '*pair1.fastq')
                 if fastq2 and len(pair1_files) != 1:
@@ -138,6 +136,10 @@ rule run_skewer:
                     base_name = os.path.basename(file_path)
                     new_name = os.path.join(outputfolder, base_name.replace('-trimmed.fastq', '.trimmed.fastq.gz'))
                     compress_to_output(file_path, new_name)
+                finish_step_sample(master_config['trim_rule_num'], sample, "run_skewer", tracking["start_time"], "OK")
+            except Exception:
+                finish_step_sample(master_config['trim_rule_num'], sample, "run_skewer", tracking["start_time"], "FAIL")
+                raise
             finally:
                 shutil.rmtree(local_workdir, ignore_errors=True)
 

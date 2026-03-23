@@ -31,26 +31,27 @@ rule touchup_bam:
         partition = master_config['partition'],
         runtime = Runtime_Per_Rule['5']
     run:
-        log_it(logfile, f"Touching up BAM files with samtools (collate | fixmate | sort | markdup | filter)...",f"EXECUTING STEP {master_config['touchup_rule_num']}")
-        log_it(logfile, f"Input folder: {params.inputfolder}")
-        log_it(logfile, f"Output folder: {params.outputfolder}")
-        log_it(logfile, f"Duplicate handling: {params.duplicate_handling}")
+        log_once(logfile, "step5.header", "Touching up BAM files with samtools (collate | fixmate | sort | markdup | filter)...", f"EXECUTING STEP {master_config['touchup_rule_num']}")
+        log_once(logfile, "step5.inputfolder", f"Input folder: {params.inputfolder}")
+        log_once(logfile, "step5.outputfolder", f"Output folder: {params.outputfolder}")
+        log_once(logfile, "step5.duplicate_handling", f"Duplicate handling: {params.duplicate_handling}")
         samtools_version = subprocess.check_output("samtools --version | head -n2", shell=True, executable='/bin/bash')
-        log_it(logfile, "\n"+samtools_version.decode("utf-8"), "SAMTOOLS VERSION")
+        log_once(logfile, "step5.samtools_version", "\n"+samtools_version.decode("utf-8"), "SAMTOOLS VERSION")
 
         sanity_check_dir(logfile, params.inputfolder, master_config['input_file_types'][master_config['touchup_rule_num']-1])
 
         def touchup_bam_file(input_file, samcores, thetype, duplicate_handling, sample, outputfolder):
+            tracking = begin_step_sample(master_config['touchup_rule_num'], sample, "touchup_bam")
             tmpdir_root = os.environ.get("TMPDIR")
             local_workdir = tempfile.mkdtemp(prefix=f"{sample}.", dir=tmpdir_root if tmpdir_root else None)
-            log_it(logfile, f"Scratch directory: {local_workdir}")
+            record_step_note(master_config['touchup_rule_num'], sample, f"scratch_dir={local_workdir}")
 
             def quote(path):
                 return shlex.quote(path)
 
             local_input = os.path.join(local_workdir, os.path.basename(input_file))
             stage_input_command = f'cp {quote(input_file)} {quote(local_input)}'
-            log_it(logfile, stage_input_command, "STAGE INPUT COMMAND")
+            record_step_note(master_config['touchup_rule_num'], sample, "staging_bam_to_scratch")
             shell(stage_input_command)
 
             try:
@@ -64,7 +65,7 @@ rule touchup_bam:
                 markdup_args = "-ru" if duplicate_handling == "remove" else "-u"
 
                 if thetype == "RNA":
-                    log_it(logfile, f"Touching up RNA-seq sample {input_file} (duplicate handling: {duplicate_handling}, MAPQ >= {min_mapq})")
+                    record_step_note(master_config['touchup_rule_num'], sample, f"running_rna_touchup duplicate_handling={duplicate_handling} mapq={min_mapq}")
                     command = f"""
                         samtools collate -O -@ {samcores} {quote(local_input)} {quote(os.path.join(local_workdir, f'collate.{sample}.tmp'))} | \
                         samtools fixmate -mu -@ {samcores} - - | \
@@ -73,7 +74,7 @@ rule touchup_bam:
                         samtools view -@ {samcores} -q {min_mapq} -F {filter_flags} -b -o {quote(local_output)} -
                     """
                 elif thetype == "ATAC":
-                    log_it(logfile, f"Touching up ATAC-seq sample {input_file} (duplicate handling: {duplicate_handling}, MAPQ >= {min_mapq})")
+                    record_step_note(master_config['touchup_rule_num'], sample, f"running_atac_touchup duplicate_handling={duplicate_handling} mapq={min_mapq}")
                     command = f"""
                         samtools collate -O -@ {samcores} {quote(local_input)} {quote(os.path.join(local_workdir, f'collate.{sample}.tmp'))} | \
                         samtools fixmate -mu -@ {samcores} - - | \
@@ -82,7 +83,7 @@ rule touchup_bam:
                         samtools view -@ {samcores} -q {min_mapq} -F {filter_flags} -b -o {quote(local_output)} -
                     """
                 else:
-                    log_it(logfile, f"Touching up ChIP-seq sample {input_file} (duplicate handling: {duplicate_handling}, MAPQ >= {min_mapq})")
+                    record_step_note(master_config['touchup_rule_num'], sample, f"running_chip_touchup duplicate_handling={duplicate_handling} mapq={min_mapq}")
                     command = f"""
                         samtools collate -O -@ {samcores} {quote(local_input)} {quote(os.path.join(local_workdir, f'collate.{sample}.tmp'))} | \
                         samtools fixmate -mu -@ {samcores} - - | \
@@ -92,17 +93,22 @@ rule touchup_bam:
                     """
 
                 command = " ".join(command.split())
-                log_it(logfile, command, "SAMTOOLS TOUCHUP COMMAND")
+                record_step_command(master_config['touchup_rule_num'], sample, command)
                 shell(command)
 
                 if thetype == "ATAC":
-                    log_it(logfile, f"Getting ATAC statistics for sample {input_file}")
+                    record_step_note(master_config['touchup_rule_num'], sample, "writing_atac_mitochondrial_summary")
                     atac_stats_path = os.path.join(outputfolder, f"{sample}.ATAC_stats.txt")
                     shell(f"""samtools view {quote(local_input)} | awk '{{{{if($3~/chrM/)chrm=chrm+1}}}}END{{{{printf \"%34s\\t%11d\\n\", \"Total aligned reads before filtering:\",NR;printf \"%34s\\t%11d %1s%2.2f%2s\\n\", \"chrM aligned reads before filtering:\",chrm, \"(\", (chrm/NR)*100,\"%)\"}}}}' > {quote(atac_stats_path)}""")
 
                 shell(f"""echo "necessity file for touchup_bam. can delete this." > {quote(local_extra)}""")
+                record_step_note(master_config['touchup_rule_num'], sample, "copying_filtered_bam_back")
                 shell(f'cp {quote(local_output)} {quote(os.path.join(outputfolder, os.path.basename(local_output)))}')
                 shell(f'cp {quote(local_extra)} {quote(os.path.join(outputfolder, os.path.basename(local_extra)))}')
+                finish_step_sample(master_config['touchup_rule_num'], sample, "touchup_bam", tracking["start_time"], "OK")
+            except Exception:
+                finish_step_sample(master_config['touchup_rule_num'], sample, "touchup_bam", tracking["start_time"], "FAIL")
+                raise
             finally:
                 shutil.rmtree(local_workdir, ignore_errors=True)
         samcores = threads

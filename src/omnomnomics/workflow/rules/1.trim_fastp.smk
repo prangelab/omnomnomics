@@ -47,7 +47,7 @@ rule run_fastp:
             log_once(logfile, "step1.inputfolder", f"Input folder: {inputfolder}")
             log_once(logfile, "step1.outputfolder", f"Output folder: {outputfolder}")
             log_once(logfile, "step1.trimtool", f"Trim Tool: {trim_tool}")
-            log_it(logfile, f"Sample {sample}: trimming reads...")
+            tracking = begin_step_sample(master_config['trim_rule_num'], sample, "run_fastp")
 
             fastp_version = subprocess.check_output(["fastp", "--version"], stderr=subprocess.STDOUT)
             log_once(logfile, "step1.fastp_version", "\n" + fastp_version.decode("utf-8"), "FASTP VERSION")
@@ -56,7 +56,7 @@ rule run_fastp:
 
             tmpdir_root = os.environ.get("TMPDIR")
             local_workdir = tempfile.mkdtemp(prefix=f"{sample}.", dir=tmpdir_root if tmpdir_root else None)
-            log_it(logfile, f"Scratch directory: {local_workdir}")
+            record_step_note(master_config['trim_rule_num'], sample, f"scratch_dir={local_workdir}")
 
             def quote(path):
                 return shlex.quote(path)
@@ -64,7 +64,7 @@ rule run_fastp:
             def stage_input(path):
                 local_path = os.path.join(local_workdir, os.path.basename(path))
                 stage_command = f"cp {quote(path)} {quote(local_path)}"
-                log_it(logfile, f"Staging {os.path.basename(path)} to scratch...")
+                record_step_note(master_config['trim_rule_num'], sample, f"staging {os.path.basename(path)}")
                 shell(stage_command)
                 return local_path
 
@@ -78,7 +78,7 @@ rule run_fastp:
                 json_report = os.path.join(local_workdir, f"{sample}.fastp.json")
 
                 if fastq2:
-                    log_it(logfile, "Running fastp in Paired End mode.")
+                    record_step_note(master_config['trim_rule_num'], sample, "running_fastp_paired_end")
                     fastp_command = f"""
                         fastp --in1 {quote(local_fastq1)} --in2 {quote(local_fastq2)} \
                         --out1 {quote(local_trimmed_fastq1)} --out2 {quote(local_trimmed_fastq2)} \
@@ -86,25 +86,28 @@ rule run_fastp:
                         --detect_adapter_for_pe
                     """
                 else:
-                    log_it(logfile, "Running fastp in Single End mode.")
+                    record_step_note(master_config['trim_rule_num'], sample, "running_fastp_single_end")
                     fastp_command = f"""
                         fastp --in1 {quote(local_fastq1)} --out1 {quote(local_trimmed_fastq1)} \
                         --thread {threads} --html {quote(html_report)} --json {quote(json_report)}
                     """
 
                 fastp_command = " ".join(fastp_command.split())
-                log_it(logfile, fastp_command, "FASTP COMMAND")
+                record_step_command(master_config['trim_rule_num'], sample, fastp_command)
                 shell(fastp_command)
-                log_it(logfile, f"fastp completed for {sample}")
 
                 copy_fastq1_command = f"cp {quote(local_trimmed_fastq1)} {quote(trimmed_fastq1)}"
-                log_it(logfile, f"Copying trimmed R1 for {sample} back to project space...")
+                record_step_note(master_config['trim_rule_num'], sample, "copying_trimmed_r1_back")
                 shell(copy_fastq1_command)
 
                 if fastq2 and trimmed_fastq2:
                     copy_fastq2_command = f"cp {quote(local_trimmed_fastq2)} {quote(trimmed_fastq2)}"
-                    log_it(logfile, f"Copying trimmed R2 for {sample} back to project space...")
+                    record_step_note(master_config['trim_rule_num'], sample, "copying_trimmed_r2_back")
                     shell(copy_fastq2_command)
+                finish_step_sample(master_config['trim_rule_num'], sample, "run_fastp", tracking["start_time"], "OK")
+            except Exception:
+                finish_step_sample(master_config['trim_rule_num'], sample, "run_fastp", tracking["start_time"], "FAIL")
+                raise
             finally:
                 shutil.rmtree(local_workdir, ignore_errors=True)
 

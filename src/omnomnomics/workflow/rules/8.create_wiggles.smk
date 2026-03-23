@@ -39,10 +39,10 @@ rule create_wiggles:
         sanity_check_dir(logfile, params.inputfolder, master_config['input_file_types'][master_config['wig_rule_num'] - 1], "step8.sanity")
 
         def create_wig(input_bam, input_bai, outputfolder, sample):
-            log_it(logfile, f"Sample {sample}: creating BigWig...")
+            tracking = begin_step_sample(master_config['wig_rule_num'], sample, "create_wiggles")
             tmpdir_root = os.environ.get("TMPDIR")
             local_workdir = tempfile.mkdtemp(prefix=f"{sample}.", dir=tmpdir_root if tmpdir_root else None)
-            log_it(logfile, f"Scratch directory: {local_workdir}")
+            record_step_note(master_config['wig_rule_num'], sample, f"scratch_dir={local_workdir}")
 
             def quote(path):
                 return shlex.quote(path)
@@ -50,7 +50,7 @@ rule create_wiggles:
             def stage_input(path):
                 local_path = os.path.join(local_workdir, os.path.basename(path))
                 command = f"cp {quote(path)} {quote(local_path)}"
-                log_it(logfile, f"Staging {os.path.basename(path)} to scratch...")
+                record_step_note(master_config['wig_rule_num'], sample, f"staging {os.path.basename(path)}")
                 shell(command)
                 return local_path
 
@@ -65,12 +65,16 @@ rule create_wiggles:
                     --numberOfProcessors {threads} --binSize 10 --normalizeUsing CPM
                 """
                 bamcoverage_command = " ".join(bamcoverage_command.split())
-                log_it(logfile, bamcoverage_command, "BAMCOVERAGE COMMAND")
+                record_step_command(master_config['wig_rule_num'], sample, bamcoverage_command)
                 shell(bamcoverage_command)
 
                 copy_bw_command = f"cp {quote(local_bw)} {quote(output_bw)}"
-                log_it(logfile, f"Copying BigWig for {sample} back to project space...")
+                record_step_note(master_config['wig_rule_num'], sample, "copying_bigwig_back")
                 shell(copy_bw_command)
+                finish_step_sample(master_config['wig_rule_num'], sample, "create_wiggles", tracking["start_time"], "OK")
+            except Exception:
+                finish_step_sample(master_config['wig_rule_num'], sample, "create_wiggles", tracking["start_time"], "FAIL")
+                raise
             finally:
                 shutil.rmtree(local_workdir, ignore_errors=True)
 

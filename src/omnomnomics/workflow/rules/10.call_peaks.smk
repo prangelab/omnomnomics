@@ -48,9 +48,9 @@ rule call_peaks:
         partition = lambda wildcards: master_config['partition'],
         runtime = lambda wildcards: Runtime_Per_Rule['10']
     run:
-        log_it(logfile, "Calling Peaks...", f"EXECUTING STEP {master_config['callpeaks_rule_num']}")
-        log_it(logfile, f"Input folder: {params.inputfolder1}")
-        log_it(logfile, f"Output folder: {params.outputfolder}")
+        log_once(logfile, "step10.header", "Calling Peaks...", f"EXECUTING STEP {master_config['callpeaks_rule_num']}")
+        log_once(logfile, "step10.inputfolder", f"Input folder: {params.inputfolder1}")
+        log_once(logfile, "step10.outputfolder", f"Output folder: {params.outputfolder}")
 
         def chip_style_label(broad):
             if broad == "1":
@@ -407,13 +407,13 @@ rule call_peaks:
                 log_it(logfile, "Not a ChIP- or ATAC-seq experiment, skipping this step...")
                 return
             
-            log_it(logfile, "Calling peaks...", f"EXECUTING STEP {master_config['callpeaks_rule_num']}") 
-            log_it(logfile, f"The type = {thetype}")
+            log_once(logfile, "step10.calling", "Calling peaks...", f"EXECUTING STEP {master_config['callpeaks_rule_num']}")
+            log_once(logfile, "step10.type", f"The type = {thetype}")
             log_peak_qc_versions()
 
             # Report version
             macs3_version = subprocess.check_output(["macs3", "--version"], stderr=subprocess.STDOUT)
-            log_it(logfile, "\n"+macs3_version.decode("utf-8"), "MACS3 VERSION")
+            log_once(logfile, "step10.macs3_version", "\n"+macs3_version.decode("utf-8"), "MACS3 VERSION")
 
             if thetype == "CHIP":
                 chip_qc_rows = []

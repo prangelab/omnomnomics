@@ -31,19 +31,20 @@ rule merge_bam:
         partition = master_config['partition'],
         runtime = Runtime_Per_Rule['4']
     run:
-        log_it(logfile, "Merging lanes...", f"EXECUTING STEP {master_config['merge_rule_num']}")
-        log_it(logfile, f"Input folder: {params.inputfolder}")
-        log_it(logfile, f"Output folder: {params.outputfolder}")
+        log_once(logfile, "step4.header", "Merging lanes...", f"EXECUTING STEP {master_config['merge_rule_num']}")
+        log_once(logfile, "step4.inputfolder", f"Input folder: {params.inputfolder}")
+        log_once(logfile, "step4.outputfolder", f"Output folder: {params.outputfolder}")
             
         merging_version = subprocess.check_output("samtools --version | head -n2", shell=True, executable='/bin/bash')
-        log_it(logfile, "\n"+merging_version.decode("utf-8"), "SAMTOOLS VERSION")
+        log_once(logfile, "step4.samtools_version", "\n"+merging_version.decode("utf-8"), "SAMTOOLS VERSION")
 
         sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['merge_rule_num']-1])
 
         def merge_bam_files(threads, inputfolder, sample4):
+            tracking = begin_step_sample(master_config['merge_rule_num'], sample4, "merge_bam")
             tmpdir_root = os.environ.get("TMPDIR")
             local_workdir = tempfile.mkdtemp(prefix=f"{sample4}.", dir=tmpdir_root if tmpdir_root else None)
-            log_it(logfile, f"Scratch directory: {local_workdir}")
+            record_step_note(master_config['merge_rule_num'], sample4, f"scratch_dir={local_workdir}")
 
             def quote(path):
                 return shlex.quote(path)
@@ -94,7 +95,7 @@ rule merge_bam:
                             myname = parts[0]   # the sample name without lane info or aligner extension
 
                             # Run samtools merge
-                            log_it(logfile, f"Merging {myname} lanes...")
+                            record_step_note(master_config['merge_rule_num'], myname, "merging_lanes")
                             local_bam_list = []
                             for bamfile in bam_list:
                                 local_bam = os.path.join(local_workdir, os.path.basename(bamfile))
@@ -102,7 +103,7 @@ rule merge_bam:
                                 local_bam_list.append(local_bam)
                             local_output = os.path.join(local_workdir, f"{myname}{ext}")
                             merge_command = f"samtools merge -@ {threads} -o {quote(local_output)} {' '.join(quote(bam) for bam in local_bam_list)}"
-                            log_it(logfile, merge_command, "SAMTOOLS MERGE COMMAND")
+                            record_step_command(master_config['merge_rule_num'], myname, merge_command)
                             shell(merge_command)
                             shell(f'cp {quote(local_output)} {quote(os.path.join(inputfolder, f"{myname}{ext}"))}')
                             shell(f"""echo "necessity file for merge bams. can delete this." > {inputfolder}/{wildcards.sample4}.extra_4.tmp""")
@@ -111,13 +112,17 @@ rule merge_bam:
                             parts = sample_key.split('.', 1)
                             from_file = glob.glob(f"{inputfolder}/{parts[0]}_L00*.{parts[1]}")[0]
                             to_file = os.path.join(inputfolder, parts[0] + ('.'+parts[1]))
-                            log_it(logfile, f"Renaming {from_file} to {to_file}...")
+                            record_step_note(master_config['merge_rule_num'], parts[0], "renaming_single_lane_bam")
                             shell(f"cp {quote(from_file)} {quote(to_file)}")
                             shell(f"""echo "necessity file for merge bams. can delete this." > {inputfolder}/{wildcards.sample4}.extra_4.tmp""")
 
                 else:
-                    log_it(logfile, "No lane info found!")
+                    record_step_note(master_config['merge_rule_num'], sample4, "no_lane_info_found")
                     shell(f"""echo "necessity file for merge bams. can delete this." > {inputfolder}/{wildcards.sample4}.extra_4.tmp""")
+                finish_step_sample(master_config['merge_rule_num'], sample4, "merge_bam", tracking["start_time"], "OK")
+            except Exception:
+                finish_step_sample(master_config['merge_rule_num'], sample4, "merge_bam", tracking["start_time"], "FAIL")
+                raise
             finally:
                 shutil.rmtree(local_workdir, ignore_errors=True)
 

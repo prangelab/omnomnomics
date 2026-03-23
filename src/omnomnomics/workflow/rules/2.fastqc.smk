@@ -34,7 +34,7 @@ rule run_fastqc:
             log_once(logfile, "step2.header", "Generating FastQC reports...", f"EXECUTING STEP {master_config['qc']}")
             log_once(logfile, "step2.inputfolder", f"Input folder: {params.inputfolder}")
             log_once(logfile, "step2.outputfolder", f"Output folder: {params.outputfolder}")
-            log_it(logfile, f"Sample {wildcards.sample}: generating FastQC reports...")
+            tracking = begin_step_sample(master_config['qc_rule_num'], wildcards.sample, "run_fastqc")
 
             fastqc_version = subprocess.check_output(["fastqc", "--version"])
             log_once(logfile, "step2.fastqc_version", "\n"+fastqc_version.decode("utf-8"), "FASTQC VERSION")
@@ -42,21 +42,26 @@ rule run_fastqc:
             sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['qc_rule_num']-1], "step2.sanity")
 
             if config['PAIRED']:
-                log_it(logfile, "Running FastQC in paired end mode...")
+                record_step_note(master_config['qc_rule_num'], wildcards.sample, "running_fastqc_paired_end")
                 fastqc_command = f"""
                     fastqc -t {threads} -o {outputfolder} {input.trimmed_fastq1} {input.trimmed_fastq2}
                 """
             else:
-                log_it(logfile, "Running FastQC in single end mode...")
+                record_step_note(master_config['qc_rule_num'], wildcards.sample, "running_fastqc_single_end")
                 fastqc_command = f"""
                     fastqc -t {threads} -o {outputfolder} {input.trimmed_fastq1}
                 """
 
             fastqc_command = " ".join(fastqc_command.split())
-            log_it(logfile, fastqc_command, "FASTQC COMMAND")
+            record_step_command(master_config['qc_rule_num'], wildcards.sample, fastqc_command)
 
             # Run the FastQC command
-            shell(fastqc_command)
+            try:
+                shell(fastqc_command)
+                finish_step_sample(master_config['qc_rule_num'], wildcards.sample, "run_fastqc", tracking["start_time"], "OK")
+            except Exception:
+                finish_step_sample(master_config['qc_rule_num'], wildcards.sample, "run_fastqc", tracking["start_time"], "FAIL")
+                raise
 
         # Call the function with parameters
         run_fastqc(threads, input, params.outputfolder)

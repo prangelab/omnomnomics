@@ -46,10 +46,10 @@ rule run_hisat2:
         sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['map_rule_num']-1], "step3.sanity")
 
         def run_hisat2(seq_type, threads, genome_path, fastq1, fastq2, keepunpaired, inputfolder, outputfolder, sample):
-            log_it(logfile, f"Sample {sample}: mapping reads...")
+            tracking = begin_step_sample(master_config['map_rule_num'], sample, "run_hisat2")
             tmpdir_root = os.environ.get("TMPDIR")
             local_workdir = tempfile.mkdtemp(prefix=f"{sample}.", dir=tmpdir_root if tmpdir_root else None)
-            log_it(logfile, f"Scratch directory: {local_workdir}")
+            record_step_note(master_config['map_rule_num'], sample, f"scratch_dir={local_workdir}")
 
             def quote(path):
                 return shlex.quote(path)
@@ -57,15 +57,15 @@ rule run_hisat2:
             def stage_input(path):
                 local_path = os.path.join(local_workdir, os.path.basename(path))
                 command = f'cp {quote(path)} {quote(local_path)}'
-                log_it(logfile, f"Staging {os.path.basename(path)} to scratch...")
+                record_step_note(master_config['map_rule_num'], sample, f"staging {os.path.basename(path)}")
                 shell(command)
                 return local_path
 
             if seq_type == "RNA":
                 if config["PAIRED"]:
-                    log_it(logfile, f"Running HISAT2 in Paired End mode on RNA data.")
+                    record_step_note(master_config['map_rule_num'], sample, "running_hisat2_paired_end_rna")
                     MYNAME = os.path.basename(fastq1)
-                    log_it(logfile, f"Launching: {MYNAME}...")
+                    record_step_note(master_config['map_rule_num'], sample, f"launching {MYNAME}")
                     local_fastq1 = stage_input(fastq1)
                     local_fastq2 = stage_input(fastq2)
                     local_bam = os.path.join(local_workdir, f"{sample}.bam")
@@ -87,14 +87,14 @@ rule run_hisat2:
                             | samtools view -b - 1> "{local_bam}"
                             """
                         hisat2_command = " ".join(hisat2_command.split())
-                        log_it(logfile, hisat2_command, "HISAT2 COMMAND")
+                        record_step_command(master_config['map_rule_num'], sample, hisat2_command)
                         shell(hisat2_command)
                         shell(f'cp {quote(local_bam)} {quote(os.path.join(outputfolder, f"{sample}.bam"))}')
                         shell(f'cp {quote(local_stats)} {quote(os.path.join(outputfolder, f"{sample}.HISAT2_stats.txt"))}')
                     finally:
                         shutil.rmtree(local_workdir, ignore_errors=True)
                 else:
-                    log_it(logfile, f"Running HISAT2 in Single End mode on RNA data.")
+                    record_step_note(master_config['map_rule_num'], sample, "running_hisat2_single_end_rna")
                     local_fastq1 = stage_input(fastq1)
                     local_bam = os.path.join(local_workdir, f"{sample}.bam")
                     local_stats = os.path.join(local_workdir, f"{sample}.HISAT2_stats.txt")
@@ -106,7 +106,7 @@ rule run_hisat2:
                         | samtools view -b - 1> "{local_bam}"
                         """
                         hisat2_command = " ".join(hisat2_command.split())
-                        log_it(logfile, hisat2_command, "HISAT2 COMMAND")
+                        record_step_command(master_config['map_rule_num'], sample, hisat2_command)
                         shell(hisat2_command)
                         shell(f'cp {quote(local_bam)} {quote(os.path.join(outputfolder, f"{sample}.bam"))}')
                         shell(f'cp {quote(local_stats)} {quote(os.path.join(outputfolder, f"{sample}.HISAT2_stats.txt"))}')
@@ -114,9 +114,9 @@ rule run_hisat2:
                         shutil.rmtree(local_workdir, ignore_errors=True)
             else: #if ChIP- or ATAC data
                 if config["PAIRED"]:
-                    log_it(logfile, f"Running HISAT2 in Paired End mode  on ChIP or ATAC data.")
+                    record_step_note(master_config['map_rule_num'], sample, "running_hisat2_paired_end_chip_or_atac")
                     MYNAME = os.path.basename(fastq1)
-                    log_it(logfile, f"Launching: {MYNAME}...")
+                    record_step_note(master_config['map_rule_num'], sample, f"launching {MYNAME}")
                     local_fastq1 = stage_input(fastq1)
                     local_fastq2 = stage_input(fastq2)
                     local_bam = os.path.join(local_workdir, f"{sample}.bam")
@@ -138,14 +138,14 @@ rule run_hisat2:
                             | samtools view -b - 1> "{local_bam}"
                             """
                         hisat2_command = " ".join(hisat2_command.split())
-                        log_it(logfile, hisat2_command, "HISAT2 COMMAND")
+                        record_step_command(master_config['map_rule_num'], sample, hisat2_command)
                         shell(hisat2_command)
                         shell(f'cp {quote(local_bam)} {quote(os.path.join(outputfolder, f"{sample}.bam"))}')
                         shell(f'cp {quote(local_stats)} {quote(os.path.join(outputfolder, f"{sample}.HISAT2_stats.txt"))}')
                     finally:
                         shutil.rmtree(local_workdir, ignore_errors=True)
                 else:
-                    log_it(logfile, f"Running HISAT2 in Single End mode  on ChIP or ATAC data.")
+                    record_step_note(master_config['map_rule_num'], sample, "running_hisat2_single_end_chip_or_atac")
                     local_fastq1 = stage_input(fastq1)
                     local_bam = os.path.join(local_workdir, f"{sample}.bam")
                     local_stats = os.path.join(local_workdir, f"{sample}.HISAT2_stats.txt")
@@ -157,8 +157,12 @@ rule run_hisat2:
                         | samtools view -b - 1> "{local_bam}"
                         """
                         hisat2_command = " ".join(hisat2_command.split())
-                        log_it(logfile, hisat2_command, "HISAT2 COMMAND")
+                        record_step_command(master_config['map_rule_num'], sample, hisat2_command)
                         shell(hisat2_command)
+                finish_step_sample(master_config['map_rule_num'], sample, "run_hisat2", tracking["start_time"], "OK")
+            except Exception:
+                finish_step_sample(master_config['map_rule_num'], sample, "run_hisat2", tracking["start_time"], "FAIL")
+                raise
                         shell(f'cp {quote(local_bam)} {quote(os.path.join(outputfolder, f"{sample}.bam"))}')
                         shell(f'cp {quote(local_stats)} {quote(os.path.join(outputfolder, f"{sample}.HISAT2_stats.txt"))}')
                     finally:

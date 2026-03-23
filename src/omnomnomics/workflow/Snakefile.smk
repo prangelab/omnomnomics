@@ -11,6 +11,8 @@ import os
 import sys
 import time
 import datetime
+import csv
+import fcntl
 import yaml
 import shutil
 import glob
@@ -28,8 +30,10 @@ experiment_dir = config["EXPERIMENT_DIR"]
 run_date = config["RUNDATE"]
 logfile = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.log")
 log_marker_dir = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.markers")
+step_log_dir = os.path.join(experiment_dir, "run_logs", "steps")
 is_worker_job = "--target-jobs" in sys.argv
 os.makedirs(log_marker_dir, exist_ok=True)
+os.makedirs(step_log_dir, exist_ok=True)
 
 # Function to log messages
 def log_it(logfile, message, heading=None):
@@ -48,6 +52,170 @@ def log_once(logfile, marker_name, message, heading=None):
     except FileExistsError:
         return
     log_it(logfile, message, heading)
+
+
+def expected_sample_count_for_step(step_num):
+    if step_num in {1, 2, 3}:
+        return len(lane_samples)
+    if step_num in {4, 5, 6, 7, 8, 13}:
+        return len(samples2)
+    return 1
+
+
+def step_tracking_paths(step_num):
+    step_prefix = f"step{step_num:02d}"
+    step_state_dir = os.path.join(step_log_dir, f".{step_prefix}.state")
+    os.makedirs(step_state_dir, exist_ok=True)
+    return {
+        "summary_tsv": os.path.join(step_log_dir, f"{step_prefix}.summary.tsv"),
+        "commands_txt": os.path.join(step_log_dir, f"{step_prefix}.commands.txt"),
+        "notes_txt": os.path.join(step_log_dir, f"{step_prefix}.notes.txt"),
+        "started_dir": os.path.join(step_state_dir, "started"),
+        "completed_dir": os.path.join(step_state_dir, "completed"),
+        "failed_dir": os.path.join(step_state_dir, "failed"),
+        "entered_marker": os.path.join(step_state_dir, "entered.marker"),
+        "finished_marker": os.path.join(step_state_dir, "finished.marker"),
+    }
+
+
+def ensure_step_tracking_dirs(step_num):
+    paths = step_tracking_paths(step_num)
+    for key in ("started_dir", "completed_dir", "failed_dir"):
+        os.makedirs(paths[key], exist_ok=True)
+    return paths
+
+
+def append_locked_text(path, text):
+    with open(path, "a") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        handle.write(text)
+        handle.flush()
+        os.fsync(handle.fileno())
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def update_step_summary_row(summary_tsv, row):
+    fieldnames = [
+        "sample",
+        "job_id",
+        "status",
+        "start_time",
+        "end_time",
+        "elapsed_seconds",
+        "worker_log",
+    ]
+    rows = []
+    if os.path.exists(summary_tsv):
+        with open(summary_tsv, newline="") as handle:
+            reader = csv.DictReader(handle, delimiter="\t")
+            rows = list(reader)
+    updated = False
+    for existing in rows:
+        if existing["sample"] == row["sample"]:
+            existing.update(row)
+            updated = True
+            break
+    if not updated:
+        rows.append(row)
+    with open(summary_tsv, "w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t", lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def worker_log_path(rule_log_subdir):
+    job_id = os.environ.get("SLURM_JOB_ID", "NA")
+    if not rule_log_subdir or job_id == "NA":
+        return "NA"
+    return os.path.join(experiment_dir, "slurm_logs", rule_log_subdir, f"{rule_log_subdir}.{job_id}.out")
+
+
+def begin_step_sample(step_num, sample, rule_log_subdir):
+    paths = ensure_step_tracking_dirs(step_num)
+    start_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    started_marker = os.path.join(paths["started_dir"], sample)
+    entered_first = False
+    try:
+        fd = os.open(paths["entered_marker"], os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.close(fd)
+        entered_first = True
+    except FileExistsError:
+        pass
+    try:
+        fd = os.open(started_marker, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.close(fd)
+    except FileExistsError:
+        pass
+    update_step_summary_row(
+        paths["summary_tsv"],
+        {
+            "sample": sample,
+            "job_id": os.environ.get("SLURM_JOB_ID", "NA"),
+            "status": "RUNNING",
+            "start_time": start_time,
+            "end_time": "",
+            "elapsed_seconds": "",
+            "worker_log": worker_log_path(rule_log_subdir),
+        },
+    )
+    if entered_first:
+        log_it(logfile, f"Step {step_num}: first sample entered ({sample})")
+    return {"start_time": start_time, "paths": paths}
+
+
+def record_step_command(step_num, sample, command):
+    paths = ensure_step_tracking_dirs(step_num)
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    append_locked_text(
+        paths["commands_txt"],
+        f"[{timestamp}] sample={sample}\n{command}\n\n",
+    )
+
+
+def record_step_note(step_num, sample, message):
+    paths = ensure_step_tracking_dirs(step_num)
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    append_locked_text(
+        paths["notes_txt"],
+        f"{timestamp}\t{sample}\t{message}\n",
+    )
+
+
+def finish_step_sample(step_num, sample, rule_log_subdir, start_time, status):
+    paths = ensure_step_tracking_dirs(step_num)
+    end_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    started_dt = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+    ended_dt = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+    elapsed_seconds = f"{(ended_dt - started_dt).total_seconds():.2f}"
+    marker_dir = paths["completed_dir"] if status == "OK" else paths["failed_dir"]
+    marker_path = os.path.join(marker_dir, sample)
+    try:
+        fd = os.open(marker_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.close(fd)
+    except FileExistsError:
+        pass
+    update_step_summary_row(
+        paths["summary_tsv"],
+        {
+            "sample": sample,
+            "job_id": os.environ.get("SLURM_JOB_ID", "NA"),
+            "status": status,
+            "start_time": start_time,
+            "end_time": end_time,
+            "elapsed_seconds": elapsed_seconds,
+            "worker_log": worker_log_path(rule_log_subdir),
+        },
+    )
+    expected = expected_sample_count_for_step(step_num)
+    completed = len(os.listdir(paths["completed_dir"]))
+    failed = len(os.listdir(paths["failed_dir"]))
+    if completed + failed >= expected:
+        try:
+            fd = os.open(paths["finished_marker"], os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.close(fd)
+            log_it(logfile, f"Step {step_num}: last sample finished ({sample}); {completed}/{expected} OK, {failed}/{expected} failed")
+        except FileExistsError:
+            pass
 
 onstart:
     # Upon start, log the start time of the pipeline
@@ -78,10 +246,7 @@ def sanity_check_dir(logfile, input_directory, file_ext, marker_name=None):
         log_it(logfile, "Aborting...")
         print(f"The {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir}) does not contain any {file_ext} files! Aborting...")
         sys.exit(1)
-    if marker_name:
-        log_once(logfile, marker_name, "Sanity check completed", "SANITY CHECK")
-    else:
-        log_it(logfile, "Sanity check completed", "SANITY CHECK")
+    return
 
 # Hold our horses for a little while to ensure all files are up to date
 time.sleep(0.1)

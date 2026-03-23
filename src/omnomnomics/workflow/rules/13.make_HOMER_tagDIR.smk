@@ -33,20 +33,21 @@ rule create_homer_tagDir:
         partition = master_config['partition'],
         runtime = Runtime_Per_Rule['13']
     run:
-        log_it(logfile, "Creating optional HOMER tag directory exports...", "OPTIONAL HOMER EXPORT")
-        log_it(logfile, f"Input folder: {params.inputfolder}")
-        log_it(logfile, f"Output folder: {params.outputfolder}")
+        log_once(logfile, "step13.header", "Creating optional HOMER tag directory exports...", "OPTIONAL HOMER EXPORT")
+        log_once(logfile, "step13.inputfolder", f"Input folder: {params.inputfolder}")
+        log_once(logfile, "step13.outputfolder", f"Output folder: {params.outputfolder}")
 
         samtools_version = subprocess.check_output("samtools --version | head -n2", shell=True, executable='/bin/bash')
-        log_it(logfile, "\n"+samtools_version.decode("utf-8"), "SAMTOOLS VERSION")
+        log_once(logfile, "step13.samtools_version", "\n"+samtools_version.decode("utf-8"), "SAMTOOLS VERSION")
 
         sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['homer_tagdir_rule_num']-1], "step13.homer_sanity")
 
         # Function to create HOMER tag directories
         def create_homer_tagDir(filepath, outputfolder, genome, thetype):
+            tracking = begin_step_sample(master_config['homer_tagdir_rule_num'], wildcards.sample, "create_homer_tagDir")
             tmpdir_root = os.environ.get("TMPDIR")
             local_workdir = tempfile.mkdtemp(prefix=f"{wildcards.sample}.", dir=tmpdir_root if tmpdir_root else None)
-            log_it(logfile, f"Scratch directory: {local_workdir}")
+            record_step_note(master_config['homer_tagdir_rule_num'], wildcards.sample, f"scratch_dir={local_workdir}")
 
             def quote(path):
                 return shlex.quote(path)
@@ -57,9 +58,8 @@ rule create_homer_tagDir:
             local_bai = os.path.join(local_workdir, os.path.basename(input.bai_BAM))
             stage_bam_command = f'cp {quote(filepath)} {quote(local_bam)}'
             stage_bai_command = f'cp {quote(input.bai_BAM)} {quote(local_bai)}'
-            log_it(logfile, stage_bam_command, "STAGE INPUT COMMAND")
+            record_step_note(master_config['homer_tagdir_rule_num'], wildcards.sample, "staging_bam_and_index")
             shell(stage_bam_command)
-            log_it(logfile, stage_bai_command, "STAGE INPUT COMMAND")
             shell(stage_bai_command)
 
             tag_dir = os.path.join(local_workdir, f"{sample_name}.HOMER_tagDir")
@@ -83,24 +83,28 @@ rule create_homer_tagDir:
                                 break
 
                     if paired_end_count > 0:
-                        log_it(logfile, f"Running makeTagDirectory on paired-end RNA sample {filepath}")
+                        record_step_note(master_config['homer_tagdir_rule_num'], wildcards.sample, "running_makeTagDirectory_paired_rna")
                         command = f"makeTagDirectory {quote(tag_dir)} {quote(local_bam)} -genome {genome} -sspe -single"
                     else:
-                        log_it(logfile, f"Running makeTagDirectory on {filepath}")
+                        record_step_note(master_config['homer_tagdir_rule_num'], wildcards.sample, "running_makeTagDirectory_single_rna")
                         command = f"makeTagDirectory {quote(tag_dir)} {quote(local_bam)} -genome {genome} -single"
                 else:
-                    log_it(logfile, f"Running makeTagDirectory on {filepath}")
+                    record_step_note(master_config['homer_tagdir_rule_num'], wildcards.sample, "running_makeTagDirectory")
                     command = f"makeTagDirectory {quote(tag_dir)} {quote(local_bam)} -genome {genome} -single"
 
-                log_it(logfile, command, "HOMER TAGDIR COMMAND")
+                record_step_command(master_config['homer_tagdir_rule_num'], wildcards.sample, command)
                 shell(command)
 
                 # Compress the tag directory
-                log_it(logfile, f"Compressing {os.path.basename(tag_dir)} into {tag_dir}.tar.gz")
+                record_step_note(master_config['homer_tagdir_rule_num'], wildcards.sample, "compressing_homer_tagdir")
                 shell(f"cd {quote(local_workdir)} && tar czf {quote(os.path.basename(tar_gz_path))} {quote(os.path.basename(tag_dir))}")
 
                 shell(f'cp {quote(tar_gz_path)} {quote(os.path.join(outputfolder, os.path.basename(tar_gz_path)))}')
                 shell(f"""echo "necessity file for homer_tagdir export. can delete this." > {quote(os.path.join(outputfolder, f"{wildcards.sample}.extra_13.tmp"))}""")
+                finish_step_sample(master_config['homer_tagdir_rule_num'], wildcards.sample, "create_homer_tagDir", tracking["start_time"], "OK")
+            except Exception:
+                finish_step_sample(master_config['homer_tagdir_rule_num'], wildcards.sample, "create_homer_tagDir", tracking["start_time"], "FAIL")
+                raise
             finally:
                 shutil.rmtree(local_workdir, ignore_errors=True)
 
