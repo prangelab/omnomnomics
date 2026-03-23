@@ -38,10 +38,18 @@ rule bam_stats:
         ),
         filtered_BAM=lambda wildcards: (
             f"{experiment_dir}/{master_config['input_folders'][master_config['stats_rule_num']-1]}/{wildcards.sample}.sorted.dups_marked.filtered.bam"
-            if config['THETYPE'] != "CHIP" and os.path.exists(f"{experiment_dir}/{master_config['input_folders'][master_config['stats_rule_num']-1]}/{wildcards.sample}.sorted.dups_marked.filtered.bam")
+            if config['THETYPE'] != "CHIP" and (
+                5 in themode or
+                6 in themode or
+                os.path.exists(f"{experiment_dir}/{master_config['input_folders'][master_config['stats_rule_num']-1]}/{wildcards.sample}.sorted.dups_marked.filtered.bam")
+            )
             else (
                 f"{experiment_dir}/{master_config['input_folders'][master_config['stats_rule_num']-1]}/{wildcards.sample}.filtered.bam"
-                if config['THETYPE'] == "CHIP" and os.path.exists(f"{experiment_dir}/{master_config['input_folders'][master_config['stats_rule_num']-1]}/{wildcards.sample}.filtered.bam")
+                if config['THETYPE'] == "CHIP" and (
+                    5 in themode or
+                    6 in themode or
+                    os.path.exists(f"{experiment_dir}/{master_config['input_folders'][master_config['stats_rule_num']-1]}/{wildcards.sample}.filtered.bam")
+                )
                 else []
             )
         )

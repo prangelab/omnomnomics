@@ -583,10 +583,13 @@ def write_run_config(experiment_dir, run_date, config_data):
 def start_log(experiment_dir, run_date, config):
     #Initialize the log file
     log_file = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.log")
+    marker_dir = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.markers")
     if os.path.isfile(log_file):
         backup_log = f"{log_file}.{os.urandom(8).hex()}.backup" #Create a random backup if multiple runs
         os.rename(log_file, backup_log)
         print(f"Existing log file backed up as: {backup_log}")
+    if os.path.isdir(marker_dir):
+        shutil.rmtree(marker_dir)
 
 
     with open(log_file, 'w') as log:
