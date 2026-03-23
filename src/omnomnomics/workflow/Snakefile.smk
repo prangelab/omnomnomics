@@ -271,6 +271,8 @@ samples2 = [re.sub(r'_L00.', '', string) for string in samples] #From step 4 on,
 
 samples = list(set(samples))
 samples2 = list(set(samples2))
+sample_wildcard_pattern = "|".join(re.escape(sample_name) for sample_name in sorted(samples))
+merged_sample_wildcard_pattern = "|".join(re.escape(sample_name) for sample_name in sorted(samples2))
 
 if config['PAIRED'] == 1 and THEMODERANGEMIN < 4: 
     num_samples = len(samples) / 2
