@@ -14,6 +14,8 @@ import subprocess
 import tempfile
 
 rule run_skewer:
+    wildcard_constraints:
+        sample=lane_sample_wildcard_pattern
     input:
         fastq1=lambda wildcards: resolve_fastq_input(
             wildcards.sample,

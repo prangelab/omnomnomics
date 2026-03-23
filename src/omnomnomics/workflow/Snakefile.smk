@@ -264,7 +264,41 @@ samples2 = [re.sub(r'_L00.', '', string) for string in samples] #From step 4 on,
 
 samples = list(set(samples))
 samples2 = list(set(samples2))
-sample_wildcard_pattern = "|".join(re.escape(sample_name) for sample_name in sorted(samples))
+
+lane_sample_files = []
+lane_sample_sources = [
+    (master_config['input_folders'][master_config['trim_rule_num'] - 1], FASTQ_EXTENSIONS),
+    (master_config['output_folders'][master_config['trim_rule_num'] - 1], (".trimmed.fastq.gz", ".trimmed.fastq", ".trimmed.fq.gz", ".trimmed.fq")),
+    (master_config['output_folders'][master_config['map_rule_num'] - 1], (".bam",)),
+]
+for folder_name, extensions in lane_sample_sources:
+    candidate_files = []
+    for extension in extensions:
+        candidate_files.extend(glob.glob(os.path.join(experiment_dir, folder_name, f"*{extension}")))
+    if folder_name == master_config['output_folders'][master_config['map_rule_num'] - 1]:
+        candidate_files = [path for path in candidate_files if re.search(r'_L0\d+\.bam$', os.path.basename(path))]
+    if candidate_files:
+        lane_sample_files = candidate_files
+        break
+
+lane_samples = []
+for path in lane_sample_files:
+    extension = next((ext for ext in FASTQ_EXTENSIONS if path.endswith(ext)), None)
+    if extension is None:
+        for ext in (".trimmed.fastq.gz", ".trimmed.fastq", ".trimmed.fq.gz", ".trimmed.fq", ".bam"):
+            if path.endswith(ext):
+                extension = ext
+                break
+    if extension is None:
+        continue
+    lane_samples.append(normalize_sample_name(path, extension))
+
+lane_samples = sorted(set(lane_samples))
+if lane_samples:
+    lane_sample_wildcard_pattern = "|".join(re.escape(sample_name) for sample_name in lane_samples)
+else:
+    lane_sample_wildcard_pattern = r"$.^"
+
 merged_sample_wildcard_pattern = "|".join(re.escape(sample_name) for sample_name in sorted(samples2))
 
 if config['PAIRED'] == 1 and THEMODERANGEMIN < 4: 
