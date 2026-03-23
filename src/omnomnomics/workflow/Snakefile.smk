@@ -16,6 +16,13 @@ import shutil
 import glob
 import random
 import re
+import csv
+import gzip
+import statistics
+import subprocess
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 
 # Load the configuration file from command line arguments
@@ -449,8 +456,6 @@ for rule_num in themode:
             all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.filtered.bam.stats.txt", sample = samples2)
             all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.filtered.bam.qc_summary.pdf", sample = samples2)
             all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.filtered.bam.qc_summary.svg", sample = samples2)
-        all_outputs.append(f"{experiment_dir}/{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.alignment_qc_experiment_summary.pdf")
-        all_outputs.append(f"{experiment_dir}/{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.alignment_qc_experiment_summary.svg")
     if rule_num == 8:
         all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.extra_8.tmp",  sample = samples2)
     if rule_num == 9:
@@ -503,6 +508,489 @@ onsuccess:
         # Run multiqc to gather all stats
         #---------------------------------------------------------------------------------------------------------------
         if not config['NO_MULTIQC']:
+            def normalize_numeric_string(value):
+                return value.replace(",", "").replace("%", "").strip()
+
+            def parse_star_mapper_stats(stats_path):
+                metrics = {}
+                with open(stats_path) as handle:
+                    for line in handle:
+                        if "|" not in line:
+                            continue
+                        key, value = [part.strip() for part in line.split("|", 1)]
+                        metrics[key] = value
+                total_reads = int(normalize_numeric_string(metrics.get("Number of input reads", "0")))
+                unique_reads = int(normalize_numeric_string(metrics.get("Uniquely mapped reads number", "0")))
+                multi_reads = (
+                    int(normalize_numeric_string(metrics.get("Number of reads mapped to multiple loci", "0")))
+                    + int(normalize_numeric_string(metrics.get("Number of reads mapped to too many loci", "0")))
+                )
+                aligned_reads = unique_reads + multi_reads
+                aligned_pct = round((aligned_reads / total_reads) * 100, 4) if total_reads else None
+                return {
+                    "mapper_input_reads": total_reads,
+                    "mapper_reported_aligned_reads": aligned_reads,
+                    "mapper_uniquely_mapped_reads": unique_reads,
+                    "mapper_multimapped_reads": multi_reads,
+                    "mapper_reported_alignment_pct": aligned_pct,
+                }
+
+            def parse_hisat2_mapper_stats(stats_path):
+                total_reads = None
+                alignment_pct = None
+                with open(stats_path) as handle:
+                    for line in handle:
+                        total_match = re.match(r"^\s*([\d,]+)\s+reads; of these:", line)
+                        if total_match:
+                            total_reads = int(normalize_numeric_string(total_match.group(1)))
+                        pct_match = re.match(r"^\s*([\d.]+)% overall alignment rate", line)
+                        if pct_match:
+                            alignment_pct = float(pct_match.group(1))
+                aligned_reads = round((total_reads * alignment_pct) / 100) if total_reads is not None and alignment_pct is not None else None
+                return {
+                    "mapper_input_reads": total_reads,
+                    "mapper_reported_aligned_reads": aligned_reads,
+                    "mapper_uniquely_mapped_reads": None,
+                    "mapper_multimapped_reads": None,
+                    "mapper_reported_alignment_pct": alignment_pct,
+                }
+
+            def count_fastq_reads(path):
+                open_func = gzip.open if path.endswith(".gz") else open
+                line_count = 0
+                with open_func(path, "rt") as handle:
+                    for _ in handle:
+                        line_count += 1
+                return line_count // 4
+
+            def sample_qc_stats_path(sample_name):
+                stats_output_folder = master_config['output_folders'][master_config['stats_rule_num'] - 1]
+                if config['THETYPE'] != "CHIP":
+                    return f"{experiment_dir}/{stats_output_folder}/{sample_name}.sorted.dups_marked.filtered.bam.stats.txt"
+                return f"{experiment_dir}/{stats_output_folder}/{sample_name}.filtered.bam.stats.txt"
+
+            def mapper_stats_path(sample_name):
+                map_output_folder = master_config['output_folders'][master_config['map_rule_num'] - 1]
+                if config['THEMAPTOOL'] == "hisat2":
+                    return f"{experiment_dir}/{map_output_folder}/{sample_name}.HISAT2_stats.txt"
+                if config['THEMAPTOOL'] == "star_te":
+                    return f"{experiment_dir}/{map_output_folder}/{sample_name}.STAR_TE_stats.txt"
+                return f"{experiment_dir}/{map_output_folder}/{sample_name}.STAR_stats.txt"
+
+            sample_to_raw_inputs = {}
+            for path in input_files:
+                normalized_sample = normalize_sample_name(path, input_file_type)
+                sample_to_raw_inputs.setdefault(normalized_sample, []).append(path)
+
+            sample2_to_lane_samples = {}
+            for sample_name in samples:
+                aggregated_sample = re.sub(r'_L00.', '', sample_name)
+                sample2_to_lane_samples.setdefault(aggregated_sample, []).append(sample_name)
+
+            def load_alignment_qc_rows(tsv_paths):
+                rows = []
+                for tsv_path in tsv_paths:
+                    sample_name = None
+                    with open(tsv_path, newline="") as handle:
+                        for line in handle:
+                            if line.startswith("# sample\t"):
+                                sample_name = line.strip().split("\t", 1)[1]
+                                break
+                    with open(tsv_path, newline="") as handle:
+                        reader = csv.DictReader((line for line in handle if not line.startswith("#")), delimiter="\t")
+                        for row in reader:
+                            value = row["value"]
+                            if value == "NA":
+                                parsed_value = None
+                            else:
+                                try:
+                                    parsed_value = float(value)
+                                except ValueError:
+                                    parsed_value = None
+                            rows.append({
+                                "sample": sample_name or row["sample"],
+                                "stage": row["stage"],
+                                "metric": row["metric"],
+                                "unit": row["unit"],
+                                "value": parsed_value,
+                            })
+                return rows
+
+            def build_flow_qc_rows():
+                rows = []
+                trim_output_folder = master_config['output_folders'][master_config['trim_rule_num'] - 1]
+                mapper_parser = parse_hisat2_mapper_stats if config['THEMAPTOOL'] == "hisat2" else parse_star_mapper_stats
+
+                for sample_name in samples2:
+                    lane_samples = sample2_to_lane_samples.get(sample_name, [sample_name])
+                    raw_read_total = 0
+                    trimmed_read_total = 0
+
+                    for lane_sample in lane_samples:
+                        raw_files = sample_to_raw_inputs.get(lane_sample, [])
+                        raw_read_total += sum(count_fastq_reads(path) for path in raw_files if os.path.exists(path))
+
+                        if config['PAIRED']:
+                            trimmed_paths = [
+                                f"{experiment_dir}/{trim_output_folder}/{lane_sample}_R1.trimmed.fastq.gz",
+                                f"{experiment_dir}/{trim_output_folder}/{lane_sample}_R2.trimmed.fastq.gz",
+                            ]
+                        else:
+                            trimmed_paths = [f"{experiment_dir}/{trim_output_folder}/{lane_sample}.trimmed.fastq.gz"]
+                        trimmed_read_total += sum(count_fastq_reads(path) for path in trimmed_paths if os.path.exists(path))
+
+                    if raw_read_total:
+                        rows.append({"sample": sample_name, "stage": "raw_fastq", "metric": "raw_reads", "unit": "reads", "value": raw_read_total})
+                    if trimmed_read_total:
+                        rows.append({"sample": sample_name, "stage": "trimmed_fastq", "metric": "trimmed_reads", "unit": "reads", "value": trimmed_read_total})
+                    if raw_read_total and trimmed_read_total:
+                        rows.append({
+                            "sample": sample_name,
+                            "stage": "trimmed_fastq",
+                            "metric": "trimmed_reads_retained_pct",
+                            "unit": "percent",
+                            "value": round((trimmed_read_total / raw_read_total) * 100, 4),
+                        })
+
+                    mapper_totals = {
+                        "mapper_input_reads": 0,
+                        "mapper_reported_aligned_reads": 0,
+                        "mapper_uniquely_mapped_reads": 0,
+                        "mapper_multimapped_reads": 0,
+                    }
+                    mapper_fields_present = {key: False for key in mapper_totals}
+
+                    for lane_sample in lane_samples:
+                        stats_path = mapper_stats_path(lane_sample)
+                        if not os.path.exists(stats_path):
+                            continue
+                        lane_metrics = mapper_parser(stats_path)
+                        for key in mapper_totals:
+                            value = lane_metrics.get(key)
+                            if value is not None:
+                                mapper_totals[key] += value
+                                mapper_fields_present[key] = True
+
+                    if mapper_fields_present["mapper_input_reads"]:
+                        rows.append({
+                            "sample": sample_name,
+                            "stage": "mapper_report",
+                            "metric": "mapper_input_reads",
+                            "unit": "reads",
+                            "value": mapper_totals["mapper_input_reads"],
+                        })
+                    if mapper_fields_present["mapper_reported_aligned_reads"]:
+                        rows.append({
+                            "sample": sample_name,
+                            "stage": "mapper_report",
+                            "metric": "mapper_reported_aligned_reads",
+                            "unit": "reads",
+                            "value": mapper_totals["mapper_reported_aligned_reads"],
+                        })
+                    if mapper_fields_present["mapper_uniquely_mapped_reads"]:
+                        rows.append({
+                            "sample": sample_name,
+                            "stage": "mapper_report",
+                            "metric": "mapper_uniquely_mapped_reads",
+                            "unit": "reads",
+                            "value": mapper_totals["mapper_uniquely_mapped_reads"],
+                        })
+                    if mapper_fields_present["mapper_multimapped_reads"]:
+                        rows.append({
+                            "sample": sample_name,
+                            "stage": "mapper_report",
+                            "metric": "mapper_multimapped_reads",
+                            "unit": "reads",
+                            "value": mapper_totals["mapper_multimapped_reads"],
+                        })
+                    if mapper_fields_present["mapper_input_reads"] and mapper_fields_present["mapper_reported_aligned_reads"] and mapper_totals["mapper_input_reads"]:
+                        rows.append({
+                            "sample": sample_name,
+                            "stage": "mapper_report",
+                            "metric": "mapper_reported_alignment_pct",
+                            "unit": "percent",
+                            "value": round((mapper_totals["mapper_reported_aligned_reads"] / mapper_totals["mapper_input_reads"]) * 100, 4),
+                        })
+
+                return rows
+
+            def metric_values(rows, stage, metric):
+                values = []
+                for row in rows:
+                    if row["stage"] == stage and row["metric"] == metric and row["value"] is not None:
+                        values.append(row["value"])
+                return values
+
+            def draw_alignment_qc_panel(ax, rows, metric_specs, title, ylabel, log_scale=False):
+                point_color = "#355070"
+                summary_color = "#e56b6f"
+                box_face_color = "#dbe7ee"
+                box_edge_color = "#8aa1b1"
+
+                ax.set_title(title)
+                if log_scale:
+                    ax.set_yscale("symlog", linthresh=1)
+                ax.set_ylabel(ylabel)
+                ax.grid(axis="y", color="#e6e6e6", linewidth=0.8)
+                ax.spines["top"].set_visible(False)
+                ax.spines["right"].set_visible(False)
+
+                for idx, (label, stage, metric) in enumerate(metric_specs):
+                    values = metric_values(rows, stage, metric)
+                    if not values:
+                        ax.text(idx, 0.5, "NA", ha="center", va="bottom", fontsize=10, color="#777777")
+                        continue
+                    if len(values) > 1:
+                        ax.boxplot(
+                            values,
+                            positions=[idx],
+                            widths=0.5,
+                            patch_artist=True,
+                            showfliers=False,
+                            boxprops={"facecolor": box_face_color, "edgecolor": box_edge_color, "linewidth": 1.2},
+                            whiskerprops={"color": box_edge_color, "linewidth": 1.2},
+                            capprops={"color": box_edge_color, "linewidth": 1.2},
+                            medianprops={"color": box_edge_color, "linewidth": 1.4},
+                        )
+                    offsets = [idx + ((pos - (len(values) - 1) / 2) * 0.04) for pos in range(len(values))]
+                    ax.scatter(offsets, values, color=point_color, alpha=0.85, s=30, zorder=3)
+                    mean_value = statistics.mean(values)
+                    sd_value = statistics.stdev(values) if len(values) > 1 else 0.0
+                    ax.errorbar(
+                        idx,
+                        mean_value,
+                        yerr=sd_value,
+                        fmt="o",
+                        color=summary_color,
+                        ecolor=summary_color,
+                        elinewidth=2,
+                        capsize=4,
+                        markersize=7,
+                        zorder=4,
+                    )
+                    ax.text(idx, mean_value, f"{mean_value:.1f}", ha="center", va="bottom", fontsize=9, color=summary_color)
+
+                ax.set_xticks(range(len(metric_specs)))
+                ax.set_xticklabels([label for label, _, _ in metric_specs], rotation=15, ha="right")
+
+            def write_alignment_qc_experiment_summary(tsv_paths):
+                os.makedirs(f"{experiment_dir}/MultiQC", exist_ok=True)
+                experiment_name = os.path.basename(config["EXPERIMENT_DIR"])
+                aggregate_tsv = f"{experiment_dir}/MultiQC/{experiment_name}.alignment_qc_experiment_summary.tsv"
+                aggregate_pdf = f"{experiment_dir}/MultiQC/{experiment_name}.alignment_qc_experiment_summary.pdf"
+                aggregate_svg = f"{experiment_dir}/MultiQC/{experiment_name}.alignment_qc_experiment_summary.svg"
+                rows = load_alignment_qc_rows(tsv_paths) + build_flow_qc_rows()
+
+                with open(aggregate_tsv, "w", newline="") as handle:
+                    writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+                    writer.writerow(["sample", "stage", "metric", "unit", "value"])
+                    for row in rows:
+                        writer.writerow([
+                            row["sample"],
+                            row["stage"],
+                            row["metric"],
+                            row["unit"],
+                            "NA" if row["value"] is None else row["value"],
+                        ])
+
+                fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+                fig.patch.set_facecolor("white")
+                fig.suptitle(f"{experiment_name} alignment QC experiment summary", fontsize=16, fontweight="bold")
+
+                draw_alignment_qc_panel(
+                    axes[0, 0],
+                    rows,
+                    [
+                        ("Raw reads", "raw_fastq", "raw_reads"),
+                        ("Trimmed reads", "trimmed_fastq", "trimmed_reads"),
+                        ("Aligned reads", "mapper_report", "mapper_reported_aligned_reads"),
+                        ("Filtered mapped reads", "post_filter", "mapped_primary_reads"),
+                    ],
+                    "Read counts across the pipeline",
+                    "Reads",
+                    log_scale=True,
+                )
+
+                draw_alignment_qc_panel(
+                    axes[0, 1],
+                    rows,
+                    [
+                        ("Trim retained %", "trimmed_fastq", "trimmed_reads_retained_pct"),
+                        ("Mapper aligned %", "mapper_report", "mapper_reported_alignment_pct"),
+                        ("Mapped retained %", "derived", "mapped_primary_reads_retained_pct"),
+                        ("Proper pairs retained %", "derived", "properly_paired_templates_retained_pct"),
+                    ] if config["PAIRED"] else [
+                        ("Trim retained %", "trimmed_fastq", "trimmed_reads_retained_pct"),
+                        ("Mapper aligned %", "mapper_report", "mapper_reported_alignment_pct"),
+                        ("Mapped retained %", "derived", "mapped_primary_reads_retained_pct"),
+                    ],
+                    "Pipeline retention metrics",
+                    "Percent",
+                )
+
+                draw_alignment_qc_panel(
+                    axes[1, 0],
+                    rows,
+                    [
+                        ("Mapped reads removed", "derived", "mapped_primary_reads_removed"),
+                        ("Duplicate reads removed", "derived", "duplicate_primary_reads_removed"),
+                        ("Discordant pairs removed", "derived", "discordant_templates_removed"),
+                    ] if config["PAIRED"] else [
+                        ("Mapped reads removed", "derived", "mapped_primary_reads_removed"),
+                        ("Duplicate reads removed", "derived", "duplicate_primary_reads_removed"),
+                    ],
+                    "Reads or pairs removed",
+                    "Count",
+                    log_scale=True,
+                )
+
+                draw_alignment_qc_panel(
+                    axes[1, 1],
+                    rows,
+                    [
+                        ("Unique mapped reads", "mapper_report", "mapper_uniquely_mapped_reads"),
+                        ("Multi mapped reads", "mapper_report", "mapper_multimapped_reads"),
+                        ("Pre duplicate reads", "pre_filter", "duplicate_primary_reads"),
+                    ] if config["PAIRED"] else [
+                        ("Unique mapped reads", "mapper_report", "mapper_uniquely_mapped_reads"),
+                        ("Multi mapped reads", "mapper_report", "mapper_multimapped_reads"),
+                        ("Pre duplicate reads", "pre_filter", "duplicate_primary_reads"),
+                    ],
+                    "Mapper and duplication profile",
+                    "Reads",
+                    log_scale=True,
+                )
+
+                fig.tight_layout(rect=[0, 0.02, 1, 0.95])
+                fig.savefig(aggregate_pdf)
+                fig.savefig(aggregate_svg)
+                plt.close(fig)
+                return aggregate_tsv, aggregate_pdf, aggregate_svg, rows
+
+            def rows_to_sample_metric_map(rows):
+                sample_map = {}
+                for row in rows:
+                    if row["value"] is None:
+                        continue
+                    sample_map.setdefault(row["sample"], {})
+                    sample_map[row["sample"]][f"{row['stage']}__{row['metric']}"] = row["value"]
+                return sample_map
+
+            def write_multiqc_custom_content(rows):
+                multiqc_dir = f"{experiment_dir}/MultiQC"
+                os.makedirs(multiqc_dir, exist_ok=True)
+
+                generalstats_path = os.path.join(multiqc_dir, "omnomnomics_alignment_flow_generalstats_mqc.yaml")
+                table_path = os.path.join(multiqc_dir, "omnomnomics_alignment_flow_table_mqc.yaml")
+                sample_metric_map = rows_to_sample_metric_map(rows)
+
+                generalstats_yaml = {
+                    "id": "omnomnomics_alignment_flow_generalstats",
+                    "plot_type": "generalstats",
+                    "headers": {
+                        "raw_fastq__raw_reads": {
+                            "title": "Raw Reads",
+                            "description": "Raw FASTQ reads across all files for this sample.",
+                            "scale": "Blues",
+                            "format": "{:,.0f}",
+                        },
+                        "trimmed_fastq__trimmed_reads_retained_pct": {
+                            "title": "Trim %",
+                            "description": "Trimmed reads retained relative to raw FASTQ reads.",
+                            "min": 0,
+                            "max": 100,
+                            "suffix": "%",
+                            "scale": "RdYlGn",
+                            "format": "{:,.1f}",
+                        },
+                        "mapper_report__mapper_reported_alignment_pct": {
+                            "title": "Align %",
+                            "description": "Mapper-reported aligned reads as a percentage of mapper input reads.",
+                            "min": 0,
+                            "max": 100,
+                            "suffix": "%",
+                            "scale": "RdYlGn",
+                            "format": "{:,.1f}",
+                        },
+                        "derived__mapped_primary_reads_retained_pct": {
+                            "title": "Filt Retained %",
+                            "description": "Post-filter mapped primary reads retained relative to the pre-filter BAM.",
+                            "min": 0,
+                            "max": 100,
+                            "suffix": "%",
+                            "scale": "RdYlGn",
+                            "format": "{:,.1f}",
+                        },
+                        "derived__duplicate_primary_reads_removed": {
+                            "title": "Dup Removed",
+                            "description": "Duplicate primary reads removed between the pre-filter and post-filter BAMs.",
+                            "scale": "OrRd",
+                            "format": "{:,.0f}",
+                        },
+                    },
+                    "data": sample_metric_map,
+                }
+
+                table_headers = {
+                    "raw_fastq__raw_reads": {"title": "Raw Reads", "format": "{:,.0f}"},
+                    "trimmed_fastq__trimmed_reads": {"title": "Trimmed Reads", "format": "{:,.0f}"},
+                    "trimmed_fastq__trimmed_reads_retained_pct": {"title": "Trimmed %", "suffix": "%", "format": "{:,.1f}"},
+                    "mapper_report__mapper_input_reads": {"title": "Mapper Input Reads", "format": "{:,.0f}"},
+                    "mapper_report__mapper_reported_aligned_reads": {"title": "Mapper Aligned Reads", "format": "{:,.0f}"},
+                    "mapper_report__mapper_reported_alignment_pct": {"title": "Mapper Align %", "suffix": "%", "format": "{:,.1f}"},
+                    "mapper_report__mapper_uniquely_mapped_reads": {"title": "Unique Mapped Reads", "format": "{:,.0f}"},
+                    "mapper_report__mapper_multimapped_reads": {"title": "Multi-mapped Reads", "format": "{:,.0f}"},
+                    "pre_filter__mapped_primary_reads": {"title": "Pre-filter Mapped Reads", "format": "{:,.0f}"},
+                    "post_filter__mapped_primary_reads": {"title": "Post-filter Mapped Reads", "format": "{:,.0f}"},
+                    "derived__mapped_primary_reads_retained_pct": {"title": "Filtered Retained %", "suffix": "%", "format": "{:,.1f}"},
+                    "derived__mapped_primary_reads_removed": {"title": "Mapped Reads Removed", "format": "{:,.0f}"},
+                    "pre_filter__duplicate_primary_reads": {"title": "Pre-filter Duplicate Reads", "format": "{:,.0f}"},
+                    "post_filter__duplicate_primary_reads": {"title": "Post-filter Duplicate Reads", "format": "{:,.0f}"},
+                    "derived__duplicate_primary_reads_removed": {"title": "Duplicate Reads Removed", "format": "{:,.0f}"},
+                }
+                if config["PAIRED"]:
+                    table_headers.update({
+                        "pre_filter__properly_paired_templates": {"title": "Pre Proper Pairs", "format": "{:,.0f}"},
+                        "post_filter__properly_paired_templates": {"title": "Post Proper Pairs", "format": "{:,.0f}"},
+                        "derived__properly_paired_templates_retained_pct": {"title": "Proper Pair Retained %", "suffix": "%", "format": "{:,.1f}"},
+                        "pre_filter__discordant_templates": {"title": "Pre Discordant Pairs", "format": "{:,.0f}"},
+                        "derived__discordant_templates_removed": {"title": "Discordant Pairs Removed", "format": "{:,.0f}"},
+                    })
+
+                table_yaml = {
+                    "id": "omnomnomics_alignment_flow_table",
+                    "section_name": "Omnomnomics Alignment Flow QC",
+                    "description": "Aggregated raw, trimmed, mapper, and filtered alignment QC metrics collected across the pipeline.",
+                    "plot_type": "table",
+                    "pconfig": {
+                        "id": "omnomnomics_alignment_flow_table_plot",
+                        "title": "Omnomnomics Alignment Flow QC",
+                    },
+                    "headers": table_headers,
+                    "data": sample_metric_map,
+                }
+
+                with open(generalstats_path, "w") as handle:
+                    yaml.safe_dump(generalstats_yaml, handle, sort_keys=False)
+                with open(table_path, "w") as handle:
+                    yaml.safe_dump(table_yaml, handle, sort_keys=False)
+
+                return generalstats_path, table_path
+
+            stats_tsv_paths = [sample_qc_stats_path(sample_name) for sample_name in samples2]
+            existing_stats_tsvs = [path for path in stats_tsv_paths if os.path.exists(path)]
+            if existing_stats_tsvs:
+                log_it(logfile, "Generating experiment-level alignment QC summary...", "ALIGNMENT QC SUMMARY")
+                aggregate_tsv, aggregate_pdf, aggregate_svg, aggregate_rows = write_alignment_qc_experiment_summary(existing_stats_tsvs)
+                log_it(logfile, f"Aggregate alignment QC table: {aggregate_tsv}")
+                log_it(logfile, f"Aggregate alignment QC PDF: {aggregate_pdf}")
+                log_it(logfile, f"Aggregate alignment QC SVG: {aggregate_svg}")
+                multiqc_generalstats, multiqc_table = write_multiqc_custom_content(aggregate_rows)
+                log_it(logfile, f"MultiQC custom general stats file: {multiqc_generalstats}")
+                log_it(logfile, f"MultiQC custom table file: {multiqc_table}")
+            else:
+                log_it(logfile, "No sample-level alignment QC tables found. Skipping experiment-level alignment QC summary.", "ALIGNMENT QC SUMMARY")
+
             log_it(logfile, "Running multiQC...", "STATS")
             multiqc_version = subprocess.check_output(["multiqc", "--version"])
             log_it(logfile, "\n" + multiqc_version.decode("utf-8"), "MULTIQC VERSION")

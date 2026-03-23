@@ -210,7 +210,7 @@ Post-processing steps:
 				ATAC:	Get chrM stats
 6:	Index BAM
 7:	Generate pre/post-filter alignment QC summaries
-			Writes a tabular QC summary plus per-sample PDF/SVG summary plots and experiment-level PDF/SVG overview plots derived from those tables
+			Writes a per-sample tabular QC summary plus per-sample PDF/SVG summary plots
 8:	Create BigWigs
 9:	Merge Bigwigs and trackhubs by experimental group. Optional, will even in 'auto' mode only be run if the -E flag is set. See below.
 
@@ -224,10 +224,11 @@ Optional export:
 
 
 Auto mode:
-	By default runs the whole public pipeline. i.e., sets mode to 'all'
-	Will detect an aborted run (e.g. cancelled by user using scancel or requeued by slurm due to resouce constraints)
-	If an aborted run is detected, 'auto' mode will restart the run after the last succesfully completed step.
-	Optional HOMER tag directory export is not part of the numbered pipeline. Add `--create-homer-tagdirs` if you want it.
+		By default runs the whole public pipeline. i.e., sets mode to 'all'
+		Will detect an aborted run (e.g. cancelled by user using scancel or requeued by slurm due to resouce constraints)
+		If an aborted run is detected, 'auto' mode will restart the run after the last succesfully completed step.
+		Optional HOMER tag directory export is not part of the numbered pipeline. Add `--create-homer-tagdirs` if you want it.
+		If MultiQC is enabled, the final reporting block also writes an experiment-level QC TSV plus PDF/SVG summary plots before running MultiQC. These aggregate raw FASTQ read counts, trimmed FASTQ read counts, mapper-reported alignment metrics, and the post-touchup BAM QC summaries.
 
 Some job mode examples:
 	--job=all:	Run the whole pipeline 
