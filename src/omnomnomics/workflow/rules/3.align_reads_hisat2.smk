@@ -159,14 +159,14 @@ rule run_hisat2:
                         hisat2_command = " ".join(hisat2_command.split())
                         record_step_command(master_config['map_rule_num'], sample, hisat2_command)
                         shell(hisat2_command)
-                finish_step_sample(master_config['map_rule_num'], sample, "run_hisat2", tracking["start_time"], "OK")
-            except Exception:
-                finish_step_sample(master_config['map_rule_num'], sample, "run_hisat2", tracking["start_time"], "FAIL")
-                raise
                         shell(f'cp {quote(local_bam)} {quote(os.path.join(outputfolder, f"{sample}.bam"))}')
                         shell(f'cp {quote(local_stats)} {quote(os.path.join(outputfolder, f"{sample}.HISAT2_stats.txt"))}')
                     finally:
                         shutil.rmtree(local_workdir, ignore_errors=True)
+                finish_step_sample(master_config['map_rule_num'], sample, "run_hisat2", tracking["start_time"], "OK")
+            except Exception:
+                finish_step_sample(master_config['map_rule_num'], sample, "run_hisat2", tracking["start_time"], "FAIL")
+                raise
             shell(f"""echo "necessity file for aligners. can delete this." > {outputfolder}/{sample}.extra_3.tmp""")
         # Call the function with parameters
         run_hisat2(params.seq_type, threads, params.genome_path, input.trimmed_fastq1, input.trimmed_fastq2, params.keepunpaired, params.inputfolder, params.outputfolder, wildcards.sample3)
