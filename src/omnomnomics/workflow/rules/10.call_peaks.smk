@@ -1,4 +1,4 @@
-# Rule 11: Call Peaks
+# Rule 10: Call Peaks
 
 ## Omnomnomics Snake Rule ##
 #=============================================
@@ -16,13 +16,11 @@ import tempfile
 from shlex import quote
 
 def input_function(wildcards):
-    input_folder1 = f"{experiment_dir}/{master_config['input_folders'][master_config['callpeaks_rule_num']-1][0]}"
-    input_folder2 = f"{experiment_dir}/{master_config['input_folders'][master_config['callpeaks_rule_num']-1][1]}"
+    input_folder1 = f"{experiment_dir}/{master_config['input_folders'][master_config['callpeaks_rule_num']-1]}"
     input_files = []
     if config['THETYPE'] == "CHIP":
         for sample in samples2:
             input_files.append(f"{input_folder1}/{sample}.filtered.bam")
-            input_files.append(f"{input_folder2}/{sample}.filtered.HOMER_tagDir.tar.gz")
     elif config['THETYPE'] == "ATAC":
         for sample in samples2:
             input_files.append(f"{input_folder1}/{sample}.sorted.dups_marked.filtered.bam")
@@ -32,36 +30,30 @@ rule call_peaks:
     input:
         input_function
     output:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/extra_11.tmp"
+        f"{experiment_dir}/{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/extra_10.tmp"
     params:
         thetype= lambda wildcards: config['THETYPE'],  
         broad= lambda wildcards: config['BROAD'],
         input_sample= lambda wildcards: config['INPUT'],
-        homer_input= lambda wildcards: config['HOMERINPUT'],
-        genome= lambda wildcards: config['THEGENOME'],  
         experiment_dir= lambda wildcards: config['EXPERIMENT_DIR'], 
         name_fields= lambda wildcards: config['NAMEFIELDS'],  
         separator= lambda wildcards: config['THESEPARATOR'],
         thetype_field = lambda wildcards: config['THETYPEFIELD'] ,
-        style= lambda wildcards: config['THESTYLE'],
-        homersize= lambda wildcards: config['HOMERSIZE'],
-        homermindist= lambda wildcards: config['HOMERMINDIST'],
-        inputfolder1=lambda wildcards: f"{experiment_dir}/{master_config['input_folders'][master_config['callpeaks_rule_num']-1][0]}",
-        inputfolder2= lambda wildcards: f"{experiment_dir}/{master_config['input_folders'][master_config['callpeaks_rule_num']-1][1]}",
+        inputfolder1=lambda wildcards: f"{experiment_dir}/{master_config['input_folders'][master_config['callpeaks_rule_num']-1]}",
         outputfolder= lambda wildcards: f"{experiment_dir}/{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}"
     threads:
-        lambda wildcards: Threads_Per_Rule['11']
+        lambda wildcards: Threads_Per_Rule['10']
     resources:
-        mem_mb = lambda wildcards: Memory_Per_Rule['11'],
+        mem_mb = lambda wildcards: Memory_Per_Rule['10'],
         partition = lambda wildcards: master_config['partition'],
-        runtime = lambda wildcards: Runtime_Per_Rule['11']
+        runtime = lambda wildcards: Runtime_Per_Rule['10']
     run:
         log_it(logfile, "Calling Peaks...", f"EXECUTING STEP {master_config['callpeaks_rule_num']}")
-        log_it(logfile, f"Input folders: {params.inputfolder1} and {params.inputfolder2}")
+        log_it(logfile, f"Input folder: {params.inputfolder1}")
         log_it(logfile, f"Output folder: {params.outputfolder}")
 
-        def chip_style_label(style, broad):
-            if broad == "1" or style == "histone":
+        def chip_style_label(broad):
+            if broad == "1":
                 return "broad histone marks"
             return "TF / narrow peaks"
 
@@ -84,16 +76,6 @@ rule call_peaks:
             except subprocess.CalledProcessError:
                 return None
         
-
-        def get_name_from_homer(inputfolder, group, name_fields, separator):
-            group_escaped = group.replace(separator, '.*')
-            cmd = f'basename "$(ls "{inputfolder}" | grep "{group_escaped}" - | grep ".HOMER_tagDir$" | head -n1)" | cut -f{name_fields} -d{separator}'
-            try:
-                result = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
-                return result
-            except subprocess.CalledProcessError:
-                return None
-
         def ensure_peak_qc_dir(outputfolder):
             qc_dir = os.path.join(outputfolder, "peak_qc")
             os.makedirs(qc_dir, exist_ok=True)
@@ -102,10 +84,10 @@ rule call_peaks:
         def log_peak_qc_versions():
             bedtools_version = subprocess.check_output(["bedtools", "--version"], stderr=subprocess.STDOUT)
             samtools_version = subprocess.check_output(["samtools", "--version"], stderr=subprocess.STDOUT).decode("utf-8").splitlines()[0]
-            log_once(logfile, "step11.bedtools_version", "\n" + bedtools_version.decode("utf-8"), "BEDTOOLS VERSION")
-            log_once(logfile, "step11.samtools_version", "\n" + samtools_version + "\n", "SAMTOOLS VERSION")
+            log_once(logfile, "step10.bedtools_version", "\n" + bedtools_version.decode("utf-8"), "BEDTOOLS VERSION")
+            log_once(logfile, "step10.samtools_version", "\n" + samtools_version + "\n", "SAMTOOLS VERSION")
             if shutil.which("run_spp.R"):
-                log_once(logfile, "step11.phantompeakqualtools", f"\nrun_spp.R: {shutil.which('run_spp.R')}\n", "PHANTOMPEAKQUALTOOLS")
+                log_once(logfile, "step10.phantompeakqualtools", f"\nrun_spp.R: {shutil.which('run_spp.R')}\n", "PHANTOMPEAKQUALTOOLS")
 
         def macs3_peak_to_bed_path(peak_path):
             basename = os.path.basename(peak_path)
@@ -335,7 +317,7 @@ rule call_peaks:
             import matplotlib.pyplot as plt
             from matplotlib.backends.backend_pdf import PdfPages
 
-            log_once(logfile, "step11.matplotlib_version", f"\nmatplotlib {matplotlib.__version__}\n", "MATPLOTLIB VERSION")
+            log_once(logfile, "step10.matplotlib_version", f"\nmatplotlib {matplotlib.__version__}\n", "MATPLOTLIB VERSION")
 
             qc_dir = ensure_peak_qc_dir(outputfolder)
             pdf_path = os.path.join(qc_dir, f"{thetype.lower()}.peak_qc_summary.pdf")
@@ -420,7 +402,7 @@ rule call_peaks:
                 })
             return sample_rows
 
-        def call_peaks(logfile, thetype, inputfolder1, inputfolder2, outputfolder, separator, thetype_field, name_fields, broad, input_sample, homer_input, homer_size, homer_mindist, thestyle):
+        def call_peaks(logfile, thetype, inputfolder1, outputfolder, separator, thetype_field, name_fields, broad, input_sample):
             if thetype == "RNA":
                 log_it(logfile, "Not a ChIP- or ATAC-seq experiment, skipping this step...")
                 return
@@ -437,8 +419,8 @@ rule call_peaks:
                 chip_qc_rows = []
                 chip_sample_qc_rows = []
                 #If ChIP, call peaks
-                log_it(logfile, f"Finding ChIP enriched regions for {chip_style_label(thestyle, broad)}...")
-                if broad == "1" or thestyle == "histone":
+                log_it(logfile, f"Finding ChIP enriched regions for {chip_style_label(broad)}...")
+                if broad == "1":
                     log_it(logfile, "NSC and RSC are reported for broad histone marks, but they are typically less informative there than for TF / narrow peaks.")
 
                 log_it(logfile, "Calling peaks with MACS3...")
@@ -530,77 +512,6 @@ rule call_peaks:
                 if sample_qc_table:
                     log_it(logfile, f"Sample QC metrics: {sample_qc_table}")
                 write_peak_qc_summary_pdf(outputfolder, thetype, chip_sample_qc_rows, chip_qc_rows)
-                
-                # Call peaks using HOMER
-                log_it(logfile, "Calling peaks with HOMER...")
-                log_it(logfile, f"Input folder: {inputfolder2}")
-                
-                # Sanity check the working dir
-                sanity_check_dir(logfile, inputfolder2,  master_config['input_file_types'][master_config['callpeaks_rule_num']-1][1])
-                
-                # See if we need to unpack the tag dirs
-                if glob.glob(f"{inputfolder2}/*tagDir.tar.gz"):
-                    for tagdir in glob.glob(f"{inputfolder2}/*tagDir.tar.gz"):
-                        tagdir_basename = os.path.basename(tagdir)
-                        log_it(logfile, f"cd {inputfolder2} && tar --strip-components=1 -xzf {tagdir_basename}")
-                        shell(f"cd {inputfolder2} && tar --strip-components=1 -xzf {tagdir_basename}")
-                # Fetch tagdirs
-                tagdirs = glob.glob(f"{inputfolder2}/*.HOMER_tagDir")
-                
-                if homer_input == "NA": # No input sample was provided
-                    if broad == "1": # Check if we should call broad peaks
-                        log_it(logfile, "Calling broad histone marks with HOMER...") 
-                        for tagdir in tagdirs:
-                            log_it(logfile, f"findPeaks {tagdir} -style {thestyle} -size {homer_size} -minDist {homer_mindist} -region -o auto")
-                            shell(f"findPeaks {tagdir} -style {thestyle} -size {homer_size} -minDist {homer_mindist} -region -o auto")
-                    else:
-                        log_it(logfile, "Calling peaks with HOMER...")
-                        for tagdir in tagdirs:
-                            log_it(logfile, f"findPeaks {tagdir} -style {thestyle} -o auto")
-                            shell(f"findPeaks {tagdir} -style {thestyle} -o auto")
-                else:  # We have input!
-                    if broad == "1": # Check if we should call broad peaks
-                        log_it(logfile, "Calling broad histone marks with HOMER...")
-                        for tagdir in tagdirs:
-                            log_it(logfile, f"findPeaks {tagdir} -i {homer_input} -style {thestyle} -size {homer_size} -minDist {homer_mindist} -region -o auto")
-                            shell(f"findPeaks {tagdir} -i {homer_input} -style {thestyle} -size {homer_size} -minDist {homer_mindist} -region -o auto")
-                    else:
-                        log_it(logfile, "Calling peaks with HOMER...")
-                        for tagdir in tagdirs:
-                            log_it(logfile, f"findPeaks {tagdir} -i {homer_input} -style {thestyle} -o auto")
-                            shell(f"findPeaks {tagdir} -i {homer_input} -style {thestyle} -o auto")
-                
-                # Convert peaks to BED format and clean up unwanted contigs (chrUn | alt | random)
-                log_it(logfile, "Converting peaks to BED format and cleaning up unwanted contigs (chrUn | alt | random)...")
-                for tagdir in tagdirs:
-                    log_it(logfile, f"Testpp {tagdir}")
-                    if thestyle == "factor":
-                        shell(f"pos2bed.pl {tagdir}/peaks.txt | grep -v '#\\|alt\\|Un\\|random' | sort -k1,1 -k2,2n -k3,3n | cut -f-3 > {tagdir}/peaks.bed ")
-                    elif thestyle == "histone":
-                        shell(f"pos2bed.pl {tagdir}/regions.txt | grep -v '#\\|alt\\|Un\\|random' | sort -k1,1 -k2,2n -k3,3n | cut -f-3 > {tagdir}/regions.bed ")
-
-                ## Distribute samples over groups based on the file name pattern
-                # Build group list
-                tagdirs2 = [os.path.basename(tagdir).split(separator)[thetype_field - 1] for tagdir in tagdirs]
-                chip_groups = sorted(set(tagdirs2))
-
-                log_it(logfile, f"chip_groups = {chip_groups}")
-
-                # Iterate over the groups to merge the BED files
-                for group in chip_groups:
-                    # Fetch samples
-                    beds = [os.path.join(inputfolder2, bed) for bed in os.listdir(inputfolder2) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.HOMER_tagDir$", bed)]
-                    if thestyle == "factor":
-                        beds = [f"{bed}/peaks.bed" for bed in beds]
-                    elif thestyle == "histone":
-                        beds = [f"{bed}/regions.bed" for bed in beds]
-                    log_it(logfile, f"Merging peaks for: {group}...")
-                    log_it(logfile, f"Samples in group: {', '.join(beds)}")
-                    
-                    the_name = get_name_from_homer(inputfolder2, group, name_fields, separator)
-                    sorted_bed = f"{outputfolder}/{the_name}.HOMER.merged_peaks.bed"
-                    log_it(logfile, f"module load bedtools && cat {' '.join(beds)} | sort -k1,1 -k2,2n -k3,3n | bedtools merge -i - > {sorted_bed}")
-                    shell(f"""module load bedtools && cat {' '.join(beds)} | sort -k1,1 -k2,2n -k3,3n | bedtools merge -i - > {sorted_bed}""")
             else:
                 atac_qc_rows = []
                 atac_sample_qc_rows = []
@@ -679,16 +590,11 @@ rule call_peaks:
             logfile,
             thetype=params.thetype,
             inputfolder1=params.inputfolder1,
-            inputfolder2=params.inputfolder2,
             outputfolder=params.outputfolder,
             separator=params.separator,
             thetype_field=int(params.thetype_field),
             name_fields=params.name_fields,  
             broad=params.broad,
             input_sample=params.input_sample,
-            homer_input=params.homer_input,
-            homer_size=int(params.homersize),
-            homer_mindist=int(params.homermindist),
-            thestyle=params.style
         )
-        shell(f"""echo "necessity file for callpeaks. can delete this." > {params.outputfolder}/extra_11.tmp""")
+        shell(f"""echo "necessity file for callpeaks. can delete this." > {params.outputfolder}/extra_10.tmp""")

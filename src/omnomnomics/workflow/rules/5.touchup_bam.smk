@@ -21,6 +21,7 @@ rule touchup_bam:
         f"{experiment_dir}/{master_config['output_folders'][master_config['touchup_rule_num']-1]}/{{sample5}}.extra_5.tmp"
     params:
         thetype=config['THETYPE'],
+        duplicate_handling=config['DUPLICATE_HANDLING'],
         inputfolder = f"{experiment_dir}/{master_config['input_folders'][master_config['touchup_rule_num']-1]}",
         outputfolder = f"{experiment_dir}/{master_config['output_folders'][master_config['touchup_rule_num']-1]}"
     threads:
@@ -33,12 +34,13 @@ rule touchup_bam:
         log_it(logfile, f"Touching up BAM files with samtools (collate | fixmate | sort | markdup | filter)...",f"EXECUTING STEP {master_config['touchup_rule_num']}")
         log_it(logfile, f"Input folder: {params.inputfolder}")
         log_it(logfile, f"Output folder: {params.outputfolder}")
+        log_it(logfile, f"Duplicate handling: {params.duplicate_handling}")
         samtools_version = subprocess.check_output("samtools --version | head -n2", shell=True, executable='/bin/bash')
         log_it(logfile, "\n"+samtools_version.decode("utf-8"), "SAMTOOLS VERSION")
 
         sanity_check_dir(logfile, params.inputfolder, master_config['input_file_types'][master_config['touchup_rule_num']-1])
 
-        def touchup_bam_file(input_file, samcores, thetype, sample, outputfolder):
+        def touchup_bam_file(input_file, samcores, thetype, duplicate_handling, sample, outputfolder):
             tmpdir_root = os.environ.get("TMPDIR")
             local_workdir = tempfile.mkdtemp(prefix=f"{sample}.", dir=tmpdir_root if tmpdir_root else None)
             log_it(logfile, f"Scratch directory: {local_workdir}")
@@ -57,33 +59,36 @@ rule touchup_bam:
                     f"{sample}.sorted.dups_marked.filtered.bam" if thetype != "CHIP" else f"{sample}.filtered.bam",
                 )
                 local_extra = os.path.join(local_workdir, f"{sample}.extra_5.tmp")
+                min_mapq = 15 if thetype == "RNA" else 30
+                filter_flags = 2820
+                markdup_args = "-ru" if duplicate_handling == "remove" else "-u"
 
                 if thetype == "RNA":
-                    log_it(logfile, f"Touching up RNA-seq sample {input_file} (sort, mark dups, and keep MAPQ > 15)")
+                    log_it(logfile, f"Touching up RNA-seq sample {input_file} (duplicate handling: {duplicate_handling}, MAPQ >= {min_mapq})")
                     command = f"""
                         samtools collate -O -@ {samcores} {quote(local_input)} {quote(os.path.join(local_workdir, f'collate.{sample}.tmp'))} | \
                         samtools fixmate -mu -@ {samcores} - - | \
                         samtools sort -u -@ {samcores} - | \
-                        samtools markdup -u -@ {samcores} - - | \
-                        samtools view -@ {samcores} -q 15 -b -o {quote(local_output)} -
+                        samtools markdup {markdup_args} -@ {samcores} - - | \
+                        samtools view -@ {samcores} -q {min_mapq} -F {filter_flags} -b -o {quote(local_output)} -
                     """
                 elif thetype == "ATAC":
-                    log_it(logfile, f"Touching up ATAC-seq sample {input_file} (sort, mark dups, and keep MAPQ > 15)")
+                    log_it(logfile, f"Touching up ATAC-seq sample {input_file} (duplicate handling: {duplicate_handling}, MAPQ >= {min_mapq})")
                     command = f"""
                         samtools collate -O -@ {samcores} {quote(local_input)} {quote(os.path.join(local_workdir, f'collate.{sample}.tmp'))} | \
                         samtools fixmate -mu -@ {samcores} - - | \
                         samtools sort -u -@ {samcores} - | \
-                        samtools markdup -u -@ {samcores} - - | \
-                        samtools view -@ {samcores} -q 15 -b -o {quote(local_output)} -
+                        samtools markdup {markdup_args} -@ {samcores} - - | \
+                        samtools view -@ {samcores} -q {min_mapq} -F {filter_flags} -b -o {quote(local_output)} -
                     """
                 else:
-                    log_it(logfile, f"Touching up ChIP-seq sample {input_file} (sort, remove dups, and keep MAPQ > 15)")
+                    log_it(logfile, f"Touching up ChIP-seq sample {input_file} (duplicate handling: {duplicate_handling}, MAPQ >= {min_mapq})")
                     command = f"""
                         samtools collate -O -@ {samcores} {quote(local_input)} {quote(os.path.join(local_workdir, f'collate.{sample}.tmp'))} | \
                         samtools fixmate -mu -@ {samcores} - - | \
                         samtools sort -u -@ {samcores} - | \
-                        samtools markdup -ru -@ {samcores} - - | \
-                        samtools view -@ {samcores} -q 15 -b -o {quote(local_output)} -
+                        samtools markdup {markdup_args} -@ {samcores} - - | \
+                        samtools view -@ {samcores} -q {min_mapq} -F {filter_flags} -b -o {quote(local_output)} -
                     """
 
                 command = " ".join(command.split())
@@ -93,12 +98,12 @@ rule touchup_bam:
                 if thetype == "ATAC":
                     log_it(logfile, f"Getting ATAC statistics for sample {input_file}")
                     atac_stats_path = os.path.join(outputfolder, f"{sample}.ATAC_stats.txt")
-                    shell(f"""samtools view {quote(local_input)} | awk '{{{{if($3~/chrM/)chrm=chrm+1}}}}END{{{{printf \"%13s\\t%11d\\n\", \"Total Reads:\",NR;printf \"%13s\\t%11d %1s%2.2f%2s\\n\", \"ChrM Reads:\",chrm, \"(\", (chrm/NR)*100,\"%)\"}}}}' > {quote(atac_stats_path)}""")
+                    shell(f"""samtools view {quote(local_input)} | awk '{{{{if($3~/chrM/)chrm=chrm+1}}}}END{{{{printf \"%34s\\t%11d\\n\", \"Total aligned reads before filtering:\",NR;printf \"%34s\\t%11d %1s%2.2f%2s\\n\", \"chrM aligned reads before filtering:\",chrm, \"(\", (chrm/NR)*100,\"%)\"}}}}' > {quote(atac_stats_path)}""")
 
                 shell(f"""echo "necessity file for touchup_bam. can delete this." > {quote(local_extra)}""")
                 shell(f'cp {quote(local_output)} {quote(os.path.join(outputfolder, os.path.basename(local_output)))}')
                 shell(f'cp {quote(local_extra)} {quote(os.path.join(outputfolder, os.path.basename(local_extra)))}')
             finally:
                 shutil.rmtree(local_workdir, ignore_errors=True)
-        samcores = max(1, threads // 5)
-        touchup_bam_file(input.bamfile, samcores, params.thetype, wildcards.sample5, params.outputfolder)
+        samcores = threads
+        touchup_bam_file(input.bamfile, samcores, params.thetype, params.duplicate_handling, wildcards.sample5, params.outputfolder)

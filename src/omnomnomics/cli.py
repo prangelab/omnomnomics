@@ -45,22 +45,22 @@ def parse_arguments():
    parser.add_argument('-T', '--trim-tool', help='Trimming tool choice. Can be fastp or skewer. \n \t Default: fastp')
    parser.add_argument('-M', '--map-tool', help='Mapping tool choice. Can be HISAT2, STAR, or STAR_TE. STAR(_TE) can only be used for RNA-seq data. \n \t Default: HISAT2')
    parser.add_argument('-f', '--formula', help='RNA: Experimental Design for DE calling. \n \t Default: 1 (just an intercept)')
-   parser.add_argument('-I', '--input', help='Input file used for ChIP peak calling. Has to be a .bam file or HOMER tag directory. \n \t Default: do not use input')
+   parser.add_argument('-I', '--input', help='Input BAM file used for ChIP peak calling with MACS3. \n \t Default: do not use input')
    parser.add_argument('-m', '--metadata', help='.txt file with columns of metadata for RNA-seq experiments. \n \t Default: DESeq2 style metadata table describing all samples. Rownames should be samplenames')
-   parser.add_argument('-b', '--broad', action='store_true', help='ChIP: Peak calling style. If set, use MACS3 in --broad mode, and use HOMER findPeaks with -size, -minDist and -region settings. Works best with STYLE histone.')
-   parser.add_argument('-S', '--style', help='ChIP: Peak calling style for HOMER peak calling. Can be factor or histone. \n \t Default: factor')
+   parser.add_argument('-b', '--broad', action='store_true', help='ChIP: Call broad histone marks with MACS3 --broad mode. Default is TF / narrow peaks.')
    parser.add_argument('-C', '--col-table', help='File specifying which colors to use for the tracks. \n \t Default: gray.tint.color.table from the packaged palette directory. Can be a *txt list file with one color table per line. Different color tables will be used per hub as split by -e. Can be a full path or a file basename in combination with -P. Use `omnomnomics create-track-color-table` to build custom palettes and `omnomnomics display-track-color-table` to preview them.')
    parser.add_argument('-P', '--color-data-folder', help='Path to a folder with color tables. \n \t Default: packaged color_data_for_hubs directory. Use this to point the workflow at custom palettes.') ##################change this default??
    parser.add_argument('-o', '--overlay', help='Overlay type (transparentOverlay|stacked|solidOverlay|none) \n \t Default: transparentOverlay')
    parser.add_argument('-L', '--hub-mail', help='Email to use in trackhub \n \t Default: m.dewinther@amsterdamumc.nl')
    parser.add_argument('-X', '--no-multiqc', action='store_true', help='Exclude multiQC stats aggregator. Set if you don not wish to run multiQC.')
+   parser.add_argument('--create-homer-tagdirs', action='store_true', help='Create optional HOMER tag directory exports in addition to the main pipeline outputs.')
+   parser.add_argument('--remove-duplicates', action='store_true', help='Remove duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.')
+   parser.add_argument('--keep-duplicates', action='store_true', help='Keep duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.')
    parser.add_argument('-n', '--name-fields', help='Field(s) in filename to use as track name, peak file name, and column header in the count table \n \t Default: 1-3')
    parser.add_argument('-e', '--type-field', help='Field(s) in filename to use as merged hub or peak calling group identifier \n \t Default: 1 (Creates separate merged hubs for each unique entry)')
    parser.add_argument('-c', '--col-field', help='Field(s) in filename to use as color type \n \t Default: 2')
    parser.add_argument('-s', '--separator', help='Separator used in file names. \n \t Default: _')
    parser.add_argument('-a', '--appendix', help='Appendix to add to track name \n \t Default: hub')
-   parser.add_argument('-d', '--homer-mindist', help='Minimum distance bewteen peaks. Used for merging regions in HOMER broad peak calling mode. \n \t Default: 2000')
-   parser.add_argument('-z', '--homer-size', help='Minimum peak size. Used for defining peaks in HOMER broad peak calling mode. \n \t Default: 500')
    parser.add_argument('-k', '--keepunpaired', action='store_true', help='Keep unpaired or not in HISAT2')
    parser.add_argument('--dry-run', action='store_true', help='Validate the workflow and build the Snakemake DAG without executing jobs')
    parser.add_argument('--site-config', help='Optional path to a site-specific config YAML. Default: packaged site config')
@@ -198,7 +198,7 @@ def set_user_subroutine_choices(trim_tool, map_tool, config):
 ##---------------------------------------------------------------------------------------------------------------
 ## Validate user defined variables
 ##---------------------------------------------------------------------------------------------------------------
-def validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, the_style, color_data_folder, col_table, overlay, the_type, map_tool, homer_size, homer_mindist, config):
+def validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, color_data_folder, col_table, overlay, the_type, map_tool, config):
     #Validate user-defined variables
     print("Validating options...")
 
@@ -230,24 +230,7 @@ def validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, t
             print(f"e.g., -I {os.path.join(str(Path.home()), 'genomes', 'input_ChIP', 'my_awesome_input.bam')}. Aborting...", file=sys.stderr)
             sys.exit(1)
 
-        if not os.path.isdir(os.path.join(os.path.dirname(INPUT), f"{os.path.basename(INPUT).replace('.bam', '')}.HOMER_tagDir")):
-            print(f"WARNING: No corresponding input HOMER tagDir found! ({homer_input}) does not exist...", file=sys.stderr)
-            print("WARNING: Will run HOMER findPeaks without input...", file=sys.stderr)
-            homer_input = "NA"
-        else:
-            homer_input = os.path.join(os.path.dirname(INPUT), f"{os.path.basename(INPUT).replace('.bam', '')}.HOMER_tagDir")
-    else:
-        homer_input = config['homer_input']
-
-    # Convert peak style to lowercase if given on command line, else take the default from config file
-    the_style = the_style.lower()
-
-
-    # Check peak style
-    if the_style not in ["factor", "histone"]:
-        print("ChIP peak calling style has to be factor or histone! Aborting...", file=sys.stderr)
-        sys.exit(1)
-
+    
 
     # Check color data folder
     if not os.path.isdir(color_data_folder):
@@ -303,14 +286,7 @@ def validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, t
         print("STAR read aligner can only be used with RNA-seq data! Aborting...", file=sys.stderr)
         sys.exit(1)
 
-    # Check if HOMER peak size and mindist are integers
-    if homer_size and not isinstance(homer_size, int):
-        print("HOMER peak size (-z) has to be an integer! Aborting...", file=sys.stderr)
-        sys.exit(1)
-    if homer_mindist and not isinstance(homer_mindist, int):
-        print("HOMER minimal distance (-d) has to be an integer! Aborting...", file=sys.stderr)
-        sys.exit(1)
-    return homer_input
+    return
 
 ##---------------------------------------------------------------------------------------------------------------
 ## Finetune some vars
@@ -441,15 +417,7 @@ def validate_input_files(the_type, config, mode_range_min, experiment_dir):
     input_file_type_mod_range_min = input_file_types[mode_range_min - 1]
 
     #For rules with multiple input filetypes, set it to the right one
-    if mode_range_min == 10:
-        if the_type == "RNA":
-            input_file_type_mod_range_min = input_file_type_mod_range_min[0]
-        else:
-            input_file_type_mod_range_min = input_file_type_mod_range_min[1]
     if mode_range_min == 11:
-        input_file_type_mod_range_min = input_file_type_mod_range_min[0]
-        input_folder_mod_range_min = input_folder_mod_range_min[0]
-    if mode_range_min == 12:
         input_file_type_mod_range_min = input_file_type_mod_range_min[0]
         input_folder_mod_range_min = input_folder_mod_range_min[0]
 
@@ -460,15 +428,13 @@ def validate_input_files(the_type, config, mode_range_min, experiment_dir):
 
     # Sanity check file number
     if num_files == 0:
-        if mode_range_min == 13 and the_type == "CHIP":
-                pass
-        elif mode_range_min == 12 and the_type == "CHIP":
+        if mode_range_min == 12 and the_type == "CHIP":
                 pass
         else: 
             print("No input files detected! Aborting...", file=sys.stderr)
             sys.exit(1)
    
-    if (mode_range_min == 13 or mode_range_min == 12) and the_type == "CHIP":
+    if mode_range_min == 12 and the_type == "CHIP":
         pass
     else:
         # Check if input files are readable
@@ -657,10 +623,17 @@ def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
                 if os.path.exists(file):
                     if num == 4 and output_filetype == ".bam" and re.search(r'L0\d+', os.path.basename(file)):
                         continue
-                    elif num == 10:
+                    elif num == 9:
                         shutil.rmtree(file) # Is actually a hub directory and not a file
                     else:
                         os.remove(file)
+    if config.get('create_homer_tagdirs', False):
+        homer_outputfolder = config['output_folders'][config['homer_tagdir_rule_num'] - 1]
+        homer_output_filetype = config['output_file_types'][config['homer_tagdir_rule_num'] - 1]
+        files = glob.glob(f"{experiment_dir}/{homer_outputfolder}/*{homer_output_filetype}")
+        for file in files:
+            if os.path.exists(file):
+                os.remove(file)
 ##--------------------------------------------------------------------------------------------------------------
 # Main function
 ##--------------------------------------------------------------------------------------------------------------
@@ -729,24 +702,34 @@ def main():
     broad = args.broad if args.broad else config.get('broad', "NA")
     INPUT = args.input if args.input else config.get('input',"NA")
     metadata = args.metadata if args.metadata else config.get('metadata', "NA")
-    style = args.style if args.style else config.get('the_style', "factor")
     col_table = resolve_config_path(args.col_table, workflow_root) if args.col_table else resolve_config_path(config.get('color_table', f"{workflow_root}/bin/color_data_for_hubs/gray.tint.color.table"), workflow_root)
     color_data_folder = resolve_config_path(args.color_data_folder, workflow_root) if args.color_data_folder else resolve_config_path(config.get('color_data_folder', f"{workflow_root}/bin/color_data_for_hubs"), workflow_root)
     overlay = args.overlay if args.overlay else config.get('overlay', "transparentOverlay")
     hub_mail = args.hub_mail if args.hub_mail else config.get('hub_mail', "m.dewinther@amsterdamumc.nl")
     no_multiqc = args.no_multiqc if args.no_multiqc else config.get('no_multiqc', 0)
+    create_homer_tagdirs = args.create_homer_tagdirs or config.get('create_homer_tagdirs', False)
+    if args.remove_duplicates and args.keep_duplicates:
+        print("Please specify only one of --remove-duplicates or --keep-duplicates. Aborting...", file=sys.stderr)
+        sys.exit(1)
+    duplicate_handling = config.get('duplicate_handling', 'auto')
+    if args.remove_duplicates:
+        duplicate_handling = "remove"
+    elif args.keep_duplicates:
+        duplicate_handling = "keep"
+    elif duplicate_handling == "auto":
+        duplicate_handling = "keep" if the_type == "RNA" else "remove"
     name_fields = args.name_fields if args.name_fields else config.get('name_fields', "1-3")
     type_field = args.type_field if args.type_field else config.get('type_field', "1")
     col_field = args.col_field if args.col_field else config.get('col_field', "2")
     separator = args.separator if args.separator else config.get('separator', "_")
     appendix = args.appendix if args.appendix else config.get('appendix', "hub")
-    homer_mindist = args.homer_mindist if args.homer_mindist else config.get('homer_mindist', 2000)
-    homer_size = args.homer_size if args.homer_size else config.get('homer_size', 500)
     keep_unpaired = args.keepunpaired if args.keepunpaired else config.get('keep_unpaired', False)
     dry_run = args.dry_run
 
     # Check required variables
     check_required_vars(the_type, experiment_dir, genome, available_genomes, config)
+    config['create_homer_tagdirs'] = create_homer_tagdirs
+    config['duplicate_handling'] = duplicate_handling
 
     # Set user subroutine choices
     selected_routine_trim, selected_routine_map = set_user_subroutine_choices(trim_tool, map_tool, config)
@@ -758,7 +741,6 @@ def main():
     selected_routines['selected_routine_touchup'] = config['selected_routine_touchup']   
     selected_routines['selected_routine_index'] = config['selected_routine_index']
     selected_routines['selected_routine_stats'] = config['selected_routine_stats']
-    selected_routines['selected_routine_tagdir'] = config['selected_routine_tagdir']
     selected_routines['selected_routine_wig'] = config['selected_routine_wig']
     selected_routines['selected_routine_mergewig'] = config['selected_routine_mergewig']
     selected_routines['selected_routine_callpeaks'] = config['selected_routine_callpeaks']
@@ -766,7 +748,7 @@ def main():
     selected_routines['selected_routine_de'] = config['selected_routine_de']
 
     # Validate user-defined variables
-    homer_input = validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, style, color_data_folder, col_table, overlay, the_type, map_tool, homer_size, homer_mindist, config)
+    validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, color_data_folder, col_table, overlay, the_type, map_tool, config)
 
     # Setup variables
     run_date = setup_variables(experiment_dir, config)
@@ -776,15 +758,14 @@ def main():
     print(f"MODE STEPS = {mode_steps}")
 
     # Check if pipeline needed or user first has to run separate scripts
-    if min(mode_steps) == 12 and the_type == "CHIP":
+    if min(mode_steps) == 11 and the_type == "CHIP":
         print("For ChIP experiments, first determine optimal peak caller settings and quantify peaks with your chosen downstream workflow before continuing.")
         return
-    elif min(mode_steps) == 13 and the_type == "CHIP":
+    elif min(mode_steps) == 12 and the_type == "CHIP":
         print("To call DE peaks for ChIP data, first determine the best peak calling settings for your experiment and quantify peaks with your chosen downstream workflow.")
-        print("Then execute 'run_call_DE_peaks.sh' on your optimal peak set.")
         return
-    elif min(mode_steps) == 11 and the_type == "RNA":
-        print("Not a ChIP- or ATAC-seq experiment, skipping step 11 Call Peaks step...")
+    elif min(mode_steps) == 10 and the_type == "RNA":
+        print("Not a ChIP- or ATAC-seq experiment, skipping step 10 Call Peaks step...")
         mode_steps.pop(0)
         if not mode_steps:
             print("For the rest no steps to run. Done!")
@@ -823,9 +804,7 @@ def main():
         'INPUT_FOLDER': input_folder_mod_range_min,
         'INPUT_FILE_TYPE': input_file_type_mod_range_min,
         'INPUT': INPUT,
-        'HOMERINPUT': homer_input,
         'BROAD': broad,
-        'THESTYLE': style,
         'THEMODE': mode_steps,
         'THETYPE': the_type,
         'NUMFILES': num_files,
@@ -840,6 +819,8 @@ def main():
         'THETRIMTOOL': trim_tool,
         'THEMAPTOOL': map_tool,
         'NO_MULTIQC': no_multiqc,
+        'CREATE_HOMER_TAGDIRS': create_homer_tagdirs,
+        'DUPLICATE_HANDLING': duplicate_handling,
         'THETYPEFIELD': type_field,
         'NAMEFIELDS': name_fields,
         'THECOLFIELD': col_field,
@@ -849,8 +830,6 @@ def main():
         'THECOLORDATAFOLDER': color_data_folder,
         'THEHUBMAIL': hub_mail,
         'THECOLTABLE': col_table,
-        'HOMERSIZE': homer_size,
-        'HOMERMINDIST': homer_mindist,
         'THEMEM': the_mem,
         'THEHEAPINIT': the_heap_init  
     }

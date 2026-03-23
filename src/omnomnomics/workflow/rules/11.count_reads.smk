@@ -1,4 +1,4 @@
-# Rule 12: Count Reads
+# Rule 11: Count Reads
 
 ## Omnomnomics Snake Rule ##
 #=============================================
@@ -20,8 +20,10 @@ def count_reads_input(_wildcards):
             for sample in samples2
         )
     elif config["THETYPE"] == "ATAC":
-        if 11 in themode:
-            input_files.append(f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num'] - 1][1]}/extra_11.tmp")
+        if master_config["callpeaks_rule_num"] in themode:
+            input_files.append(
+                f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num'] - 1][1]}/extra_{master_config['callpeaks_rule_num']}.tmp"
+            )
         input_files.extend(
             f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num'] - 1][0]}/{sample}.sorted.dups_marked.filtered.bam"
             for sample in samples2
@@ -36,7 +38,7 @@ rule count_reads:
     input:
         count_reads_input
     output:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num']-1]}/extra_12.tmp"
+        f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num']-1]}/extra_11.tmp"
     params:
         thetype=config["THETYPE"],
         genome=config["THEGENOME"],
@@ -47,34 +49,34 @@ rule count_reads:
         outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num'] - 1]}",
         gtf_file=os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "annotation", "genes.gtf")
     threads:
-        Threads_Per_Rule["12"]
+        Threads_Per_Rule[str(master_config["countreads_rule_num"])]
     resources:
-        mem_mb=Memory_Per_Rule["12"],
+        mem_mb=Memory_Per_Rule[str(master_config["countreads_rule_num"])],
         partition=master_config["partition"],
-        runtime=Runtime_Per_Rule["12"]
+        runtime=Runtime_Per_Rule[str(master_config["countreads_rule_num"])]
     run:
-        log_once(logfile, "step12.header", "Counting Reads...", f"EXECUTING STEP {master_config['countreads_rule_num']}")
-        log_once(logfile, "step12.inputfolder", f"Input folder: {params.bam_input_folder} and also {params.peak_input_folder} for ATAC data")
-        log_once(logfile, "step12.outputfolder", f"Output folder: {params.outputfolder}")
+        log_once(logfile, "step11.header", "Counting Reads...", f"EXECUTING STEP {master_config['countreads_rule_num']}")
+        log_once(logfile, "step11.inputfolder", f"Input folder: {params.bam_input_folder} and also {params.peak_input_folder} for ATAC data")
+        log_once(logfile, "step11.outputfolder", f"Output folder: {params.outputfolder}")
 
         def quote(path):
             return shlex.quote(path)
 
         def write_tmp_file(outputfolder):
-            shell(f"""echo "necessity file for count reads. can delete this." > {outputfolder}/extra_12.tmp""")
+            shell(f"""echo "necessity file for count reads. can delete this." > {outputfolder}/extra_11.tmp""")
 
         def rna_output_path(outputfolder):
             return os.path.join(outputfolder, f"{os.path.basename(params.experiment_dir)}.raw_read_quant.table.txt")
 
         def count_reads_rna(input_folder, output_folder, gtf_file, paired):
             log_it(logfile, "Counting RNA reads from BAMs with featureCounts...")
-            sanity_check_dir(logfile, input_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][0], "step12.rna_sanity")
+            sanity_check_dir(logfile, input_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][0], "step11.rna_sanity")
 
             if not os.path.isfile(gtf_file):
                 raise FileNotFoundError(f"Genome annotation GTF not found: {gtf_file}")
 
             featurecounts_version = subprocess.check_output(["featureCounts", "-v"], stderr=subprocess.STDOUT)
-            log_once(logfile, "step12.featurecounts_version", "\n" + featurecounts_version.decode("utf-8"), "FEATURECOUNTS VERSION")
+            log_once(logfile, "step11.featurecounts_version", "\n" + featurecounts_version.decode("utf-8"), "FEATURECOUNTS VERSION")
 
             bam_files = [os.path.join(input_folder, f"{sample}.sorted.dups_marked.filtered.bam") for sample in samples2]
             featurecounts_output = os.path.join(output_folder, f"{os.path.basename(params.experiment_dir)}.featureCounts.tmp.txt")
@@ -100,11 +102,11 @@ rule count_reads:
 
         def count_reads_atac(input_folder, peak_folder, output_folder):
             log_it(logfile, "Counting ATAC reads from BAMs with bedtools multicov...")
-            sanity_check_dir(logfile, input_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][0], "step12.atac_bam_sanity")
-            sanity_check_dir(logfile, peak_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][1], "step12.atac_peak_sanity")
+            sanity_check_dir(logfile, input_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][0], "step11.atac_bam_sanity")
+            sanity_check_dir(logfile, peak_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][1], "step11.atac_peak_sanity")
 
             bedtools_version = subprocess.check_output(["bedtools", "--version"], stderr=subprocess.STDOUT)
-            log_once(logfile, "step12.bedtools_version", "\n" + bedtools_version.decode("utf-8"), "BEDTOOLS VERSION")
+            log_once(logfile, "step11.bedtools_version", "\n" + bedtools_version.decode("utf-8"), "BEDTOOLS VERSION")
 
             peak_bed = os.path.join(peak_folder, "all_groups.merged_peaks.bed")
             bam_files = [os.path.join(input_folder, f"{sample}.sorted.dups_marked.filtered.bam") for sample in samples2]

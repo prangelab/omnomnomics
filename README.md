@@ -89,12 +89,12 @@ OMNOM_HOME
      |- 5.touchup_bam.smk
      |- 6.index_bam.smk
      |- 7.bam_stats.smk
-     |- 8.make_HOMER_tagDIR.smk
-     |- 9.create_wiggles.smk
-     |- 10.merge_wiggles.smk
-     |- 11.call_peaks.smk
-     |- 12.count_reads.smk
-     |- 13.call_DE.smk
+     |- 8.create_wiggles.smk
+     |- 9.merge_wiggles.smk
+     |- 10.call_peaks.smk
+     |- 11.count_reads.smk
+     |- 12.call_DE.smk
+     |- 13.make_HOMER_tagDIR.smk   (optional export rule triggered by --create-homer-tagdirs)
 |- slurm_profile
 	|- config.yaml (slurm config file)
 |- src
@@ -172,7 +172,6 @@ EXPERIMENT_DIR
 |- peak_calling
      |- {sample}.MACS3.q-0p01_peaks.bed (if the data type = ATAC, from call_peaks)
      |- all_groups.merged_peaks.bed (if the data type = ATAC, from call_peaks)
-     |- THENAME.HOMER.merged_peaks.bed (if the data type = ChIP, from call_peaks)
      |- THENAME.MACS3.q-0p05_peaks.bed (if the data type = ChIP, from call_peaks)
      |- THENAME.MACS3.q-0p01_peaks.bed (if the data type = ChIP, from call_peaks)
      |- THENAME.MACS3.q-0p001_peaks.bed (if the data type = ChIP, from call_peaks)
@@ -202,44 +201,50 @@ Pre-processing steps:
 
 Post-processing steps:
 5:	Touchup BAM
-			Runs a chain of samtools commands to sort, mark duplicate reads, and filter the BAM files
-			Specifically: samtools collate | fixmate -m | sort | markdup (-r) | view -q 15
-				All:	MAPQ > 15
-				ChIP:	discard duplicates (-r)
+			Runs a chain of samtools commands to collate, repair mate tags, sort, mark or remove duplicates, and filter the BAM files
+			Specifically: samtools collate | fixmate -m | sort | markdup | view
+				RNA:	keep duplicates by default, MAPQ >= 15
+				ATAC:	remove duplicates by default, MAPQ >= 30
+				ChIP:	remove duplicates by default, MAPQ >= 30
+				Override duplicate handling with --remove-duplicates or --keep-duplicates
 				ATAC:	Get chrM stats
 6:	Index BAM
-7:	Generate read # statistics with bamtools stats
-8:	Create HOMER tag directories
-9:	Create BigWigs and trackHubs
-10:	Merge Bigwigs and trackhubs by experimental group. Optional, will even in 'auto' mode only be run if the -E flag is set. See below.
+7:	Generate pre/post-filter alignment QC summaries
+			Writes a tabular QC summary plus per-sample PDF/SVG summary plots and experiment-level PDF/SVG overview plots derived from those tables
+8:	Create BigWigs
+9:	Merge Bigwigs and trackhubs by experimental group. Optional, will even in 'auto' mode only be run if the -E flag is set. See below.
 
 Assay dependent follow-up steps:
-11:	ChIP/ATAC: Call peaks
-12:	RNA/ATAC:	   Create count table
-13:	RNA/ATAC:	   Call DE genes/peaks
+10:	ChIP/ATAC: Call peaks
+11:	RNA/ATAC:	   Create count table
+12:	RNA/ATAC:	   Call DE genes/peaks
+
+Optional export:
+	--create-homer-tagdirs:	Create HOMER tag directory tarballs alongside the main numbered workflow outputs.
 
 
 Auto mode:
-	By default runs the whole pipeline. i.e., sets mode to 'all'
+	By default runs the whole public pipeline. i.e., sets mode to 'all'
 	Will detect an aborted run (e.g. cancelled by user using scancel or requeued by slurm due to resouce constraints)
 	If an aborted run is detected, 'auto' mode will restart the run after the last succesfully completed step.
+	Optional HOMER tag directory export is not part of the numbered pipeline. Add `--create-homer-tagdirs` if you want it.
 
 Some job mode examples:
 	--job=all:	Run the whole pipeline 
 					Input is the 'FASTQ' folder inside your <EXPERIMENT_DIR>, which contains the .fastq.gz files you want analysed.
 	--job=1-3:	Run the pipeline up to and including the mapping step.
 					Input is the 'FASTQ' folder inside your <EXPERIMENT_DIR>, which contains the .fastq.gz files you want analysed.
-	-j 1-10:	Run the whole pipeline excluding the assay dependent follow-up.
+	-j 1-9:	Run the whole pipeline excluding the assay dependent follow-up.
 					Input is the 'FASTQ' folder inside your <EXPERIMENT_DIR>, which contains the .fastq.gz files you want analysed.
-	-j 4-12:	Run The whole pipeline, starting after the mapping step.
+	-j 4-11:	Run The whole pipeline, starting after the mapping step.
 					Input is the 'BAM' folder inside your <EXPERIMENT_DIR>, which contains the raw .bam files you want analysed.
-	--job=8-9:	Only generate HOMER tag directories and BigWigs.
-					Input is the 'filtered_BAM' folder inside your <EXPERIMENT_DIR>, which contains the .bam files you want analysed.
-	--job=7:	Only run the bamtools stats step to genrate some statistics.
-					Input is the 'filtered_BAM' folder inside your <EXPERIMENT_DIR>, which contains the .bam files you want analysed.
-	--job=1-9,11-13:	Run everything but do not create merged trackhubs.
+	--job=7:	Only run the alignment QC summary step.
+					Input is the 'BAM' and 'filtered_BAM' folders inside your <EXPERIMENT_DIR>, which contain the pre- and post-filter BAM files to compare.
+	--job=1-8,10-12:	Run everything but do not create merged trackhubs.
 					Input is the 'FASTQ' folder inside your <EXPERIMENT_DIR>, which contains the .fastq.gz files you want analysed.
-	--job=1,3,5,6,8,11-13:	Trim the reads, map, touch up, create index and tagDirs, and run the assay dependent follow-up. Skip QC, merging and bigwigs
+	--job=1,3,5,6,10-12:	Trim the reads, map, touch up, create index, and run the assay dependent follow-up. Skip QC, merging, and BigWigs.
+					Input is the 'FASTQ' folder inside your <EXPERIMENT_DIR>, which contains the .fastq.gz files you want analysed.
+	--job=1-12 --create-homer-tagdirs:	Run the full public pipeline and also export optional HOMER tag directories.
 					Input is the 'FASTQ' folder inside your <EXPERIMENT_DIR>, which contains the .fastq.gz files you want analysed.
 ```
 
@@ -254,6 +259,9 @@ Some job mode examples:
 								ENSMBL/GenBank:		GRCh38.p14, GRCm39
 								Required argument
     -X:                     eXclude multiQC stats aggregator. Set if you don not wish to run multiQC.
+    --create-homer-tagdirs: Create optional HOMER tag directory tarballs in addition to the main numbered workflow outputs.
+    --remove-duplicates:    Remove duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.
+    --keep-duplicates:      Keep duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.
     -j MODE:                Job mode. Can be 'auto', 'all' or a range of jobs. See below (-h) for some 
 							examples.
                                     Default: auto
@@ -264,19 +272,12 @@ Some job mode examples:
                                     Default: HISAT2
     -f DESIGN_FORMULA:      RNA: Experimental Design for DE calling
                                     Default: 1 (just an intercept)
-    -I <INPUT>:             Input file used for ChIP peak calling. Has to be a .bam file or HOMER tag 
-							directory.
+    -I <INPUT>:             Input BAM file used for ChIP peak calling with MACS3.
                                     Default: Do not use input.
     -m <METADATA_TABLE>:    .txt file with columns of metadata for RNA-seq experiments.
                                     DESeq2 style metadata table describing all samples. Rownames should be 
 							samplenames
-	  -b:						ChIP: Call broad histone marks. If set, use MACS3 in --broad mode, and use HOMER findPeaks with -size, -minDist and -region settings.
-  	-S STYLE:				ChIP: HOMER peak style. Use factor for TF / narrow peaks or histone for broad histone marks.
-								Default: factor
-  	-z SIZE:				Minimum peak size. Used for defining peaks in HOMER broad peak calling mode.
-								Default: 500
-	  -d MINDIST:				Minimum distance bewteen peaks. Used for merging regions in HOMER broad peak calling mode.
-								Default: 2000
+	  -b:						ChIP: Call broad histone marks with MACS3 --broad mode.
 								
       File name field settings for merged trackhubs, peak calling, and read counting. See below (-h) for some 
   	  examples
@@ -328,7 +329,6 @@ After completion of a run of _Omnomnomics_, MultiQC is used to parse and combine
 	  	- hisat2
 	  	- star
 	  	- samtools
-	  	- bamtools
 	  	- bedtools
 	  	- deeptools
 	  	- subread

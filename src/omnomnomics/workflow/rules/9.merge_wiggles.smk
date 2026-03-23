@@ -1,4 +1,4 @@
-# Rule 10 merge wiggles
+# Rule 9 merge wiggles
 
 ## Omnomnomics Snake Rule ##
 #=============================================
@@ -12,9 +12,9 @@ import shutil
 
 rule merge_wiggles:
     input:
-        extra_file=expand(f"{experiment_dir}/{master_config['input_folders'][master_config['mergewig_rule_num']-1]}/{{sample}}.extra_9.tmp", sample=samples2) if 9 in themode else []
+        extra_file=expand(f"{experiment_dir}/{master_config['input_folders'][master_config['mergewig_rule_num']-1]}/{{sample}}.extra_8.tmp", sample=samples2) if 8 in themode else []
     output:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['mergewig_rule_num']-1]}/extra_10.tmp"
+        f"{experiment_dir}/{master_config['output_folders'][master_config['mergewig_rule_num']-1]}/extra_9.tmp"
     params:
         thegenome=lambda wildcards: config['THEGENOME'],
         coltable=lambda wildcards: config["THECOLTABLE"],
@@ -28,15 +28,15 @@ rule merge_wiggles:
         inputfolder=lambda wildcards: f"{experiment_dir}/{master_config['input_folders'][master_config['mergewig_rule_num']-1]}",
         outputfolder=lambda wildcards: f"{experiment_dir}/{master_config['output_folders'][master_config['mergewig_rule_num']-1]}"
     threads:
-        lambda wildcards: Threads_Per_Rule['10']
+        lambda wildcards: Threads_Per_Rule['9']
     resources:
-        mem_mb=lambda wildcards: Memory_Per_Rule['10'],
+        mem_mb=lambda wildcards: Memory_Per_Rule['9'],
         partition=lambda wildcards: master_config['partition'],
-        runtime=lambda wildcards: Runtime_Per_Rule['10']
+        runtime=lambda wildcards: Runtime_Per_Rule['9']
     run:
-        log_once(logfile, "step10.header", "Merging BigWigs and TrackHubs...", f"EXECUTING STEP {master_config['mergewig_rule_num']}")
-        log_once(logfile, "step10.inputfolder", f"Input folder: {params.inputfolder}")
-        log_once(logfile, "step10.outputfolder", f"Output folder: {params.outputfolder}")
+        log_once(logfile, "step9.header", "Merging BigWigs and TrackHubs...", f"EXECUTING STEP {master_config['mergewig_rule_num']}")
+        log_once(logfile, "step9.inputfolder", f"Input folder: {params.inputfolder}")
+        log_once(logfile, "step9.outputfolder", f"Output folder: {params.outputfolder}")
 
         def parse_namefields(namefields):
             indices = []
@@ -88,7 +88,7 @@ rule merge_wiggles:
                 )
 
         def merge_wig(input_folder, output_folder, col_field, separator, type_field, name_fields, col_table, appendix, genome, hub_mail, overlay):
-            sanity_check_dir(logfile, input_folder, master_config['input_file_types'][master_config['mergewig_rule_num'] - 1], "step10.sanity")
+            sanity_check_dir(logfile, input_folder, master_config['input_file_types'][master_config['mergewig_rule_num'] - 1], "step9.sanity")
 
             col_array = []
             if col_table.endswith(".txt"):
@@ -167,7 +167,7 @@ rule merge_wiggles:
 
                 ctabletracker += 1
 
-            shell(f"""echo "necessity file for merge wiggle. can delete this." > {output_folder}/extra_10.tmp""")
+            shell(f"""echo "necessity file for merge wiggle. can delete this." > {output_folder}/extra_9.tmp""")
             log_it(logfile, "Merge Wiggles and TrackHubs completed!")
 
         merge_wig(

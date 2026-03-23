@@ -1,5 +1,4 @@
 
-
 ## Omnomnomics pipeline config ##
 ## Workflow defaults config ##
 #set step indices
@@ -10,15 +9,15 @@ merge_rule_num: 4
 touchup_rule_num: 5
 index_rule_num: 6
 stats_rule_num: 7
-tagdir_rule_num: 8
-wig_rule_num: 9
-mergewig_rule_num: 10
-callpeaks_rule_num: 11
-countreads_rule_num: 12
-de_rule_num: 13
+wig_rule_num: 8
+mergewig_rule_num: 9
+callpeaks_rule_num: 10
+countreads_rule_num: 11
+de_rule_num: 12
+homer_tagdir_rule_num: 13
 
-#Define the maximum number of steps as the biggest step index given above
-max_step: 13
+#Define the maximum public step index
+max_step: 12
 
 
 trim:
@@ -38,8 +37,6 @@ index:
   - "index_bam"
 stats:
   - "bam_stats"
-tagdir:
-  - "create_homer_tagDir"
 wig:
   - "create_wiggles"
 mergewig:
@@ -59,7 +56,6 @@ selected_routine_merge: 0
 selected_routine_touchup: 0
 selected_routine_index: 0
 selected_routine_stats: 0
-selected_routine_tagdir: 0
 selected_routine_wig: 0
 selected_routine_mergewig: 0
 selected_routine_callpeaks: 0
@@ -74,7 +70,6 @@ routines:
   - touchup
   - index
   - stats
-  - tagdir
   - wig
   - mergewig
   - callpeaks
@@ -91,11 +86,11 @@ input_folders:
   - "filtered_BAM"
   - "filtered_BAM"
   - "filtered_BAM"
-  - "filtered_BAM"
   - "BigWigs"
-  - ["filtered_BAM", "HOMER_tagDirs"]
+  - "filtered_BAM"
   - ["filtered_BAM", "peak_calling"]
   - "DE_calling"
+  - "filtered_BAM"
 
 output_folders:
   - "trimmed_FASTQ"
@@ -105,12 +100,12 @@ output_folders:
   - "filtered_BAM"
   - "filtered_BAM"
   - "filtered_BAM"
-  - "HOMER_tagDirs"
   - "BigWigs"
   - "merged_hubs"
   - "peak_calling"
   - "DE_calling"
   - "DE_calling"
+  - "HOMER_tagDirs"
 
 input_file_types:
   - ".fastq.gz"
@@ -120,12 +115,12 @@ input_file_types:
   - ".bam"
   - ".filtered.bam"
   - ".filtered.bam"
-  - ".filtered.bam"
   - ".bam"
   - ".bw"
-  - [".bam", ".HOMER_tagDir.tar.gz"]
+  - ".bam"
   - [".bam", ".bed"]
   - ".raw_read_quant.table.txt"
+  - ".filtered.bam"
 
 output_file_types:
   - ".trimmed.fastq.gz"
@@ -134,13 +129,13 @@ output_file_types:
   - ".bam"
   - ".sorted.dups_marked.filtered.bam"
   - ".sorted.dups_marked.filtered.bam.bai"
-  - ".sorted.dups_marked.filtered.bam.stats.txt"
-  - ".HOMER_tagDir.tar.gz"
+  - [".stats.txt", ".qc_summary.pdf", ".qc_summary.svg"]
   - ".bw"
   - ".hub"
   - ".bed"
   - ".raw_read_quant.table.txt"
   - ".results.zip"
+  - ".HOMER_tagDir.tar.gz"
 
 mincores_single_sample_step1_9:
   - 16
@@ -201,8 +196,8 @@ rule_runtime:
   - 60
   - 120
   - 120
-  - 120
   - 240
+  - 120
   - 120
   - 120
 
@@ -219,11 +214,9 @@ mode: "auto"
 formula: "1"
 broad: "NA"
 input: "NA"
-homer_input: "NA"
-the_style: "factor"
-homer_size: 500
-homer_mindist: 2000
 metadata: "NA"
+create_homer_tagdirs: False
+duplicate_handling: "auto"
 name_fields: "1,8,11"
 type_field: "1"
 col_field: "2"

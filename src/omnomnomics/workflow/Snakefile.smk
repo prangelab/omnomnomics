@@ -168,16 +168,13 @@ if not is_worker_job:
     log_it(logfile, f"Mode max: {max(themode)}")
     log_it(logfile, f"Trim tool: {config['THETRIMTOOL']}")
     log_it(logfile, f"Map tool: {config['THEMAPTOOL']}")
+    log_it(logfile, f"Duplicate handling: {config['DUPLICATE_HANDLING']}")
 
     log_it(logfile, f"Design formula: {config['MYFORMULA']}", "READ COUNTING SETTINGS")
     log_it(logfile, f"Metadata file: {config['MYMETADATA']}")
 
     log_it(logfile, f"Input file (MACS3): {config['INPUT']}", "PEAK CALLING SETTINGS")
-    log_it(logfile, f"Input file (HOMER): {config['HOMERINPUT']}")
     log_it(logfile, f"Broad peaks: {config['BROAD']}")
-    log_it(logfile, f"Peak style: {config['THESTYLE']}")
-    log_it(logfile, f"HOMER peaksize: {config['HOMERSIZE']}")
-    log_it(logfile, f"HOMER minDist: {config['HOMERMINDIST']}")
 
     log_it(logfile, f"{config['THEHEAPINIT']} HEAP init", "JAVA MEMORY SETTINGS")
     log_it(logfile, f"{config['THEMEM']} memory per sample")
@@ -197,20 +194,13 @@ if not is_worker_job:
 ##--------------------------------------------------------------------------------------------------------------
 all_outputs = []
 routines = []
+create_homer_tagdirs = config.get('CREATE_HOMER_TAGDIRS', False)
 
 THEMODERANGEMIN = config['THEMODERANGEMIN']
 
 input_folder = master_config['input_folders'][THEMODERANGEMIN-1]
 input_file_type =  master_config['input_file_types'][THEMODERANGEMIN-1]
-if THEMODERANGEMIN == 10:
-    if config['THETYPE'] == "RNA":
-        input_file_type = input_file_type[0]
-    else:
-        input_file_type = input_file_type[1]
 if THEMODERANGEMIN == 11:
-    input_file_type = input_file_type[0]
-    input_folder = input_folder[0]
-if THEMODERANGEMIN == 12:
     input_file_type = input_file_type[0]
     input_folder = input_folder[0]
 
@@ -312,12 +302,13 @@ def get_rule_core_limits(rule_num):
 
 
 Threads_Per_Rule = {}
-for rule_num in range(1, master_config['max_step'] + 1):
+internal_max_rule_num = max(master_config['max_step'], master_config.get('homer_tagdir_rule_num', master_config['max_step']))
+for rule_num in range(1, internal_max_rule_num + 1):
     min_cores, max_cores = get_rule_core_limits(rule_num)
     Threads_Per_Rule[f'{rule_num}'] = min_cores if rule_num <= 9 else max_cores
 
 Memory_Per_Rule = {}
-for rule_num in range(1, master_config['max_step'] + 1):
+for rule_num in range(1, internal_max_rule_num + 1):
     min_mem_mb = None
     if (
         'min_mem_mb' in master_config
@@ -336,7 +327,7 @@ for rule_num in range(1, master_config['max_step'] + 1):
     Memory_Per_Rule[f'{rule_num}'] = default_mem_mb
 
 Runtime_Per_Rule = {}
-for rule_num in range(1, master_config['max_step'] + 1):
+for rule_num in range(1, internal_max_rule_num + 1):
     runtime = master_config.get('default_runtime', 120)
     if (
         'rule_runtime' in master_config
@@ -452,27 +443,33 @@ for rule_num in themode:
     if rule_num == 7:
         if config['THETYPE'] != "CHIP":
             all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.sorted.dups_marked.filtered.bam.stats.txt", sample = samples2)
+            all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.sorted.dups_marked.filtered.bam.qc_summary.pdf", sample = samples2)
+            all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.sorted.dups_marked.filtered.bam.qc_summary.svg", sample = samples2)
         else: 
             all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.filtered.bam.stats.txt", sample = samples2)
+            all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.filtered.bam.qc_summary.pdf", sample = samples2)
+            all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.filtered.bam.qc_summary.svg", sample = samples2)
+        all_outputs.append(f"{experiment_dir}/{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.alignment_qc_experiment_summary.pdf")
+        all_outputs.append(f"{experiment_dir}/{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.alignment_qc_experiment_summary.svg")
     if rule_num == 8:
-        if config['THETYPE'] != "CHIP":
-            all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz", sample = samples2)
-            all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.extra_8.tmp",  sample = samples2)
-        else:
-            all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.filtered.HOMER_tagDir.tar.gz", sample = samples2)
-            all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.extra_8.tmp",  sample = samples2)
-
+        all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.extra_8.tmp",  sample = samples2)
     if rule_num == 9:
-        all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.extra_9.tmp",  sample = samples2)
+        all_outputs.append( f"{experiment_dir}/{output_folder}/extra_9.tmp")
     if rule_num == 10:
         all_outputs.append( f"{experiment_dir}/{output_folder}/extra_10.tmp")
     if rule_num == 11:
         all_outputs.append( f"{experiment_dir}/{output_folder}/extra_11.tmp")
     if rule_num == 12:
-        all_outputs.append( f"{experiment_dir}/{output_folder}/extra_12.tmp")
-    if rule_num == 13:
         all_outputs.append( f"{experiment_dir}/{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.results.zip")
-    
+
+if create_homer_tagdirs:
+    homer_output_folder = master_config['output_folders'][master_config['homer_tagdir_rule_num'] - 1]
+    if config['THETYPE'] != "CHIP":
+        all_outputs += expand(f"{experiment_dir}/{homer_output_folder}/{{sample}}.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz", sample=samples2)
+        all_outputs += expand(f"{experiment_dir}/{homer_output_folder}/{{sample}}.extra_13.tmp", sample=samples2)
+    else:
+        all_outputs += expand(f"{experiment_dir}/{homer_output_folder}/{{sample}}.filtered.HOMER_tagDir.tar.gz", sample=samples2)
+        all_outputs += expand(f"{experiment_dir}/{homer_output_folder}/{{sample}}.extra_13.tmp", sample=samples2)
 
 if not is_worker_job:
     log_it(logfile, '\n'.join(all_outputs), 'ALL OUTPUTS')
@@ -530,23 +527,23 @@ onsuccess:
             for file in list_of_extra_files:
                 os.remove(file)
         if 8 in themode:
-            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['tagdir_rule_num']-1]}/*.extra_8.tmp")
+            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['wig_rule_num']-1]}/*.extra_8.tmp")
             for file in list_of_extra_files:
                 os.remove(file)
         if 9 in themode:
-            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['wig_rule_num']-1]}/*.extra_9.tmp")
+            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['mergewig_rule_num']-1]}/extra_9.tmp")
             for file in list_of_extra_files:
                 os.remove(file)
         if 10 in themode:
-            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['mergewig_rule_num']-1]}/extra_10.tmp")
+            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/extra_10.tmp")
             for file in list_of_extra_files:
                 os.remove(file)
         if 11 in themode:
-            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/extra_11.tmp")
+            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['countreads_rule_num']-1]}/extra_11.tmp")
             for file in list_of_extra_files:
                 os.remove(file)
-        if 12 in themode:
-            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/extra_11.tmp")
+        if create_homer_tagdirs:
+            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['homer_tagdir_rule_num']-1]}/*.extra_13.tmp")
             for file in list_of_extra_files:
                 os.remove(file)
 

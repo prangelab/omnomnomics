@@ -1,4 +1,4 @@
-# Rule 13 call DE
+# Rule 12 call DE
 
 ## Omnomnomics Snake Rule ##
 #=============================================
@@ -16,11 +16,11 @@ rule call_DE:
         inputfolder = f"{experiment_dir}/{master_config['input_folders'][master_config['de_rule_num']-1]}",
         outputfolder = f"{experiment_dir}/{master_config['output_folders'][master_config['de_rule_num']-1]}"
     threads:
-        Threads_Per_Rule['13']
+        Threads_Per_Rule[str(master_config['de_rule_num'])]
     resources:
-        mem_mb = Memory_Per_Rule['13'],
+        mem_mb = Memory_Per_Rule[str(master_config['de_rule_num'])],
         partition = master_config['partition'],
-        runtime = Runtime_Per_Rule['13']
+        runtime = Runtime_Per_Rule[str(master_config['de_rule_num'])]
     run:
         def calling_DE(logfile, thetype, inputfolder, outputfolder):
             if thetype == "RNA":
@@ -42,5 +42,4 @@ rule call_DE:
                 log_it(logfile, f"Input folder: {inputfolder}")
                 log_it(logfile, f"Output folder: {outputfolder}")
                 log_it(logfile, "To call DE peaks for ChIP data, first determine the best peak calling settings for your experiment and quantify peaks with your chosen downstream workflow.")
-                log_it(logfile, "Then execute 'run_call_DE_peaks.sh' on your optimal peak set.")
         calling_DE(logfile, params.thetype, params.inputfolder, params.outputfolder)      

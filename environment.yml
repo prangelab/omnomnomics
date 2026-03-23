@@ -18,7 +18,6 @@ dependencies:
   - star
   - samtools
   - bedtools
-  - bamtools
   - ucsc-bedgraphtobigwig
   - ucsc-genepredtobed
   - ucsc-genepredtogtf
