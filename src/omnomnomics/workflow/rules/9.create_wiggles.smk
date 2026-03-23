@@ -7,78 +7,73 @@
 # Copyright PrangeLab 2024 ##
 #=============================================
 import os
-import glob
+import shlex
+import shutil
+import subprocess
+import tempfile
 
 rule create_wiggles:
     input:
-        input_tar_gz_file = f"{experiment_dir}/{master_config['input_folders'][master_config['wig_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz" if config['THETYPE'] != "CHIP" else f"{experiment_dir}/{master_config['input_folders'][master_config['wig_rule_num']-1]}/{{sample}}.filtered.HOMER_tagDir.tar.gz"
+        input_bam=f"{experiment_dir}/{master_config['input_folders'][master_config['wig_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.bam" if config['THETYPE'] != "CHIP" else f"{experiment_dir}/{master_config['input_folders'][master_config['wig_rule_num']-1]}/{{sample}}.filtered.bam",
+        input_bai=f"{experiment_dir}/{master_config['input_folders'][master_config['wig_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.bam.bai" if config['THETYPE'] != "CHIP" else f"{experiment_dir}/{master_config['input_folders'][master_config['wig_rule_num']-1]}/{{sample}}.filtered.bam.bai"
     output:
         f"{experiment_dir}/{master_config['output_folders'][master_config['wig_rule_num']-1]}/{{sample}}.extra_9.tmp"
     params:
-        thetype = config['THETYPE'],
-        genome = config['THEGENOME'],
-        inputfolder = f"{experiment_dir}/{master_config['input_folders'][master_config['wig_rule_num']-1]}",
-        outputfolder = f"{experiment_dir}/{master_config['output_folders'][master_config['wig_rule_num']-1]}"
+        thetype=config['THETYPE'],
+        inputfolder=f"{experiment_dir}/{master_config['input_folders'][master_config['wig_rule_num']-1]}",
+        outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['wig_rule_num']-1]}"
     threads:
         Threads_Per_Rule['9']
     resources:
-        mem_mb = Memory_Per_Rule['9'],
-        partition = master_config['partition'],
-        runtime = Runtime_Per_Rule['9']
+        mem_mb=Memory_Per_Rule['9'],
+        partition=master_config['partition'],
+        runtime=Runtime_Per_Rule['9']
     run:
-        def create_wig(input_tar_gz_file, inputfolder, outputfolder, thetype, genome):
-            log_it(logfile, "Creating Wiggles and TrackHubs...", f"EXECUTING STEP {master_config['wig']}")
-            log_it(logfile, f"Input folder: {params.inputfolder}")
-            log_it(logfile, f"Output folder: {params.outputfolder}")
+        log_once(logfile, "step9.header", "Creating BigWigs...", f"EXECUTING STEP {master_config['wig_rule_num']}")
+        log_once(logfile, "step9.inputfolder", f"Input folder: {params.inputfolder}")
+        log_once(logfile, "step9.outputfolder", f"Output folder: {params.outputfolder}")
 
-            sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['wig_rule_num']-1])
-            basename = os.path.basename(input_tar_gz_file)
-            tag_dir = os.path.join(inputfolder, basename.replace(".tar.gz", ""))
-            tag_dir_short = basename.replace(".tar.gz", "")
-            
-            # unpack the tar.gz file
-            log_it(logfile, f"Unpacking {basename} in {inputfolder}")
-            shell(f"""
-                    mkdir -p {tag_dir} && \
-                    cd {inputfolder} && \
-                    tar --strip-components=1 -xzf {basename} -C {tag_dir_short}
-                    
-            """)
-            
-            if os.path.exists(tag_dir):
-                log_it(logfile, f"Unpacked {basename} successfully")
-            else:
-                log_it(logfile, f"Failed to unpack {basename}")
+        bamcoverage_version = subprocess.check_output(["bamCoverage", "--version"], stderr=subprocess.STDOUT)
+        log_once(logfile, "step9.bamcoverage_version", "\n" + bamcoverage_version.decode("utf-8"), "DEEPTOOLS VERSION")
 
-            if thetype == "RNA": 
-                log_it(logfile, f"Creating trackhub from {tag_dir}")
-                base_name = os.path.basename(tag_dir).replace(".HOMER_tagDir", '')
-                log_it(logfile, f"makeMultiWigHub.pl {master_config['output_folders'][master_config['wig_rule_num']-1]}/{base_name}.hub {genome} -d {master_config['input_folders'][master_config['wig_rule_num']-1]}/{tag_dir_short} -force -fsize 1e8 -strand -webdir . -url \"https:/www.macrophages.eu/UCSCtracks/\"")
-                shell(f"makeMultiWigHub.pl {master_config['output_folders'][master_config['wig_rule_num']-1]}/{base_name}.hub {genome} -d {master_config['input_folders'][master_config['wig_rule_num']-1]}/{tag_dir_short} -force -fsize 1e8 -strand -webdir . -url \"https:/www.macrophages.eu/UCSCtracks/\"")
-                
-            else:
-                log_it(logfile, f"Creating bigwig from {tag_dir}")
-                basename = os.path.basename(tag_dir).replace(".HOMER_tagDir", '')
-                log_it(logfile, f"makeUCSCfile {tag_dir} -fsize 1e8 > {outputfolder}/{basename}.bw")
-                shell(f"makeUCSCfile {tag_dir} -fsize 1e8 > {outputfolder}/{basename}.bw")
+        sanity_check_dir(logfile, params.inputfolder, master_config['input_file_types'][master_config['wig_rule_num'] - 1], "step9.sanity")
 
-            # Fix results by converting bedGraph to bigWig if needed
-            for hub_file in glob.glob(os.path.join(outputfolder, "*.hub")):
-                log_it(logfile, f"Fixing trackhub {hub_file}...")
-                log_it(logfile, f"fix_HOMER_trackHub.sh -i {hub_file} -g {genome}")
-                path = os.path.join(config['SCRIPT_DIR'], "fix_HOMER_trackHub.sh")
-                shell(f"{path} -i {hub_file} -g {genome} -c {config['GENOME_AUX_DIR']}")
+        def create_wig(input_bam, input_bai, outputfolder, sample):
+            log_it(logfile, f"Sample {sample}: creating BigWig...")
+            tmpdir_root = os.environ.get("TMPDIR")
+            local_workdir = tempfile.mkdtemp(prefix=f"{sample}.", dir=tmpdir_root if tmpdir_root else None)
+            log_it(logfile, f"Scratch directory: {local_workdir}")
 
-            for bw_file in glob.glob(os.path.join(outputfolder, "*.bw")):
-                log_it(logfile, f"Fixing bigwig {bw_file}...")
-                log_it(logfile, f"fix_HOMER_bigwig.sh -i {bw_file} -g {genome}")
-                path = os.path.join(config['SCRIPT_DIR'], "fix_HOMER_bigwig.sh")
-                shell(f"{path} -i {bw_file} -g {genome} -c {config['GENOME_AUX_DIR']}")
+            def quote(path):
+                return shlex.quote(path)
 
-            # Remove the uncompressed tag directory
-            log_it(logfile, f"Removing uncompressed tag directory {tag_dir}")
-            shell(f"rm -r {tag_dir}")
+            def stage_input(path):
+                local_path = os.path.join(local_workdir, os.path.basename(path))
+                command = f"cp {quote(path)} {quote(local_path)}"
+                log_it(logfile, f"Staging {os.path.basename(path)} to scratch...")
+                shell(command)
+                return local_path
 
-            shell(f"""echo "necessity file for create wiggs. can delete this." > {outputfolder}/{wildcards.sample}.extra_9.tmp""")
-            
-        create_wig(input.input_tar_gz_file, params.inputfolder, params.outputfolder, params.thetype, params.genome)
+            try:
+                local_bam = stage_input(input_bam)
+                local_bai = stage_input(input_bai)
+                local_bw = os.path.join(local_workdir, f"{sample}.bw")
+                output_bw = os.path.join(outputfolder, f"{sample}.bw")
+
+                bamcoverage_command = f"""
+                    bamCoverage -b {quote(local_bam)} -o {quote(local_bw)} \
+                    --numberOfProcessors {threads} --binSize 10 --normalizeUsing CPM
+                """
+                bamcoverage_command = " ".join(bamcoverage_command.split())
+                log_it(logfile, bamcoverage_command, "BAMCOVERAGE COMMAND")
+                shell(bamcoverage_command)
+
+                copy_bw_command = f"cp {quote(local_bw)} {quote(output_bw)}"
+                log_it(logfile, f"Copying BigWig for {sample} back to project space...")
+                shell(copy_bw_command)
+            finally:
+                shutil.rmtree(local_workdir, ignore_errors=True)
+
+            shell(f"""echo "necessity file for create wiggles. can delete this." > {outputfolder}/{sample}.extra_9.tmp""")
+
+        create_wig(input.input_bam, input.input_bai, params.outputfolder, wildcards.sample)

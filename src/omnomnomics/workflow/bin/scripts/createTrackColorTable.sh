@@ -1,53 +1,52 @@
-#! /bin/bash
+#!/bin/bash
 
-#Given a base color, construct a collection of shades and tints for that color and store it in a 'color table' as used by make_ChIP_hubs.sh
+# Build a track color table from one or more seed colors.
 
 #--------------------------------------------------------------------------------------------------------------
 #Function definitions
 #Usage function
 function display_help {
 	echo ""
-	echo "Usage: $0  -c BASE_COLOR -2 SECOND_COLOR -3 THIRD_COLOR -f FRACTION -s SKEW -n NAME -P <DIR> -d DIRECTION -r -v -t -h"
+	echo "Usage: $0 -c BASE_COLOR -2 SECOND_COLOR -3 THIRD_COLOR -f FRACTION -s SKEW -n NAME -P <DIR> -d DIRECTION -r -v -t -h"
 	echo ""
-	echo "	-c:			Base color to work shade (darken) or tint (lighten). {RRR,GGG,BBB} {0-255} or R color name."
-	echo "				Default: random!"
-	echo "	-2:			Second color to  shade (darken) or tint (lighten) to. {RRR,GGG,BBB} {0-255} or R color name."
-	echo "				Used with type 'mix'. Default: random."
-	echo "	-3:			Third color to  shade (darken) or tint (lighten) to. {RRR,GGG,BBB} {0-255} or R color name."
-	echo "				Used with type 'mix3'. Default: random."
+	echo "	-c:			Base color to shade or tint. {RRR,GGG,BBB} {0-255} or R color name."
+	echo "				Default: random."
+	echo "	-2:			Second color to shade or tint toward. {RRR,GGG,BBB} {0-255} or R color name."
+	echo "				Used with direction 'mix'. Default: random."
+	echo "	-3:			Third color to shade or tint toward. {RRR,GGG,BBB} {0-255} or R color name."
+	echo "				Used with direction 'mix3'. Default: random."
 	echo "	-f:			Fraction to shade or tint by. {0-1}"
 	echo "				Default: 0.25"
 	echo "	-s:			Multiplier to skew the fraction with after each round. {>1}"
 	echo "				Default: 1"
 	echo "	-n:			Name given to the output table"
 	echo "				Default: mycolor"
-	echo "	-P <DIR>:			Path to a folder with color tables in which to save the output table."
-	echo "				Default: ~/bin/color_data_for_hubs"
+	echo "	-P <DIR>:		Path to a writable folder in which to save the output table."
+	echo "				Required unless -t is used."
 	echo "	-d:			Direction to manipulate in: 'shade', 'tint', 'both', 'mix', or 'mix3'"
 	echo "				Default: tint."
-	echo "	-r:			Reverse the order of the colors in the palette."
+	echo "	-r:			Reverse the order of the palette."
 	echo ""
-	echo "	-v:			Display the results"
+	echo "	-v:			Display the resulting palette."
 	echo ""
-	echo "	-t:			Trash the results!"
-	echo "     				Only display the colors, do not keep the file!"
+	echo "	-t:			Only display the palette. Do not keep the file."
 	echo ""
 	echo "	-h:			Print this help message"
 	echo ""
 	echo "Direction"
-	echo "	shade:	Shades color (-c) to black."
-	echo "	tint:	Tints  color (-c) to white."
+	echo "	shade:	Shade color (-c) toward black."
+	echo "	tint:	Tint color (-c) toward white."
 	echo "	both:	Make a gradient from black via color (-c) to white."
 	echo "	mix:	Make a gradient between colors (-c) and (-2)."
 	echo "	mix3:	Make a gradient from color (-c) via (-2) to (-3)."
 	echo ""
 	echo "Palette length"
-	echo "	Fraction:	Determines the step size bewteen each output color."
+	echo "	Fraction:	Determines the step size between each output color."
 	echo "			The smaller the fraction, the more steps will be needed to reach the end color."
 	echo "	Skew:		Controls if and by how much the step size will be increased after each round of color picking."
 	echo "			If skew is 1, step size will not increase."
 	echo "			If skew is > 1, step size will increase and the end color will be reached faster." 
-	echo "			Useful if the colors in the beginning of a palette are visually separated better than at the end (e.g. when reaching black the last few colors tend to be to dark to distinguish)."
+	echo "			Useful if the early colors in a palette separate better than the late colors."
 	exit 1
 }
 
@@ -120,17 +119,23 @@ then
 	THENAME="mycolor"
 fi
 
-if [ -z "$THEFOLDER" ]
+if [ -z "$THEFOLDER" ] && [ "$TRASH_TABLE" -ne 1 ]
 then
-	SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-	WORKFLOW_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-	THEFOLDER="$WORKFLOW_ROOT/bin/color_data_for_hubs"
-	echo $THEFOLDER
+	echo "A writable output folder (-P) is required when creating a custom color table."
+	echo "The packaged color tables are read-only defaults."
+	exit 1
 fi
 
-if [ ! -d "$THEFOLDER" ]
+if [ -n "$THEFOLDER" ] && [ ! -d "$THEFOLDER" ]
 then
 	echo "Color table folder (-P) does not exist!"
+	echo "Exiting..."
+	exit 1
+fi
+
+if [ -n "$THEFOLDER" ] && [ ! -w "$THEFOLDER" ]
+then
+	echo "Color table folder (-P) is not writable!"
 	echo "Exiting..."
 	exit 1
 fi
@@ -166,17 +171,20 @@ then
 fi
 
 #Remove slash from the end of the color table path if necessary.
-[[ $THEFOLDER == */ ]] && THEFOLDER=${THEFOLDER%?}	
-
+if [ -n "$THEFOLDER" ]
+then
+	[[ $THEFOLDER == */ ]] && THEFOLDER=${THEFOLDER%?}
+fi
+	
 #Check if color file exists already (do not overwrite)
-if [ -f "$THEFOLDER/$THENAME.color.table" ]
+if [ -n "$THEFOLDER" ] && [ -f "$THEFOLDER/$THENAME.color.table" ]
 then
 	echo "File $THEFOLDER/$THENAME.color.table already exists! Please use a different name."
 	exit 1
 fi
 
-#Check for valid color
-#Set color table file path
+# Check for valid color names
+# Set color table file path
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 WORKFLOW_ROOT="${WORKFLOW_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 R_COLOR_TABLE="$WORKFLOW_ROOT/bin/R.color.table"

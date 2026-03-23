@@ -23,6 +23,7 @@ from pathlib import Path
 from datetime import date, datetime
 
 from omnomnomics.genomes import genomes_main
+from omnomnomics.helpers import create_track_color_table_main, display_track_color_table_main
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
 WORKFLOW_ROOT = PACKAGE_ROOT / "workflow"
@@ -41,15 +42,15 @@ def parse_arguments():
    parser.add_argument('-t', '--type', help='Type of experiment: RNA, ChIP, ATAC')
    parser.add_argument('-g', '--genome', help='Genome assembly name. Must match an available directory under the configured genome assembly root')
    parser.add_argument('-j', '--mode', help='Job mode. Can be auto, all or a range of jobs. See readme for some examples. \n \t Default: auto')
-   parser.add_argument('-T', '--trim-tool', help='Trimming tool choice. can be Skewer or Trimmomatic \n \t Default: Skewer')
+   parser.add_argument('-T', '--trim-tool', help='Trimming tool choice. Can be fastp or skewer. \n \t Default: fastp')
    parser.add_argument('-M', '--map-tool', help='Mapping tool choice. Can be HISAT2, STAR, or STAR_TE. STAR(_TE) can only be used for RNA-seq data. \n \t Default: HISAT2')
    parser.add_argument('-f', '--formula', help='RNA: Experimental Design for DE calling. \n \t Default: 1 (just an intercept)')
    parser.add_argument('-I', '--input', help='Input file used for ChIP peak calling. Has to be a .bam file or HOMER tag directory. \n \t Default: do not use input')
    parser.add_argument('-m', '--metadata', help='.txt file with columns of metadata for RNA-seq experiments. \n \t Default: DESeq2 style metadata table describing all samples. Rownames should be samplenames')
    parser.add_argument('-b', '--broad', action='store_true', help='ChIP: Peak calling style. If set, use MACS3 in --broad mode, and use HOMER findPeaks with -size, -minDist and -region settings. Works best with STYLE histone.')
    parser.add_argument('-S', '--style', help='ChIP: Peak calling style for HOMER peak calling. Can be factor or histone. \n \t Default: factor')
-   parser.add_argument('-C', '--col-table', help='File specifying which colors to use for the tracks. \n \t Default: gray.tint.color.table. Can be a *txt list file with one color table per line. Different color tables will be used per hub as split by -e. Can be a full (relative) path to a file or a file basename only in conjuction with -P. Use createTrackColorTable.sh to roll your own. Use displayTrackColorTable.sh to visualize existing color tables.')
-   parser.add_argument('-P', '--color-data-folder', help='Path to a folder with color tables. \n \t Default: dewintherlab/bin/color_data_for_hubs') ##################change this default??
+   parser.add_argument('-C', '--col-table', help='File specifying which colors to use for the tracks. \n \t Default: gray.tint.color.table from the packaged palette directory. Can be a *txt list file with one color table per line. Different color tables will be used per hub as split by -e. Can be a full path or a file basename in combination with -P. Use `omnomnomics create-track-color-table` to build custom palettes and `omnomnomics display-track-color-table` to preview them.')
+   parser.add_argument('-P', '--color-data-folder', help='Path to a folder with color tables. \n \t Default: packaged color_data_for_hubs directory. Use this to point the workflow at custom palettes.') ##################change this default??
    parser.add_argument('-o', '--overlay', help='Overlay type (transparentOverlay|stacked|solidOverlay|none) \n \t Default: transparentOverlay')
    parser.add_argument('-L', '--hub-mail', help='Email to use in trackhub \n \t Default: m.dewinther@amsterdamumc.nl')
    parser.add_argument('-X', '--no-multiqc', action='store_true', help='Exclude multiQC stats aggregator. Set if you don not wish to run multiQC.')
@@ -667,6 +668,22 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "genomes":
         genomes_main(sys.argv[2:], WORKFLOW_ROOT, DEFAULT_WORKFLOW_CONFIG, DEFAULT_SITE_CONFIG)
         return
+    if len(sys.argv) > 1 and sys.argv[1] == "create-track-color-table":
+        original_argv = sys.argv[:]
+        try:
+            sys.argv = [original_argv[0], *original_argv[2:]]
+            create_track_color_table_main()
+        finally:
+            sys.argv = original_argv
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "display-track-color-table":
+        original_argv = sys.argv[:]
+        try:
+            sys.argv = [original_argv[0], *original_argv[2:]]
+            display_track_color_table_main()
+        finally:
+            sys.argv = original_argv
+        return
 
     # Define variables for packaged workflow paths
     workflow_root = WORKFLOW_ROOT
@@ -760,10 +777,10 @@ def main():
 
     # Check if pipeline needed or user first has to run separate scripts
     if min(mode_steps) == 12 and the_type == "CHIP":
-        print("For ChIP experiments, first determine optimal peak caller settings, then manually run run_quant_peaks.sh and then continue with the next step!")
+        print("For ChIP experiments, first determine optimal peak caller settings and quantify peaks with your chosen downstream workflow before continuing.")
         return
     elif min(mode_steps) == 13 and the_type == "CHIP":
-        print("To call DE peaks for ChIP  data, please first manually determine the best peak calling settings for your experiment and use run_quant_peaks.sh.")
+        print("To call DE peaks for ChIP data, first determine the best peak calling settings for your experiment and quantify peaks with your chosen downstream workflow.")
         print("Then execute 'run_call_DE_peaks.sh' on your optimal peak set.")
         return
     elif min(mode_steps) == 11 and the_type == "RNA":

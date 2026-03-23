@@ -91,10 +91,10 @@ input_folders:
   - "filtered_BAM"
   - "filtered_BAM"
   - "filtered_BAM"
-  - "HOMER_tagDirs"
+  - "filtered_BAM"
   - "BigWigs"
   - ["filtered_BAM", "HOMER_tagDirs"]
-  - ["HOMER_tagDirs", "peak_calling"]
+  - ["filtered_BAM", "peak_calling"]
   - "DE_calling"
 
 output_folders:
@@ -121,10 +121,10 @@ input_file_types:
   - ".filtered.bam"
   - ".filtered.bam"
   - ".filtered.bam"
-  - ".HOMER_tagDir.tar.gz"
-  - [".hub", ".bw"]
+  - ".bam"
+  - ".bw"
   - [".bam", ".HOMER_tagDir.tar.gz"]
-  - [".HOMER_tagDir.tar.gz", ".bed"]
+  - [".bam", ".bed"]
   - ".raw_read_quant.table.txt"
 
 output_file_types:
@@ -136,7 +136,7 @@ output_file_types:
   - ".sorted.dups_marked.filtered.bam.bai"
   - ".sorted.dups_marked.filtered.bam.stats.txt"
   - ".HOMER_tagDir.tar.gz"
-  - [".bw", ".hub"]
+  - ".bw"
   - ".hub"
   - ".bed"
   - ".raw_read_quant.table.txt"

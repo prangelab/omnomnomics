@@ -6,163 +6,132 @@
 # Affiliation: Prangelab AMC / Amsterdam UMC's Core Facility Genomics
 # Copyright PrangeLab 2024 ##
 #=============================================
+import csv
 import os
+import shlex
+import subprocess
 
-def input_function(wilcards):
+
+def count_reads_input(_wildcards):
     input_files = []
-    if config['THETYPE'] != "CHIP":
-        if config['THETYPE'] == "ATAC":
-            if 11 in themode:
-                input_files.append(f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num']-1][1]}/extra_11.tmp")
-            for sample in samples2:
-                input_files.append(f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num']-1][0]}/{sample}.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz")
-        else:
-            for sample in samples2:
-                input_files.append(f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num']-1][0]}/{sample}.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz")
-    else:
-        pass
+    if config["THETYPE"] == "RNA":
+        input_files.extend(
+            f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num'] - 1][0]}/{sample}.sorted.dups_marked.filtered.bam"
+            for sample in samples2
+        )
+    elif config["THETYPE"] == "ATAC":
+        if 11 in themode:
+            input_files.append(f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num'] - 1][1]}/extra_11.tmp")
+        input_files.extend(
+            f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num'] - 1][0]}/{sample}.sorted.dups_marked.filtered.bam"
+            for sample in samples2
+        )
+        input_files.append(
+            f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num'] - 1][1]}/all_groups.merged_peaks.bed"
+        )
     return input_files
+
 
 rule count_reads:
     input:
-        input_function
+        count_reads_input
     output:
-        #f"{master_config['output_folders'][master_config['countreads_rule_num']-1]}/{os.path.basename(config['EXPERIMENT_DIR'])}.raw_read_quant.table.txt" will get produced if type is RNA or ATAC
-        f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num']-1]}/extra_12.tmp" #must specify this so that it always performs this rule if asked for, also vor CHIP.
+        f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num']-1]}/extra_12.tmp"
     params:
-        thetype=config['THETYPE'],  
-        genome=config['THEGENOME'],  
-        experiment_dir=config['EXPERIMENT_DIR'], 
-        namefields=config['NAMEFIELDS'],  
-        separator=config['THESEPARATOR'],
-        inputfolder1 = f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num']-1][0]}",
-        inputfolder2 = f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num']-1][1]}",
-        outputfolder = f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num']-1]}"
+        thetype=config["THETYPE"],
+        genome=config["THEGENOME"],
+        experiment_dir=config["EXPERIMENT_DIR"],
+        paired=config["PAIRED"],
+        bam_input_folder=f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num'] - 1][0]}",
+        peak_input_folder=f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num'] - 1][1]}",
+        outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num'] - 1]}",
+        gtf_file=os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "annotation", "genes.gtf")
     threads:
-        Threads_Per_Rule['12']
+        Threads_Per_Rule["12"]
     resources:
-        mem_mb = Memory_Per_Rule['12'],
-        partition = master_config['partition'],
-        runtime = Runtime_Per_Rule['12']
+        mem_mb=Memory_Per_Rule["12"],
+        partition=master_config["partition"],
+        runtime=Runtime_Per_Rule["12"]
     run:
-        log_it(logfile, "Counting Reads...", f"EXECUTING STEP {master_config['countreads_rule_num']}")
-        log_it(logfile, f"Input folder: {params.inputfolder1} and also {params.inputfolder2} for ATAC data")
-        log_it(logfile, f"Output folder: {params.outputfolder}")
-        
-        def count_reads_rna(input_folder, output_folder, genome, namefields, separator): 
-            sanity_check_dir(logfile, input_folder,  master_config['input_file_types'][master_config['countreads_rule_num']-1][0]) 
+        log_once(logfile, "step12.header", "Counting Reads...", f"EXECUTING STEP {master_config['countreads_rule_num']}")
+        log_once(logfile, "step12.inputfolder", f"Input folder: {params.bam_input_folder} and also {params.peak_input_folder} for ATAC data")
+        log_once(logfile, "step12.outputfolder", f"Output folder: {params.outputfolder}")
 
-            tagdir_files = glob.glob(os.path.join(input_folder, '*tagDir.tar.gz'))
-            if len(tagdir_files) != 0:
-                log_it(logfile, "Unpacking HOMER tagDir tar balls...")
+        def quote(path):
+            return shlex.quote(path)
 
-                for file in tagdir_files:
-                    basename = os.path.basename(file)
-                    tag_dir = os.path.join(input_folder, basename.replace(".tar.gz", ""))
-                    tag_dir_short = basename.replace(".tar.gz", "")
+        def write_tmp_file(outputfolder):
+            shell(f"""echo "necessity file for count reads. can delete this." > {outputfolder}/extra_12.tmp""")
 
-                    # unpack the tar.gz file
-                    log_it(logfile, f"Unpacking {basename} in {input_folder}")
-                    shell(f"""
-                        mkdir -p {tag_dir} && \
-                        cd {input_folder} && \
-                        tar --strip-components=1 -xzf {basename} -C {tag_dir_short}
-                        """)
+        def rna_output_path(outputfolder):
+            return os.path.join(outputfolder, f"{os.path.basename(params.experiment_dir)}.raw_read_quant.table.txt")
 
-            shell(f"ls -d {input_folder}/*tagDir/ > TAGDIRlist.txt") # Make a list of tag dirs
-            log_it(logfile, "Counting reads with analyzeRepeats.pl...")
-            shell(f"""analyzeRepeats.pl rna {genome} -dfile TAGDIRlist.txt -count exons -noadj > {output_folder}/{os.path.basename(params.experiment_dir)}.raw_read_quant.table.txt""")
+        def count_reads_rna(input_folder, output_folder, gtf_file, paired):
+            log_it(logfile, "Counting RNA reads from BAMs with featureCounts...")
+            sanity_check_dir(logfile, input_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][0], "step12.rna_sanity")
 
-            shell(f"""sed '1d' {output_folder}/{os.path.basename(params.experiment_dir)}.raw_read_quant.table.txt | cut -f1,9- | sort -k1,1 | sed 's/ \\+/\\t/g' > clean.tmp""")
-            
-            #Command in script works better: cat TAGDIRlist.txt | xargs -l basename | cut -f {namefields} -d '{separator}' | awk 'BEGIN{{ORS="\t"}}{{print $0}}' > clean.header.tmp
-            shell(f"""{config['SCRIPT_DIR']}/generate_header.sh {params.namefields} '{params.separator}' """)
+            if not os.path.isfile(gtf_file):
+                raise FileNotFoundError(f"Genome annotation GTF not found: {gtf_file}")
 
-            shell(f"""sed "1iRefSeq_ID\\t$(cat clean.header.tmp)" clean.tmp > {output_folder}/{os.path.basename(params.experiment_dir)}.raw_read_quant.table.txt""")
+            featurecounts_version = subprocess.check_output(["featureCounts", "-v"], stderr=subprocess.STDOUT)
+            log_once(logfile, "step12.featurecounts_version", "\n" + featurecounts_version.decode("utf-8"), "FEATURECOUNTS VERSION")
 
-            shell("rm TAGDIRlist.txt clean.header.tmp clean.tmp")
+            bam_files = [os.path.join(input_folder, f"{sample}.sorted.dups_marked.filtered.bam") for sample in samples2]
+            featurecounts_output = os.path.join(output_folder, f"{os.path.basename(params.experiment_dir)}.featureCounts.tmp.txt")
+            paired_flags = "-p --countReadPairs" if paired else ""
+            featurecounts_command = (
+                f"featureCounts -T {threads} -a {quote(gtf_file)} -o {quote(featurecounts_output)} "
+                f"-t exon -g gene_id {paired_flags} {' '.join(quote(path) for path in bam_files)}"
+            ).strip()
+            log_it(logfile, featurecounts_command, "FEATURECOUNTS COMMAND")
+            shell(featurecounts_command)
 
-            for tag_dir in tagdir_files:
-                tag_dir_folder = tag_dir.replace(".tar.gz", "")
-                # Remove the uncompressed tag directory
-                log_it(logfile, f"Removing uncompressed tag directory {tag_dir_folder}")
-                shell(f"rm -r {tag_dir_folder}")
-            if os.path.isfile(f"{input_folder1}/genome.tags.tsv"):
-                shell(f"rm {input_folder1}/genome.tags.tsv")
-            if os.path.isfile(f"{input_folder1}/tagAutocorrelation.txt"):
-                shell(f"rm {input_folder1}/tagAutocorrelation.txt")
-            if os.path.isfile(f"{input_folder1}/tagCountDistribution.txt"):
-                shell(f"rm {input_folder1}/tagCountDistribution.txt")
-            if os.path.isfile(f"{input_folder1}/tagInfo.txt"):
-                shell(f"rm {input_folder1}/tagInfo.txt")
-            if os.path.isfile(f"{input_folder1}/tagLengthDistribution.txt"):
-                shell(f"rm {input_folder1}/tagLengthDistribution.txt")
+            final_output = rna_output_path(output_folder)
+            with open(featurecounts_output, newline="") as source, open(final_output, "w", newline="") as destination:
+                reader = csv.reader((line for line in source if not line.startswith("#")), delimiter="\t")
+                header = next(reader)
+                sample_headers = [os.path.basename(path).replace(".sorted.dups_marked.filtered.bam", "") for path in header[6:]]
+                writer = csv.writer(destination, delimiter="\t", lineterminator="\n")
+                writer.writerow(["Geneid", *sample_headers])
+                for row in reader:
+                    writer.writerow([row[0], *row[6:]])
 
+            os.remove(featurecounts_output)
 
-        def count_reads_atac(input_folder1, input_folder2, output_folder, genome, namefields, separator):
-            sanity_check_dir(logfile, input_folder1,  master_config['input_file_types'][master_config['countreads_rule_num']-1][0])
-            sanity_check_dir(logfile, input_folder2,  master_config['input_file_types'][master_config['countreads_rule_num']-1][1])
+        def count_reads_atac(input_folder, peak_folder, output_folder):
+            log_it(logfile, "Counting ATAC reads from BAMs with bedtools multicov...")
+            sanity_check_dir(logfile, input_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][0], "step12.atac_bam_sanity")
+            sanity_check_dir(logfile, peak_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][1], "step12.atac_peak_sanity")
 
-            tagdir_files = glob.glob(os.path.join(input_folder, '*tagDir.tar.gz'))
-            if len(tagdir_files) != 0:
-                log_it(logfile, "Unpacking HOMER tagDir tar balls...")
+            bedtools_version = subprocess.check_output(["bedtools", "--version"], stderr=subprocess.STDOUT)
+            log_once(logfile, "step12.bedtools_version", "\n" + bedtools_version.decode("utf-8"), "BEDTOOLS VERSION")
 
-                for file in tagdir_files:
-                    basename = os.path.basename(file)
-                    tag_dir = os.path.join(input_folder1, basename.replace(".tar.gz", ""))
-                    tag_dir_short = basename.replace(".tar.gz", "")
+            peak_bed = os.path.join(peak_folder, "all_groups.merged_peaks.bed")
+            bam_files = [os.path.join(input_folder, f"{sample}.sorted.dups_marked.filtered.bam") for sample in samples2]
+            multicov_output = os.path.join(output_folder, f"{os.path.basename(params.experiment_dir)}.multicov.tmp.txt")
+            multicov_command = (
+                f"bedtools multicov -bed {quote(peak_bed)} -bams {' '.join(quote(path) for path in bam_files)} "
+                f"> {quote(multicov_output)}"
+            )
+            log_it(logfile, multicov_command, "BEDTOOLS MULTICOV COMMAND")
+            shell(multicov_command)
 
-                    # unpack the tar.gz file
-                    log_it(logfile, f"Unpacking {basename} in {input_folder1}")
-                    shell(f"""
-                        mkdir -p {tag_dir} && \
-                        cd {input_folder1} && \
-                        tar --strip-components=1 -xzf {basename} -C {tag_dir_short}
-                        """)
+            final_output = rna_output_path(output_folder)
+            with open(multicov_output, newline="") as source, open(final_output, "w", newline="") as destination:
+                reader = csv.reader(source, delimiter="\t")
+                writer = csv.writer(destination, delimiter="\t", lineterminator="\n")
+                writer.writerow(["Peak", *samples2])
+                for row in reader:
+                    peak_name = f"{row[0]}_{row[1]}_{row[2]}"
+                    writer.writerow([peak_name, *row[3:]])
 
-            shell(f"ls -d {input_folder1}/*tagDir/ > TAGDIRlist.txt") # Make a list of tag dirs
-
-            # Convert peaks
-            log_it(logfile, "Converting BED peak file to HOMER POS peak file...")
-            shell("bed2pos.pl peak_calling/all_groups.merged_peaks.bed > all_groups.merged_peaks.pos")
-
-            ## Run HOMER's analyze_repeats.pl to count tags
-            log_it(logfile, "Counting reads with analyzeRepeats.pl...")
-            shell(f"""analyzeRepeats.pl all_groups.merged_peaks.pos {genome} -dfile TAGDIRlist.txt -noadj > {output_folder}/{os.path.basename(params.experiment_dir)}.raw_read_quant.table.txt""")
-
-            # Clean the table
-            shell(f"""sed '1d' {output_folder}/{os.path.basename(params.experiment_dir)}.raw_read_quant.table.txt | cut -f2-4,9- | sort -k1,1 -k2,2n -k3,3n | sed 's/ \\t/_/;s/\\t/_/' | sed 's/ \+/\t/g' > clean.tmp""")
-
-            #cat TAGDIRlist.txt | xargs -l basename | cut -f {namefields} -d '{separator}' | awk 'BEGIN{{ORS="\t"}}{{print $0}}' > clean.header.tmp
-            shell(f"""{config['SCRIPT_DIR']}/generate_header.sh {params.namefields} '{params.separator}'""")
-
-
-            shell(f"""sed "1iPeak\\t$(cat clean.header.tmp)" clean.tmp > {output_folder}/{os.path.basename(params.experiment_dir)}.raw_read_quant.table.txt""")
-
-
-            shell("rm TAGDIRlist.txt clean.header.tmp clean.tmp all_groups.merged_peaks.pos")
-
-            for tag_dir in tagdir_files:
-                tag_dir_folder = tag_dir.replace(".tar.gz", "")
-                # Remove the uncompressed tag directory
-                log_it(logfile, f"Removing uncompressed tag directory {tag_dir_folder}")
-                shell(f"rm -r {tag_dir_folder}")
-            if os.path.isfile(f"{input_folder1}/genome.tags.tsv"):
-                shell(f"rm {input_folder1}/genome.tags.tsv")
-            if os.path.isfile(f"{input_folder1}/tagAutocorrelation.txt"):
-                shell(f"rm {input_folder1}/tagAutocorrelation.txt")
-            if os.path.isfile(f"{input_folder1}/tagCountDistribution.txt"):
-                shell(f"rm {input_folder1}/tagCountDistribution.txt")
-            if os.path.isfile(f"{input_folder1}/tagInfo.txt"):
-                shell(f"rm {input_folder1}/tagInfo.txt")
-            if os.path.isfile(f"{input_folder1}/tagLengthDistribution.txt"):
-                shell(f"rm {input_folder1}/tagLengthDistribution.txt")
+            os.remove(multicov_output)
 
         if params.thetype == "RNA":
-            count_reads_rna(params.inputfolder1, params.outputfolder, params.genome, params.namefields, params.separator)
+            count_reads_rna(params.bam_input_folder, params.outputfolder, params.gtf_file, params.paired)
         elif params.thetype == "ATAC":
-            count_reads_atac(params.inputfolder1, params.inputfolder2, params.outputfolder, params.genome, params.namefields, params.separator)
+            count_reads_atac(params.bam_input_folder, params.peak_input_folder, params.outputfolder)
         else:
-            log_it(logfile, "For ChIP experiments, first determine optimal peak caller settings, then manually run run_quant_peaks.sh and then continue with the next step!")
+            log_it(logfile, "For ChIP experiments, first determine optimal peak caller settings and quantify peaks with your chosen downstream workflow before continuing.")
 
-        shell(f"""echo "necessity file for count reads. can delete this." > {params.outputfolder}/extra_12.tmp""")
+        write_tmp_file(params.outputfolder)

@@ -1,13 +1,13 @@
-#! /bin/bash
+#!/bin/bash
 
-# Visualize a 'color table' file as made by createTrackcolorTable.sh and used by make_ChIP_hubs.sh.
+# Preview a track color table in the terminal.
 
 #--------------------------------------------------------------------------------------------------------------
 # Function definitions
 # Usage function
 function display_help {
 	echo ""
-	echo "Usage: $0  -i <COLOR_TABLE> -h"
+	echo "Usage: $0 -i <COLOR_TABLE> -t -h"
 	echo ""
 	echo "	-i:			Color table file to display"
 	echo "				Mandatory argument"
@@ -15,7 +15,7 @@ function display_help {
 	echo "				Display a spectrum to see if your terminal supports true color"
 	echo "	-h:			Print this help message"
 	echo ""
-	echo "Examples:	~/bin/color_data_for_hubs"
+	echo "Example:	$0 -i gray.tint.color.table"
 	exit 1
 }
 
@@ -45,7 +45,7 @@ while getopts ":i:th" opt; do
 done
 
 # Run test and exit, if required
-if [ ! -z "$THETEST" ]
+if [ -n "$THETEST" ]
 then
 	echo "Color Test: Following line should be a rainbow. If not your terminal does not support true color."
 	COLUMNS=$(tput cols)
@@ -66,7 +66,7 @@ then
 fi
 
 
-# Set defaults
+# Validate input
 if [ ! -f "$THEFILE" ]
 then
 	echo "No color table file (-i) specified!"
@@ -78,7 +78,7 @@ fi
 # Display color table
 echo "Displaying color table:"
 echo "$THEFILE"
-NUMCOLS=$(wc -l $THEFILE | cut -f 1 -d " ")
+NUMCOLS=$(wc -l "$THEFILE" | cut -f 1 -d " ")
 COLUMNS=$(tput cols)
 echo "Number of colors: $NUMCOLS"
 
@@ -89,7 +89,7 @@ awk 'BEGIN{FS=","}{
 	printf "%d %d %d", r,g,b
 	printf "\033[48;2;%d;%d;%dm", r,g,b;
     printf "\n";
-}' $THEFILE
+}' "$THEFILE"
 
 # Reset terminal colors
 tput sgr0 

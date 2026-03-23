@@ -41,6 +41,6 @@ rule call_DE:
                 log_it(logfile, "Calling DE peaks...", f"EXECUTING STEP {master_config['de_rule_num']}")
                 log_it(logfile, f"Input folder: {inputfolder}")
                 log_it(logfile, f"Output folder: {outputfolder}")
-                log_it(logfile, "To call DE peaks for ChIP  data, please first manually determine the best peak calling settings for your experiment and use run_quant_peaks.sh.")
+                log_it(logfile, "To call DE peaks for ChIP data, first determine the best peak calling settings for your experiment and quantify peaks with your chosen downstream workflow.")
                 log_it(logfile, "Then execute 'run_call_DE_peaks.sh' on your optimal peak set.")
         calling_DE(logfile, params.thetype, params.inputfolder, params.outputfolder)      

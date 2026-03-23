@@ -30,10 +30,9 @@ where = ["src"]
 omnomnomics = [
   "workflow/Snakefile.smk",
   "workflow/config/*.yaml",
+  "workflow/bin/R.color.table",
   "workflow/bin/scripts/*.sh",
   "workflow/bin/homer/*",
-  "workflow/bin/Trimmomatic-0.39/*",
-  "workflow/bin/Trimmomatic-0.39/adapters/*",
   "workflow/bin/color_data_for_hubs/*",
   "workflow/rules/*.smk",
   "workflow/slurm_profile/*.yaml",
