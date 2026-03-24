@@ -32,6 +32,12 @@ rule create_wiggles:
         log_once(logfile, "step8.header", "Creating BigWigs...", f"EXECUTING STEP {master_config['wig_rule_num']}")
         log_once(logfile, "step8.inputfolder", f"Input folder: {params.inputfolder}")
         log_once(logfile, "step8.outputfolder", f"Output folder: {params.outputfolder}")
+        if params.thetype == "RNA":
+            log_once(
+                logfile,
+                "step8.rna_stranded_mode",
+                "RNA BigWigs are split into plus/minus strand tracks with bamCoverage --filterRNAstrand forward/reverse.",
+            )
 
         bamcoverage_version = subprocess.check_output(["bamCoverage", "--version"], stderr=subprocess.STDOUT)
         log_once(logfile, "step8.bamcoverage_version", "\n" + bamcoverage_version.decode("utf-8"), "DEEPTOOLS VERSION")
@@ -57,20 +63,45 @@ rule create_wiggles:
             try:
                 local_bam = stage_input(input_bam)
                 local_bai = stage_input(input_bai)
-                local_bw = os.path.join(local_workdir, f"{sample}.bw")
-                output_bw = os.path.join(outputfolder, f"{sample}.bw")
+                if params.thetype == "RNA":
+                    local_plus_bw = os.path.join(local_workdir, f"{sample}.plus.bw")
+                    local_minus_bw = os.path.join(local_workdir, f"{sample}.minus.bw")
+                    output_plus_bw = os.path.join(outputfolder, f"{sample}.plus.bw")
+                    output_minus_bw = os.path.join(outputfolder, f"{sample}.minus.bw")
 
-                bamcoverage_command = f"""
-                    bamCoverage -b {quote(local_bam)} -o {quote(local_bw)} \
-                    --numberOfProcessors {threads} --binSize 10 --normalizeUsing CPM
-                """
-                bamcoverage_command = " ".join(bamcoverage_command.split())
-                record_step_command(master_config['wig_rule_num'], sample, bamcoverage_command)
-                shell(bamcoverage_command)
+                    plus_command = f"""
+                        bamCoverage -b {quote(local_bam)} -o {quote(local_plus_bw)} \
+                        --numberOfProcessors {threads} --binSize 10 --normalizeUsing CPM --filterRNAstrand forward
+                    """
+                    minus_command = f"""
+                        bamCoverage -b {quote(local_bam)} -o {quote(local_minus_bw)} \
+                        --numberOfProcessors {threads} --binSize 10 --normalizeUsing CPM --filterRNAstrand reverse
+                    """
+                    plus_command = " ".join(plus_command.split())
+                    minus_command = " ".join(minus_command.split())
+                    record_step_command(master_config['wig_rule_num'], sample, plus_command)
+                    record_step_command(master_config['wig_rule_num'], sample, minus_command)
+                    shell(plus_command)
+                    shell(minus_command)
 
-                copy_bw_command = f"cp {quote(local_bw)} {quote(output_bw)}"
-                record_step_note(master_config['wig_rule_num'], sample, "copying_bigwig_back")
-                shell(copy_bw_command)
+                    record_step_note(master_config['wig_rule_num'], sample, "copying_stranded_bigwigs_back")
+                    shell(f"cp {quote(local_plus_bw)} {quote(output_plus_bw)}")
+                    shell(f"cp {quote(local_minus_bw)} {quote(output_minus_bw)}")
+                else:
+                    local_bw = os.path.join(local_workdir, f"{sample}.bw")
+                    output_bw = os.path.join(outputfolder, f"{sample}.bw")
+
+                    bamcoverage_command = f"""
+                        bamCoverage -b {quote(local_bam)} -o {quote(local_bw)} \
+                        --numberOfProcessors {threads} --binSize 10 --normalizeUsing CPM
+                    """
+                    bamcoverage_command = " ".join(bamcoverage_command.split())
+                    record_step_command(master_config['wig_rule_num'], sample, bamcoverage_command)
+                    shell(bamcoverage_command)
+
+                    copy_bw_command = f"cp {quote(local_bw)} {quote(output_bw)}"
+                    record_step_note(master_config['wig_rule_num'], sample, "copying_bigwig_back")
+                    shell(copy_bw_command)
                 finish_step_sample(master_config['wig_rule_num'], sample, "create_wiggles", tracking["start_time"], "OK")
             except Exception:
                 finish_step_sample(master_config['wig_rule_num'], sample, "create_wiggles", tracking["start_time"], "FAIL")

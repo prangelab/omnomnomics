@@ -51,7 +51,7 @@ def parse_arguments():
    parser.add_argument('-C', '--col-table', help='File specifying which colors to use for the tracks. \n \t Default: gray.tint.color.table from the packaged palette directory. Can be a *txt list file with one color table per line. Different color tables will be used per hub as split by -e. Can be a full path or a file basename in combination with -P. Use `omnomnomics create-track-color-table` to build custom palettes and `omnomnomics display-track-color-table` to preview them.')
    parser.add_argument('-P', '--color-data-folder', help='Path to a folder with color tables. \n \t Default: packaged color_data_for_hubs directory. Use this to point the workflow at custom palettes.') ##################change this default??
    parser.add_argument('-o', '--overlay', help='Overlay type (transparentOverlay|stacked|solidOverlay|none) \n \t Default: transparentOverlay')
-   parser.add_argument('-L', '--hub-mail', help='Email to use in trackhub \n \t Default: m.dewinther@amsterdamumc.nl')
+   parser.add_argument('-L', '--hub-mail', help='Email to use in trackhub \n \t Default: your@email.com')
    parser.add_argument('-X', '--no-multiqc', action='store_true', help='Exclude multiQC stats aggregator. Set if you don not wish to run multiQC.')
    parser.add_argument('--create-homer-tagdirs', action='store_true', help='Create optional HOMER tag directory exports in addition to the main pipeline outputs.')
    parser.add_argument('--remove-duplicates', action='store_true', help='Remove duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.')
@@ -707,7 +707,7 @@ def main():
     col_table = resolve_config_path(args.col_table, workflow_root) if args.col_table else resolve_config_path(config.get('color_table', f"{workflow_root}/bin/color_data_for_hubs/gray.tint.color.table"), workflow_root)
     color_data_folder = resolve_config_path(args.color_data_folder, workflow_root) if args.color_data_folder else resolve_config_path(config.get('color_data_folder', f"{workflow_root}/bin/color_data_for_hubs"), workflow_root)
     overlay = args.overlay if args.overlay else config.get('overlay', "transparentOverlay")
-    hub_mail = args.hub_mail if args.hub_mail else config.get('hub_mail', "m.dewinther@amsterdamumc.nl")
+    hub_mail = args.hub_mail if args.hub_mail else config.get('hub_mail', "your@email.com")
     no_multiqc = args.no_multiqc if args.no_multiqc else config.get('no_multiqc', 0)
     create_homer_tagdirs = args.create_homer_tagdirs or config.get('create_homer_tagdirs', False)
     if args.remove_duplicates and args.keep_duplicates:

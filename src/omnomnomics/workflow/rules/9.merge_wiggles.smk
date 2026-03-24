@@ -16,6 +16,7 @@ rule merge_wiggles:
     output:
         f"{experiment_dir}/{master_config['output_folders'][master_config['mergewig_rule_num']-1]}/extra_9.tmp"
     params:
+        thetype=lambda wildcards: config['THETYPE'],
         thegenome=lambda wildcards: config['THEGENOME'],
         coltable=lambda wildcards: config["THECOLTABLE"],
         theappendix=lambda wildcards: config['THEAPPENDIX'],
@@ -87,7 +88,32 @@ rule merge_wiggles:
                     "maxHeightPixels 64:32:8\n"
                 )
 
-        def merge_wig(input_folder, output_folder, col_field, separator, type_field, name_fields, col_table, appendix, genome, hub_mail, overlay):
+        def sample_root_from_bw(filename, thetype):
+            if thetype == "RNA":
+                if filename.endswith(".plus.bw"):
+                    return filename[:-len(".plus.bw")]
+                if filename.endswith(".minus.bw"):
+                    return filename[:-len(".minus.bw")]
+            if filename.endswith(".bw"):
+                return filename[:-len(".bw")]
+            return filename
+
+        def append_track(trackdb_path, track_name, bigwig_name, short_label, long_label, parent_name, color, negate=False):
+            with open(trackdb_path, "a") as trackdb_file:
+                trackdb_file.write(
+                    f"\ntrack {track_name}\n"
+                    f"bigDataUrl {bigwig_name}\n"
+                    f"shortLabel {short_label}\n"
+                    f"longLabel {long_label}\n"
+                    "type bigWig\n"
+                    f"parent {parent_name}\n"
+                    f"color {color}\n"
+                    "alwaysZero on\n"
+                )
+                if negate:
+                    trackdb_file.write("negateValues on\n")
+
+        def merge_wig(input_folder, output_folder, thetype, col_field, separator, type_field, name_fields, col_table, appendix, genome, hub_mail, overlay):
             sanity_check_dir(logfile, input_folder, master_config['input_file_types'][master_config['mergewig_rule_num'] - 1], "step9.sanity")
 
             col_array = []
@@ -99,25 +125,26 @@ rule merge_wiggles:
                 col_array.append(col_table)
 
             field_indices = parse_namefields(name_fields)
+            bw_files = [bw for bw in os.listdir(input_folder) if bw.endswith(".bw")]
+            sample_roots = sorted(set(sample_root_from_bw(bw, thetype) for bw in bw_files))
             hubtypes = sorted(set(
-                os.path.basename(bw).split(separator)[type_field - 1]
-                for bw in os.listdir(input_folder)
-                if bw.endswith(".bw")
+                sample_root.split(separator)[type_field - 1]
+                for sample_root in sample_roots
             ))
 
             ctabletracker = 0
             for superhub in hubtypes:
-                tracks = [
-                    bw for bw in os.listdir(input_folder)
-                    if re.match(re.escape(superhub).replace(re.escape(separator), ".*") + ".*\\.bw$", bw)
+                sample_tracks = [
+                    sample_root for sample_root in sample_roots
+                    if re.match(re.escape(superhub).replace(re.escape(separator), ".*") + ".*$", sample_root)
                 ]
-                tracks.sort()
-                if not tracks:
+                sample_tracks.sort()
+                if not sample_tracks:
                     continue
 
                 coltypes = sorted(set(
-                    os.path.basename(bw).split(separator)[col_field - 1]
-                    for bw in tracks
+                    sample_root.split(separator)[col_field - 1]
+                    for sample_root in sample_tracks
                 ))
 
                 if ctabletracker == len(col_array):
@@ -129,12 +156,12 @@ rule merge_wiggles:
                 if not table_colors:
                     raise ValueError(f"Color table {col_array[ctabletracker]} does not contain any colors")
 
-                if len(table_colors) < len(tracks):
-                    repeats = (len(tracks) // len(table_colors)) + 1
-                    mycols = (table_colors * repeats)[:len(tracks)]
+                if len(table_colors) < len(sample_tracks):
+                    repeats = (len(sample_tracks) // len(table_colors)) + 1
+                    mycols = (table_colors * repeats)[:len(sample_tracks)]
                 else:
-                    stride = max(1, (len(table_colors) - 1) // max(1, len(tracks)))
-                    mycols = [table_colors[idx] for idx in range(0, len(table_colors), stride)][:len(tracks)]
+                    stride = max(1, (len(table_colors) - 1) // max(1, len(sample_tracks)))
+                    mycols = [table_colors[idx] for idx in range(0, len(table_colors), stride)][:len(sample_tracks)]
 
                 hub_name = f"{superhub}.{appendix}"
                 hub_folder = os.path.join(output_folder, hub_name)
@@ -145,25 +172,58 @@ rule merge_wiggles:
 
                 ensure_hub_structure(hub_folder, genome_folder, hub_name, genome, hub_mail, overlay)
 
-                for i, bw in enumerate(tracks):
-                    bw_path = os.path.join(input_folder, bw)
-                    fields = bw.split(separator)
+                for i, sample_root in enumerate(sample_tracks):
+                    fields = sample_root.split(separator)
                     name = separator.join(fields[idx - 1] for idx in field_indices if idx - 1 < len(fields))
                     color = mycols[i]
                     log_it(logfile, f"Processing {name}...")
+                    trackdb_path = os.path.join(genome_folder, "trackDb.txt")
 
-                    with open(os.path.join(genome_folder, "trackDb.txt"), "a") as trackdb_file:
-                        trackdb_file.write(
-                            f"\ntrack {name}.{appendix}\n"
-                            f"bigDataUrl {bw}\n"
-                            f"shortLabel {name}.{appendix}\n"
-                            f"longLabel {name}.{appendix}\n"
-                            "type bigWig\n"
-                            f"parent {hub_name}\n"
-                            f"color {color}\n"
+                    if thetype == "RNA":
+                        plus_bw = f"{sample_root}.plus.bw"
+                        minus_bw = f"{sample_root}.minus.bw"
+                        plus_bw_path = os.path.join(input_folder, plus_bw)
+                        minus_bw_path = os.path.join(input_folder, minus_bw)
+                        if not os.path.exists(plus_bw_path) or not os.path.exists(minus_bw_path):
+                            raise FileNotFoundError(
+                                f"Expected stranded RNA BigWigs {plus_bw} and {minus_bw} in {input_folder}"
+                            )
+
+                        append_track(
+                            trackdb_path,
+                            f"{name}.{appendix}.plus",
+                            plus_bw,
+                            f"{name}+",
+                            f"{name} plus strand",
+                            hub_name,
+                            color,
+                        )
+                        append_track(
+                            trackdb_path,
+                            f"{name}.{appendix}.minus",
+                            minus_bw,
+                            f"{name}-",
+                            f"{name} minus strand",
+                            hub_name,
+                            color,
+                            negate=True,
                         )
 
-                    shutil.copyfile(bw_path, os.path.join(genome_folder, bw))
+                        shutil.copyfile(plus_bw_path, os.path.join(genome_folder, plus_bw))
+                        shutil.copyfile(minus_bw_path, os.path.join(genome_folder, minus_bw))
+                    else:
+                        bw = f"{sample_root}.bw"
+                        bw_path = os.path.join(input_folder, bw)
+                        append_track(
+                            trackdb_path,
+                            f"{name}.{appendix}",
+                            bw,
+                            f"{name}.{appendix}",
+                            f"{name}.{appendix}",
+                            hub_name,
+                            color,
+                        )
+                        shutil.copyfile(bw_path, os.path.join(genome_folder, bw))
 
                 ctabletracker += 1
 
@@ -173,6 +233,7 @@ rule merge_wiggles:
         merge_wig(
             input_folder=params.inputfolder,
             output_folder=params.outputfolder,
+            thetype=params.thetype,
             col_field=int(params.thecolfield),
             separator=params.theseparator,
             type_field=int(params.thetypefield),
