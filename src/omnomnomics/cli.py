@@ -607,7 +607,17 @@ def start_log(experiment_dir, run_date, config):
 ##--------------------------------------------------------------------------------------------------------------
 def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
     print("DELETING TO BE UPDATED OUTPUT FILES")
+    step_log_dir = os.path.join(experiment_dir, "run_logs", "steps")
     for num in mode_steps: # Loop over all the to run steps
+        step_prefix = f"step{num:02d}"
+        step_state_dir = os.path.join(step_log_dir, f".{step_prefix}.state")
+        if os.path.isdir(step_state_dir):
+            shutil.rmtree(step_state_dir)
+        for suffix in ("summary.tsv", "commands.txt", "notes.txt"):
+            step_log_file = os.path.join(step_log_dir, f"{step_prefix}.{suffix}")
+            if os.path.exists(step_log_file):
+                os.remove(step_log_file)
+
         outputfolder = config['output_folders'][num-1]
         output_filetype = config['output_file_types'][num-1]
         if isinstance(output_filetype, list): # If multiple output filetypes

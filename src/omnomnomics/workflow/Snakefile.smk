@@ -42,6 +42,8 @@ def log_it(logfile, message, heading=None):
         if heading: #Check if heading
             log.write("\n{}\n\n".format(heading))
         log.write(f"{timestamp}: {message}\n") #write to log
+        log.flush()
+        os.fsync(log.fileno())
     print(f"{timestamp}: {message}")
 
 def log_once(logfile, marker_name, message, heading=None):
