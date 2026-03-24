@@ -673,7 +673,12 @@ if create_homer_tagdirs:
         all_outputs += expand(f"{experiment_dir}/{homer_output_folder}/{{sample}}.extra_13.tmp", sample=samples2)
 
 if not is_worker_job:
-    log_it(logfile, '\n'.join(all_outputs), 'ALL OUTPUTS')
+    target_manifest = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.targets.txt")
+    with open(target_manifest, "w") as handle:
+        handle.write("\n".join(all_outputs) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    log_it(logfile, f"Planned targets: {len(all_outputs)}. Full target manifest: {target_manifest}", "ALL OUTPUTS")
 
 # Determine rule priority to resolve any rule ambuigity
 if config['THETRIMTOOL'] == "fastp" and config['THEMAPTOOL'] == "star":
