@@ -68,6 +68,9 @@ rule count_reads:
         def rna_output_path(outputfolder):
             return os.path.join(outputfolder, f"{os.path.basename(params.experiment_dir)}.raw_read_quant.table.txt")
 
+        def rna_featurecounts_summary_path(outputfolder):
+            return os.path.join(outputfolder, f"{os.path.basename(params.experiment_dir)}.featureCounts.summary.txt")
+
         def count_reads_rna(input_folder, output_folder, gtf_file, paired):
             log_it(logfile, "Counting RNA reads from BAMs with featureCounts...")
             sanity_check_dir(logfile, input_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][0], "step11.rna_sanity")
@@ -98,6 +101,9 @@ rule count_reads:
                 for row in reader:
                     writer.writerow([row[0], *row[6:]])
 
+            featurecounts_summary = f"{featurecounts_output}.summary"
+            if os.path.exists(featurecounts_summary):
+                os.replace(featurecounts_summary, rna_featurecounts_summary_path(output_folder))
             os.remove(featurecounts_output)
 
         def count_reads_atac(input_folder, peak_folder, output_folder):
