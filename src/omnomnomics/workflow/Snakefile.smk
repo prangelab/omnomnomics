@@ -659,7 +659,10 @@ for rule_num in themode:
     if rule_num == 10:
         all_outputs.append( f"{experiment_dir}/{output_folder}/extra_10.tmp")
     if rule_num == 11:
-        all_outputs.append( f"{experiment_dir}/{output_folder}/extra_11.tmp")
+        all_outputs.append(f"{experiment_dir}/{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.raw_read_quant.table.txt")
+        if config['THETYPE'] == "RNA":
+            all_outputs.append(f"{experiment_dir}/{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.featureCounts.summary.txt")
+        all_outputs.append(f"{experiment_dir}/{output_folder}/extra_11.tmp")
     if rule_num == 12:
         all_outputs.append( f"{experiment_dir}/{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.results.zip")
 

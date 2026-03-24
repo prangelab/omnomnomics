@@ -38,7 +38,16 @@ rule count_reads:
     input:
         count_reads_input
     output:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num']-1]}/extra_11.tmp"
+        (
+            f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num']-1]}/{os.path.basename(config['EXPERIMENT_DIR'])}.raw_read_quant.table.txt",
+            f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num']-1]}/{os.path.basename(config['EXPERIMENT_DIR'])}.featureCounts.summary.txt",
+            f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num']-1]}/extra_11.tmp",
+        )
+        if config["THETYPE"] == "RNA"
+        else (
+            f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num']-1]}/{os.path.basename(config['EXPERIMENT_DIR'])}.raw_read_quant.table.txt",
+            f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num']-1]}/extra_11.tmp",
+        )
     params:
         thetype=config["THETYPE"],
         genome=config["THEGENOME"],
