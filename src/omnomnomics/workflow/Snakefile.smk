@@ -908,6 +908,35 @@ onsuccess:
                             })
                 return rows
 
+            def append_duplicate_flagged_pct_rows(rows):
+                sample_metric_map = {}
+                for row in rows:
+                    sample_metric_map.setdefault(row["sample"], {})
+                    sample_metric_map[row["sample"]][(row["stage"], row["metric"])] = row["value"]
+                for sample_name, metrics in sample_metric_map.items():
+                    post_duplicate_reads = metrics.get(("post_filter", "duplicate_flagged_primary_reads"))
+                    post_mapped_reads = metrics.get(("post_filter", "mapped_primary_reads"))
+                    if post_duplicate_reads is not None and post_mapped_reads not in (None, 0):
+                        rows.append({
+                            "sample": sample_name,
+                            "stage": "post_filter",
+                            "metric": "duplicate_flagged_primary_reads_pct",
+                            "unit": "percent",
+                            "value": round((post_duplicate_reads / post_mapped_reads) * 100, 4),
+                        })
+                    if config["PAIRED"]:
+                        post_duplicate_pairs = metrics.get(("post_filter", "duplicate_flagged_primary_pairs"))
+                        post_mapped_pairs = metrics.get(("post_filter", "mapped_primary_pairs"))
+                        if post_duplicate_pairs is not None and post_mapped_pairs not in (None, 0):
+                            rows.append({
+                                "sample": sample_name,
+                                "stage": "post_filter",
+                                "metric": "duplicate_flagged_primary_pairs_pct",
+                                "unit": "percent",
+                                "value": round((post_duplicate_pairs / post_mapped_pairs) * 100, 4),
+                            })
+                return rows
+
             def parse_trim_metrics(metrics_path):
                 metrics = {}
                 if not os.path.exists(metrics_path):
@@ -1081,6 +1110,7 @@ onsuccess:
                 aggregate_pdf = f"{experiment_dir}/MultiQC/{experiment_name}.alignment_qc_experiment_summary.pdf"
                 aggregate_svg = f"{experiment_dir}/MultiQC/{experiment_name}.alignment_qc_experiment_summary.svg"
                 rows = load_alignment_qc_rows(tsv_paths) + build_flow_qc_rows()
+                rows = append_duplicate_flagged_pct_rows(rows)
 
                 with open(aggregate_tsv, "w", newline="") as handle:
                     writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
@@ -1134,11 +1164,11 @@ onsuccess:
                     rows,
                     [
                         ("Mapped reads\nremoved", "derived", "mapped_primary_reads_removed"),
-                        ("Duplicate reads\nremoved", "derived", "duplicate_primary_reads_removed"),
+                        ("Post duplicate-\nflagged reads", "post_filter", "duplicate_flagged_primary_reads"),
                         ("Discordant pairs\nremoved", "derived", "discordant_templates_removed"),
                     ] if config["PAIRED"] else [
                         ("Mapped reads\nremoved", "derived", "mapped_primary_reads_removed"),
-                        ("Duplicate reads\nremoved", "derived", "duplicate_primary_reads_removed"),
+                        ("Post duplicate-\nflagged reads", "post_filter", "duplicate_flagged_primary_reads"),
                     ],
                     "Reads or pairs removed",
                     "Count",
@@ -1151,11 +1181,11 @@ onsuccess:
                     [
                         ("Unique mapped\nreads", "mapper_report", "mapper_uniquely_mapped_reads"),
                         ("Multi mapped\nreads", "mapper_report", "mapper_multimapped_reads"),
-                        ("Pre duplicate\nreads", "pre_filter", "duplicate_primary_reads"),
+                        ("Post duplicate-\nflagged %", "post_filter", "duplicate_flagged_primary_reads_pct"),
                     ] if config["PAIRED"] else [
                         ("Unique mapped\nreads", "mapper_report", "mapper_uniquely_mapped_reads"),
                         ("Multi mapped\nreads", "mapper_report", "mapper_multimapped_reads"),
-                        ("Pre duplicate\nreads", "pre_filter", "duplicate_primary_reads"),
+                        ("Post duplicate-\nflagged %", "post_filter", "duplicate_flagged_primary_reads_pct"),
                     ],
                     "Mapper and duplication profile",
                     "Reads",
@@ -1222,11 +1252,14 @@ onsuccess:
                             "scale": "RdYlGn",
                             "format": "{:,.1f}",
                         },
-                        "derived__duplicate_primary_reads_removed": {
-                            "title": "Dup Removed",
-                            "description": "Duplicate primary reads removed between the pre-filter and post-filter BAMs.",
+                        "post_filter__duplicate_flagged_primary_reads_pct": {
+                            "title": "Dup Flag %",
+                            "description": "Duplicate-flagged primary reads in the post-filter BAM as a percentage of post-filter mapped primary reads.",
+                            "min": 0,
+                            "max": 100,
+                            "suffix": "%",
                             "scale": "OrRd",
-                            "format": "{:,.0f}",
+                            "format": "{:,.1f}",
                         },
                     },
                     "data": sample_metric_map,
@@ -1245,9 +1278,8 @@ onsuccess:
                     "post_filter__mapped_primary_reads": {"title": "Post-filter Mapped Reads", "format": "{:,.0f}"},
                     "derived__mapped_primary_reads_retained_pct": {"title": "Filtered Retained %", "suffix": "%", "format": "{:,.1f}"},
                     "derived__mapped_primary_reads_removed": {"title": "Mapped Reads Removed", "format": "{:,.0f}"},
-                    "pre_filter__duplicate_primary_reads": {"title": "Pre-filter Duplicate Reads", "format": "{:,.0f}"},
-                    "post_filter__duplicate_primary_reads": {"title": "Post-filter Duplicate Reads", "format": "{:,.0f}"},
-                    "derived__duplicate_primary_reads_removed": {"title": "Duplicate Reads Removed", "format": "{:,.0f}"},
+                    "post_filter__duplicate_flagged_primary_reads": {"title": "Post Duplicate-flagged Reads", "format": "{:,.0f}"},
+                    "post_filter__duplicate_flagged_primary_reads_pct": {"title": "Post Duplicate-flagged %", "suffix": "%", "format": "{:,.1f}"},
                 }
                 if config["PAIRED"]:
                     table_headers.update({
@@ -1256,6 +1288,8 @@ onsuccess:
                         "derived__properly_paired_templates_retained_pct": {"title": "Proper Pair Retained %", "suffix": "%", "format": "{:,.1f}"},
                         "pre_filter__discordant_templates": {"title": "Pre Discordant Pairs", "format": "{:,.0f}"},
                         "derived__discordant_templates_removed": {"title": "Discordant Pairs Removed", "format": "{:,.0f}"},
+                        "post_filter__duplicate_flagged_primary_pairs": {"title": "Post Duplicate-flagged Pairs", "format": "{:,.0f}"},
+                        "post_filter__duplicate_flagged_primary_pairs_pct": {"title": "Post Duplicate-flagged Pair %", "suffix": "%", "format": "{:,.1f}"},
                     })
 
                 table_yaml = {
