@@ -831,6 +831,18 @@ def parse_name_fields(fields):
             field_list.append(int(part)) # Add all the wanted steps to list
     return field_list
 
+def normalize_field_selection_name(filename, file_type):
+    normalized = os.path.basename(filename)
+    if normalized.endswith(file_type):
+        normalized = normalized[:-len(file_type)]
+    if any(normalized.endswith(suffix) for suffix in (".plus", ".minus")):
+        normalized = re.sub(r'\.(plus|minus)$', '', normalized)
+    if "fastq" in file_type or file_type.endswith(".fq.gz") or file_type.endswith(".fq"):
+        normalized = strip_fastq_read_suffix(normalized)
+    normalized = normalized.replace(".filtered", "")
+    normalized = normalized.replace(".sorted.dups_marked", "")
+    return normalized
+
 def run_cut_command(filename, fields, separator):
     #Select specified fields from a filename using the given separator
     try:
@@ -852,17 +864,14 @@ def check_name_field_settings(experiment_dir, separator, name_fields, type_field
         if not sample_files:
             raise ValueError("No sample files found.")
         
-        mock_cut = os.path.basename(sample_files[0])
-        print(f"Debug: Mock cut - {mock_cut}")  # Debugging line
+        mock_cut = normalize_field_selection_name(sample_files[0], input_file_type_mod_range_min)
         
         # Run the cut command simulations
         cut_test = ""
         cut_test += run_cut_command(mock_cut, name_fields, separator)
         cut_test += run_cut_command(mock_cut, type_field, separator)
         cut_test += run_cut_command(mock_cut, col_field, separator)
-        
-        print(f"Debug: Cut test - {cut_test}")  # Debugging line
-        
+
     except (IndexError, ValueError) as e:
         print("Oops, something is wrong with your field settings! Check your -n, -c, -e, and -s variables!", file=sys.stderr)
         print(f"Error message: {e}")
@@ -907,8 +916,7 @@ def check_unique_sample_names(experiment_dir, input_folder_mod_range_min, input_
         files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*_R1*{input_file_type_mod_range_min}")
 
     # Extract names using the specified fields
-    sample_names = [extract_fields(os.path.basename(f), name_fields, separator) for f in files]
-    print(sample_names)
+    sample_names = [extract_fields(normalize_field_selection_name(f, input_file_type_mod_range_min), name_fields, separator) for f in files]
 
     # Check for uniqueness
     if len(sample_names) != len(set(sample_names)):
