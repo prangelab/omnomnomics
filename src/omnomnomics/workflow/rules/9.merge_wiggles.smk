@@ -10,6 +10,9 @@ import os
 import re
 import shutil
 
+RNA_PLUS_TRACK_COLOR = "255,0,0"
+RNA_MINUS_TRACK_COLOR = "0,0,255"
+
 rule merge_wiggles:
     input:
         extra_file=expand(f"{experiment_dir}/{master_config['input_folders'][master_config['mergewig_rule_num']-1]}/{{sample}}.extra_8.tmp", sample=samples2) if 8 in themode else []
@@ -38,6 +41,12 @@ rule merge_wiggles:
         log_once(logfile, "step9.header", "Merging BigWigs and TrackHubs...", f"EXECUTING STEP {master_config['mergewig_rule_num']}")
         log_once(logfile, "step9.inputfolder", f"Input folder: {params.inputfolder}")
         log_once(logfile, "step9.outputfolder", f"Output folder: {params.outputfolder}")
+        if params.thetype == "RNA":
+            log_once(
+                logfile,
+                "step9.rna_track_colors",
+                f"RNA track colors are fixed to plus strand {RNA_PLUS_TRACK_COLOR} and minus strand {RNA_MINUS_TRACK_COLOR}.",
+            )
 
         def parse_namefields(namefields):
             indices = []
@@ -196,7 +205,7 @@ rule merge_wiggles:
                             f"{name}+",
                             f"{name} plus strand",
                             hub_name,
-                            color,
+                            RNA_PLUS_TRACK_COLOR,
                         )
                         append_track(
                             trackdb_path,
@@ -205,7 +214,7 @@ rule merge_wiggles:
                             f"{name}-",
                             f"{name} minus strand",
                             hub_name,
-                            color,
+                            RNA_MINUS_TRACK_COLOR,
                             negate=True,
                         )
 
