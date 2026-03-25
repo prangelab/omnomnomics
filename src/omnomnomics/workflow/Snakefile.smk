@@ -558,6 +558,14 @@ else:
 
 merged_sample_wildcard_pattern = "|".join(re.escape(sample_name) for sample_name in sorted(samples2))
 
+
+def lane_samples_for_merged_sample(sample_name):
+    return sorted(
+        lane_sample
+        for lane_sample in lane_samples
+        if re.sub(r'_L00.', '', lane_sample) == sample_name
+    )
+
 if config['PAIRED'] == 1 and THEMODERANGEMIN < 4: 
     num_samples = len(samples) / 2
 else: 

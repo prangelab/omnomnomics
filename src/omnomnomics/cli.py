@@ -148,15 +148,18 @@ def load_step_monitor_rows(experiment_dir):
        started_dir = state_dir / "started"
        completed_dir = state_dir / "completed"
        failed_dir = state_dir / "failed"
+       finished_marker = state_dir / "finished.marker"
        if state_dir.is_dir():
            started = len(list(started_dir.iterdir())) if started_dir.is_dir() else 0
            completed = len(list(completed_dir.iterdir())) if completed_dir.is_dir() else 0
            failed = len(list(failed_dir.iterdir())) if failed_dir.is_dir() else 0
            running = max(0, started - completed - failed)
+           finished = finished_marker.exists()
        else:
            running = 0
            completed = 0
            failed = 0
+           finished = False
            summary_path = step_log_dir / f"step{step_num:02d}.summary.tsv"
            if summary_path.exists():
                with summary_path.open(newline="") as handle:
@@ -175,9 +178,12 @@ def load_step_monitor_rows(experiment_dir):
        elif running:
            state = "RUNNING"
            state_color = ANSI_STATUS_FIRST
-       elif completed:
+       elif finished:
            state = "DONE"
            state_color = ANSI_STATUS_OK
+       elif completed:
+           state = "WAITING"
+           state_color = ANSI_HEADER
        else:
            state = "PENDING"
            state_color = ANSI_HEADER

@@ -17,7 +17,10 @@ rule merge_bam:
     wildcard_constraints:
         sample4=merged_sample_wildcard_pattern
     input:
-        extra_files = expand(f"{experiment_dir}/{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample1}}.extra_3.tmp", sample1 = samples) if 3 in themode else []
+        extra_files=lambda wildcards: [
+            f"{experiment_dir}/{master_config['input_folders'][master_config['merge_rule_num']-1]}/{lane_sample}.extra_3.tmp"
+            for lane_sample in lane_samples_for_merged_sample(wildcards.sample4)
+        ] if 3 in themode else []
     output:
         f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/{{sample4}}.bam",
         f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/{{sample4}}.extra_4.tmp"
