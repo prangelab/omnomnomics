@@ -80,7 +80,7 @@ def find_latest_run_log(experiment_dir):
        sys.exit(1)
    candidates = [
        path for path in run_logs_dir.glob("omnomnomics.run.*.log")
-       if path.is_file() and ".backup" not in path.name
+       if path.is_file() and ".backup" not in path.name and not path.name.endswith(".tools.log")
    ]
    if not candidates:
        print(f"No omnomnomics run logs found in '{run_logs_dir}'. Aborting...", file=sys.stderr)
