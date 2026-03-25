@@ -64,6 +64,7 @@ rule count_reads:
         partition=master_config["partition"],
         runtime=Runtime_Per_Rule[str(master_config["countreads_rule_num"])]
     run:
+        tracking = begin_step_sample(master_config["countreads_rule_num"], "aggregate", "count_reads")
         log_once(logfile, "step11.header", "Counting Reads...", f"EXECUTING STEP {master_config['countreads_rule_num']}")
         log_once(logfile, "step11.inputfolder", f"Input folder: {params.bam_input_folder} and also {params.peak_input_folder} for ATAC data")
         log_once(logfile, "step11.outputfolder", f"Output folder: {params.outputfolder}")
@@ -81,7 +82,7 @@ rule count_reads:
             return os.path.join(outputfolder, f"{os.path.basename(params.experiment_dir)}.featureCounts.summary.txt")
 
         def count_reads_rna(input_folder, output_folder, gtf_file, paired):
-            log_it(logfile, "Counting RNA reads from BAMs with featureCounts...")
+            log_once(logfile, "step11.rna_mode", "Counting RNA reads from BAMs with featureCounts...")
             sanity_check_dir(logfile, input_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][0], "step11.rna_sanity")
 
             if not os.path.isfile(gtf_file):
@@ -116,7 +117,7 @@ rule count_reads:
             os.remove(featurecounts_output)
 
         def count_reads_atac(input_folder, peak_folder, output_folder):
-            log_it(logfile, "Counting ATAC reads from BAMs with bedtools multicov...")
+            log_once(logfile, "step11.atac_mode", "Counting ATAC reads from BAMs with bedtools multicov...")
             sanity_check_dir(logfile, input_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][0], "step11.atac_bam_sanity")
             sanity_check_dir(logfile, peak_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][1], "step11.atac_peak_sanity")
 
@@ -144,11 +145,16 @@ rule count_reads:
 
             os.remove(multicov_output)
 
-        if params.thetype == "RNA":
-            count_reads_rna(params.bam_input_folder, params.outputfolder, params.gtf_file, params.paired)
-        elif params.thetype == "ATAC":
-            count_reads_atac(params.bam_input_folder, params.peak_input_folder, params.outputfolder)
-        else:
-            log_it(logfile, "For ChIP experiments, first determine optimal peak caller settings and quantify peaks with your chosen downstream workflow before continuing.")
+        try:
+            if params.thetype == "RNA":
+                count_reads_rna(params.bam_input_folder, params.outputfolder, params.gtf_file, params.paired)
+            elif params.thetype == "ATAC":
+                count_reads_atac(params.bam_input_folder, params.peak_input_folder, params.outputfolder)
+            else:
+                log_once(logfile, "step11.chip_note", "For ChIP experiments, first determine optimal peak caller settings and quantify peaks with your chosen downstream workflow before continuing.")
 
-        write_tmp_file(params.outputfolder)
+            write_tmp_file(params.outputfolder)
+            finish_step_sample(master_config["countreads_rule_num"], "aggregate", "count_reads", tracking["start_time"], "OK")
+        except Exception:
+            finish_step_sample(master_config["countreads_rule_num"], "aggregate", "count_reads", tracking["start_time"], "FAIL")
+            raise

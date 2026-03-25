@@ -58,6 +58,10 @@ rule merge_wiggles:
                     indices.append(int(part))
             return sorted(set(indices))
 
+        def select_fields(values, field_spec):
+            indices = parse_namefields(str(field_spec))
+            return separator.join(values[idx - 1] for idx in indices if idx - 1 < len(values))
+
         def ensure_hub_structure(hub_folder, genome_folder, hub_name, genome, hub_mail, overlay):
             if os.path.exists(hub_folder):
                 return
@@ -137,7 +141,7 @@ rule merge_wiggles:
             bw_files = [bw for bw in os.listdir(input_folder) if bw.endswith(".bw")]
             sample_roots = sorted(set(sample_root_from_bw(bw, thetype) for bw in bw_files))
             hubtypes = sorted(set(
-                sample_root.split(separator)[type_field - 1]
+                select_fields(sample_root.split(separator), type_field)
                 for sample_root in sample_roots
             ))
 
@@ -152,7 +156,7 @@ rule merge_wiggles:
                     continue
 
                 coltypes = sorted(set(
-                    sample_root.split(separator)[col_field - 1]
+                    select_fields(sample_root.split(separator), col_field)
                     for sample_root in sample_tracks
                 ))
 
@@ -243,9 +247,9 @@ rule merge_wiggles:
             input_folder=params.inputfolder,
             output_folder=params.outputfolder,
             thetype=params.thetype,
-            col_field=int(params.thecolfield),
+            col_field=params.thecolfield,
             separator=params.theseparator,
-            type_field=int(params.thetypefield),
+            type_field=params.thetypefield,
             name_fields=params.thenamefields,
             col_table=params.coltable,
             appendix=params.theappendix,
