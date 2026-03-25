@@ -224,6 +224,7 @@ Assay dependent follow-up steps:
 
 Optional export:
 	--create-homer-tagdirs:	Create HOMER tag directory tarballs alongside the main numbered workflow outputs.
+					This requires a working HOMER installation with the requested genome installed separately via `configureHomer.pl`.
 
 
 Auto mode:
@@ -264,6 +265,7 @@ Some job mode examples:
 								Required argument
     -X:                     eXclude multiQC stats aggregator. Set if you don not wish to run multiQC.
     --create-homer-tagdirs: Create optional HOMER tag directory tarballs in addition to the main numbered workflow outputs.
+                                    HOMER genomes are not installed automatically with the package. Install them separately with `configureHomer.pl` if you want to use this export.
     --rerun-selected-steps: Force recomputation of the selected workflow steps by deleting their current outputs first.
                                     Default behavior is to reuse existing outputs when Snakemake sees them as up to date.
     --remove-duplicates:    Remove duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.
@@ -362,3 +364,29 @@ If that does not clear the problem, remove the stale Snakemake working directory
 cd <EXPERIMENT_DIR>
 rm -r .snakemake
 ```
+
+If optional HOMER tag directory export fails with messages such as `Could not find genome`, HOMER itself is installed but its genome data are missing. Install the required HOMER genome explicitly, for example:
+
+```bash
+configureHomer.pl -install hg38
+configureHomer.pl -install mm39
+```
+
+On HPC systems where HOMER was installed inside a Conda or Mamba environment, `configureHomer.pl` is often not on `PATH` even though `makeTagDirectory` is. In that case, run it from the HOMER tree inside the active environment, for example:
+
+```bash
+cd "$HOME/conda/envs/omnomnomics/share/homer"
+perl configureHomer.pl -install hg38
+```
+
+This can also be submitted as a batch job if you prefer not to run the download on a login node:
+
+```bash
+sbatch -p <PARTITION> -N 1 -n 1 -c 4 -t 01:00:00 --wrap='cd "$HOME/conda/envs/omnomnomics/share/homer" && perl configureHomer.pl -install hg38'
+```
+
+Adjust the environment path, partition, wall time, and genome name to match your setup.
+
+For the optional HOMER export, `omnomnomics` translates common Ensembl/GenBank assembly names to HOMER aliases where needed:
+- `GRCh38` and `GRCh38.p14` use HOMER genome `hg38`
+- `GRCm39` uses HOMER genome `mm39`

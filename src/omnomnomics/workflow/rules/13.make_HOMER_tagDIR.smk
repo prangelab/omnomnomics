@@ -14,6 +14,14 @@ import shutil
 import subprocess
 import tempfile
 
+def resolve_homer_genome(genome_name):
+    genome_aliases = {
+        "GRCh38": "hg38",
+        "GRCh38.p14": "hg38",
+        "GRCm39": "mm39",
+    }
+    return genome_aliases.get(genome_name, genome_name)
+
 rule create_homer_tagDir:
     input:
         filtered_BAM=f"{experiment_dir}/{master_config['input_folders'][master_config['homer_tagdir_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.bam" if config['THETYPE'] != "CHIP" else f"{experiment_dir}/{master_config['input_folders'][master_config['homer_tagdir_rule_num']-1]}/{{sample}}.filtered.bam",
@@ -39,6 +47,9 @@ rule create_homer_tagDir:
 
         samtools_version = subprocess.check_output("samtools --version | head -n2", shell=True, executable='/bin/bash')
         log_once(logfile, "step13.samtools_version", "\n"+samtools_version.decode("utf-8"), "SAMTOOLS VERSION")
+
+        homer_genome = resolve_homer_genome(params.genome)
+        log_once(logfile, "step13.homer_genome", f"HOMER genome alias: {params.genome} -> {homer_genome}")
 
         sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['homer_tagdir_rule_num']-1], "step13.homer_sanity")
 
@@ -93,7 +104,23 @@ rule create_homer_tagDir:
                     command = f"makeTagDirectory {quote(tag_dir)} {quote(local_bam)} -genome {genome} -single"
 
                 record_step_command(master_config['homer_tagdir_rule_num'], wildcards.sample, command)
-                shell(command)
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    executable="/bin/bash",
+                    capture_output=True,
+                    text=True,
+                )
+                if result.stdout.strip():
+                    record_step_note(master_config['homer_tagdir_rule_num'], wildcards.sample, f"homer_stdout={result.stdout.strip()}")
+                if result.stderr.strip():
+                    record_step_note(master_config['homer_tagdir_rule_num'], wildcards.sample, f"homer_stderr={result.stderr.strip()}")
+                if result.returncode != 0 or not os.path.isdir(tag_dir):
+                    raise RuntimeError(
+                        f"HOMER makeTagDirectory failed for sample {wildcards.sample}. "
+                        f"Requested genome '{genome}'. "
+                        f"Check that HOMER has this genome installed via configureHomer.pl."
+                    )
 
                 # Compress the tag directory
                 record_step_note(master_config['homer_tagdir_rule_num'], wildcards.sample, "compressing_homer_tagdir")
@@ -108,4 +135,4 @@ rule create_homer_tagDir:
             finally:
                 shutil.rmtree(local_workdir, ignore_errors=True)
 
-        create_homer_tagDir(input.filtered_BAM, params.outputfolder, params.genome, params.thetype)
+        create_homer_tagDir(input.filtered_BAM, params.outputfolder, homer_genome, params.thetype)
