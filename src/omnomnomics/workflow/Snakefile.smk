@@ -803,7 +803,6 @@ onsuccess:
         #---------------------------------------------------------------------------------------------------------------
         if not config['NO_MULTIQC']:
             import csv
-            import gzip
             import statistics
             import subprocess
             import matplotlib
@@ -857,19 +856,15 @@ onsuccess:
                     "mapper_reported_alignment_pct": alignment_pct,
                 }
 
-            def count_fastq_reads(path):
-                open_func = gzip.open if path.endswith(".gz") else open
-                line_count = 0
-                with open_func(path, "rt") as handle:
-                    for _ in handle:
-                        line_count += 1
-                return line_count // 4
-
             def sample_qc_stats_path(sample_name):
                 stats_output_folder = master_config['output_folders'][master_config['stats_rule_num'] - 1]
                 if config['THETYPE'] != "CHIP":
                     return f"{experiment_dir}/{stats_output_folder}/{sample_name}.sorted.dups_marked.filtered.bam.stats.txt"
                 return f"{experiment_dir}/{stats_output_folder}/{sample_name}.filtered.bam.stats.txt"
+
+            def trim_metrics_path(sample_name):
+                trim_output_folder = master_config['output_folders'][master_config['trim_rule_num'] - 1]
+                return f"{experiment_dir}/{trim_output_folder}/{sample_name}.trim_metrics.tsv"
 
             def mapper_stats_path(sample_name):
                 map_output_folder = master_config['output_folders'][master_config['map_rule_num'] - 1]
@@ -878,11 +873,6 @@ onsuccess:
                 if config['THEMAPTOOL'] == "star_te":
                     return f"{experiment_dir}/{map_output_folder}/{sample_name}.STAR_TE_stats.txt"
                 return f"{experiment_dir}/{map_output_folder}/{sample_name}.STAR_stats.txt"
-
-            sample_to_raw_inputs = {}
-            for path in input_files:
-                normalized_sample = normalize_sample_name(path, input_file_type)
-                sample_to_raw_inputs.setdefault(normalized_sample, []).append(path)
 
             sample2_to_lane_samples = {}
             for sample_name in samples:
@@ -918,9 +908,22 @@ onsuccess:
                             })
                 return rows
 
+            def parse_trim_metrics(metrics_path):
+                metrics = {}
+                if not os.path.exists(metrics_path):
+                    return metrics
+                with open(metrics_path, newline="") as handle:
+                    reader = csv.DictReader(handle, delimiter="\t")
+                    for row in reader:
+                        value = row["value"]
+                        if value == "NA":
+                            metrics[row["metric"]] = None
+                        else:
+                            metrics[row["metric"]] = int(float(value))
+                return metrics
+
             def build_flow_qc_rows():
                 rows = []
-                trim_output_folder = master_config['output_folders'][master_config['trim_rule_num'] - 1]
                 mapper_parser = parse_hisat2_mapper_stats if config['THEMAPTOOL'] == "hisat2" else parse_star_mapper_stats
 
                 for sample_name in samples2:
@@ -929,17 +932,13 @@ onsuccess:
                     trimmed_read_total = 0
 
                     for lane_sample in lane_samples:
-                        raw_files = sample_to_raw_inputs.get(lane_sample, [])
-                        raw_read_total += sum(count_fastq_reads(path) for path in raw_files if os.path.exists(path))
-
-                        if config['PAIRED']:
-                            trimmed_paths = [
-                                f"{experiment_dir}/{trim_output_folder}/{lane_sample}_R1.trimmed.fastq.gz",
-                                f"{experiment_dir}/{trim_output_folder}/{lane_sample}_R2.trimmed.fastq.gz",
-                            ]
-                        else:
-                            trimmed_paths = [f"{experiment_dir}/{trim_output_folder}/{lane_sample}.trimmed.fastq.gz"]
-                        trimmed_read_total += sum(count_fastq_reads(path) for path in trimmed_paths if os.path.exists(path))
+                        lane_trim_metrics = parse_trim_metrics(trim_metrics_path(lane_sample))
+                        raw_value = lane_trim_metrics.get("raw_reads")
+                        trimmed_value = lane_trim_metrics.get("trimmed_reads")
+                        if raw_value is not None:
+                            raw_read_total += raw_value
+                        if trimmed_value is not None:
+                            trimmed_read_total += trimmed_value
 
                     if raw_read_total:
                         rows.append({"sample": sample_name, "stage": "raw_fastq", "metric": "raw_reads", "unit": "reads", "value": raw_read_total})

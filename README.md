@@ -321,6 +321,14 @@ Some job mode examples:
 
 By default, _Omnomnomics_ lets Snakemake reuse existing outputs that are already up to date. If you want to explicitly recompute the selected steps with the current settings, add `--rerun-selected-steps`.
 
+Additional utility command:
+
+```bash
+omnomnomics monitor -i <EXPERIMENT_DIR>
+```
+
+This watches the latest main run log in `<EXPERIMENT_DIR>/run_logs`, highlights step and sample-status lines, refreshes automatically, and exits on any key press.
+
 ## Logs
 To ensure proper logging, multiple logs can be found. Inside the run_logs folder in your EXPERIMENT_DIR, a run log can be found created by _Omnomnomics_ which logs a lot of information about the current run and settings of the pipeline. In addition, slurm keeps a log of every submitted job which can be found inside the slurm_logs folder in your EXPERIMENT_DIR, and then inside its rule name folder. Here information about every submitted job can be found and potential errors while executing will be directed towards. Lastly, Snakemake also provides a log in the .snakemake folder. 
 

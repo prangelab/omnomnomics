@@ -7,6 +7,7 @@
 # Copyright PrangeLab 2024 ##
 #=============================================
 import os
+import json
 import shlex
 import shutil
 import subprocess
@@ -30,7 +31,8 @@ rule run_fastp:
         ) if config["PAIRED"] else []
     output:
         trimmed_fastq1=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.trimmed.fastq.gz" if config["PAIRED"] else f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}.trimmed.fastq.gz",
-        trimmed_fastq2=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.trimmed.fastq.gz" if config["PAIRED"] else []
+        trimmed_fastq2=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.trimmed.fastq.gz" if config["PAIRED"] else [],
+        trim_metrics=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}.trim_metrics.tsv"
     params:
         seq_type=config["THETYPE"],
         inputfolder=f"{experiment_dir}/{master_config['input_folders'][master_config['trim_rule_num']-1]}",
@@ -42,7 +44,7 @@ rule run_fastp:
         partition=master_config['partition'],
         runtime=Runtime_Per_Rule['1']
     run:
-        def run_fastp(logfile, trim_tool, seq_type, threads, fastq1, fastq2, inputfolder, outputfolder, sample, trimmed_fastq1, trimmed_fastq2):
+        def run_fastp(logfile, trim_tool, seq_type, threads, fastq1, fastq2, inputfolder, outputfolder, sample, trimmed_fastq1, trimmed_fastq2, trim_metrics_output):
             log_once(logfile, "step1.header", "Trimming reads...", f"EXECUTING STEP {master_config['trim_rule_num']}")
             log_once(logfile, "step1.inputfolder", f"Input folder: {inputfolder}")
             log_once(logfile, "step1.outputfolder", f"Output folder: {outputfolder}")
@@ -96,6 +98,18 @@ rule run_fastp:
                 record_step_command(master_config['trim_rule_num'], sample, fastp_command)
                 shell(fastp_command)
 
+                with open(json_report, "r") as handle:
+                    fastp_metrics = json.load(handle)
+                before_filtering = fastp_metrics.get("summary", {}).get("before_filtering", {})
+                after_filtering = fastp_metrics.get("summary", {}).get("after_filtering", {})
+                raw_reads = before_filtering.get("total_reads")
+                trimmed_reads = after_filtering.get("total_reads")
+                trim_metrics_path = os.path.join(local_workdir, f"{sample}.trim_metrics.tsv")
+                with open(trim_metrics_path, "w") as metrics_handle:
+                    metrics_handle.write("metric\tvalue\n")
+                    metrics_handle.write(f"raw_reads\t{raw_reads if raw_reads is not None else 'NA'}\n")
+                    metrics_handle.write(f"trimmed_reads\t{trimmed_reads if trimmed_reads is not None else 'NA'}\n")
+
                 copy_fastq1_command = f"cp {quote(local_trimmed_fastq1)} {quote(trimmed_fastq1)}"
                 record_step_note(master_config['trim_rule_num'], sample, "copying_trimmed_r1_back")
                 shell(copy_fastq1_command)
@@ -104,6 +118,7 @@ rule run_fastp:
                     copy_fastq2_command = f"cp {quote(local_trimmed_fastq2)} {quote(trimmed_fastq2)}"
                     record_step_note(master_config['trim_rule_num'], sample, "copying_trimmed_r2_back")
                     shell(copy_fastq2_command)
+                shell(f"cp {quote(trim_metrics_path)} {quote(trim_metrics_output)}")
                 finish_step_sample(master_config['trim_rule_num'], sample, "run_fastp", tracking["start_time"], "OK")
             except Exception:
                 finish_step_sample(master_config['trim_rule_num'], sample, "run_fastp", tracking["start_time"], "FAIL")
@@ -123,4 +138,5 @@ rule run_fastp:
             wildcards.sample,
             output.trimmed_fastq1,
             output.trimmed_fastq2,
+            output.trim_metrics,
         )

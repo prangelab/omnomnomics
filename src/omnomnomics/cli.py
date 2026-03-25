@@ -19,6 +19,11 @@ import glob
 import random
 import math
 import shutil
+import time
+import select
+import termios
+import tty
+import csv
 from pathlib import Path
 from datetime import date, datetime
 
@@ -29,6 +34,214 @@ PACKAGE_ROOT = Path(__file__).resolve().parent
 WORKFLOW_ROOT = PACKAGE_ROOT / "workflow"
 DEFAULT_WORKFLOW_CONFIG = WORKFLOW_ROOT / "config" / "workflow.yaml"
 DEFAULT_SITE_CONFIG = WORKFLOW_ROOT / "config" / "site.yaml"
+
+ANSI_RESET = "\033[0m"
+ANSI_BOLD = "\033[1m"
+ANSI_COLORS = [
+    "\033[38;5;39m",
+    "\033[38;5;208m",
+    "\033[38;5;112m",
+    "\033[38;5;141m",
+    "\033[38;5;214m",
+    "\033[38;5;45m",
+    "\033[38;5;220m",
+    "\033[38;5;177m",
+    "\033[38;5;81m",
+    "\033[38;5;203m",
+    "\033[38;5;149m",
+    "\033[38;5;69m",
+    "\033[38;5;186m",
+]
+ANSI_STATUS_FIRST = "\033[38;5;81m"
+ANSI_STATUS_OK = "\033[38;5;112m"
+ANSI_STATUS_FAIL = "\033[38;5;203m"
+ANSI_HEADER = "\033[38;5;250m"
+ANSI_WARNING = "\033[38;5;214m"
+
+
+def parse_monitor_arguments(argv):
+   parser = argparse.ArgumentParser(
+       description="Monitor the latest omnomnomics run log for an experiment directory.",
+       allow_abbrev=False,
+   )
+   parser.add_argument('-i', '--experiment-dir', default='.', help='Path to the experiment directory. Default: current directory')
+   parser.add_argument('--refresh', type=float, default=5.0, help='Polling interval in seconds. Default: 5')
+   parser.add_argument('--latest-lines', type=int, default=20, help='Number of existing lines to show on startup. Default: 20')
+   args, unknown = parser.parse_known_args(argv)
+   if unknown:
+       parser.error(f"Unrecognized arguments: {' '.join(unknown)}")
+   return args
+
+
+def find_latest_run_log(experiment_dir):
+   run_logs_dir = Path(experiment_dir) / "run_logs"
+   if not run_logs_dir.is_dir():
+       print(f"Run log directory '{run_logs_dir}' does not exist. Aborting...", file=sys.stderr)
+       sys.exit(1)
+   candidates = [
+       path for path in run_logs_dir.glob("omnomnomics.run.*.log")
+       if path.is_file() and ".backup" not in path.name
+   ]
+   if not candidates:
+       print(f"No omnomnomics run logs found in '{run_logs_dir}'. Aborting...", file=sys.stderr)
+       sys.exit(1)
+   return max(candidates, key=lambda path: path.stat().st_mtime)
+
+
+def colorize_monitor_line(line):
+   stripped = line.rstrip("\n")
+   if not stripped:
+       return stripped
+
+   if "last sample finished" in stripped:
+       failed_match = re.search(r"; \d+/\d+ OK, (\d+)/\d+ failed", stripped)
+       if failed_match and int(failed_match.group(1)) > 0:
+           return f"{ANSI_STATUS_FAIL}{stripped}{ANSI_RESET}"
+       return f"{ANSI_STATUS_OK}{stripped}{ANSI_RESET}"
+
+   if "first sample entered" in stripped:
+       return f"{ANSI_STATUS_FIRST}{stripped}{ANSI_RESET}"
+
+   if "ERROR" in stripped or "Aborting" in stripped or "Pipeline failed" in stripped:
+       return f"{ANSI_STATUS_FAIL}{stripped}{ANSI_RESET}"
+
+   if "Warning" in stripped or "WARNING" in stripped:
+       return f"{ANSI_WARNING}{stripped}{ANSI_RESET}"
+
+   step_match = re.search(r"(\[STEP (\d+)\])", stripped)
+   if step_match:
+       full_marker = step_match.group(1)
+       step_num = int(step_match.group(2))
+       color = ANSI_COLORS[(step_num - 1) % len(ANSI_COLORS)]
+       return stripped.replace(full_marker, f"{ANSI_BOLD}{color}{full_marker}{ANSI_RESET}", 1)
+
+   if stripped.isupper() or stripped.startswith("##"):
+       return f"{ANSI_HEADER}{ANSI_BOLD}{stripped}{ANSI_RESET}"
+
+   return stripped
+
+
+def load_monitor_tail(log_path, latest_lines):
+   with log_path.open('r') as handle:
+       lines = handle.readlines()
+   return [colorize_monitor_line(line) for line in lines[-latest_lines:]]
+
+
+def load_step_monitor_rows(experiment_dir):
+   step_log_dir = Path(experiment_dir) / "run_logs" / "steps"
+   if not step_log_dir.is_dir():
+       return []
+
+   rows = []
+   for summary_path in sorted(step_log_dir.glob("step*.summary.tsv")):
+       match = re.search(r"step(\d+)\.summary\.tsv$", summary_path.name)
+       if not match:
+           continue
+       step_num = int(match.group(1))
+       running = 0
+       completed = 0
+       failed = 0
+       with summary_path.open(newline="") as handle:
+           reader = csv.DictReader(handle, delimiter="\t")
+           for row in reader:
+               status = row.get("status", "")
+               if status == "RUNNING":
+                   running += 1
+               elif status == "OK":
+                   completed += 1
+               elif status == "FAIL":
+                   failed += 1
+       if failed:
+           state = "FAILED" if running == 0 else "RUNNING/FAIL"
+           state_color = ANSI_STATUS_FAIL
+       elif running:
+           state = "RUNNING"
+           state_color = ANSI_STATUS_FIRST
+       elif completed:
+           state = "DONE"
+           state_color = ANSI_STATUS_OK
+       else:
+           state = "PENDING"
+           state_color = ANSI_HEADER
+       rows.append({
+           "step_num": step_num,
+           "state": state,
+           "state_color": state_color,
+           "running": running,
+           "completed": completed,
+           "failed": failed,
+       })
+   return rows
+
+
+def render_monitor_screen(log_path, step_rows, tail_lines):
+   print("\033[2J\033[H", end="")
+   print(f"{ANSI_HEADER}{ANSI_BOLD}omnomnomics monitor{ANSI_RESET}")
+   print(f"Log: {log_path}")
+   print("Press any key to exit.\n")
+
+   if step_rows:
+       print(f"{ANSI_BOLD}Step summary{ANSI_RESET}")
+       print(f"{'STEP':<6} {'STATE':<14} {'RUNNING':>8} {'DONE':>8} {'FAIL':>8}")
+       for row in step_rows:
+           step_label = f"{row['step_num']}"
+           state = f"{row['state_color']}{row['state']}{ANSI_RESET}"
+           print(f"{step_label:<6} {state:<14} {row['running']:>8} {row['completed']:>8} {row['failed']:>8}")
+       print("")
+
+   print(f"{ANSI_BOLD}Recent log lines{ANSI_RESET}")
+   for line in tail_lines:
+       print(line)
+
+
+class KeypressListener:
+   def __init__(self):
+       self.enabled = sys.stdin.isatty()
+       self.fd = None
+       self.original = None
+
+   def __enter__(self):
+       if self.enabled:
+           self.fd = sys.stdin.fileno()
+           self.original = termios.tcgetattr(self.fd)
+           tty.setcbreak(self.fd)
+       return self
+
+   def __exit__(self, exc_type, exc, tb):
+       if self.enabled and self.fd is not None and self.original is not None:
+           termios.tcsetattr(self.fd, termios.TCSADRAIN, self.original)
+
+   def wait_for_keypress(self, timeout_seconds):
+       if not self.enabled:
+           time.sleep(timeout_seconds)
+           return False
+       end_time = time.time() + timeout_seconds
+       while time.time() < end_time:
+           remaining = max(0, min(0.2, end_time - time.time()))
+           readable, _, _ = select.select([sys.stdin], [], [], remaining)
+           if readable:
+               os.read(self.fd, 1)
+               return True
+       return False
+
+
+def monitor_main(argv):
+   args = parse_monitor_arguments(argv)
+   experiment_dir = Path(args.experiment_dir).expanduser().resolve()
+   latest_log = find_latest_run_log(experiment_dir)
+
+   with KeypressListener() as listener:
+       while True:
+           current_log = find_latest_run_log(experiment_dir)
+           if current_log != latest_log:
+               latest_log = current_log
+           step_rows = load_step_monitor_rows(experiment_dir)
+           tail_lines = load_monitor_tail(latest_log, args.latest_lines)
+           render_monitor_screen(latest_log, step_rows, tail_lines)
+
+           if listener.wait_for_keypress(args.refresh):
+               print("Monitor stopped.")
+               return
 
 def parse_arguments():
    #Parse command-line arguments
@@ -659,6 +872,11 @@ def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
                         shutil.rmtree(file) # Is actually a hub directory and not a file
                     else:
                         os.remove(file)
+        if num == 1:
+            trim_metric_files = glob.glob(f"{experiment_dir}/{outputfolder}/*.trim_metrics.tsv")
+            for file in trim_metric_files:
+                if os.path.exists(file):
+                    os.remove(file)
     if config.get('create_homer_tagdirs', False):
         homer_outputfolder = config['output_folders'][config['homer_tagdir_rule_num'] - 1]
         homer_output_filetype = config['output_file_types'][config['homer_tagdir_rule_num'] - 1]
@@ -672,6 +890,9 @@ def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "genomes":
         genomes_main(sys.argv[2:], WORKFLOW_ROOT, DEFAULT_WORKFLOW_CONFIG, DEFAULT_SITE_CONFIG)
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "monitor":
+        monitor_main(sys.argv[2:])
         return
     if len(sys.argv) > 1 and sys.argv[1] == "create-track-color-table":
         original_argv = sys.argv[:]
@@ -924,12 +1145,12 @@ def main():
     if dry_run:
         cmd.append("--dry-run")
 
-    # For all the specified steps to run, add them to --forcerun so that they are always specified regardless 
-    # from if the output is already present or not
-    cmd.append("--forcerun")
-    for i in mode_steps:
-        routine = config['routines'][i-1]
-        cmd.append(config[routine][selected_routines[f'selected_routine_{routine}']])
+    # Only force selected routines when the user explicitly asks to recompute them
+    if rerun_selected_steps:
+        cmd.append("--forcerun")
+        for i in mode_steps:
+            routine = config['routines'][i-1]
+            cmd.append(config[routine][selected_routines[f'selected_routine_{routine}']])
 
     controller_script = Path(experiment_dir) / "run_configs" / f"omnomnomics.run.{run_date}.controller.sh"
     write_controller_script(controller_script, experiment_dir, cmd)
