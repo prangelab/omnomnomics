@@ -268,6 +268,11 @@ Some job mode examples:
                                     HOMER genomes are not installed automatically with the package. Install them separately with `configureHomer.pl` if you want to use this export.
     --rerun-selected-steps: Force recomputation of the selected workflow steps by deleting their current outputs first.
                                     Default behavior is to reuse existing outputs when Snakemake sees them as up to date.
+    --site-config:         Optional path to a site-specific config YAML.
+                                    Default resolution order:
+                                    1. $XDG_CONFIG_HOME/omnomnomics/site.yaml
+                                    2. ~/.config/omnomnomics/site.yaml
+                                    3. packaged site config
     --remove-duplicates:    Remove duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.
     --keep-duplicates:      Keep duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.
     -j MODE:                Job mode. Can be 'auto', 'all' or a range of jobs. See below (-h) for some 
@@ -333,7 +338,18 @@ This watches the latest main run log in `<EXPERIMENT_DIR>/run_logs`, highlights 
 To ensure proper logging, multiple logs can be found. Inside the run_logs folder in your EXPERIMENT_DIR, a run log can be found created by _Omnomnomics_ which logs a lot of information about the current run and settings of the pipeline. In addition, slurm keeps a log of every submitted job which can be found inside the slurm_logs folder in your EXPERIMENT_DIR, and then inside its rule name folder. Here information about every submitted job can be found and potential errors while executing will be directed towards. Lastly, Snakemake also provides a log in the .snakemake folder. 
 
 ## Config files
-For a run of _Omnomnomics_, three config layers are involved. The packaged workflow config contains pipeline defaults. The site config contains cluster-specific defaults such as partition and node characteristics. During a run, the CLI builds a run config that passes the resolved settings to Snakemake. This run config is written into the `run_configs` folder inside `EXPERIMENT_DIR`.
+For a run of _Omnomnomics_, three config layers are involved. The packaged workflow config contains pipeline defaults. The site config contains cluster-specific defaults such as partition and node characteristics. By default the CLI now looks for a user site config in `$XDG_CONFIG_HOME/omnomnomics/site.yaml` or `~/.config/omnomnomics/site.yaml` before falling back to the packaged site config. During a run, the CLI builds a run config that passes the resolved settings to Snakemake. This run config is written into the `run_configs` folder inside `EXPERIMENT_DIR`.
+
+The packaged site-config template lives at [src/omnomnomics/workflow/config/site.yaml](/Users/k.h.prange/Library/CloudStorage/OneDrive-AmsterdamUMC/Documenten/Tech/omnomnomics/src/omnomnomics/workflow/config/site.yaml). Copy that file and edit the cluster-specific values for your own environment. Important site-level settings include the partition defaults, node layout, controller settings, and the Snakemake submission pacing controls `max_jobs`, `max_jobs_per_second`, and `max_status_checks_per_second`.
+
+On clusters other than Snellius, the intended setup is therefore:
+
+```bash
+mkdir -p ~/.config/omnomnomics
+cp /path/to/site.yaml ~/.config/omnomnomics/site.yaml
+```
+
+Use `--site-config` only when you want to override that default for a specific run.
 
 ## MultiQC
 After completion of a run of _Omnomnomics_, MultiQC is used to parse and combine the results from the different bioinformatics tools. This helps to summarize the experiments that were run by giving a holistic view of all the samples and their results. In addition, it provides visual representation of the data to facilitate better interpretation. When running the full pipeline, MultiQC will generally produce a summarize html report, as well as data reports and plot reports. 

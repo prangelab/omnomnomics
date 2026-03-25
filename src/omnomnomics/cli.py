@@ -57,6 +57,8 @@ ANSI_STATUS_OK = "\033[38;5;112m"
 ANSI_STATUS_FAIL = "\033[38;5;203m"
 ANSI_HEADER = "\033[38;5;250m"
 ANSI_WARNING = "\033[38;5;214m"
+FASTQ_EXTENSIONS = (".fastq.gz", ".fq.gz", ".fastq", ".fq")
+FASTQ_READ_SUFFIX_RE = re.compile(r'_(?:R)?[12](?:_[0-9]{3})?$')
 
 
 def parse_monitor_arguments(argv):
@@ -71,6 +73,20 @@ def parse_monitor_arguments(argv):
    if unknown:
        parser.error(f"Unrecognized arguments: {' '.join(unknown)}")
    return args
+
+
+def default_user_site_config():
+   xdg_config_home = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")).expanduser()
+   return xdg_config_home / "omnomnomics" / "site.yaml"
+
+
+def resolve_site_config_path(site_config_arg):
+   if site_config_arg:
+       return Path(site_config_arg).expanduser().resolve()
+   user_site_config = default_user_site_config()
+   if user_site_config.is_file():
+       return user_site_config.resolve()
+   return DEFAULT_SITE_CONFIG
 
 
 def find_latest_run_log(experiment_dir):
@@ -127,10 +143,96 @@ def load_monitor_tail(log_path, latest_lines):
    return [colorize_monitor_line(line) for line in lines[-latest_lines:]]
 
 
+def strip_fastq_read_suffix(sample_name):
+   return FASTQ_READ_SUFFIX_RE.sub('', sample_name)
+
+
+def normalize_monitor_sample_name(file_path, file_type):
+   sample_name = os.path.basename(file_path).replace(file_type, "")
+   if "fastq" in file_type or file_type.endswith(".fq.gz") or file_type.endswith(".fq"):
+       sample_name = strip_fastq_read_suffix(sample_name)
+   sample_name = sample_name.replace(".filtered", "")
+   sample_name = sample_name.replace(".sorted.dups_marked", "")
+   return sample_name
+
+
+def collect_monitor_sample_totals(experiment_dir):
+   lane_sample_files = []
+   lane_sources = [
+       ("FASTQ", FASTQ_EXTENSIONS),
+       ("trimmed_FASTQ", (".trimmed.fastq.gz", ".trimmed.fastq", ".trimmed.fq.gz", ".trimmed.fq")),
+       ("BAM", (".bam",)),
+   ]
+   for folder_name, extensions in lane_sources:
+       folder_path = Path(experiment_dir) / folder_name
+       if not folder_path.is_dir():
+           continue
+       candidate_files = []
+       for extension in extensions:
+           candidate_files.extend(folder_path.glob(f"*{extension}"))
+       if folder_name == "BAM":
+           candidate_files = [
+               path for path in candidate_files
+               if re.search(r'_L0\d+\.bam$', path.name)
+           ]
+       if candidate_files:
+           lane_sample_files = candidate_files
+           break
+
+   lane_samples = []
+   for path in lane_sample_files:
+       extension = next((ext for ext in FASTQ_EXTENSIONS if str(path).endswith(ext)), None)
+       if extension is None:
+           for ext in (".trimmed.fastq.gz", ".trimmed.fastq", ".trimmed.fq.gz", ".trimmed.fq", ".bam"):
+               if str(path).endswith(ext):
+                   extension = ext
+                   break
+       if extension is None:
+           continue
+       lane_samples.append(normalize_monitor_sample_name(str(path), extension))
+   lane_samples = sorted(set(lane_samples))
+
+   if lane_samples:
+       merged_samples = sorted(set(re.sub(r'_L00.', '', sample_name) for sample_name in lane_samples))
+       return len(lane_samples), len(merged_samples)
+
+   merged_sample_files = []
+   merged_sources = [
+       ("filtered_BAM", (".sorted.dups_marked.filtered.bam", ".filtered.bam")),
+       ("BAM", (".bam",)),
+       ("BigWigs", (".plus.bw", ".minus.bw", ".bw")),
+   ]
+   for folder_name, extensions in merged_sources:
+       folder_path = Path(experiment_dir) / folder_name
+       if not folder_path.is_dir():
+           continue
+       candidate_files = []
+       for extension in extensions:
+           candidate_files.extend(folder_path.glob(f"*{extension}"))
+       if folder_name == "BAM":
+           candidate_files = [
+               path for path in candidate_files
+               if not re.search(r'_L0\d+\.bam$', path.name)
+           ]
+       if candidate_files:
+           merged_sample_files = candidate_files
+           break
+
+   merged_samples = set()
+   for path in merged_sample_files:
+       name = path.name
+       for extension in (".sorted.dups_marked.filtered.bam", ".filtered.bam", ".plus.bw", ".minus.bw", ".bw", ".bam"):
+           if name.endswith(extension):
+               merged_samples.add(normalize_monitor_sample_name(str(path), extension))
+               break
+   return 0, len(merged_samples)
+
+
 def load_step_monitor_rows(experiment_dir):
    step_log_dir = Path(experiment_dir) / "run_logs" / "steps"
    if not step_log_dir.is_dir():
        return []
+   lane_total, merged_total = collect_monitor_sample_totals(experiment_dir)
 
    step_nums = set()
    for summary_path in step_log_dir.glob("step*.summary.tsv"):
@@ -187,6 +289,13 @@ def load_step_monitor_rows(experiment_dir):
        else:
            state = "PENDING"
            state_color = ANSI_HEADER
+       if step_num in {1, 2, 3}:
+           total = lane_total
+       elif step_num in {4, 5, 6, 7, 8, 13}:
+           total = merged_total
+       else:
+           total = running + completed + failed
+       pending = max(0, total - running - completed - failed)
        rows.append({
            "step_num": step_num,
            "state": state,
@@ -194,6 +303,8 @@ def load_step_monitor_rows(experiment_dir):
            "running": running,
            "completed": completed,
            "failed": failed,
+           "pending": pending,
+           "total": total,
        })
    return rows
 
@@ -215,6 +326,7 @@ def render_monitor_screen(log_path, step_rows, tail_lines):
            f"{'STEP':<{step_width}} "
            f"{'STATE':<{state_width}} "
            f"{'RUNNING':>{count_width}} "
+           f"{'PEND':>{count_width}} "
            f"{'DONE':>{count_width}} "
            f"{'FAIL':>{count_width}}"
        )
@@ -226,6 +338,7 @@ def render_monitor_screen(log_path, step_rows, tail_lines):
                f"{step_label:<{step_width}} "
                f"{colored_state} "
                f"{row['running']:>{count_width}} "
+               f"{row['pending']:>{count_width}} "
                f"{row['completed']:>{count_width}} "
                f"{row['failed']:>{count_width}}"
            )
@@ -322,7 +435,7 @@ def parse_arguments():
    parser.add_argument('-a', '--appendix', help='Appendix to add to track name \n \t Default: hub')
    parser.add_argument('-k', '--keepunpaired', action='store_true', help='Keep unpaired or not in HISAT2')
    parser.add_argument('--dry-run', action='store_true', help='Validate the workflow and build the Snakemake DAG without executing jobs')
-   parser.add_argument('--site-config', help='Optional path to a site-specific config YAML. Default: packaged site config')
+   parser.add_argument('--site-config', help='Optional path to a site-specific config YAML. Default: $XDG_CONFIG_HOME/omnomnomics/site.yaml or ~/.config/omnomnomics/site.yaml, then packaged site config')
 
    args, unknown = parser.parse_known_args()
    # Check if any unknown arguments are provided
@@ -976,7 +1089,7 @@ def main():
     # Parse command-line arguments
     args = parse_arguments()
 
-    site_config_file = Path(args.site_config).expanduser().resolve() if args.site_config else DEFAULT_SITE_CONFIG
+    site_config_file = resolve_site_config_path(args.site_config)
     if not site_config_file.is_file():
         print(f"Site config file '{site_config_file}' does not exist. Please make sure it exists. Aborting...")
         sys.exit(1)
@@ -1182,9 +1295,13 @@ def main():
 
     # Call to snakemake!!
     max_cores = str(config.get("max_nodes", 1) * config.get("cores_per_node", 1))
+    max_jobs = str(config.get("max_jobs", 100))
+    max_jobs_per_second = str(config.get("max_jobs_per_second", 2))
+    max_status_checks_per_second = str(config.get("max_status_checks_per_second", 2))
     cmd = [ "snakemake",  "--profile", os.path.join(str(workflow_root), "slurm_profile"), "--snakefile", f"{workflow_root}/Snakefile.smk",
-        "--config", "config_file="+os.path.join(experiment_dir, "run_configs", f'omnomnomics.run.{run_date}.config.yaml'), "--jobs", "1000",
-        "--cores", max_cores, "--default-resources", f"partition={config['partition']}", f"runtime={config['default_runtime']}", "--rerun-triggers", "mtime", "--keep-going"
+        "--config", "config_file="+os.path.join(experiment_dir, "run_configs", f'omnomnomics.run.{run_date}.config.yaml'), "--jobs", max_jobs,
+        "--cores", max_cores, "--max-jobs-per-second", max_jobs_per_second, "--max-status-checks-per-second", max_status_checks_per_second,
+        "--default-resources", f"partition={config['partition']}", f"runtime={config['default_runtime']}", "--rerun-triggers", "mtime", "--keep-going"
     ]
 
     if dry_run:

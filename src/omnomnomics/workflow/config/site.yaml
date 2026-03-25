@@ -4,6 +4,9 @@
 ## Site defaults config ##
 partition: "rome"
 max_nodes: 504
+max_jobs: 100
+max_jobs_per_second: 2
+max_status_checks_per_second: 2
 
 # Snellius Rome thin-node defaults
 nodes_in_partition: 504
