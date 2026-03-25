@@ -782,6 +782,12 @@ def main():
         if not mode_steps:
             print("For the rest no steps to run. Done!")
             return
+    if 12 in mode_steps and the_type in {"RNA", "ATAC"}:
+        print("Step 12 DE calling is not implemented yet for RNA or ATAC, skipping it for now...")
+        mode_steps = [step for step in mode_steps if step != 12]
+        if not mode_steps:
+            print("For the rest no steps to run. Done!")
+            return
     print(f"MODE STEPS NEW = {mode_steps}")
 
     #Delete to be updated outputs

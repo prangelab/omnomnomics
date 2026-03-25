@@ -84,7 +84,7 @@ rule create_homer_tagDir:
 
                     if paired_end_count > 0:
                         record_step_note(master_config['homer_tagdir_rule_num'], wildcards.sample, "running_makeTagDirectory_paired_rna")
-                        command = f"makeTagDirectory {quote(tag_dir)} {quote(local_bam)} -genome {genome} -sspe -single"
+                        command = f"makeTagDirectory {quote(tag_dir)} {quote(local_bam)} -genome {genome} -sspe"
                     else:
                         record_step_note(master_config['homer_tagdir_rule_num'], wildcards.sample, "running_makeTagDirectory_single_rna")
                         command = f"makeTagDirectory {quote(tag_dir)} {quote(local_bam)} -genome {genome} -single"
