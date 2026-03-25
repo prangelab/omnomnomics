@@ -175,21 +175,26 @@ def load_step_monitor_rows(experiment_dir):
 
 
 def render_monitor_screen(log_path, step_rows, tail_lines):
+   separator = "-" * 72
    print("\033[2J\033[H", end="")
    print(f"{ANSI_HEADER}{ANSI_BOLD}omnomnomics monitor{ANSI_RESET}")
    print(f"Log: {log_path}")
    print("Press any key to exit.\n")
 
    if step_rows:
+       print(separator)
        print(f"{ANSI_BOLD}Step summary{ANSI_RESET}")
        print(f"{'STEP':<6} {'STATE':<14} {'RUNNING':>8} {'DONE':>8} {'FAIL':>8}")
        for row in step_rows:
            step_label = f"{row['step_num']}"
            state = f"{row['state_color']}{row['state']}{ANSI_RESET}"
            print(f"{step_label:<6} {state:<14} {row['running']:>8} {row['completed']:>8} {row['failed']:>8}")
+       print(separator)
        print("")
 
+   print(separator)
    print(f"{ANSI_BOLD}Recent log lines{ANSI_RESET}")
+   print(separator)
    for line in tail_lines:
        print(line)
 

@@ -1028,7 +1028,7 @@ onsuccess:
                 box_face_color = "#dbe7ee"
                 box_edge_color = "#8aa1b1"
 
-                ax.set_title(title)
+                ax.set_title(title, fontsize=11, pad=12)
                 if log_scale:
                     ax.set_yscale("symlog", linthresh=1)
                 ax.set_ylabel(ylabel)
@@ -1072,7 +1072,7 @@ onsuccess:
                     ax.text(idx, mean_value, f"{mean_value:.1f}", ha="center", va="bottom", fontsize=9, color=summary_color)
 
                 ax.set_xticks(range(len(metric_specs)))
-                ax.set_xticklabels([label for label, _, _ in metric_specs], rotation=15, ha="right")
+                ax.set_xticklabels([label for label, _, _ in metric_specs], rotation=0, ha="center", fontsize=9)
 
             def write_alignment_qc_experiment_summary(tsv_paths):
                 os.makedirs(f"{experiment_dir}/MultiQC", exist_ok=True)
@@ -1094,7 +1094,7 @@ onsuccess:
                             "NA" if row["value"] is None else row["value"],
                         ])
 
-                fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+                fig, axes = plt.subplots(2, 2, figsize=(16, 11))
                 fig.patch.set_facecolor("white")
                 fig.suptitle(f"{experiment_name} alignment QC experiment summary", fontsize=16, fontweight="bold")
 
@@ -1105,7 +1105,7 @@ onsuccess:
                         ("Raw reads", "raw_fastq", "raw_reads"),
                         ("Trimmed reads", "trimmed_fastq", "trimmed_reads"),
                         ("Aligned reads", "mapper_report", "mapper_reported_aligned_reads"),
-                        ("Filtered mapped reads", "post_filter", "mapped_primary_reads"),
+                        ("Filtered\nmapped reads", "post_filter", "mapped_primary_reads"),
                     ],
                     "Read counts across the pipeline",
                     "Reads",
@@ -1119,7 +1119,7 @@ onsuccess:
                         ("Trim retained %", "trimmed_fastq", "trimmed_reads_retained_pct"),
                         ("Mapper aligned %", "mapper_report", "mapper_reported_alignment_pct"),
                         ("Mapped retained %", "derived", "mapped_primary_reads_retained_pct"),
-                        ("Proper pairs retained %", "derived", "properly_paired_templates_retained_pct"),
+                        ("Proper pairs\nretained %", "derived", "properly_paired_templates_retained_pct"),
                     ] if config["PAIRED"] else [
                         ("Trim retained %", "trimmed_fastq", "trimmed_reads_retained_pct"),
                         ("Mapper aligned %", "mapper_report", "mapper_reported_alignment_pct"),
@@ -1133,12 +1133,12 @@ onsuccess:
                     axes[1, 0],
                     rows,
                     [
-                        ("Mapped reads removed", "derived", "mapped_primary_reads_removed"),
-                        ("Duplicate reads removed", "derived", "duplicate_primary_reads_removed"),
-                        ("Discordant pairs removed", "derived", "discordant_templates_removed"),
+                        ("Mapped reads\nremoved", "derived", "mapped_primary_reads_removed"),
+                        ("Duplicate reads\nremoved", "derived", "duplicate_primary_reads_removed"),
+                        ("Discordant pairs\nremoved", "derived", "discordant_templates_removed"),
                     ] if config["PAIRED"] else [
-                        ("Mapped reads removed", "derived", "mapped_primary_reads_removed"),
-                        ("Duplicate reads removed", "derived", "duplicate_primary_reads_removed"),
+                        ("Mapped reads\nremoved", "derived", "mapped_primary_reads_removed"),
+                        ("Duplicate reads\nremoved", "derived", "duplicate_primary_reads_removed"),
                     ],
                     "Reads or pairs removed",
                     "Count",
@@ -1149,20 +1149,20 @@ onsuccess:
                     axes[1, 1],
                     rows,
                     [
-                        ("Unique mapped reads", "mapper_report", "mapper_uniquely_mapped_reads"),
-                        ("Multi mapped reads", "mapper_report", "mapper_multimapped_reads"),
-                        ("Pre duplicate reads", "pre_filter", "duplicate_primary_reads"),
+                        ("Unique mapped\nreads", "mapper_report", "mapper_uniquely_mapped_reads"),
+                        ("Multi mapped\nreads", "mapper_report", "mapper_multimapped_reads"),
+                        ("Pre duplicate\nreads", "pre_filter", "duplicate_primary_reads"),
                     ] if config["PAIRED"] else [
-                        ("Unique mapped reads", "mapper_report", "mapper_uniquely_mapped_reads"),
-                        ("Multi mapped reads", "mapper_report", "mapper_multimapped_reads"),
-                        ("Pre duplicate reads", "pre_filter", "duplicate_primary_reads"),
+                        ("Unique mapped\nreads", "mapper_report", "mapper_uniquely_mapped_reads"),
+                        ("Multi mapped\nreads", "mapper_report", "mapper_multimapped_reads"),
+                        ("Pre duplicate\nreads", "pre_filter", "duplicate_primary_reads"),
                     ],
                     "Mapper and duplication profile",
                     "Reads",
                     log_scale=True,
                 )
 
-                fig.tight_layout(rect=[0, 0.02, 1, 0.95])
+                fig.tight_layout(rect=[0, 0.03, 1, 0.95], h_pad=3.0, w_pad=2.5)
                 fig.savefig(aggregate_pdf)
                 fig.savefig(aggregate_svg)
                 plt.close(fig)
