@@ -40,8 +40,8 @@ rule run_hisat2:
         log_once(logfile, "step3.inputfolder", f"Input folder: {params.inputfolder}")
         log_once(logfile, "step3.outputfolder", f"Output folder: {params.outputfolder}")
 
-        hisat2_version = subprocess.check_output(["hisat2", "--version"])
-        log_once(logfile, "step3.hisat2_version", "\n"+hisat2_version.decode("utf-8"), "HISAT2 VERSION")
+        hisat2_version = subprocess.check_output(["hisat2", "--version"]).decode("utf-8").splitlines()[0]
+        log_once(logfile, "step3.hisat2_version", f"\n{hisat2_version}", "HISAT2 VERSION")
         
         sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['map_rule_num']-1], "step3.sanity")
 

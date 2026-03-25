@@ -584,19 +584,33 @@ def write_run_config(experiment_dir, run_date, config_data):
 def start_log(experiment_dir, run_date, config):
     #Initialize the log file
     log_file = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.log")
+    tools_log_file = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.tools.log")
     marker_dir = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.markers")
+    tools_marker_dir = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.tools.markers")
     if os.path.isfile(log_file):
         backup_log = f"{log_file}.{os.urandom(8).hex()}.backup" #Create a random backup if multiple runs
         os.rename(log_file, backup_log)
         print(f"Existing log file backed up as: {backup_log}")
+    if os.path.isfile(tools_log_file):
+        backup_tools_log = f"{tools_log_file}.{os.urandom(8).hex()}.backup"
+        os.rename(tools_log_file, backup_tools_log)
+        print(f"Existing tools log backed up as: {backup_tools_log}")
     if os.path.isdir(marker_dir):
         shutil.rmtree(marker_dir)
+    if os.path.isdir(tools_marker_dir):
+        shutil.rmtree(tools_marker_dir)
 
 
     with open(log_file, 'w') as log:
         log.write("#################################\n")
         log.write("## Run log for omnomnomics run ##\n")
         log.write("#################################\n\n")
+        log.write(f"Pipeline version: {config['omnomnomics']}\n\n")
+
+    with open(tools_log_file, 'w') as log:
+        log.write("###################################\n")
+        log.write("## Tool log for omnomnomics run ##\n")
+        log.write("###################################\n\n")
         log.write(f"Pipeline version: {config['omnomnomics']}\n\n")
 
 
@@ -780,17 +794,20 @@ def main():
     if min(mode_steps) == 11 and the_type == "CHIP":
         print("For ChIP experiments, first determine optimal peak caller settings and quantify peaks with your chosen downstream workflow before continuing.")
         return
-    elif min(mode_steps) == 12 and the_type == "CHIP":
-        print("To call DE peaks for ChIP data, first determine the best peak calling settings for your experiment and quantify peaks with your chosen downstream workflow.")
-        return
     if 10 in mode_steps and the_type == "RNA":
         print("Not a ChIP- or ATAC-seq experiment, skipping step 10 Call Peaks step...")
         mode_steps = [step for step in mode_steps if step != 10]
         if not mode_steps:
             print("For the rest no steps to run. Done!")
             return
-    if 12 in mode_steps and the_type in {"RNA", "ATAC"}:
-        print("Step 12 DE calling is not implemented yet for RNA or ATAC, skipping it for now...")
+    if 12 in mode_steps and the_type != "RNA":
+        print("Step 12 DE calling is RNA-only. Skipping it for this assay type...")
+        mode_steps = [step for step in mode_steps if step != 12]
+        if not mode_steps:
+            print("For the rest no steps to run. Done!")
+            return
+    if 12 in mode_steps and the_type == "RNA":
+        print("Step 12 DE calling is not implemented yet for RNA, skipping it for now...")
         mode_steps = [step for step in mode_steps if step != 12]
         if not mode_steps:
             print("For the rest no steps to run. Done!")

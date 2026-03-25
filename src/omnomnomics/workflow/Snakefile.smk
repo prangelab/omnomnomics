@@ -18,6 +18,8 @@ import shutil
 import glob
 import random
 import re
+import hashlib
+import shlex
 
 
 # Load the configuration file from command line arguments
@@ -29,19 +31,30 @@ workflow_root = config['WORKFLOW_ROOT']
 experiment_dir = config["EXPERIMENT_DIR"]
 run_date = config["RUNDATE"]
 logfile = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.log")
+tools_logfile = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.tools.log")
 log_marker_dir = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.markers")
+tools_marker_dir = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.tools.markers")
 step_log_dir = os.path.join(experiment_dir, "run_logs", "steps")
 is_worker_job = "--target-jobs" in sys.argv
 os.makedirs(log_marker_dir, exist_ok=True)
+os.makedirs(tools_marker_dir, exist_ok=True)
 os.makedirs(step_log_dir, exist_ok=True)
 
 # Function to log messages
 def log_it(logfile, message, heading=None):
+    if logfile == globals().get("logfile") and heading and ("VERSION" in heading or "COMMAND" in heading):
+        maybe_log_tool_event(heading, message)
+        print(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: {message}")
+        return
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    step_heading_match = re.match(r"^(?:EXECUTING STEP|STEP)\s+(\d+)(?:\s+STATUS|\s+CONTEXT)?$", heading or "")
     with open(logfile, 'a') as log:
-        if heading: #Check if heading
-            log.write("\n{}\n\n".format(heading))
-        log.write(f"{timestamp}: {message}\n") #write to log
+        if step_heading_match:
+            log.write(f"{timestamp}: [STEP {step_heading_match.group(1)}] {message}\n")
+        else:
+            if heading: #Check if heading
+                log.write("\n{}\n\n".format(heading))
+            log.write(f"{timestamp}: {message}\n") #write to log
         log.flush()
         os.fsync(log.fileno())
     print(f"{timestamp}: {message}")
@@ -53,7 +66,79 @@ def log_once(logfile, marker_name, message, heading=None):
         os.close(fd)
     except FileExistsError:
         return
+    if heading is None:
+        marker_match = re.match(r"^step(\d+)\.", marker_name)
+        if marker_match:
+            heading = f"STEP {int(marker_match.group(1))} CONTEXT"
     log_it(logfile, message, heading)
+
+
+def sanitize_command_message(message):
+    placeholders = {
+        ".fastq.gz": "<FASTQ_GZ>",
+        ".fastq": "<FASTQ>",
+        ".fq.gz": "<FQ_GZ>",
+        ".fq": "<FQ>",
+        ".bam": "<BAM>",
+        ".bai": "<BAI>",
+        ".bw": "<BIGWIG>",
+        ".bed": "<BED>",
+        ".gtf": "<GTF>",
+        ".txt": "<TXT>",
+        ".html": "<HTML>",
+        ".zip": "<ZIP>",
+        ".pdf": "<PDF>",
+        ".tar.gz": "<TAR_GZ>",
+    }
+
+    try:
+        tokens = shlex.split(message)
+    except ValueError:
+        tokens = message.split()
+
+    sanitized_tokens = []
+    genome_assembly_dir = config.get("GENOME_ASSEMBLY_DIR")
+    for token in tokens:
+        replacement = None
+        if token.startswith(experiment_dir):
+            token = token.replace(experiment_dir, "<EXPERIMENT_DIR>")
+        if token.startswith(workflow_root):
+            token = token.replace(workflow_root, "<WORKFLOW_ROOT>")
+        if genome_assembly_dir and token.startswith(genome_assembly_dir):
+            token = token.replace(genome_assembly_dir, "<GENOME_ASSEMBLY_DIR>")
+        for suffix, placeholder in placeholders.items():
+            if token.endswith(suffix):
+                replacement = placeholder
+                break
+        if replacement is None and (token.startswith("/") or "/" in token):
+            replacement = "<PATH>"
+        sanitized_tokens.append(replacement if replacement is not None else token)
+    return " ".join(sanitized_tokens)
+
+
+def log_tool_once(marker_name, message, heading):
+    marker_path = os.path.join(tools_marker_dir, marker_name)
+    try:
+        fd = os.open(marker_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.close(fd)
+    except FileExistsError:
+        return
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(tools_logfile, "a") as log:
+        log.write(f"\n{heading}\n\n")
+        log.write(f"{timestamp}: {message}\n")
+        log.flush()
+        os.fsync(log.fileno())
+
+
+def maybe_log_tool_event(heading, message):
+    if "VERSION" in heading:
+        marker_name = f"version.{hashlib.sha1((heading + message).encode('utf-8')).hexdigest()}"
+        log_tool_once(marker_name, message, heading)
+    elif "COMMAND" in heading:
+        sanitized = sanitize_command_message(message)
+        marker_name = f"command.{hashlib.sha1((heading + sanitized).encode('utf-8')).hexdigest()}"
+        log_tool_once(marker_name, sanitized, heading)
 
 
 def expected_sample_count_for_step(step_num):
@@ -161,7 +246,7 @@ def begin_step_sample(step_num, sample, rule_log_subdir):
         },
     )
     if entered_first:
-        log_it(logfile, f"Step {step_num}: first sample entered ({sample})")
+        log_it(logfile, f"first sample entered ({sample})", f"STEP {step_num} STATUS")
     return {"start_time": start_time, "paths": paths}
 
 
@@ -215,7 +300,11 @@ def finish_step_sample(step_num, sample, rule_log_subdir, start_time, status):
         try:
             fd = os.open(paths["finished_marker"], os.O_CREAT | os.O_EXCL | os.O_WRONLY)
             os.close(fd)
-            log_it(logfile, f"Step {step_num}: last sample finished ({sample}); {completed}/{expected} OK, {failed}/{expected} failed")
+            log_it(
+                logfile,
+                f"last sample finished ({sample}); {completed}/{expected} OK, {failed}/{expected} failed",
+                f"STEP {step_num} STATUS",
+            )
         except FileExistsError:
             pass
 
@@ -230,9 +319,10 @@ onerror:
     # Upon error, log the error time of the pipeline and the elapsed time
     end_time = time.time()
     elapsed_time = end_time - start_time
+    elapsed_minutes = elapsed_time / 60
     if not is_worker_job:
         log_it(logfile, "Pipeline failed at {}\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")), "PIPELINE RUN TIME")
-        log_it(logfile, "Total elapsed time: {:.2f} seconds\n".format(elapsed_time))
+        log_it(logfile, "Total elapsed time: {:.2f} minutes\n".format(elapsed_minutes))
 
 # Function for sanity check on directory
 def sanity_check_dir(logfile, input_directory, file_ext, marker_name=None):
@@ -1260,8 +1350,9 @@ onsuccess:
         #---------------------------------------------------------------------------------------------------------------
         end_time = time.time()
         elapsed_time = end_time - start_time
+        elapsed_minutes = elapsed_time / 60
         log_it(logfile, "Pipeline finished at {}\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")), "PIPELINE RUN TIME")
-        log_it(logfile, "Total elapsed time: {:.2f} seconds\n".format(elapsed_time))
+        log_it(logfile, "Total elapsed time: {:.2f} minutes\n".format(elapsed_minutes))
 
         log_it(logfile, "All done!" ,"FINAL REMARKS")
         log_it(logfile, "Good luck with your downstream analyses!")

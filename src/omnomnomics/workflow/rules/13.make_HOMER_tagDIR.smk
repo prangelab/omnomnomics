@@ -33,7 +33,7 @@ rule create_homer_tagDir:
         partition = master_config['partition'],
         runtime = Runtime_Per_Rule['13']
     run:
-        log_once(logfile, "step13.header", "Creating optional HOMER tag directory exports...", "OPTIONAL HOMER EXPORT")
+        log_once(logfile, "step13.header", "Creating optional HOMER tag directory exports...", f"EXECUTING STEP {master_config['homer_tagdir_rule_num']}")
         log_once(logfile, "step13.inputfolder", f"Input folder: {params.inputfolder}")
         log_once(logfile, "step13.outputfolder", f"Output folder: {params.outputfolder}")
 
