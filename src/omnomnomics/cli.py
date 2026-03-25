@@ -54,6 +54,7 @@ def parse_arguments():
    parser.add_argument('-L', '--hub-mail', help='Email to use in trackhub \n \t Default: your@email.com')
    parser.add_argument('-X', '--no-multiqc', action='store_true', help='Exclude multiQC stats aggregator. Set if you don not wish to run multiQC.')
    parser.add_argument('--create-homer-tagdirs', action='store_true', help='Create optional HOMER tag directory exports in addition to the main pipeline outputs.')
+   parser.add_argument('--rerun-selected-steps', action='store_true', help='Force recomputation of the selected workflow steps by deleting their existing outputs before submission. Default behavior is to reuse existing outputs when Snakemake considers them up to date.')
    parser.add_argument('--remove-duplicates', action='store_true', help='Remove duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.')
    parser.add_argument('--keep-duplicates', action='store_true', help='Keep duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.')
    parser.add_argument('-n', '--name-fields', help='Field(s) in filename to use as track name, peak file name, and column header in the count table \n \t Default: 1-3')
@@ -603,12 +604,11 @@ def start_log(experiment_dir, run_date, config):
 
 
 ##--------------------------------------------------------------------------------------------------------------
-# Remove already present outputs of rules that you want to run
+# Reset selected step bookkeeping for a new run
 ##--------------------------------------------------------------------------------------------------------------
-def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
-    print("DELETING TO BE UPDATED OUTPUT FILES")
+def reset_step_tracking(mode_steps, experiment_dir):
     step_log_dir = os.path.join(experiment_dir, "run_logs", "steps")
-    for num in mode_steps: # Loop over all the to run steps
+    for num in mode_steps:
         step_prefix = f"step{num:02d}"
         step_state_dir = os.path.join(step_log_dir, f".{step_prefix}.state")
         if os.path.isdir(step_state_dir):
@@ -618,6 +618,12 @@ def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
             if os.path.exists(step_log_file):
                 os.remove(step_log_file)
 
+##--------------------------------------------------------------------------------------------------------------
+# Remove already present outputs of rules that you want to run
+##--------------------------------------------------------------------------------------------------------------
+def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
+    print("FORCING RECOMPUTATION OF SELECTED STEP OUTPUTS")
+    for num in mode_steps: # Loop over all the to run steps
         outputfolder = config['output_folders'][num-1]
         output_filetype = config['output_file_types'][num-1]
         if isinstance(output_filetype, list): # If multiple output filetypes
@@ -720,6 +726,7 @@ def main():
     hub_mail = args.hub_mail if args.hub_mail else config.get('hub_mail', "your@email.com")
     no_multiqc = args.no_multiqc if args.no_multiqc else config.get('no_multiqc', 0)
     create_homer_tagdirs = args.create_homer_tagdirs or config.get('create_homer_tagdirs', False)
+    rerun_selected_steps = args.rerun_selected_steps
     if args.remove_duplicates and args.keep_duplicates:
         print("Please specify only one of --remove-duplicates or --keep-duplicates. Aborting...", file=sys.stderr)
         sys.exit(1)
@@ -776,9 +783,9 @@ def main():
     elif min(mode_steps) == 12 and the_type == "CHIP":
         print("To call DE peaks for ChIP data, first determine the best peak calling settings for your experiment and quantify peaks with your chosen downstream workflow.")
         return
-    elif min(mode_steps) == 10 and the_type == "RNA":
+    if 10 in mode_steps and the_type == "RNA":
         print("Not a ChIP- or ATAC-seq experiment, skipping step 10 Call Peaks step...")
-        mode_steps.pop(0)
+        mode_steps = [step for step in mode_steps if step != 10]
         if not mode_steps:
             print("For the rest no steps to run. Done!")
             return
@@ -790,8 +797,14 @@ def main():
             return
     print(f"MODE STEPS NEW = {mode_steps}")
 
-    #Delete to be updated outputs
-    delete_outputs_to_be_updated(mode_steps, config, experiment_dir)
+    # Reset selected step bookkeeping for the new run
+    reset_step_tracking(mode_steps, experiment_dir)
+
+    # Optionally force recomputation of selected step outputs
+    if rerun_selected_steps:
+        delete_outputs_to_be_updated(mode_steps, config, experiment_dir)
+    else:
+        print("REUSING EXISTING OUTPUTS WHEN POSSIBLE")
 
     #checking input files
     num_files, num_pairs, paired, input_folder_mod_range_min, input_file_type_mod_range_min = validate_input_files(the_type, config, min(mode_steps),experiment_dir)
@@ -838,6 +851,7 @@ def main():
         'THEMAPTOOL': map_tool,
         'NO_MULTIQC': no_multiqc,
         'CREATE_HOMER_TAGDIRS': create_homer_tagdirs,
+        'RERUN_SELECTED_STEPS': rerun_selected_steps,
         'DUPLICATE_HANDLING': duplicate_handling,
         'THETYPEFIELD': type_field,
         'NAMEFIELDS': name_fields,

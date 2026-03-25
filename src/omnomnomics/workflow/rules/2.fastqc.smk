@@ -31,7 +31,7 @@ rule run_fastqc:
         runtime = Runtime_Per_Rule['2']
     run:
         def run_fastqc(threads, input, outputfolder):
-            log_once(logfile, "step2.header", "Generating FastQC reports...", f"EXECUTING STEP {master_config['qc']}")
+            log_once(logfile, "step2.header", "Generating FastQC reports...", f"EXECUTING STEP {master_config['qc_rule_num']}")
             log_once(logfile, "step2.inputfolder", f"Input folder: {params.inputfolder}")
             log_once(logfile, "step2.outputfolder", f"Output folder: {params.outputfolder}")
             tracking = begin_step_sample(master_config['qc_rule_num'], wildcards.sample, "run_fastqc")

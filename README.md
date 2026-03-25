@@ -264,6 +264,8 @@ Some job mode examples:
 								Required argument
     -X:                     eXclude multiQC stats aggregator. Set if you don not wish to run multiQC.
     --create-homer-tagdirs: Create optional HOMER tag directory tarballs in addition to the main numbered workflow outputs.
+    --rerun-selected-steps: Force recomputation of the selected workflow steps by deleting their current outputs first.
+                                    Default behavior is to reuse existing outputs when Snakemake sees them as up to date.
     --remove-duplicates:    Remove duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.
     --keep-duplicates:      Keep duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.
     -j MODE:                Job mode. Can be 'auto', 'all' or a range of jobs. See below (-h) for some 
@@ -314,6 +316,8 @@ Some job mode examples:
 
     -h:                     Print elaborate usage information
     -k: 		    Keep output of HISAT2 unpaired or not
+
+By default, _Omnomnomics_ lets Snakemake reuse existing outputs that are already up to date. If you want to explicitly recompute the selected steps with the current settings, add `--rerun-selected-steps`.
 
 ## Logs
 To ensure proper logging, multiple logs can be found. Inside the run_logs folder in your EXPERIMENT_DIR, a run log can be found created by _Omnomnomics_ which logs a lot of information about the current run and settings of the pipeline. In addition, slurm keeps a log of every submitted job which can be found inside the slurm_logs folder in your EXPERIMENT_DIR, and then inside its rule name folder. Here information about every submitted job can be found and potential errors while executing will be directed towards. Lastly, Snakemake also provides a log in the .snakemake folder. 
