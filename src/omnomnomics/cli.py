@@ -132,25 +132,43 @@ def load_step_monitor_rows(experiment_dir):
    if not step_log_dir.is_dir():
        return []
 
-   rows = []
-   for summary_path in sorted(step_log_dir.glob("step*.summary.tsv")):
+   step_nums = set()
+   for summary_path in step_log_dir.glob("step*.summary.tsv"):
        match = re.search(r"step(\d+)\.summary\.tsv$", summary_path.name)
-       if not match:
-           continue
-       step_num = int(match.group(1))
-       running = 0
-       completed = 0
-       failed = 0
-       with summary_path.open(newline="") as handle:
-           reader = csv.DictReader(handle, delimiter="\t")
-           for row in reader:
-               status = row.get("status", "")
-               if status == "RUNNING":
-                   running += 1
-               elif status == "OK":
-                   completed += 1
-               elif status == "FAIL":
-                   failed += 1
+       if match:
+           step_nums.add(int(match.group(1)))
+   for state_dir in step_log_dir.glob(".step*.state"):
+       match = re.search(r"\.step(\d+)\.state$", state_dir.name)
+       if match:
+           step_nums.add(int(match.group(1)))
+
+   rows = []
+   for step_num in sorted(step_nums):
+       state_dir = step_log_dir / f".step{step_num:02d}.state"
+       started_dir = state_dir / "started"
+       completed_dir = state_dir / "completed"
+       failed_dir = state_dir / "failed"
+       if state_dir.is_dir():
+           started = len(list(started_dir.iterdir())) if started_dir.is_dir() else 0
+           completed = len(list(completed_dir.iterdir())) if completed_dir.is_dir() else 0
+           failed = len(list(failed_dir.iterdir())) if failed_dir.is_dir() else 0
+           running = max(0, started - completed - failed)
+       else:
+           running = 0
+           completed = 0
+           failed = 0
+           summary_path = step_log_dir / f"step{step_num:02d}.summary.tsv"
+           if summary_path.exists():
+               with summary_path.open(newline="") as handle:
+                   reader = csv.DictReader(handle, delimiter="\t")
+                   for row in reader:
+                       status = row.get("status", "")
+                       if status == "RUNNING":
+                           running += 1
+                       elif status == "OK":
+                           completed += 1
+                       elif status == "FAIL":
+                           failed += 1
        if failed:
            state = "FAILED" if running == 0 else "RUNNING/FAIL"
            state_color = ANSI_STATUS_FAIL
@@ -176,6 +194,9 @@ def load_step_monitor_rows(experiment_dir):
 
 def render_monitor_screen(log_path, step_rows, tail_lines):
    separator = "-" * 72
+   step_width = 6
+   state_width = 14
+   count_width = 8
    print("\033[2J\033[H", end="")
    print(f"{ANSI_HEADER}{ANSI_BOLD}omnomnomics monitor{ANSI_RESET}")
    print(f"Log: {log_path}")
@@ -184,11 +205,24 @@ def render_monitor_screen(log_path, step_rows, tail_lines):
    if step_rows:
        print(separator)
        print(f"{ANSI_BOLD}Step summary{ANSI_RESET}")
-       print(f"{'STEP':<6} {'STATE':<14} {'RUNNING':>8} {'DONE':>8} {'FAIL':>8}")
+       print(
+           f"{'STEP':<{step_width}} "
+           f"{'STATE':<{state_width}} "
+           f"{'RUNNING':>{count_width}} "
+           f"{'DONE':>{count_width}} "
+           f"{'FAIL':>{count_width}}"
+       )
        for row in step_rows:
            step_label = f"{row['step_num']}"
-           state = f"{row['state_color']}{row['state']}{ANSI_RESET}"
-           print(f"{step_label:<6} {state:<14} {row['running']:>8} {row['completed']:>8} {row['failed']:>8}")
+           padded_state = f"{row['state']:<{state_width}}"
+           colored_state = f"{row['state_color']}{padded_state}{ANSI_RESET}"
+           print(
+               f"{step_label:<{step_width}} "
+               f"{colored_state} "
+               f"{row['running']:>{count_width}} "
+               f"{row['completed']:>{count_width}} "
+               f"{row['failed']:>{count_width}}"
+           )
        print(separator)
        print("")
 
