@@ -441,9 +441,19 @@ def project_size_bytes():
     return total_bytes
 
 def safe_cleanup_for_size_limit(logfile, delete_partial_hubs=False):
-    cleanup_targets = [
-        master_config['output_folders'][master_config['trim_rule_num'] - 1],
-    ]
+    cleanup_targets = []
+    merge_finished_marker = step_tracking_paths(master_config['merge_rule_num'])["finished_marker"]
+    if os.path.exists(merge_finished_marker):
+        cleanup_targets.append(master_config['output_folders'][master_config['trim_rule_num'] - 1])
+    else:
+        log_it(
+            logfile,
+            (
+                "Skipping trimmed FASTQ cleanup for max project size guard because step "
+                f"{master_config['merge_rule_num']} is not fully finished yet."
+            ),
+            "SIZE GUARD",
+        )
     touchup_finished_marker = step_tracking_paths(master_config['touchup_rule_num'])["finished_marker"]
     if os.path.exists(touchup_finished_marker):
         cleanup_targets.append(master_config['output_folders'][master_config['merge_rule_num'] - 1])
