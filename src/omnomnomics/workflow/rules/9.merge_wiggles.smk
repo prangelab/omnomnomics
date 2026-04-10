@@ -58,7 +58,7 @@ rule merge_wiggles:
                     indices.append(int(part))
             return sorted(set(indices))
 
-        def select_fields(values, field_spec):
+        def select_fields(values, field_spec, separator):
             indices = parse_namefields(str(field_spec))
             return separator.join(values[idx - 1] for idx in indices if idx - 1 < len(values))
 
@@ -141,7 +141,7 @@ rule merge_wiggles:
             bw_files = [bw for bw in os.listdir(input_folder) if bw.endswith(".bw")]
             sample_roots = sorted(set(sample_root_from_bw(bw, thetype) for bw in bw_files))
             hubtypes = sorted(set(
-                select_fields(sample_root.split(separator), type_field)
+                select_fields(sample_root.split(separator), type_field, separator)
                 for sample_root in sample_roots
             ))
 
@@ -156,7 +156,7 @@ rule merge_wiggles:
                     continue
 
                 coltypes = sorted(set(
-                    select_fields(sample_root.split(separator), col_field)
+                    select_fields(sample_root.split(separator), col_field, separator)
                     for sample_root in sample_tracks
                 ))
 
