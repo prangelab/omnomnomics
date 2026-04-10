@@ -915,8 +915,15 @@ def check_unique_sample_names(experiment_dir, input_folder_mod_range_min, input_
         # Only consider R1 files for FASTQs
         files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*_R1*{input_file_type_mod_range_min}")
 
+    # For file types that emit multiple files per biological sample (for example
+    # RNA plus/minus BigWigs), validate uniqueness on normalized sample roots.
+    normalized_files = sorted(set(
+        normalize_field_selection_name(f, input_file_type_mod_range_min)
+        for f in files
+    ))
+
     # Extract names using the specified fields
-    sample_names = [extract_fields(normalize_field_selection_name(f, input_file_type_mod_range_min), name_fields, separator) for f in files]
+    sample_names = [extract_fields(f, name_fields, separator) for f in normalized_files]
 
     # Check for uniqueness
     if len(sample_names) != len(set(sample_names)):
