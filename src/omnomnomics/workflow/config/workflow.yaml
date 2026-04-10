@@ -18,6 +18,7 @@ homer_tagdir_rule_num: 13
 
 #Define the maximum public step index
 max_step: 12
+retention_policy: "all"
 
 
 trim:

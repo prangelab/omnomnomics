@@ -436,6 +436,7 @@ def parse_arguments():
    parser.add_argument('-k', '--keepunpaired', action='store_true', help='Keep unpaired or not in HISAT2')
    parser.add_argument('--dry-run', action='store_true', help='Validate the workflow and build the Snakemake DAG without executing jobs')
    parser.add_argument('--site-config', help='Optional path to a site-specific config YAML. Default: $XDG_CONFIG_HOME/omnomnomics/site.yaml or ~/.config/omnomnomics/site.yaml, then packaged site config')
+   parser.add_argument('--retention-policy', choices=['all', 'pruned', 'minimal'], help='Post-run output retention policy. all keeps everything, pruned keeps FASTQ plus reusable downstream outputs, minimal keeps FASTQ plus only the requested terminal outputs. Default: all')
 
    args, unknown = parser.parse_known_args()
    # Check if any unknown arguments are provided
@@ -1152,6 +1153,7 @@ def main():
     appendix = args.appendix if args.appendix else config.get('appendix', "hub")
     keep_unpaired = args.keepunpaired if args.keepunpaired else config.get('keep_unpaired', False)
     dry_run = args.dry_run
+    retention_policy = args.retention_policy if args.retention_policy else config.get('retention_policy', 'all')
 
     # Check required variables
     check_required_vars(the_type, experiment_dir, genome, available_genomes, config)
@@ -1274,7 +1276,8 @@ def main():
         'THEHUBMAIL': hub_mail,
         'THECOLTABLE': col_table,
         'THEMEM': the_mem,
-        'THEHEAPINIT': the_heap_init  
+        'THEHEAPINIT': the_heap_init,
+        'RETENTION_POLICY': retention_policy
     }
     # Initialize the run config
     write_run_config(experiment_dir, run_date, run_config_data)

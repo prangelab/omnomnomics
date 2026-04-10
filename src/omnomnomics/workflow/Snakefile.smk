@@ -394,6 +394,85 @@ site_config = load_and_validate_yaml(logfile, site_config_file, "## Omnomnomics 
 master_config = merge_configs(workflow_config, site_config)
 
 themode = config['THEMODE']
+retention_policy = str(config.get("RETENTION_POLICY", "all")).lower()
+
+def terminal_output_dirs(themode, thetype):
+    keep_dirs = set()
+
+    if 13 in themode:
+        keep_dirs.add(master_config['output_folders'][master_config['homer_tagdir_rule_num'] - 1])
+    if 10 in themode and thetype != "RNA":
+        keep_dirs.add(master_config['output_folders'][master_config['callpeaks_rule_num'] - 1])
+    if 11 in themode or 12 in themode:
+        keep_dirs.add(master_config['output_folders'][master_config['countreads_rule_num'] - 1])
+
+    if 9 in themode:
+        keep_dirs.add(master_config['output_folders'][master_config['mergewig_rule_num'] - 1])
+    elif 8 in themode:
+        keep_dirs.add(master_config['output_folders'][master_config['wig_rule_num'] - 1])
+    elif any(step in themode for step in (5, 6, 7)):
+        keep_dirs.add(master_config['output_folders'][master_config['touchup_rule_num'] - 1])
+    elif 4 in themode or 3 in themode:
+        keep_dirs.add(master_config['output_folders'][master_config['merge_rule_num'] - 1])
+    elif 1 in themode:
+        keep_dirs.add(master_config['output_folders'][master_config['trim_rule_num'] - 1])
+
+    if 2 in themode and not any(step in themode for step in (3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)):
+        keep_dirs.add(master_config['output_folders'][master_config['qc_rule_num'] - 1])
+
+    return keep_dirs
+
+def retention_keep_dirs(retention_policy, themode, thetype):
+    keep_dirs = {master_config['input_folders'][master_config['trim_rule_num'] - 1]}
+
+    if retention_policy == "all":
+        return keep_dirs
+
+    keep_dirs.update(terminal_output_dirs(themode, thetype))
+
+    if retention_policy == "pruned" and any(step in themode for step in (5, 6, 7, 8, 9, 10, 11, 12, 13)):
+        keep_dirs.add(master_config['output_folders'][master_config['touchup_rule_num'] - 1])
+    if retention_policy == "pruned" and any(step in themode for step in (8, 9)):
+        keep_dirs.add(master_config['output_folders'][master_config['wig_rule_num'] - 1])
+
+    if os.path.isdir(os.path.join(experiment_dir, "MultiQC")):
+        keep_dirs.add("MultiQC")
+
+    return keep_dirs
+
+def apply_retention_policy(logfile, retention_policy, themode, thetype):
+    if retention_policy == "all":
+        log_it(logfile, "Retention policy 'all': keeping all pipeline outputs.", "RETENTION POLICY")
+        return
+
+    keep_dirs = retention_keep_dirs(retention_policy, themode, thetype)
+    candidate_dirs = [
+        master_config['output_folders'][master_config['trim_rule_num'] - 1],
+        master_config['output_folders'][master_config['qc_rule_num'] - 1],
+        master_config['output_folders'][master_config['merge_rule_num'] - 1],
+        master_config['output_folders'][master_config['touchup_rule_num'] - 1],
+        master_config['output_folders'][master_config['wig_rule_num'] - 1],
+        master_config['output_folders'][master_config['mergewig_rule_num'] - 1],
+        master_config['output_folders'][master_config['callpeaks_rule_num'] - 1],
+        master_config['output_folders'][master_config['countreads_rule_num'] - 1],
+        master_config['output_folders'][master_config['homer_tagdir_rule_num'] - 1],
+        "MultiQC",
+    ]
+
+    log_it(
+        logfile,
+        f"Retention policy '{retention_policy}': keeping {', '.join(sorted(keep_dirs))}.",
+        "RETENTION POLICY",
+    )
+
+    for folder_name in candidate_dirs:
+        if folder_name in keep_dirs:
+            continue
+        folder_path = os.path.join(experiment_dir, folder_name)
+        if not os.path.exists(folder_path):
+            continue
+        shutil.rmtree(folder_path)
+        log_it(logfile, f"Deleted intermediate output folder: {folder_path}")
 
 ##---------------------------------------------------------------------------------------------------------------
 ## Final housekeeping
@@ -426,6 +505,7 @@ if not is_worker_job:
     log_it(logfile, f"Trim tool: {config['THETRIMTOOL']}")
     log_it(logfile, f"Map tool: {config['THEMAPTOOL']}")
     log_it(logfile, f"Duplicate handling: {config['DUPLICATE_HANDLING']}")
+    log_it(logfile, f"Retention policy: {retention_policy}")
 
     log_it(logfile, f"Design formula: {config['MYFORMULA']}", "READ COUNTING SETTINGS")
     log_it(logfile, f"Metadata file: {config['MYMETADATA']}")
@@ -1385,6 +1465,8 @@ onsuccess:
         if 4 in themode:
             for bam_file in glob.glob(f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/*_L00*.bam"):
                 os.remove(bam_file)
+
+        apply_retention_policy(logfile, retention_policy, themode, config['THETYPE'])
 
         #---------------------------------------------------------------------------------------------------------------
         # Log elapsed time and completion

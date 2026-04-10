@@ -273,6 +273,11 @@ Some job mode examples:
                                     1. $XDG_CONFIG_HOME/omnomnomics/site.yaml
                                     2. ~/.config/omnomnomics/site.yaml
                                     3. packaged site config
+    --retention-policy:   Post-run output retention policy.
+                                    all: keep all pipeline outputs
+                                    pruned: keep FASTQ plus reusable downstream outputs
+                                    minimal: keep FASTQ plus only the requested terminal outputs
+                                    Default: all
     --remove-duplicates:    Remove duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.
     --keep-duplicates:      Keep duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.
     -j MODE:                Job mode. Can be 'auto', 'all' or a range of jobs. See below (-h) for some 
@@ -325,6 +330,8 @@ Some job mode examples:
     -k: 		    Keep output of HISAT2 unpaired or not
 
 By default, _Omnomnomics_ lets Snakemake reuse existing outputs that are already up to date. If you want to explicitly recompute the selected steps with the current settings, add `--rerun-selected-steps`.
+
+The optional `--retention-policy` flag controls which large intermediate folders are retained after a successful run. `all` keeps the current behavior. `pruned` removes obvious bulk intermediates such as `trimmed_FASTQ` and `BAM` while retaining reusable downstream outputs such as `filtered_BAM`. `minimal` keeps only `FASTQ` plus the requested terminal output branches, for example `merged_hubs` and `DE_calling` for an RNA run that finishes at steps 9 and 11.
 
 Additional utility command:
 
