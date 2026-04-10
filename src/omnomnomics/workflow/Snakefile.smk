@@ -443,8 +443,19 @@ def project_size_bytes():
 def safe_cleanup_for_size_limit(logfile, delete_partial_hubs=False):
     cleanup_targets = [
         master_config['output_folders'][master_config['trim_rule_num'] - 1],
-        master_config['output_folders'][master_config['merge_rule_num'] - 1],
     ]
+    touchup_finished_marker = step_tracking_paths(master_config['touchup_rule_num'])["finished_marker"]
+    if os.path.exists(touchup_finished_marker):
+        cleanup_targets.append(master_config['output_folders'][master_config['merge_rule_num'] - 1])
+    else:
+        log_it(
+            logfile,
+            (
+                "Skipping BAM cleanup for max project size guard because step "
+                f"{master_config['touchup_rule_num']} is not fully finished yet."
+            ),
+            "SIZE GUARD",
+        )
     if delete_partial_hubs:
         cleanup_targets.append(master_config['output_folders'][master_config['mergewig_rule_num'] - 1])
 
