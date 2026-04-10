@@ -44,6 +44,13 @@ rule create_wiggles:
 
         sanity_check_dir(logfile, params.inputfolder, master_config['input_file_types'][master_config['wig_rule_num'] - 1], "step8.sanity")
 
+        if evaluate_space_heavy_step(logfile, master_config['wig_rule_num']):
+            tracking = begin_step_sample(master_config['wig_rule_num'], wildcards.sample, "create_wiggles")
+            record_step_note(master_config['wig_rule_num'], wildcards.sample, "skipped_due_to_max_project_size")
+            shell(f"""echo "necessity file for create wiggles. can delete this." > {params.outputfolder}/{wildcards.sample}.extra_8.tmp""")
+            finish_step_sample(master_config['wig_rule_num'], wildcards.sample, "create_wiggles", tracking["start_time"], "OK")
+            return
+
         def create_wig(input_bam, input_bai, outputfolder, sample):
             tracking = begin_step_sample(master_config['wig_rule_num'], sample, "create_wiggles")
             tmpdir_root = os.environ.get("TMPDIR")

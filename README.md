@@ -278,6 +278,8 @@ Some job mode examples:
                                     pruned: keep FASTQ plus reusable downstream outputs
                                     minimal: keep FASTQ plus only the requested terminal outputs
                                     Default: all
+    --max-project-size:   Soft project-size cap such as 200G or 800GB.
+                                    Omnomnomics may delete safe intermediates and skip BigWig or trackhub creation if the cap would otherwise be exceeded.
     --remove-duplicates:    Remove duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.
     --keep-duplicates:      Keep duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.
     -j MODE:                Job mode. Can be 'auto', 'all' or a range of jobs. See below (-h) for some 
@@ -332,6 +334,8 @@ Some job mode examples:
 By default, _Omnomnomics_ lets Snakemake reuse existing outputs that are already up to date. If you want to explicitly recompute the selected steps with the current settings, add `--rerun-selected-steps`.
 
 The optional `--retention-policy` flag controls which large intermediate folders are retained after a successful run. `all` keeps the current behavior. `pruned` removes obvious bulk intermediates such as `trimmed_FASTQ` and `BAM` while retaining reusable downstream outputs such as `filtered_BAM`. `minimal` keeps only `FASTQ` plus the requested terminal output branches, for example `merged_hubs` and `DE_calling` for an RNA run that finishes at steps 9 and 11.
+
+The optional `--max-project-size` flag adds a soft storage guard for space-heavy RNA outputs. When the configured cap would be exceeded, _Omnomnomics_ first removes safe intermediates such as `trimmed_FASTQ` and `BAM` if they are present. If the project would still exceed the cap, the pipeline logs a warning and skips BigWig or trackhub creation instead of failing on quota, while still allowing other requested branches such as read counting to continue.
 
 Additional utility command:
 

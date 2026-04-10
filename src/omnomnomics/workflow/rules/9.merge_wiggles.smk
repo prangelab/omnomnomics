@@ -48,6 +48,22 @@ rule merge_wiggles:
                 f"RNA track colors are fixed to plus strand {RNA_PLUS_TRACK_COLOR} and minus strand {RNA_MINUS_TRACK_COLOR}.",
             )
 
+        estimated_copy_bytes = sum(
+            os.path.getsize(os.path.join(params.inputfolder, bw_name))
+            for bw_name in os.listdir(params.inputfolder)
+            if bw_name.endswith(".bw")
+        )
+        if evaluate_space_heavy_step(
+            logfile,
+            master_config['mergewig_rule_num'],
+            estimated_extra_bytes=estimated_copy_bytes,
+            delete_partial_hubs=True,
+        ):
+            os.makedirs(params.outputfolder, exist_ok=True)
+            shell(f"""echo "necessity file for merge wiggle. can delete this." > {params.outputfolder}/extra_9.tmp""")
+            log_it(logfile, "Skipping trackhub creation due to max project size constraint.")
+            return
+
         def parse_namefields(namefields):
             indices = []
             for part in namefields.split(','):

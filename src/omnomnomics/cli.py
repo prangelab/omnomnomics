@@ -437,6 +437,7 @@ def parse_arguments():
    parser.add_argument('--dry-run', action='store_true', help='Validate the workflow and build the Snakemake DAG without executing jobs')
    parser.add_argument('--site-config', help='Optional path to a site-specific config YAML. Default: $XDG_CONFIG_HOME/omnomnomics/site.yaml or ~/.config/omnomnomics/site.yaml, then packaged site config')
    parser.add_argument('--retention-policy', choices=['all', 'pruned', 'minimal'], help='Post-run output retention policy. all keeps everything, pruned keeps FASTQ plus reusable downstream outputs, minimal keeps FASTQ plus only the requested terminal outputs. Default: all')
+   parser.add_argument('--max-project-size', help='Soft project-size cap such as 200G or 800GB. Omnomnomics may delete safe intermediates and skip BigWig or trackhub creation when the cap would be exceeded.')
 
    args, unknown = parser.parse_known_args()
    # Check if any unknown arguments are provided
@@ -484,6 +485,37 @@ def resolve_config_path(path_value, workflow_root):
    resolved = resolved.replace("{WORKFLOW_ROOT}", str(workflow_root))
    resolved = resolved.replace("{HOME}", str(Path.home()))
    return str(Path(resolved).expanduser().resolve())
+
+def parse_size_to_bytes(size_value):
+   if size_value is None:
+       return 0
+   if isinstance(size_value, (int, float)):
+       return int(size_value)
+
+   size_text = str(size_value).strip().upper()
+   if not size_text or size_text == "NA":
+       return 0
+
+   match = re.fullmatch(r"(\d+(?:\.\d+)?)\s*([KMGT]?B?)?", size_text)
+   if not match:
+       raise ValueError(f"Invalid size value: {size_value}")
+
+   number = float(match.group(1))
+   suffix = match.group(2) or "B"
+   multipliers = {
+       "B": 1,
+       "K": 1024,
+       "KB": 1024,
+       "M": 1024 ** 2,
+       "MB": 1024 ** 2,
+       "G": 1024 ** 3,
+       "GB": 1024 ** 3,
+       "T": 1024 ** 4,
+       "TB": 1024 ** 4,
+   }
+   if suffix not in multipliers:
+       raise ValueError(f"Invalid size suffix in value: {size_value}")
+   return int(number * multipliers[suffix])
 
 def genome_subdir(assembly_root, genome_name, subdir_name):
    return str(Path(assembly_root) / genome_name / subdir_name)
@@ -1154,6 +1186,12 @@ def main():
     keep_unpaired = args.keepunpaired if args.keepunpaired else config.get('keep_unpaired', False)
     dry_run = args.dry_run
     retention_policy = args.retention_policy if args.retention_policy else config.get('retention_policy', 'all')
+    max_project_size_raw = args.max_project_size if args.max_project_size else config.get('max_project_size', "NA")
+    try:
+        max_project_size_bytes = parse_size_to_bytes(max_project_size_raw)
+    except ValueError as exc:
+        print(f"{exc}. Aborting...", file=sys.stderr)
+        sys.exit(1)
 
     # Check required variables
     check_required_vars(the_type, experiment_dir, genome, available_genomes, config)
@@ -1277,7 +1315,9 @@ def main():
         'THECOLTABLE': col_table,
         'THEMEM': the_mem,
         'THEHEAPINIT': the_heap_init,
-        'RETENTION_POLICY': retention_policy
+        'RETENTION_POLICY': retention_policy,
+        'MAX_PROJECT_SIZE': str(max_project_size_raw),
+        'MAX_PROJECT_SIZE_BYTES': int(max_project_size_bytes)
     }
     # Initialize the run config
     write_run_config(experiment_dir, run_date, run_config_data)

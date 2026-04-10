@@ -305,6 +305,7 @@ def finish_step_sample(step_num, sample, rule_log_subdir, start_time, status):
                 f"last sample finished ({sample}); {completed}/{expected} OK, {failed}/{expected} failed",
                 f"STEP {step_num} STATUS",
             )
+            evaluate_post_step_size_cleanup(logfile, step_num)
         except FileExistsError:
             pass
 
@@ -395,6 +396,211 @@ master_config = merge_configs(workflow_config, site_config)
 
 themode = config['THEMODE']
 retention_policy = str(config.get("RETENTION_POLICY", "all")).lower()
+max_project_size_raw = str(config.get("MAX_PROJECT_SIZE", "NA"))
+max_project_size_bytes = int(config.get("MAX_PROJECT_SIZE_BYTES", 0) or 0)
+
+def format_bytes(num_bytes):
+    units = ["B", "KB", "MB", "GB", "TB"]
+    size = float(num_bytes)
+    for unit in units:
+        if size < 1024 or unit == units[-1]:
+            return f"{size:.2f} {unit}"
+        size /= 1024
+
+def directory_size_bytes(path):
+    total_bytes = 0
+    if not os.path.exists(path):
+        return 0
+    for root, _, files in os.walk(path):
+        for file_name in files:
+            file_path = os.path.join(root, file_name)
+            if os.path.islink(file_path):
+                continue
+            try:
+                total_bytes += os.path.getsize(file_path)
+            except OSError:
+                pass
+    return total_bytes
+
+def project_size_bytes():
+    total_bytes = 0
+    if not os.path.isdir(experiment_dir):
+        return 0
+    for entry in os.scandir(experiment_dir):
+        if entry.name in {".snakemake"}:
+            continue
+        if entry.is_symlink():
+            continue
+        if entry.is_file():
+            try:
+                total_bytes += entry.stat().st_size
+            except OSError:
+                pass
+        elif entry.is_dir():
+            total_bytes += directory_size_bytes(entry.path)
+    return total_bytes
+
+def safe_cleanup_for_size_limit(logfile, delete_partial_hubs=False):
+    cleanup_targets = [
+        master_config['output_folders'][master_config['trim_rule_num'] - 1],
+        master_config['output_folders'][master_config['merge_rule_num'] - 1],
+    ]
+    if delete_partial_hubs:
+        cleanup_targets.append(master_config['output_folders'][master_config['mergewig_rule_num'] - 1])
+
+    for folder_name in cleanup_targets:
+        folder_path = os.path.join(experiment_dir, folder_name)
+        if not os.path.isdir(folder_path):
+            continue
+        if folder_name == master_config['output_folders'][master_config['mergewig_rule_num'] - 1] and not delete_partial_hubs:
+            continue
+        shutil.rmtree(folder_path)
+        log_it(logfile, f"Deleted intermediate output folder to respect max project size: {folder_path}", "SIZE GUARD")
+
+def evaluate_post_step_size_cleanup(logfile, step_num):
+    if max_project_size_bytes <= 0:
+        return
+
+    trim_folder = master_config['output_folders'][master_config['trim_rule_num'] - 1]
+    bam_folder = master_config['output_folders'][master_config['merge_rule_num'] - 1]
+
+    cleanup_targets = []
+    if step_num == master_config['merge_rule_num']:
+        cleanup_targets = [trim_folder]
+    elif step_num == master_config['touchup_rule_num']:
+        cleanup_targets = [trim_folder, bam_folder]
+    else:
+        return
+
+    state_prefix = f"max_project_size.poststep{step_num}"
+    done_marker = os.path.join(log_marker_dir, f"{state_prefix}.done")
+    lock_path = os.path.join(log_marker_dir, f"{state_prefix}.lock")
+
+    if os.path.exists(done_marker):
+        return
+
+    with open(lock_path, "w") as lock_handle:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        if os.path.exists(done_marker):
+            return
+
+        current_size = project_size_bytes()
+        if current_size <= max_project_size_bytes:
+            log_it(
+                logfile,
+                (
+                    f"Post-step {step_num} size check: "
+                    f"{format_bytes(current_size)} used, "
+                    f"{format_bytes(max_project_size_bytes)} allowed. "
+                    "No cleanup needed."
+                ),
+                "SIZE GUARD",
+            )
+            with open(done_marker, "w") as handle:
+                handle.write("checked\n")
+            return
+
+        deleted_any = False
+        for folder_name in cleanup_targets:
+            folder_path = os.path.join(experiment_dir, folder_name)
+            if not os.path.isdir(folder_path):
+                continue
+            shutil.rmtree(folder_path)
+            deleted_any = True
+            log_it(
+                logfile,
+                f"Deleted post-step intermediate folder due to max project size: {folder_path}",
+                "SIZE GUARD",
+            )
+
+        updated_size = project_size_bytes()
+        if deleted_any:
+            log_it(
+                logfile,
+                (
+                    f"Post-step {step_num} size after cleanup: "
+                    f"{format_bytes(updated_size)} used, "
+                    f"{format_bytes(max_project_size_bytes)} allowed."
+                ),
+                "SIZE GUARD",
+            )
+        else:
+            log_it(
+                logfile,
+                (
+                    f"Post-step {step_num} exceeded max project size "
+                    f"({format_bytes(current_size)} used, {format_bytes(max_project_size_bytes)} allowed), "
+                    "but no removable intermediate folders were found."
+                ),
+                "SIZE GUARD",
+            )
+
+        if updated_size > max_project_size_bytes:
+            log_it(
+                logfile,
+                (
+                    f"Project size remains above the configured limit after post-step {step_num} cleanup "
+                    f"({format_bytes(updated_size)} used, {format_bytes(max_project_size_bytes)} allowed)."
+                ),
+                "SIZE GUARD",
+            )
+
+        with open(done_marker, "w") as handle:
+            handle.write("checked\n")
+
+def evaluate_space_heavy_step(logfile, step_num, estimated_extra_bytes=0, delete_partial_hubs=False):
+    if max_project_size_bytes <= 0:
+        return False
+
+    state_prefix = f"max_project_size.step{step_num}"
+    skip_marker = os.path.join(log_marker_dir, f"{state_prefix}.skip")
+    ok_marker = os.path.join(log_marker_dir, f"{state_prefix}.ok")
+    lock_path = os.path.join(log_marker_dir, f"{state_prefix}.lock")
+
+    if os.path.exists(skip_marker):
+        return True
+    if os.path.exists(ok_marker):
+        return False
+
+    with open(lock_path, "w") as lock_handle:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        if os.path.exists(skip_marker):
+            return True
+        if os.path.exists(ok_marker):
+            return False
+
+        current_size = project_size_bytes()
+        if current_size + estimated_extra_bytes > max_project_size_bytes:
+            safe_cleanup_for_size_limit(logfile, delete_partial_hubs=delete_partial_hubs)
+            current_size = project_size_bytes()
+
+        if current_size + estimated_extra_bytes > max_project_size_bytes:
+            with open(skip_marker, "w") as handle:
+                handle.write("skip\n")
+            log_it(
+                logfile,
+                (
+                    f"Max project size {max_project_size_raw} would be exceeded at step {step_num}. "
+                    f"Current size: {format_bytes(current_size)}. "
+                    f"Estimated additional size: {format_bytes(estimated_extra_bytes)}. "
+                    "Skipping this space-heavy output branch."
+                ),
+                "SIZE GUARD",
+            )
+            return True
+
+        with open(ok_marker, "w") as handle:
+            handle.write("ok\n")
+        log_it(
+            logfile,
+            (
+                f"Max project size guard for step {step_num}: "
+                f"{format_bytes(current_size)} used, "
+                f"{format_bytes(max_project_size_bytes)} allowed."
+            ),
+            "SIZE GUARD",
+        )
+        return False
 
 def terminal_output_dirs(themode, thetype):
     keep_dirs = set()
@@ -506,6 +712,7 @@ if not is_worker_job:
     log_it(logfile, f"Map tool: {config['THEMAPTOOL']}")
     log_it(logfile, f"Duplicate handling: {config['DUPLICATE_HANDLING']}")
     log_it(logfile, f"Retention policy: {retention_policy}")
+    log_it(logfile, f"Max project size: {max_project_size_raw}")
 
     log_it(logfile, f"Design formula: {config['MYFORMULA']}", "READ COUNTING SETTINGS")
     log_it(logfile, f"Metadata file: {config['MYMETADATA']}")
