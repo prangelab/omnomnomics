@@ -35,10 +35,15 @@ tools_logfile = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_
 log_marker_dir = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.markers")
 tools_marker_dir = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.tools.markers")
 step_log_dir = os.path.join(experiment_dir, "run_logs", "steps")
+flow_qc_cache_root = os.path.join(experiment_dir, "run_logs", "flow_qc_cache")
+flow_qc_trim_cache_dir = os.path.join(flow_qc_cache_root, "trim_metrics")
+flow_qc_mapper_cache_dir = os.path.join(flow_qc_cache_root, "mapper_stats")
 is_worker_job = "--target-jobs" in sys.argv
 os.makedirs(log_marker_dir, exist_ok=True)
 os.makedirs(tools_marker_dir, exist_ok=True)
 os.makedirs(step_log_dir, exist_ok=True)
+os.makedirs(flow_qc_trim_cache_dir, exist_ok=True)
+os.makedirs(flow_qc_mapper_cache_dir, exist_ok=True)
 
 # Function to log messages
 def log_it(logfile, message, heading=None):
@@ -475,6 +480,7 @@ def safe_cleanup_for_size_limit(logfile, delete_partial_hubs=False):
             continue
         if folder_name == master_config['output_folders'][master_config['mergewig_rule_num'] - 1] and not delete_partial_hubs:
             continue
+        cache_flow_qc_metrics_from_folder(folder_name, logfile)
         shutil.rmtree(folder_path)
         log_it(logfile, f"Deleted intermediate output folder to respect max project size: {folder_path}", "SIZE GUARD")
 
@@ -526,6 +532,7 @@ def evaluate_post_step_size_cleanup(logfile, step_num):
             folder_path = os.path.join(experiment_dir, folder_name)
             if not os.path.isdir(folder_path):
                 continue
+            cache_flow_qc_metrics_from_folder(folder_name, logfile)
             shutil.rmtree(folder_path)
             deleted_any = True
             log_it(
@@ -623,6 +630,43 @@ def evaluate_space_heavy_step(logfile, step_num, estimated_extra_bytes=0, delete
         )
         return False
 
+def cache_flow_qc_metrics_from_folder(folder_name, logfile):
+    trim_folder = master_config['output_folders'][master_config['trim_rule_num'] - 1]
+    map_folder = master_config['output_folders'][master_config['merge_rule_num'] - 1]
+    folder_path = os.path.join(experiment_dir, folder_name)
+
+    if not os.path.isdir(folder_path):
+        return
+
+    copied_files = 0
+
+    if folder_name == trim_folder:
+        for src_path in glob.glob(os.path.join(folder_path, "*.trim_metrics.tsv")):
+            dst_path = os.path.join(flow_qc_trim_cache_dir, os.path.basename(src_path))
+            try:
+                shutil.copy2(src_path, dst_path)
+                copied_files += 1
+            except OSError:
+                pass
+
+    elif folder_name == map_folder:
+        mapper_patterns = ["*.HISAT2_stats.txt", "*.STAR_stats.txt", "*.STAR_TE_stats.txt"]
+        for pattern in mapper_patterns:
+            for src_path in glob.glob(os.path.join(folder_path, pattern)):
+                dst_path = os.path.join(flow_qc_mapper_cache_dir, os.path.basename(src_path))
+                try:
+                    shutil.copy2(src_path, dst_path)
+                    copied_files += 1
+                except OSError:
+                    pass
+
+    if copied_files > 0:
+        log_it(
+            logfile,
+            f"Cached {copied_files} flow-QC metric files before deleting {folder_path}",
+            "SIZE GUARD",
+        )
+
 def terminal_output_dirs(themode, thetype):
     keep_dirs = set()
 
@@ -698,6 +742,7 @@ def apply_retention_policy(logfile, retention_policy, themode, thetype):
         folder_path = os.path.join(experiment_dir, folder_name)
         if not os.path.exists(folder_path):
             continue
+        cache_flow_qc_metrics_from_folder(folder_name, logfile)
         shutil.rmtree(folder_path)
         log_it(logfile, f"Deleted intermediate output folder: {folder_path}")
 
@@ -1180,15 +1225,27 @@ onsuccess:
 
             def trim_metrics_path(sample_name):
                 trim_output_folder = master_config['output_folders'][master_config['trim_rule_num'] - 1]
-                return f"{experiment_dir}/{trim_output_folder}/{sample_name}.trim_metrics.tsv"
+                primary_path = f"{experiment_dir}/{trim_output_folder}/{sample_name}.trim_metrics.tsv"
+                if os.path.exists(primary_path):
+                    return primary_path
+                return f"{flow_qc_trim_cache_dir}/{sample_name}.trim_metrics.tsv"
 
             def mapper_stats_path(sample_name):
                 map_output_folder = master_config['output_folders'][master_config['map_rule_num'] - 1]
                 if config['THEMAPTOOL'] == "hisat2":
-                    return f"{experiment_dir}/{map_output_folder}/{sample_name}.HISAT2_stats.txt"
+                    primary_path = f"{experiment_dir}/{map_output_folder}/{sample_name}.HISAT2_stats.txt"
+                    if os.path.exists(primary_path):
+                        return primary_path
+                    return f"{flow_qc_mapper_cache_dir}/{sample_name}.HISAT2_stats.txt"
                 if config['THEMAPTOOL'] == "star_te":
-                    return f"{experiment_dir}/{map_output_folder}/{sample_name}.STAR_TE_stats.txt"
-                return f"{experiment_dir}/{map_output_folder}/{sample_name}.STAR_stats.txt"
+                    primary_path = f"{experiment_dir}/{map_output_folder}/{sample_name}.STAR_TE_stats.txt"
+                    if os.path.exists(primary_path):
+                        return primary_path
+                    return f"{flow_qc_mapper_cache_dir}/{sample_name}.STAR_TE_stats.txt"
+                primary_path = f"{experiment_dir}/{map_output_folder}/{sample_name}.STAR_stats.txt"
+                if os.path.exists(primary_path):
+                    return primary_path
+                return f"{flow_qc_mapper_cache_dir}/{sample_name}.STAR_stats.txt"
 
             sample2_to_lane_samples = {}
             for sample_name in samples:

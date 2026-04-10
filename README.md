@@ -280,6 +280,9 @@ Some job mode examples:
                                     Default: all
     --max-project-size:   Soft project-size cap such as 200G or 800GB.
                                     Omnomnomics may delete safe intermediates and skip BigWig or trackhub creation if the cap would otherwise be exceeded.
+                                    Intermediate cleanup is stage-aware:
+                                    trimmed_FASTQ is only eligible for cleanup after step 4 fully finishes.
+                                    BAM is only eligible for cleanup after step 5 fully finishes.
     --remove-duplicates:    Remove duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.
     --keep-duplicates:      Keep duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.
     -j MODE:                Job mode. Can be 'auto', 'all' or a range of jobs. See below (-h) for some 
@@ -335,7 +338,13 @@ By default, _Omnomnomics_ lets Snakemake reuse existing outputs that are already
 
 The optional `--retention-policy` flag controls which large intermediate folders are retained after a successful run. `all` keeps the current behavior. `pruned` removes obvious bulk intermediates such as `trimmed_FASTQ` and `BAM` while retaining reusable downstream outputs such as `filtered_BAM`. `minimal` keeps only `FASTQ` plus the requested terminal output branches, for example `merged_hubs` and `DE_calling` for an RNA run that finishes at steps 9 and 11.
 
-The optional `--max-project-size` flag adds a soft storage guard for space-heavy RNA outputs. When the configured cap would be exceeded, _Omnomnomics_ first removes safe intermediates such as `trimmed_FASTQ` and `BAM` if they are present. If the project would still exceed the cap, the pipeline logs a warning and skips BigWig or trackhub creation instead of failing on quota, while still allowing other requested branches such as read counting to continue.
+The optional `--max-project-size` flag adds a soft storage guard for space-heavy RNA outputs. When the configured cap would be exceeded, _Omnomnomics_ first attempts stage-safe cleanup of intermediates. Cleanup is guarded by step completion markers so that required upstream data are not deleted while dependent rules are still running. Before deleting `trimmed_FASTQ` or `BAM`, the pipeline caches lightweight flow-QC metric files (`*.trim_metrics.tsv` and mapper `*_stats.txt`) under `run_logs/flow_qc_cache` so downstream reporting can still read them. If the project would still exceed the cap, the pipeline logs a warning and skips BigWig or trackhub creation (steps 8 and 9) instead of failing on quota, while still allowing other requested branches such as read counting to continue.
+
+Practical combinations:
+- Full run with reusable outputs and bounded storage:
+  `omnomnomics -i <EXPERIMENT_DIR> -t RNA -g GRCh38 --retention-policy pruned --max-project-size 300G`
+- Minimal final outputs for tight quota:
+  `omnomnomics -i <EXPERIMENT_DIR> -t RNA -g GRCh38 --retention-policy minimal --max-project-size 200G`
 
 Additional utility command:
 
@@ -399,6 +408,16 @@ If that does not clear the problem, remove the stale Snakemake working directory
 cd <EXPERIMENT_DIR>
 rm -r .snakemake
 ```
+
+If a run fails with `Disk quota exceeded` or `No space left on device`, first stop remaining worker jobs, then clear the stale lock, then resume from a later step:
+
+```bash
+squeue -h -u "$USER" -n snakejob -o "%i" | xargs -r scancel
+snakemake --unlock -s /path/to/Snakefile.smk --directory <EXPERIMENT_DIR> --profile /path/to/slurm_profile --configfile <EXPERIMENT_DIR>/run_configs/<run_config>.yaml
+omnomnomics -i <EXPERIMENT_DIR> -t RNA -g GRCh38 -j 5-11 --retention-policy pruned --max-project-size 300G
+```
+
+Adjust `-j` to match the latest successful stage in your run.
 
 If optional HOMER tag directory export fails with messages such as `Could not find genome`, HOMER itself is installed but its genome data are missing. Install the required HOMER genome explicitly, for example:
 
