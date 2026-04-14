@@ -10,6 +10,11 @@ dependencies:
   - pysam
   - r-base>=4.3
   - bioconductor-deseq2
+  - r-ggplot2
+  - r-pheatmap
+  - r-matrixstats
+  - r-rcolorbrewer
+  - r-ggrepel
   - genomepy>=0.16
   - snakemake>=7.25,<8
   - multiqc

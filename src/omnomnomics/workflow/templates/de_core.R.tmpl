@@ -91,21 +91,15 @@ categorical_palette <- function(levels_vec) {
   stats::setNames(base_palette, levels_vec)
 }
 
-gradient_palette <- function(n, low = "#2166AC", mid = "#F7F7F7", high = "#B2182B") {
+gradient_palette <- function(n) {
   n <- max(3, as.integer(n))
-  if (requireNamespace("RColorSpacer", quietly = TRUE)) {
-    ns <- asNamespace("RColorSpacer")
-    candidate_fns <- c("gradient_steps", "color_gradient", "make_gradient")
-    for (fn in candidate_fns) {
-      if (exists(fn, envir = ns, mode = "function")) {
-        pal <- tryCatch(get(fn, envir = ns)(low, mid, high, n), error = function(e) NULL)
-        if (!is.null(pal) && length(pal) >= n) {
-          return(as.character(pal)[seq_len(n)])
-        }
-      }
-    }
+  base_steps <- max(9, min(11, n))
+  base_palette <- RColorBrewer::brewer.pal(base_steps, "RdBu")
+  base_palette <- rev(base_palette)
+  if (n > length(base_palette)) {
+    return(grDevices::colorRampPalette(base_palette)(n))
   }
-  grDevices::colorRampPalette(c(low, mid, high))(n)
+  stats::setNames(base_palette[seq_len(n)], NULL)
 }
 
 counts_df <- utils::read.delim(counts_path, check.names = FALSE, stringsAsFactors = FALSE)
