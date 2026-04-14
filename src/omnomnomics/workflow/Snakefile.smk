@@ -403,6 +403,51 @@ themode = config['THEMODE']
 retention_policy = str(config.get("RETENTION_POLICY", "all")).lower()
 max_project_size_raw = str(config.get("MAX_PROJECT_SIZE", "NA"))
 max_project_size_bytes = int(config.get("MAX_PROJECT_SIZE_BYTES", 0) or 0)
+derived_metadata_file = str(config.get("DERIVED_METADATA_FILE", "NA"))
+
+
+def load_derived_metadata_rows(metadata_path):
+    if not metadata_path or metadata_path == "NA" or not os.path.isfile(metadata_path):
+        return []
+    with open(metadata_path, newline="") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        return list(reader)
+
+
+derived_metadata_rows = load_derived_metadata_rows(derived_metadata_file)
+derived_metadata_by_filename = {
+    row["filename"]: row
+    for row in derived_metadata_rows
+    if row.get("filename")
+}
+
+
+def merged_sample_name(sample_name):
+    return re.sub(r'_L00.', '', sample_name)
+
+
+def metadata_row_for_sample(sample_name):
+    return derived_metadata_by_filename.get(merged_sample_name(sample_name))
+
+
+def metadata_value_for_sample(sample_name, column_name, default_value=None):
+    row = metadata_row_for_sample(sample_name)
+    if row is None:
+        return default_value
+    value = row.get(column_name, "")
+    return value if value not in ("", None) else default_value
+
+
+def sample_id_for_sample(sample_name):
+    return metadata_value_for_sample(sample_name, "sample_id", merged_sample_name(sample_name))
+
+
+def sample_type_for_sample(sample_name):
+    return metadata_value_for_sample(sample_name, "sample_type", "all_samples")
+
+
+def sample_color_for_sample(sample_name):
+    return metadata_value_for_sample(sample_name, "sample_color", sample_type_for_sample(sample_name))
 
 def format_bytes(num_bytes):
     units = ["B", "KB", "MB", "GB", "TB"]
@@ -780,8 +825,14 @@ if not is_worker_job:
     log_it(logfile, f"Retention policy: {retention_policy}")
     log_it(logfile, f"Max project size: {max_project_size_raw}")
 
-    log_it(logfile, f"Design formula: {config['MYFORMULA']}", "READ COUNTING SETTINGS")
+    log_it(logfile, f"Requested DE formula: {config['DE_FORMULA']}", "READ COUNTING SETTINGS")
+    log_it(logfile, f"Resolved DE formula: {config['RESOLVED_DE_FORMULA']}")
+    log_it(logfile, f"DE design mode: {config['DE_DESIGN_MODE']}")
     log_it(logfile, f"Metadata file: {config['MYMETADATA']}")
+    log_it(logfile, f"Derived metadata file: {config['DERIVED_METADATA_FILE']}")
+    log_it(logfile, f"Sample name columns: {', '.join(config.get('SAMPLE_NAME_COLUMNS', []))}")
+    log_it(logfile, f"Sample type columns: {', '.join(config.get('SAMPLE_TYPE_COLUMNS', [])) or 'default(all_samples)'}")
+    log_it(logfile, f"Sample color columns: {', '.join(config.get('SAMPLE_COLOR_COLUMNS', [])) or 'default(sample_type)'}")
 
     log_it(logfile, f"Input file (MACS3): {config['INPUT']}", "PEAK CALLING SETTINGS")
     log_it(logfile, f"Broad peaks: {config['BROAD']}")
@@ -789,10 +840,9 @@ if not is_worker_job:
     log_it(logfile, f"{config['THEHEAPINIT']} HEAP init", "JAVA MEMORY SETTINGS")
     log_it(logfile, f"{config['THEMEM']} memory per sample")
 
-    log_it(logfile, f"Hub type field: {config['THETYPEFIELD']}", "TRACKHUB SETTINGS")
-    log_it(logfile, f"Hub name field: {config['NAMEFIELDS']}")
-    log_it(logfile, f"Hub col field: {config['THECOLFIELD']}")
-    log_it(logfile, f"Hub separator: {config['THESEPARATOR']}")
+    log_it(logfile, "Trackhub labels use derived metadata sample_id.", "TRACKHUB SETTINGS")
+    log_it(logfile, "Trackhub grouping uses derived metadata sample_type.")
+    log_it(logfile, "Trackhub palette categories use derived metadata sample_color.")
     log_it(logfile, f"Hub appendix: {config['THEAPPENDIX']}")
     log_it(logfile, f"Hub overlay: {config['THEOVERLAY']}")
     log_it(logfile, f"Hub coldata folder: {config['THECOLORDATAFOLDER']}")
@@ -870,7 +920,7 @@ def resolve_fastq_input(sample, read_label, input_subdir):
 
 # Obtain all the sample names
 samples = [normalize_sample_name(f, input_file_type) for f in input_files]
-samples2 = [re.sub(r'_L00.', '', string) for string in samples] #From step 4 on, the lane number is not in the sample name anymore
+samples2 = [merged_sample_name(string) for string in samples]
 
 samples = list(set(samples))
 samples2 = list(set(samples2))
@@ -916,7 +966,7 @@ def lane_samples_for_merged_sample(sample_name):
     return sorted(
         lane_sample
         for lane_sample in lane_samples
-        if re.sub(r'_L00.', '', lane_sample) == sample_name
+        if merged_sample_name(lane_sample) == sample_name
     )
 
 if config['PAIRED'] == 1 and THEMODERANGEMIN < 4: 
@@ -1249,7 +1299,7 @@ onsuccess:
 
             sample2_to_lane_samples = {}
             for sample_name in samples:
-                aggregated_sample = re.sub(r'_L00.', '', sample_name)
+                aggregated_sample = merged_sample_name(sample_name)
                 sample2_to_lane_samples.setdefault(aggregated_sample, []).append(sample_name)
 
             def load_alignment_qc_rows(tsv_paths):

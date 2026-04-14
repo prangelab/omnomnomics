@@ -7,7 +7,6 @@
 # Copyright PrangeLab 2024 ##
 #=============================================
 import os
-import re
 import glob
 import csv
 import shutil
@@ -36,9 +35,6 @@ rule call_peaks:
         broad= lambda wildcards: config['BROAD'],
         input_sample= lambda wildcards: config['INPUT'],
         experiment_dir= lambda wildcards: config['EXPERIMENT_DIR'], 
-        name_fields= lambda wildcards: config['NAMEFIELDS'],  
-        separator= lambda wildcards: config['THESEPARATOR'],
-        thetype_field = lambda wildcards: config['THETYPEFIELD'] ,
         inputfolder1=lambda wildcards: f"{experiment_dir}/{master_config['input_folders'][master_config['callpeaks_rule_num']-1]}",
         outputfolder= lambda wildcards: f"{experiment_dir}/{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}"
     threads:
@@ -67,15 +63,6 @@ rule call_peaks:
                 return [(f"{label}.broad", value) for label, value in presets]
             return presets
 
-        def get_name_from_bam(inputfolder, group, name_fields, separator):
-            group_escaped = group.replace(separator, '.*')
-            cmd = f'basename "$(ls "{inputfolder}" | grep "{group_escaped}" - | grep ".bam$" | head -n1)" | cut -f{name_fields} -d{separator}'
-            try:
-                result = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
-                return result
-            except subprocess.CalledProcessError:
-                return None
-        
         def ensure_peak_qc_dir(outputfolder):
             qc_dir = os.path.join(outputfolder, "peak_qc")
             os.makedirs(qc_dir, exist_ok=True)
@@ -395,14 +382,24 @@ rule call_peaks:
                 crosscorr_metrics = calculate_cross_correlation_metrics(bam_path, qc_dir, sample)
                 sample_rows.append({
                     "assay": thetype,
-                    "sample": sample,
+                    "sample": sample_id_for_sample(sample),
                     "bam_file": os.path.basename(bam_path),
                     **complexity_metrics,
                     **crosscorr_metrics,
                 })
             return sample_rows
 
-        def call_peaks(logfile, thetype, inputfolder1, outputfolder, separator, thetype_field, name_fields, broad, input_sample):
+        def grouped_bams_by_sample_type(inputfolder, bam_suffix):
+            grouped_bams = {}
+            for sample in samples2:
+                bam_path = os.path.join(inputfolder, f"{sample}{bam_suffix}")
+                if not os.path.exists(bam_path):
+                    continue
+                group_name = sample_type_for_sample(sample)
+                grouped_bams.setdefault(group_name, []).append((sample, bam_path))
+            return grouped_bams
+
+        def call_peaks(logfile, thetype, inputfolder1, outputfolder, broad, input_sample):
             if thetype == "RNA":
                 log_it(logfile, "Not a ChIP- or ATAC-seq experiment, skipping this step...")
                 return
@@ -427,35 +424,17 @@ rule call_peaks:
                 
                 # Sanity check the working dir
                 sanity_check_dir(logfile, inputfolder1,  master_config['input_file_types'][master_config['callpeaks_rule_num']-1][0]) 
-                
-                # Distribute samples over groups based on the file name pattern
-                bams = [os.path.basename(bam).split(separator)[thetype_field - 1] for bam in glob.glob(f"{inputfolder1}/*.bam")]
-                chip_groups = sorted(set(bams))
-                
+
+                grouped_bams = grouped_bams_by_sample_type(inputfolder1, ".filtered.bam")
+                chip_groups = sorted(grouped_bams)
+
                 for group in chip_groups:
-                    # BAMS=( $(ls "$THEINFOLDER" | grep $(echo $THEGROUP | sed "s|$THESEPARATOR|.*|g") - | grep ".bam$") )
-                    bams = [bam for bam in os.listdir(inputfolder1) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.bam$", bam)] 
-                    bams = [os.path.join(inputfolder1, bam) for bam in bams]
+                    bams = [bam_path for _, bam_path in grouped_bams[group]]
                     
                     log_it(logfile, f"Calling peaks for: {group}...")
                     log_it(logfile, f"Files in group: {', '.join(bams)}")
 
-                    bam_basename = os.path.basename(bams[0])
-                    fields = bam_basename.split(separator)
-
-                    # Function to parse the NAMEFIELDS and return the specified field indices
-                    def parse_namefields(namefields):
-                        indices = []
-                        for part in namefields.split(','):
-                            if '-' in part:
-                                start, end = map(int, part.split('-'))
-                                indices.extend(range(start, end + 1))
-                            else:
-                                indices.append(int(part))
-                        return sorted(set(indices))  # Remove duplicates and sort the indices
-                    field_indices = parse_namefields(name_fields)
-
-                    the_name = separator.join(fields[i-1] for i in field_indices if i-1 < len(fields))
+                    the_name = group
 
                     if input_sample == "NA":#No input sample provided
                         if broad == "1": # Check if we should call broad peaks
@@ -478,7 +457,7 @@ rule call_peaks:
                 # Clean up the output
                 log_it(logfile, "Cleaning up MACS3 output (keeping only narrowPeak and broadPeak files)...")
                 for group in chip_groups: 
-                    the_name = get_name_from_bam(inputfolder1, group, name_fields, separator)
+                    the_name = group
                     log_it(logfile, f"find {outputfolder} -type f -name {the_name}.MACS3* ! \( -name *broadPeak -o -name *narrowPeak \) -delete")
                     shell(f"find {outputfolder} -type f -name {the_name}.MACS3* ! \( -name *broadPeak -o -name *narrowPeak \) -delete ") # Delete all redundant MACS3 output
 
@@ -491,9 +470,8 @@ rule call_peaks:
 
                 log_it(logfile, "Calculating peak QC metrics for MACS3 peak sets...")
                 for group in chip_groups:
-                    bams = [bam for bam in os.listdir(inputfolder1) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.bam$", bam)]
-                    bams = [os.path.join(inputfolder1, bam) for bam in bams]
-                    the_name = get_name_from_bam(inputfolder1, group, name_fields, separator)
+                    bams = [bam_path for _, bam_path in grouped_bams[group]]
+                    the_name = group
                     for peak_bed in sorted(glob.glob(f"{outputfolder}/{the_name}.MACS3*.bed")):
                         metrics = calculate_peak_qc_metrics(peak_bed, bams)
                         chip_qc_rows.append({
@@ -521,24 +499,17 @@ rule call_peaks:
                 # Sanity check the working dir
                 sanity_check_dir(logfile, inputfolder1,  master_config['input_file_types'][master_config['callpeaks_rule_num']-1][0]) 
 
-                # Distribute samples over groups based on the file name pattern
-                bams = [os.path.basename(bam).split(separator)[thetype_field - 1] for bam in glob.glob(f"{inputfolder1}/*.bam")]
-                atac_groups = sorted(set(bams))
+                grouped_bams = grouped_bams_by_sample_type(inputfolder1, ".sorted.dups_marked.filtered.bam")
+                atac_groups = sorted(grouped_bams)
 
                 for group in atac_groups: # Iterate over the groups
-                    bams = [bam for bam in os.listdir(inputfolder1) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.bam$", bam)]
-                    bams = [os.path.join(inputfolder1, bam) for bam in bams] # Fetch BAM files
+                    bams = [bam_path for _, bam_path in grouped_bams[group]]
                     
                     log_it(logfile, f"Calling ATAC open chromatin peaks for: {group}...")
                     log_it(logfile, f"Files in group: {', '.join(bams)}")
-                    # Set group name
-                    the_name = get_name_from_bam(inputfolder1, group, name_fields, separator)
+                    the_name = group
 
-                    # Call open regions with MACS3 hmmr
-                    # Turns out this MACS subroutine is till buggy and not functining prooerply, check back with it later but for now just call as ChIP peaks
-                    #logIt "Calling open regions with MACS3 hmmratac..."
-                    #logIt "	macs3 hmmratac -b $BAMS --outdir \"$THEOUTFOLDER\" -n $NAMEFIELDS --verbose 0 &"
-                    #macs3 hmmratac -b ${BAMS[*]} --outdir "$THEOUTFOLDER" -n $THENAME --verbose 2 &
+                    # The dedicated MACS3 hmmratac path remains disabled here because it has not been reliable enough.
 
                     log_it(logfile, "Calling ATAC open chromatin peaks with MACS3, q value 0.01...")
                     log_it(logfile, f"macs3 callpeak -t {' '.join(bams)} --outdir {outputfolder} -n {the_name}.MACS3.q-0p01 -q 0.01 --verbose 0" )
@@ -546,8 +517,7 @@ rule call_peaks:
 
                 log_it(logfile, "Cleaning up MACS3 output (keeping only narrowPeak files)...")
                 for group in atac_groups: ## Clean up the output
-                    # Set group name
-                    the_name = get_name_from_bam(inputfolder1, group, name_fields, separator)
+                    the_name = group
                     shell(f"find {outputfolder} -type f -name {the_name}.MACS3* ! -name *narrowPeak -delete")
                 
                 # Create clean BED files
@@ -563,9 +533,8 @@ rule call_peaks:
 
                 log_it(logfile, "Calculating peak QC metrics for MACS3 peak sets...")
                 for group in atac_groups:
-                    bams = [bam for bam in os.listdir(inputfolder1) if re.match(re.escape(group).replace(re.escape(separator), ".*") + ".*\\.bam$", bam)]
-                    bams = [os.path.join(inputfolder1, bam) for bam in bams]
-                    the_name = get_name_from_bam(inputfolder1, group, name_fields, separator)
+                    bams = [bam_path for _, bam_path in grouped_bams[group]]
+                    the_name = group
                     peak_bed = os.path.join(outputfolder, f"{the_name}.MACS3.q-0p01_peaks.bed")
                     if os.path.exists(peak_bed):
                         metrics = calculate_peak_qc_metrics(peak_bed, bams)
@@ -591,9 +560,6 @@ rule call_peaks:
             thetype=params.thetype,
             inputfolder1=params.inputfolder1,
             outputfolder=params.outputfolder,
-            separator=params.separator,
-            thetype_field=int(params.thetype_field),
-            name_fields=params.name_fields,  
             broad=params.broad,
             input_sample=params.input_sample,
         )

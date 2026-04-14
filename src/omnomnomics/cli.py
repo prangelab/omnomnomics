@@ -29,6 +29,13 @@ from datetime import date, datetime
 
 from omnomnomics.genomes import genomes_main
 from omnomnomics.helpers import create_track_color_table_main, display_track_color_table_main
+from omnomnomics.metadata import (
+    MetadataError,
+    derive_metadata_rows,
+    read_metadata_table,
+    resolve_de_metadata,
+    write_metadata_table,
+)
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
 WORKFLOW_ROOT = PACKAGE_ROOT / "workflow"
@@ -59,6 +66,8 @@ ANSI_HEADER = "\033[38;5;250m"
 ANSI_WARNING = "\033[38;5;214m"
 FASTQ_EXTENSIONS = (".fastq.gz", ".fq.gz", ".fastq", ".fq")
 FASTQ_READ_SUFFIX_RE = re.compile(r'_(?:R)?[12](?:_[0-9]{3})?$')
+MERGED_LANE_SUFFIX_RE = re.compile(r'_L00.')
+METADATA_REQUIRED_STEPS = {9, 10, 11, 12}
 
 
 def parse_monitor_arguments(argv):
@@ -415,11 +424,11 @@ def parse_arguments():
    parser.add_argument('-j', '--mode', help='Job mode. Can be auto, all or a range of jobs. See readme for some examples. \n \t Default: auto')
    parser.add_argument('-T', '--trim-tool', help='Trimming tool choice. Can be fastp or skewer. \n \t Default: fastp')
    parser.add_argument('-M', '--map-tool', help='Mapping tool choice. Can be HISAT2, STAR, or STAR_TE. STAR(_TE) can only be used for RNA-seq data. \n \t Default: HISAT2')
-   parser.add_argument('-f', '--formula', help='RNA: Experimental Design for DE calling. \n \t Default: 1 (just an intercept)')
+   parser.add_argument('--de-formula', help='Explicit DESeq2 design formula for step 12. If provided, it overrides --de-columns and --de-block.')
    parser.add_argument('-I', '--input', help='Input BAM file used for ChIP peak calling with MACS3. \n \t Default: do not use input')
-   parser.add_argument('-m', '--metadata', help='.txt file with columns of metadata for RNA-seq experiments. \n \t Default: DESeq2 style metadata table describing all samples. Rownames should be samplenames')
+   parser.add_argument('-m', '--metadata', help='Tabular metadata file. The first column must be named filename. Metadata drives sample naming, peak grouping, trackhub grouping, and DE design.')
    parser.add_argument('-b', '--broad', action='store_true', help='ChIP: Call broad histone marks with MACS3 --broad mode. Default is TF / narrow peaks.')
-   parser.add_argument('-C', '--col-table', help='File specifying which colors to use for the tracks. \n \t Default: gray.tint.color.table from the packaged palette directory. Can be a *txt list file with one color table per line. Different color tables will be used per hub as split by -e. Can be a full path or a file basename in combination with -P. Use `omnomnomics create-track-color-table` to build custom palettes and `omnomnomics display-track-color-table` to preview them.')
+   parser.add_argument('-C', '--col-table', help='File specifying which colors to use for the tracks. \n \t Default: gray.tint.color.table from the packaged palette directory. Can be a *txt list file with one color table per line. Different color tables will be used per hub when multiple sample_type groups are present. Can be a full path or a file basename in combination with -P. Use `omnomnomics create-track-color-table` to build custom palettes and `omnomnomics display-track-color-table` to preview them.')
    parser.add_argument('-P', '--color-data-folder', help='Path to a folder with color tables. \n \t Default: packaged color_data_for_hubs directory. Use this to point the workflow at custom palettes.') ##################change this default??
    parser.add_argument('-o', '--overlay', help='Overlay type (transparentOverlay|stacked|solidOverlay|none) \n \t Default: transparentOverlay')
    parser.add_argument('-L', '--hub-mail', help='Email to use in trackhub \n \t Default: your@email.com')
@@ -428,10 +437,12 @@ def parse_arguments():
    parser.add_argument('--rerun-selected-steps', action='store_true', help='Force recomputation of the selected workflow steps by deleting their existing outputs before submission. Default behavior is to reuse existing outputs when Snakemake considers them up to date.')
    parser.add_argument('--remove-duplicates', action='store_true', help='Remove duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.')
    parser.add_argument('--keep-duplicates', action='store_true', help='Keep duplicate reads in step 5. Default is assay-aware: keep for RNA, remove for ATAC and ChIP.')
-   parser.add_argument('-n', '--name-fields', help='Field(s) in filename to use as track name, peak file name, and column header in the count table \n \t Default: 1-3')
-   parser.add_argument('-e', '--type-field', help='Field(s) in filename to use as merged hub or peak calling group identifier \n \t Default: 1 (Creates separate merged hubs for each unique entry)')
-   parser.add_argument('-c', '--col-field', help='Field(s) in filename to use as color type \n \t Default: 2')
-   parser.add_argument('-s', '--separator', help='Separator used in file names. \n \t Default: _')
+   parser.add_argument('--sample-name', help='Metadata columns used to derive sample_id. Accepts comma-separated column names or 1-based indices. Required when a metadata-driven step is selected.')
+   parser.add_argument('--sample-type', help='Metadata columns used to derive sample_type. Accepts comma-separated column names or 1-based indices. Default: all_samples')
+   parser.add_argument('--sample-color', help='Metadata columns used to derive sample_color categories. Accepts comma-separated column names or 1-based indices. Default: sample_type, else all_samples')
+   parser.add_argument('--de-columns', help='Metadata columns of interest for auto-building the DESeq2 design when --de-formula is not given.')
+   parser.add_argument('--de-block', help='Metadata columns to include as blocking terms when auto-building the DESeq2 design.')
+   parser.add_argument('--de-interactions', action='store_true', help='Include interaction terms when auto-building the DESeq2 design from exactly two --de-columns values.')
    parser.add_argument('-a', '--appendix', help='Appendix to add to track name \n \t Default: hub')
    parser.add_argument('-k', '--keepunpaired', action='store_true', help='Keep unpaired or not in HISAT2')
    parser.add_argument('--dry-run', action='store_true', help='Validate the workflow and build the Snakemake DAG without executing jobs')
@@ -612,12 +623,8 @@ def validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, c
         if not os.path.isfile(metadata):
             print("Metadata file (-m) does not exist! Aborting...", file=sys.stderr)
             sys.exit(1)
-        elif not metadata.endswith(".txt"):
-            print("Metadata file (-m) is not a .txt file! Aborting...", file=sys.stderr)
-            sys.exit(1)
-        elif not metadata.startswith(experiment_dir):
-            print("Please place your metadata file in your experiment dir!", file=sys.stderr)
-            print(f"e.g., -m {os.path.join(str(workflow_root), 'data', 'me', 'my_fantastic_experiment', 'my_mindboggling_metadata.txt')}. Aborting...", file=sys.stderr)
+        elif not metadata.endswith((".txt", ".tsv", ".csv")):
+            print("Metadata file (-m) must be a .txt, .tsv, or .csv file. Aborting...", file=sys.stderr)
             sys.exit(1)
 
 
@@ -853,17 +860,6 @@ def validate_input_files(the_type, config, mode_range_min, experiment_dir):
 
     return num_files, num_pairs, paired, input_folder_mod_range_min, input_file_type_mod_range_min
 
-def parse_name_fields(fields):
-    #Parse a string of fields like '1,2,4-6' into a list of integers
-    field_list = []
-    for part in fields.split(','): # Split all the fields
-        if '-' in part:
-            start, end = part.split('-') # Split a range of steps
-            field_list.extend(range(int(start), int(end) + 1)) # Add all the wanted steps to list
-        else:
-            field_list.append(int(part)) # Add all the wanted steps to list
-    return field_list
-
 def normalize_field_selection_name(filename, file_type):
     normalized = os.path.basename(filename)
     if normalized.endswith(file_type):
@@ -876,94 +872,87 @@ def normalize_field_selection_name(filename, file_type):
     normalized = normalized.replace(".sorted.dups_marked", "")
     return normalized
 
-def run_cut_command(filename, fields, separator):
-    #Select specified fields from a filename using the given separator
-    try:
-        parts = filename.split(separator) # Get all the parts in the filename
-        selected_parts = []
-        for field in parse_name_fields(fields): # Loop over all the fields
-            field_index = field - 1 # -1 since indexing of field names starts at 1
-            if field_index < 0 or field_index >= len(parts):
-                return f"Error: Field index {field} out of range"
-            selected_parts.append(parts[field_index]) # Add to the name
-        return ''.join(selected_parts)
-    except ValueError:
-        return "Error: Invalid field value"
-
-def check_name_field_settings(experiment_dir, separator, name_fields, type_field, col_field, config, input_folder_mod_range_min, input_file_type_mod_range_min):
-    try:
-        # Get a sample file
-        sample_files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}")
-        if not sample_files:
-            raise ValueError("No sample files found.")
-        
-        mock_cut = normalize_field_selection_name(sample_files[0], input_file_type_mod_range_min)
-        
-        # Run the cut command simulations
-        cut_test = ""
-        cut_test += run_cut_command(mock_cut, name_fields, separator)
-        cut_test += run_cut_command(mock_cut, type_field, separator)
-        cut_test += run_cut_command(mock_cut, col_field, separator)
-
-    except (IndexError, ValueError) as e:
-        print("Oops, something is wrong with your field settings! Check your -n, -c, -e, and -s variables!", file=sys.stderr)
-        print(f"Error message: {e}")
-        print("Exiting...", file=sys.stderr)
-        sys.exit(1)
-
-    # If cut_test contains "Error", there was an error
-    if "Error" in cut_test:
-        print("Oops, something is wrong with your field settings! Check your -n, -c, -e, and -s variables!", file=sys.stderr)
-        print("Exiting...", file=sys.stderr)
-        sys.exit(1)
-
-
-def check_unique_sample_names(experiment_dir, input_folder_mod_range_min, input_file_type_mod_range_min, name_fields, separator):
-    def parse_fields(field_string):
-        #Parse a string representing fields into a list of integers
-        fields = []
-        for part in field_string.split(','):
-            if '-' in part:
-                start, end = map(int, part.split('-'))
-                fields.extend(range(start, end + 1))
-            else:
-                fields.append(int(part))
-        return fields
-
-
-    def extract_fields(filename, fields, separator):
-        #Extract specified fields from a filename
-        parts = filename.split(separator)
-        try:
-            return separator.join([parts[i - 1] for i in fields])
-        except IndexError:
-            raise ValueError(f"Invalid field indices: {fields}")
-        
-    name_fields = parse_fields(name_fields)
-
-    if input_file_type_mod_range_min != ".fastq.gz" and input_file_type_mod_range_min != ".trimmed.fastq.gz" :
-        # Get all files with the specified type
-        files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}")
+def merged_sample_roots_for_mode(experiment_dir, input_folder, input_file_type):
+    if input_file_type not in FASTQ_EXTENSIONS and input_file_type not in (".trimmed.fastq.gz", ".trimmed.fastq", ".trimmed.fq.gz", ".trimmed.fq"):
+        files = glob.glob(f"{experiment_dir}/{input_folder}/*{input_file_type}")
     else:
-        # Only consider R1 files for FASTQs
-        files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*_R1*{input_file_type_mod_range_min}")
+        files = []
+        for extension in FASTQ_EXTENSIONS if input_file_type in FASTQ_EXTENSIONS else (input_file_type,):
+            files.extend(glob.glob(f"{experiment_dir}/{input_folder}/*_R1*{extension}"))
 
-    # For file types that emit multiple files per biological sample (for example
-    # RNA plus/minus BigWigs), validate uniqueness on normalized sample roots.
-    normalized_files = sorted(set(
-        normalize_field_selection_name(f, input_file_type_mod_range_min)
-        for f in files
-    ))
+    normalized_files = sorted(
+        set(normalize_field_selection_name(file_path, input_file_type) for file_path in files)
+    )
+    return sorted(set(MERGED_LANE_SUFFIX_RE.sub("", file_name) for file_name in normalized_files))
 
-    # Extract names using the specified fields
-    sample_names = [extract_fields(f, name_fields, separator) for f in normalized_files]
 
-    # Check for uniqueness
-    if len(sample_names) != len(set(sample_names)):
-        print(f"Error: using name fields: {name_fields} does not yield unique sample names!", file=sys.stderr)
-        print("Please choose a different range of name fields.", file=sys.stderr)
-        print("Exiting...", file=sys.stderr)
-        sys.exit(1)
+def metadata_required_for_mode(mode_steps):
+    return bool(METADATA_REQUIRED_STEPS.intersection(mode_steps))
+
+
+def validate_metadata_sample_roots(derived_rows, expected_sample_roots):
+    metadata_roots = sorted(row["filename"] for row in derived_rows)
+    expected_roots = sorted(expected_sample_roots)
+    missing = sorted(set(expected_roots) - set(metadata_roots))
+    extra = sorted(set(metadata_roots) - set(expected_roots))
+    if missing or extra:
+        problems = []
+        if missing:
+            problems.append("missing metadata rows for: " + ", ".join(missing))
+        if extra:
+            problems.append("metadata rows without matching samples: " + ", ".join(extra))
+        raise MetadataError("Metadata sample matching failed: " + "; ".join(problems))
+
+
+def count_table_sample_ids(count_table_path):
+    with open(count_table_path, newline="") as handle:
+        reader = csv.reader(handle, delimiter="\t")
+        header = next(reader, [])
+    if len(header) < 2:
+        raise MetadataError(f"Count table '{count_table_path}' is missing sample columns.")
+    return header[1:]
+
+
+def validate_metadata_sample_ids(derived_rows, expected_sample_ids):
+    metadata_sample_ids = sorted(row["sample_id"] for row in derived_rows)
+    expected_ids = sorted(expected_sample_ids)
+    missing = sorted(set(expected_ids) - set(metadata_sample_ids))
+    extra = sorted(set(metadata_sample_ids) - set(expected_ids))
+    if missing or extra:
+        problems = []
+        if missing:
+            problems.append("missing metadata rows for count-table samples: " + ", ".join(missing))
+        if extra:
+            problems.append("metadata rows without matching count-table samples: " + ", ".join(extra))
+        raise MetadataError("Metadata sample matching failed: " + "; ".join(problems))
+
+
+def validate_deseq_design_full_rank(metadata_path, formula):
+    r_expression = (
+        "args <- commandArgs(trailingOnly = TRUE); "
+        "metadata_path <- args[[1]]; "
+        "design_formula <- args[[2]]; "
+        "metadata <- read.delim(metadata_path, check.names = FALSE, stringsAsFactors = FALSE); "
+        "metadata[] <- lapply(metadata, function(column) if (is.character(column)) factor(column) else column); "
+        "design <- as.formula(design_formula); "
+        "model_matrix <- model.matrix(design, data = metadata); "
+        "if (nrow(model_matrix) == 0) stop('Design matrix is empty.'); "
+        "if (qr(model_matrix)$rank < ncol(model_matrix)) stop('Design matrix is not full rank.'); "
+        "cat('Design formula OK\\n')"
+    )
+    try:
+        completed = subprocess.run(
+            ["Rscript", "-e", r_expression, str(metadata_path), formula],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        raise MetadataError("Rscript is required to validate the DESeq2 design but was not found.") from exc
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr.strip() or exc.stdout.strip() or "Unknown R validation error."
+        raise MetadataError(f"DESeq2 design validation failed: {stderr}") from exc
+    return completed.stdout.strip()
 
 def setup_runtime_parameters(num_pairs, experiment_dir):
     print("Setup runtime parameters...")
@@ -1157,7 +1146,7 @@ def main():
     trim_tool = args.trim_tool.lower() if args.trim_tool else config.get("trim_tool","fastp").lower()
     map_tool = args.map_tool.lower() if args.map_tool else config.get('map_tool', "hisat2").lower()
     mode = args.mode.lower() if args.mode else config.get('mode', "auto")
-    formula = args.formula if args.formula else config.get('formula', "1")
+    de_formula = args.de_formula if args.de_formula else config.get('de_formula', "NA")
     broad = args.broad if args.broad else config.get('broad', "NA")
     INPUT = args.input if args.input else config.get('input',"NA")
     metadata = args.metadata if args.metadata else config.get('metadata', "NA")
@@ -1178,10 +1167,12 @@ def main():
         duplicate_handling = "keep"
     elif duplicate_handling == "auto":
         duplicate_handling = "keep" if the_type == "RNA" else "remove"
-    name_fields = args.name_fields if args.name_fields else config.get('name_fields', "1-3")
-    type_field = args.type_field if args.type_field else config.get('type_field', "1")
-    col_field = args.col_field if args.col_field else config.get('col_field', "2")
-    separator = args.separator if args.separator else config.get('separator', "_")
+    sample_name = args.sample_name if args.sample_name else config.get('sample_name', "")
+    sample_type = args.sample_type if args.sample_type else config.get('sample_type', "")
+    sample_color = args.sample_color if args.sample_color else config.get('sample_color', "")
+    de_columns = args.de_columns if args.de_columns else config.get('de_columns', "")
+    de_block = args.de_block if args.de_block else config.get('de_block', "")
+    de_interactions = args.de_interactions or config.get('de_interactions', False)
     appendix = args.appendix if args.appendix else config.get('appendix', "hub")
     keep_unpaired = args.keepunpaired if args.keepunpaired else config.get('keep_unpaired', False)
     dry_run = args.dry_run
@@ -1240,12 +1231,6 @@ def main():
         if not mode_steps:
             print("For the rest no steps to run. Done!")
             return
-    if 12 in mode_steps and the_type == "RNA":
-        print("Step 12 DE calling is not implemented yet for RNA, skipping it for now...")
-        mode_steps = [step for step in mode_steps if step != 12]
-        if not mode_steps:
-            print("For the rest no steps to run. Done!")
-            return
     print(f"MODE STEPS NEW = {mode_steps}")
 
     # Reset selected step bookkeeping for the new run
@@ -1260,11 +1245,90 @@ def main():
     #checking input files
     num_files, num_pairs, paired, input_folder_mod_range_min, input_file_type_mod_range_min = validate_input_files(the_type, config, min(mode_steps),experiment_dir)
 
-    #checking field settings
-    check_name_field_settings(experiment_dir, separator, name_fields, type_field, col_field, config, input_folder_mod_range_min, input_file_type_mod_range_min)
+    metadata_required = metadata_required_for_mode(mode_steps)
+    derived_metadata_path = "NA"
+    resolved_de_formula = "NA"
+    de_design_mode = "NA"
+    sample_name_columns = []
+    sample_type_columns = []
+    sample_color_columns = []
+    de_columns_resolved = []
+    de_block_resolved = []
 
-    #checking sample names
-    check_unique_sample_names(experiment_dir, input_folder_mod_range_min, input_file_type_mod_range_min, name_fields, separator)
+    if metadata_required:
+        if metadata == "NA":
+            print(
+                "A metadata file is required for the selected workflow steps. Provide -m/--metadata. Aborting...",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if not sample_name:
+            print(
+                "--sample-name is required when running metadata-driven workflow steps. Aborting...",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        try:
+            metadata_fieldnames, metadata_rows = read_metadata_table(metadata)
+            derived_fieldnames, derived_rows, selector_map = derive_metadata_rows(
+                metadata_fieldnames,
+                metadata_rows,
+                sample_name_selector=sample_name,
+                sample_type_selector=sample_type,
+                sample_color_selector=sample_color,
+            )
+            if min(mode_steps) == 12:
+                count_table_path = os.path.join(
+                    experiment_dir,
+                    config['input_folders'][config['de_rule_num'] - 1],
+                    f"{os.path.basename(experiment_dir)}.raw_read_quant.table.txt",
+                )
+                validate_metadata_sample_ids(
+                    derived_rows,
+                    count_table_sample_ids(count_table_path),
+                )
+            else:
+                expected_sample_roots = merged_sample_roots_for_mode(
+                    experiment_dir,
+                    input_folder_mod_range_min,
+                    input_file_type_mod_range_min,
+                )
+                validate_metadata_sample_roots(derived_rows, expected_sample_roots)
+            sample_name_columns = selector_map["sample_name_columns"]
+            sample_type_columns = selector_map["sample_type_columns"]
+            sample_color_columns = selector_map["sample_color_columns"]
+
+            if 12 in mode_steps:
+                derived_fieldnames, derived_rows, resolved_de_formula, de_context = resolve_de_metadata(
+                    metadata_fieldnames,
+                    derived_fieldnames,
+                    derived_rows,
+                    None if de_formula == "NA" else de_formula,
+                    de_columns,
+                    de_block,
+                    bool(de_interactions),
+                )
+                de_design_mode = str(de_context["mode"])
+                de_columns_resolved = list(de_context["de_columns"])
+                de_block_resolved = list(de_context["de_block"])
+
+            derived_metadata_path = os.path.join(
+                experiment_dir,
+                "run_configs",
+                f"omnomnomics.run.{run_date}.metadata_derived.tsv",
+            )
+            write_metadata_table(derived_metadata_path, derived_fieldnames, derived_rows)
+
+            if 12 in mode_steps:
+                validation_message = validate_deseq_design_full_rank(
+                    derived_metadata_path,
+                    resolved_de_formula,
+                )
+                print(validation_message)
+        except MetadataError as exc:
+            print(f"{exc} Aborting...", file=sys.stderr)
+            sys.exit(1)
 
     #setting up runtime parameters (my_cores and max_time commented out for now.)
     the_mem, the_heap_init = setup_runtime_parameters(num_pairs, experiment_dir)
@@ -1296,18 +1360,29 @@ def main():
         'THEMODERANGEMIN': min(mode_steps),
         'THEMODERANGEMAX': max(mode_steps),
         'THEGENOME': genome,
-        'MYFORMULA': formula,
+        'DE_FORMULA': de_formula,
+        'RESOLVED_DE_FORMULA': resolved_de_formula,
+        'DE_COLUMNS': de_columns,
+        'DE_BLOCK': de_block,
+        'DE_INTERACTIONS': bool(de_interactions),
+        'DE_DESIGN_MODE': de_design_mode,
         'MYMETADATA': metadata,
+        'DERIVED_METADATA_FILE': derived_metadata_path,
+        'METADATA_REQUIRED': metadata_required,
+        'SAMPLE_NAME_SELECTOR': sample_name,
+        'SAMPLE_TYPE_SELECTOR': sample_type,
+        'SAMPLE_COLOR_SELECTOR': sample_color,
+        'SAMPLE_NAME_COLUMNS': sample_name_columns,
+        'SAMPLE_TYPE_COLUMNS': sample_type_columns,
+        'SAMPLE_COLOR_COLUMNS': sample_color_columns,
+        'DE_COLUMNS_RESOLVED': de_columns_resolved,
+        'DE_BLOCK_RESOLVED': de_block_resolved,
         'THETRIMTOOL': trim_tool,
         'THEMAPTOOL': map_tool,
         'NO_MULTIQC': no_multiqc,
         'CREATE_HOMER_TAGDIRS': create_homer_tagdirs,
         'RERUN_SELECTED_STEPS': rerun_selected_steps,
         'DUPLICATE_HANDLING': duplicate_handling,
-        'THETYPEFIELD': type_field,
-        'NAMEFIELDS': name_fields,
-        'THECOLFIELD': col_field,
-        'THESEPARATOR': separator,
         'THEAPPENDIX': appendix,
         'THEOVERLAY': overlay,
         'THECOLORDATAFOLDER': color_data_folder,

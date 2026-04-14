@@ -15,6 +15,7 @@ authors = [
 dependencies = [
   "genomepy>=0.16",
   "PyYAML>=6.0",
+  "pysam>=0.22",
 ]
 
 [project.scripts]

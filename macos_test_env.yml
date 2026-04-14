@@ -1,4 +1,4 @@
-name: omnomnomics
+name: omnomnomics-macos-test
 channels:
   - conda-forge
   - bioconda
@@ -15,7 +15,6 @@ dependencies:
   - multiqc
   - fastqc
   - fastp
-  - skewer
   - hisat2
   - star
   - samtools
@@ -31,6 +30,5 @@ dependencies:
   - macs3
   - matplotlib
   - phantompeakqualtools
-  - homer
   - openjdk
   - perl

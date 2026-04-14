@@ -7,7 +7,6 @@
 # Copyright PrangeLab 2024 ##
 #=============================================
 import os
-import re
 import shutil
 
 RNA_PLUS_TRACK_COLOR = "255,0,0"
@@ -23,10 +22,6 @@ rule merge_wiggles:
         thegenome=lambda wildcards: config['THEGENOME'],
         coltable=lambda wildcards: config["THECOLTABLE"],
         theappendix=lambda wildcards: config['THEAPPENDIX'],
-        theseparator=lambda wildcards: config['THESEPARATOR'],
-        thecolfield=lambda wildcards: config['THECOLFIELD'],
-        thenamefields=lambda wildcards: config['NAMEFIELDS'],
-        thetypefield=lambda wildcards: config['THETYPEFIELD'],
         thehubmail=lambda wildcards: config['THEHUBMAIL'],
         theoverlay=lambda wildcards: config['THEOVERLAY'],
         inputfolder=lambda wildcards: f"{experiment_dir}/{master_config['input_folders'][master_config['mergewig_rule_num']-1]}",
@@ -63,20 +58,6 @@ rule merge_wiggles:
             shell(f"""echo "necessity file for merge wiggle. can delete this." > {params.outputfolder}/extra_9.tmp""")
             log_it(logfile, "Skipping trackhub creation due to max project size constraint.")
             return
-
-        def parse_namefields(namefields):
-            indices = []
-            for part in namefields.split(','):
-                if '-' in part:
-                    start, end = map(int, part.split('-'))
-                    indices.extend(range(start, end + 1))
-                else:
-                    indices.append(int(part))
-            return sorted(set(indices))
-
-        def select_fields(values, field_spec, separator):
-            indices = parse_namefields(str(field_spec))
-            return separator.join(values[idx - 1] for idx in indices if idx - 1 < len(values))
 
         def ensure_hub_structure(hub_folder, genome_folder, hub_name, genome, hub_mail, overlay):
             if os.path.exists(hub_folder):
@@ -142,7 +123,7 @@ rule merge_wiggles:
                 if negate:
                     trackdb_file.write("negateValues on\n")
 
-        def merge_wig(input_folder, output_folder, thetype, col_field, separator, type_field, name_fields, col_table, appendix, genome, hub_mail, overlay):
+        def merge_wig(input_folder, output_folder, thetype, col_table, appendix, genome, hub_mail, overlay):
             sanity_check_dir(logfile, input_folder, master_config['input_file_types'][master_config['mergewig_rule_num'] - 1], "step9.sanity")
 
             col_array = []
@@ -153,28 +134,25 @@ rule merge_wiggles:
             else:
                 col_array.append(col_table)
 
-            field_indices = parse_namefields(name_fields)
             bw_files = [bw for bw in os.listdir(input_folder) if bw.endswith(".bw")]
             sample_roots = sorted(set(sample_root_from_bw(bw, thetype) for bw in bw_files))
-            hubtypes = sorted(set(
-                select_fields(sample_root.split(separator), type_field, separator)
-                for sample_root in sample_roots
-            ))
+            hubtypes = sorted(set(sample_type_for_sample(sample_root) for sample_root in sample_roots))
 
             ctabletracker = 0
             for superhub in hubtypes:
                 sample_tracks = [
                     sample_root for sample_root in sample_roots
-                    if re.match(re.escape(superhub).replace(re.escape(separator), ".*") + ".*$", sample_root)
+                    if sample_type_for_sample(sample_root) == superhub
                 ]
-                sample_tracks.sort()
+                sample_tracks.sort(key=lambda sample_root: sample_id_for_sample(sample_root))
                 if not sample_tracks:
                     continue
 
-                coltypes = sorted(set(
-                    select_fields(sample_root.split(separator), col_field, separator)
-                    for sample_root in sample_tracks
-                ))
+                color_categories = []
+                for sample_root in sample_tracks:
+                    color_category = sample_color_for_sample(sample_root)
+                    if color_category not in color_categories:
+                        color_categories.append(color_category)
 
                 if ctabletracker == len(col_array):
                     ctabletracker = 0
@@ -185,12 +163,13 @@ rule merge_wiggles:
                 if not table_colors:
                     raise ValueError(f"Color table {col_array[ctabletracker]} does not contain any colors")
 
-                if len(table_colors) < len(sample_tracks):
-                    repeats = (len(sample_tracks) // len(table_colors)) + 1
-                    mycols = (table_colors * repeats)[:len(sample_tracks)]
+                if len(table_colors) < len(color_categories):
+                    repeats = (len(color_categories) // len(table_colors)) + 1
+                    category_palette = (table_colors * repeats)[:len(color_categories)]
                 else:
-                    stride = max(1, (len(table_colors) - 1) // max(1, len(sample_tracks)))
-                    mycols = [table_colors[idx] for idx in range(0, len(table_colors), stride)][:len(sample_tracks)]
+                    stride = max(1, (len(table_colors) - 1) // max(1, len(color_categories)))
+                    category_palette = [table_colors[idx] for idx in range(0, len(table_colors), stride)][:len(color_categories)]
+                category_to_color = dict(zip(color_categories, category_palette))
 
                 hub_name = f"{superhub}.{appendix}"
                 hub_folder = os.path.join(output_folder, hub_name)
@@ -201,10 +180,10 @@ rule merge_wiggles:
 
                 ensure_hub_structure(hub_folder, genome_folder, hub_name, genome, hub_mail, overlay)
 
-                for i, sample_root in enumerate(sample_tracks):
-                    fields = sample_root.split(separator)
-                    name = separator.join(fields[idx - 1] for idx in field_indices if idx - 1 < len(fields))
-                    color = mycols[i]
+                for sample_root in sample_tracks:
+                    name = sample_id_for_sample(sample_root)
+                    color_category = sample_color_for_sample(sample_root)
+                    color = category_to_color[color_category]
                     log_it(logfile, f"Processing {name}...")
                     trackdb_path = os.path.join(genome_folder, "trackDb.txt")
 
@@ -263,10 +242,6 @@ rule merge_wiggles:
             input_folder=params.inputfolder,
             output_folder=params.outputfolder,
             thetype=params.thetype,
-            col_field=params.thecolfield,
-            separator=params.theseparator,
-            type_field=params.thetypefield,
-            name_fields=params.thenamefields,
             col_table=params.coltable,
             appendix=params.theappendix,
             genome=params.thegenome,

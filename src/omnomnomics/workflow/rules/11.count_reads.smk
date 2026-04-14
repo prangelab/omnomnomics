@@ -105,7 +105,12 @@ rule count_reads:
             with open(featurecounts_output, newline="") as source, open(final_output, "w", newline="") as destination:
                 reader = csv.reader((line for line in source if not line.startswith("#")), delimiter="\t")
                 header = next(reader)
-                sample_headers = [os.path.basename(path).replace(".sorted.dups_marked.filtered.bam", "") for path in header[6:]]
+                sample_headers = [
+                    sample_id_for_sample(
+                        os.path.basename(path).replace(".sorted.dups_marked.filtered.bam", "")
+                    )
+                    for path in header[6:]
+                ]
                 writer = csv.writer(destination, delimiter="\t", lineterminator="\n")
                 writer.writerow(["Geneid", *sample_headers])
                 for row in reader:
@@ -138,7 +143,7 @@ rule count_reads:
             with open(multicov_output, newline="") as source, open(final_output, "w", newline="") as destination:
                 reader = csv.reader(source, delimiter="\t")
                 writer = csv.writer(destination, delimiter="\t", lineterminator="\n")
-                writer.writerow(["Peak", *samples2])
+                writer.writerow(["Peak", *[sample_id_for_sample(sample) for sample in samples2]])
                 for row in reader:
                     peak_name = f"{row[0]}_{row[1]}_{row[2]}"
                     writer.writerow([peak_name, *row[3:]])
