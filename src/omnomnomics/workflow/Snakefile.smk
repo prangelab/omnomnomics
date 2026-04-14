@@ -414,16 +414,52 @@ def load_derived_metadata_rows(metadata_path):
         return list(reader)
 
 
+FASTQ_KEY_EXTENSIONS = (
+    ".trimmed.fastq.gz",
+    ".trimmed.fastq",
+    ".trimmed.fq.gz",
+    ".trimmed.fq",
+    ".fastq.gz",
+    ".fq.gz",
+    ".fastq",
+    ".fq",
+)
+BIGWIG_KEY_EXTENSIONS = (".plus.bw", ".minus.bw", ".bw")
+OTHER_KEY_EXTENSIONS = (".bam", ".bai")
+FASTQ_KEY_READ_SUFFIX_RE = re.compile(r"_(?:R)?[12](?:_[0-9]{3})?$")
+MERGED_KEY_LANE_SUFFIX_RE = re.compile(r"_L00[0-9]$")
+
+
+def normalize_metadata_sample_key(filename_value):
+    normalized = os.path.basename(str(filename_value).strip())
+    matched_extension = None
+    for extension in [*FASTQ_KEY_EXTENSIONS, *BIGWIG_KEY_EXTENSIONS, *OTHER_KEY_EXTENSIONS]:
+        if normalized.endswith(extension):
+            normalized = normalized[:-len(extension)]
+            matched_extension = extension
+            break
+    if matched_extension in FASTQ_KEY_EXTENSIONS:
+        normalized = FASTQ_KEY_READ_SUFFIX_RE.sub("", normalized)
+    elif matched_extension in BIGWIG_KEY_EXTENSIONS:
+        normalized = re.sub(r"\.(plus|minus)$", "", normalized)
+    normalized = normalized.replace(".filtered", "")
+    normalized = normalized.replace(".sorted.dups_marked", "")
+    return MERGED_KEY_LANE_SUFFIX_RE.sub("", normalized)
+
+
 derived_metadata_rows = load_derived_metadata_rows(derived_metadata_file)
 derived_metadata_by_filename = {
-    row["filename"]: row
+    (
+        row.get("filename_key")
+        or normalize_metadata_sample_key(row.get("filename", ""))
+    ): row
     for row in derived_metadata_rows
-    if row.get("filename")
+    if row.get("filename_key") or row.get("filename")
 }
 
 
 def merged_sample_name(sample_name):
-    return re.sub(r'_L00.', '', sample_name)
+    return normalize_metadata_sample_key(sample_name)
 
 
 def metadata_row_for_sample(sample_name):

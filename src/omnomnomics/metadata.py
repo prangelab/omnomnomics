@@ -9,8 +9,22 @@ class MetadataError(ValueError):
     pass
 
 
-DERIVED_METADATA_COLUMNS = ("sample_id", "sample_type", "sample_color")
+DERIVED_METADATA_COLUMNS = ("filename_key", "sample_id", "sample_type", "sample_color")
 SANITIZE_IDENTIFIER_RE = re.compile(r"[^A-Za-z0-9._-]+")
+FASTQ_EXTENSIONS = (
+    ".trimmed.fastq.gz",
+    ".trimmed.fastq",
+    ".trimmed.fq.gz",
+    ".trimmed.fq",
+    ".fastq.gz",
+    ".fq.gz",
+    ".fastq",
+    ".fq",
+)
+BIGWIG_EXTENSIONS = (".plus.bw", ".minus.bw", ".bw")
+OTHER_EXTENSIONS = (".bam", ".bai")
+FASTQ_READ_SUFFIX_RE = re.compile(r"_(?:R)?[12](?:_[0-9]{3})?$")
+LANE_SUFFIX_RE = re.compile(r"_L00[0-9]$")
 
 
 def read_metadata_table(metadata_path: str | Path) -> tuple[list[str], list[dict[str, str]]]:
@@ -89,6 +103,28 @@ def sanitize_identifier(value: str) -> str:
     return sanitized
 
 
+def normalize_metadata_filename(filename_value: str) -> str:
+    basename = Path(filename_value.strip()).name
+    normalized = basename
+
+    matched_extension = None
+    for extension in [*FASTQ_EXTENSIONS, *BIGWIG_EXTENSIONS, *OTHER_EXTENSIONS]:
+        if normalized.endswith(extension):
+            normalized = normalized[: -len(extension)]
+            matched_extension = extension
+            break
+
+    if matched_extension in FASTQ_EXTENSIONS:
+        normalized = FASTQ_READ_SUFFIX_RE.sub("", normalized)
+    elif matched_extension in BIGWIG_EXTENSIONS:
+        normalized = re.sub(r"\.(plus|minus)$", "", normalized)
+
+    normalized = normalized.replace(".filtered", "")
+    normalized = normalized.replace(".sorted.dups_marked", "")
+    normalized = LANE_SUFFIX_RE.sub("", normalized)
+    return normalized
+
+
 def join_metadata_values(row: dict[str, str], column_names: list[str]) -> str:
     return "_".join(row[column_name].strip() for column_name in column_names if row[column_name].strip())
 
@@ -109,6 +145,7 @@ def derive_metadata_rows(
 
     derived_rows: list[dict[str, str]] = []
     seen_filenames: set[str] = set()
+    seen_filename_keys: set[str] = set()
     seen_sample_ids: set[str] = set()
 
     for row in rows:
@@ -118,6 +155,14 @@ def derive_metadata_rows(
         if filename in seen_filenames:
             raise MetadataError(f"Metadata column 'filename' contains a duplicate value: {filename}")
         seen_filenames.add(filename)
+        filename_key = normalize_metadata_filename(filename)
+        if not filename_key:
+            raise MetadataError(f"Metadata filename '{filename}' did not resolve to a usable sample key.")
+        if filename_key in seen_filename_keys:
+            raise MetadataError(
+                f"Metadata filename values resolve to duplicate sample keys. Duplicate key: {filename_key}"
+            )
+        seen_filename_keys.add(filename_key)
 
         sample_id = sanitize_identifier(join_metadata_values(row, sample_name_columns))
         if not sample_id:
@@ -139,6 +184,7 @@ def derive_metadata_rows(
             sample_color = sample_type if sample_type else "all_samples"
 
         derived_row = dict(row)
+        derived_row["filename_key"] = filename_key
         derived_row["sample_id"] = sample_id
         derived_row["sample_type"] = sample_type
         derived_row["sample_color"] = sample_color

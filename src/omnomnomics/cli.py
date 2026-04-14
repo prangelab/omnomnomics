@@ -32,6 +32,7 @@ from omnomnomics.helpers import create_track_color_table_main, display_track_col
 from omnomnomics.metadata import (
     MetadataError,
     derive_metadata_rows,
+    normalize_metadata_filename,
     read_metadata_table,
     resolve_de_metadata,
     write_metadata_table,
@@ -861,16 +862,8 @@ def validate_input_files(the_type, config, mode_range_min, experiment_dir):
     return num_files, num_pairs, paired, input_folder_mod_range_min, input_file_type_mod_range_min
 
 def normalize_field_selection_name(filename, file_type):
-    normalized = os.path.basename(filename)
-    if normalized.endswith(file_type):
-        normalized = normalized[:-len(file_type)]
-    if any(normalized.endswith(suffix) for suffix in (".plus", ".minus")):
-        normalized = re.sub(r'\.(plus|minus)$', '', normalized)
-    if "fastq" in file_type or file_type.endswith(".fq.gz") or file_type.endswith(".fq"):
-        normalized = strip_fastq_read_suffix(normalized)
-    normalized = normalized.replace(".filtered", "")
-    normalized = normalized.replace(".sorted.dups_marked", "")
-    return normalized
+    _ = file_type
+    return normalize_metadata_filename(filename)
 
 def merged_sample_roots_for_mode(experiment_dir, input_folder, input_file_type):
     if input_file_type not in FASTQ_EXTENSIONS and input_file_type not in (".trimmed.fastq.gz", ".trimmed.fastq", ".trimmed.fq.gz", ".trimmed.fq"):
@@ -891,7 +884,14 @@ def metadata_required_for_mode(mode_steps):
 
 
 def validate_metadata_sample_roots(derived_rows, expected_sample_roots):
-    metadata_roots = sorted(row["filename"] for row in derived_rows)
+    metadata_roots = []
+    for row in derived_rows:
+        filename_key = row.get("filename_key", "").strip()
+        if filename_key:
+            metadata_roots.append(filename_key)
+            continue
+        metadata_roots.append(normalize_metadata_filename(row["filename"]))
+    metadata_roots = sorted(metadata_roots)
     expected_roots = sorted(expected_sample_roots)
     missing = sorted(set(expected_roots) - set(metadata_roots))
     extra = sorted(set(metadata_roots) - set(expected_roots))
@@ -914,17 +914,30 @@ def count_table_sample_ids(count_table_path):
 
 
 def validate_metadata_sample_ids(derived_rows, expected_sample_ids):
-    metadata_sample_ids = sorted(row["sample_id"] for row in derived_rows)
-    expected_ids = sorted(expected_sample_ids)
-    missing = sorted(set(expected_ids) - set(metadata_sample_ids))
-    extra = sorted(set(metadata_sample_ids) - set(expected_ids))
-    if missing or extra:
-        problems = []
-        if missing:
-            problems.append("missing metadata rows for count-table samples: " + ", ".join(missing))
-        if extra:
-            problems.append("metadata rows without matching count-table samples: " + ", ".join(extra))
-        raise MetadataError("Metadata sample matching failed: " + "; ".join(problems))
+    expected_id_set = set(expected_sample_ids)
+    metadata_sample_id_set = {row["sample_id"] for row in derived_rows}
+    metadata_filename_key_set = {
+        (row.get("filename_key", "").strip() or normalize_metadata_filename(row["filename"]))
+        for row in derived_rows
+    }
+
+    if expected_id_set == metadata_sample_id_set:
+        return
+    if expected_id_set == metadata_filename_key_set:
+        return
+
+    missing = sorted(expected_id_set - metadata_sample_id_set)
+    extra = sorted(metadata_sample_id_set - expected_id_set)
+    problems = []
+    if missing:
+        problems.append("missing metadata rows for count-table samples: " + ", ".join(missing))
+    if extra:
+        problems.append("metadata rows without matching count-table samples: " + ", ".join(extra))
+    raise MetadataError(
+        "Metadata sample matching failed: "
+        + "; ".join(problems)
+        + ". Count table headers did not match either metadata sample_id or normalized metadata filename keys."
+    )
 
 
 def validate_deseq_design_full_rank(metadata_path, formula):
