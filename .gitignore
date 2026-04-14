@@ -1,2 +1,30 @@
-# ignore .snakemake
+# Workflow runtime artifacts
 /.snakemake/
+
+# Python packaging and build artifacts
+/build/
+/dist/
+/*.egg-info/
+/src/*.egg-info/
+__pycache__/
+*.py[cod]
+
+# Test and tool caches
+/.pytest_cache/
+/.mypy_cache/
+/.ruff_cache/
+
+# Environment and local install state
+/.venv/
+/venv/
+
+# IDE files
+/.idea/
+
+# Local planning and agent notes
+/AGENTS.md
+/DESIGNGOALS.md
+
+# macOS cruft
+.DS_Store
+._*

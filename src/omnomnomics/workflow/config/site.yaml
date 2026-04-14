@@ -1,0 +1,26 @@
+
+
+## Omnomnomics pipeline config ##
+## Site defaults config ##
+partition: "rome"
+max_nodes: 504
+max_jobs: 100
+max_jobs_per_second: 2
+max_status_checks_per_second: 2
+
+# Snellius Rome thin-node defaults
+nodes_in_partition: 504
+cores_per_node: 128
+max_mem_per_core_mb: 1792
+min_slice_cores: 16
+min_slice_mem: 32768
+default_runtime: 120
+controller_partition: "rome"
+controller_cores: 1
+controller_mem_mb: 8192
+controller_runtime: 1440
+controller_constraint:
+
+# External genome resources
+genome_assembly_dir: "{HOME}/genomes/assemblies"
+cellranger_reference_dir: "{HOME}/genomes/cellranger"

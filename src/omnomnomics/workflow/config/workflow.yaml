@@ -1,0 +1,242 @@
+
+## Omnomnomics pipeline config ##
+## Workflow defaults config ##
+#set step indices
+trim_rule_num: 1
+qc_rule_num: 2
+map_rule_num: 3
+merge_rule_num: 4
+touchup_rule_num: 5
+index_rule_num: 6
+stats_rule_num: 7
+wig_rule_num: 8
+mergewig_rule_num: 9
+callpeaks_rule_num: 10
+countreads_rule_num: 11
+de_rule_num: 12
+homer_tagdir_rule_num: 13
+
+#Define the maximum public step index
+max_step: 12
+retention_policy: "all"
+max_project_size: "NA"
+
+
+trim:
+  - "run_fastp"
+  - "run_skewer"
+qc:
+  - "run_fastqc"
+map:
+  - "run_hisat2"
+  - "run_star"
+  - "run_star_te"
+merge:
+  - "merge_bam"
+touchup:
+  - "touchup_bam"
+index:
+  - "index_bam"
+stats:
+  - "bam_stats"
+wig:
+  - "create_wiggles"
+mergewig:
+  - "merge_wiggles"
+callpeaks:
+  - "call_peaks"
+countreads:
+  - "count_reads"
+de:
+  - "call_DE"
+
+
+selected_routine_trim: 0
+selected_routine_qc: 0
+selected_routine_map: 0
+selected_routine_merge: 0
+selected_routine_touchup: 0
+selected_routine_index: 0
+selected_routine_stats: 0
+selected_routine_wig: 0
+selected_routine_mergewig: 0
+selected_routine_callpeaks: 0
+selected_routine_countreads: 0
+selected_routine_de: 0
+
+routines:
+  - trim
+  - qc
+  - map
+  - merge
+  - touchup
+  - index
+  - stats
+  - wig
+  - mergewig
+  - callpeaks
+  - countreads
+  - de
+
+
+input_folders:
+  - "FASTQ"
+  - "trimmed_FASTQ"
+  - "trimmed_FASTQ"
+  - "BAM"
+  - "BAM"
+  - "filtered_BAM"
+  - "filtered_BAM"
+  - "filtered_BAM"
+  - "BigWigs"
+  - "filtered_BAM"
+  - ["filtered_BAM", "peak_calling"]
+  - "DE_calling"
+  - "filtered_BAM"
+
+output_folders:
+  - "trimmed_FASTQ"
+  - "fastqc_reports"
+  - "BAM"
+  - "BAM"
+  - "filtered_BAM"
+  - "filtered_BAM"
+  - "filtered_BAM"
+  - "BigWigs"
+  - "merged_hubs"
+  - "peak_calling"
+  - "DE_calling"
+  - "DE_calling"
+  - "HOMER_tagDirs"
+
+input_file_types:
+  - ".fastq.gz"
+  - ".trimmed.fastq.gz"
+  - ".trimmed.fastq.gz"
+  - ".bam"
+  - ".bam"
+  - ".filtered.bam"
+  - ".filtered.bam"
+  - ".bam"
+  - ".bw"
+  - ".bam"
+  - [".bam", ".bed"]
+  - ".raw_read_quant.table.txt"
+  - ".filtered.bam"
+
+output_file_types:
+  - ".trimmed.fastq.gz"
+  - [".trimmed_fastqc.html", ".trimmed_fastqc.zip"]
+  - ".bam"
+  - ".bam"
+  - ".sorted.dups_marked.filtered.bam"
+  - ".sorted.dups_marked.filtered.bam.bai"
+  - [".stats.txt", ".qc_summary.pdf", ".qc_summary.svg"]
+  - ".bw"
+  - ".hub"
+  - ".bed"
+  - ".raw_read_quant.table.txt"
+  - ".results.zip"
+  - ".HOMER_tagDir.tar.gz"
+
+mincores_single_sample_step1_9:
+  - 16
+  - 16
+  - 48
+  - 16
+  - 32
+  - 16
+  - 16
+  - 16
+  - 16
+
+maxcores_single_sample_step1_9:
+  - 16
+  - 16
+  - 48
+  - 16
+  - 32
+  - 16
+  - 16
+  - 16
+  - 16
+
+mincores_per_rule_run_step10_13:
+  - 16
+  - 16
+  - 16
+  - 16
+
+maxcores_per_rule_run_step10_13:
+  - 16
+  - 16
+  - 16
+  - 16
+
+min_mem_mb:
+  - 32000
+  -
+  - 32000
+  -
+  -
+  -
+  -
+  -
+  -
+  -
+  -
+  -
+  -
+
+rule_runtime:
+  - 120
+  - 60
+  - 60
+  - 120
+  - 240
+  - 60
+  - 60
+  - 120
+  - 120
+  - 240
+  - 120
+  - 120
+  - 120
+
+
+MAPPERS: ["hisat2", "star", "star_te"]
+TRIMMERS: ["fastp", "skewer"]
+TYPES: ["RNA", "CHIP", "ATAC"]
+GENOMES: ["hg38", "mm10", "mm39", "GRCh38.p14", "GRCm39"]
+
+trim_tool: "fastp"
+map_tool: "hisat2"
+omnomnomics: 0.4
+mode: "auto"
+de_formula: "NA"
+de_columns: ""
+de_block: ""
+de_interactions: False
+broad: "NA"
+input: "NA"
+metadata: "NA"
+create_homer_tagdirs: False
+duplicate_handling: "auto"
+sample_name: ""
+sample_type: ""
+sample_color: ""
+appendix: "hub"
+overlay: "transparentOverlay"
+color_data_folder: "{WORKFLOW_ROOT}/bin/color_data_for_hubs"
+color_table: "{WORKFLOW_ROOT}/bin/color_data_for_hubs/gray.tint.color.table"
+hub_mail: "your@email.com"
+no_multiqc: False
+keep_unpaired: False
+
+
+homerposcol: "255,150,150"
+homernegcol: "255,180,180"
+altposcol: "255,128,0"
+altnegcol: "0,128,255"
+
+overlaytypes: ["transparentOverlay", "stacked", "solidOverlay", "none"]

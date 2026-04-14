@@ -1,0 +1,36 @@
+name: omnomnomics
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pyyaml
+  - pysam
+  - r-base>=4.3
+  - bioconductor-deseq2
+  - genomepy>=0.16
+  - snakemake>=7.25,<8
+  - multiqc
+  - fastqc
+  - fastp
+  - skewer
+  - hisat2
+  - star
+  - samtools
+  - bedtools
+  - ucsc-bedgraphtobigwig
+  - ucsc-genepredtobed
+  - ucsc-genepredtogtf
+  - ucsc-bedtogenepred
+  - ucsc-gtftogenepred
+  - ucsc-gff3togenepred
+  - deeptools
+  - subread
+  - macs3
+  - matplotlib
+  - phantompeakqualtools
+  - homer
+  - openjdk
+  - perl
