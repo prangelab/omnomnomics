@@ -1414,6 +1414,51 @@ def main():
     log_file = start_log(experiment_dir, run_date, config)
 
 
+    # Call to snakemake!!
+    max_cores = str(config.get("max_nodes", 1) * config.get("cores_per_node", 1))
+    max_jobs = str(config.get("max_jobs", 100))
+    max_jobs_per_second = str(config.get("max_jobs_per_second", 2))
+    max_status_checks_per_second = str(config.get("max_status_checks_per_second", 2))
+    cmd = [ "snakemake",  "--profile", os.path.join(str(workflow_root), "slurm_profile"), "--snakefile", f"{workflow_root}/Snakefile.smk",
+        "--config", "config_file="+os.path.join(experiment_dir, "run_configs", f'omnomnomics.run.{run_date}.config.yaml'), "--jobs", max_jobs,
+        "--cores", max_cores, "--max-jobs-per-second", max_jobs_per_second, "--max-status-checks-per-second", max_status_checks_per_second,
+        "--default-resources", f"partition={config['partition']}", f"runtime={config['default_runtime']}", "--rerun-triggers", "mtime", "--keep-going"
+    ]
+
+    if dry_run:
+        cmd.append("--dry-run")
+
+    # Only force selected routines when the user explicitly asks to recompute them
+    if rerun_selected_steps:
+        cmd.append("--forcerun")
+        for i in mode_steps:
+            routine = config['routines'][i-1]
+            cmd.append(config[routine][selected_routines[f'selected_routine_{routine}']])
+
+    with open(log_file, 'a') as log:
+        log.write(f"Invocation:\t{the_command}\n")
+
+    if dry_run:
+        print("")
+        print("####################################################################################")
+        print("Running omnomnomics dry-run...")
+        print(f"\tMODE:\t\t{mode_steps}")
+        print(f"\tTYPE:\t\t{the_type}")
+        print(f"\tFILES:\t\t{num_files}")
+        print(f"\tPAIRS:\t\t{num_pairs}")
+        print(f"\tExperiment DIR:\t\t{experiment_dir}")
+        print(f"\tRun date:\t{run_date}")
+        print("####################################################################################")
+        try:
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Dry-run failed with exit code {e.returncode}.", file=sys.stderr)
+            sys.exit(e.returncode)
+        with open(log_file, 'a') as log:
+            log.write("Dry-run completed successfully without controller submission.\n")
+        print("Dry-run completed. No controller job was submitted.")
+        return
+
     #Print some status info
     print("")
     print("####################################################################################")
@@ -1436,29 +1481,7 @@ def main():
     print("####################################################################################")
 
     with open(log_file, 'a') as log:
-        log.write(f"Invocation:\t{the_command}\n")
         log.write(f"Controller submission at:\t{sub_time}\n")
-
-    # Call to snakemake!!
-    max_cores = str(config.get("max_nodes", 1) * config.get("cores_per_node", 1))
-    max_jobs = str(config.get("max_jobs", 100))
-    max_jobs_per_second = str(config.get("max_jobs_per_second", 2))
-    max_status_checks_per_second = str(config.get("max_status_checks_per_second", 2))
-    cmd = [ "snakemake",  "--profile", os.path.join(str(workflow_root), "slurm_profile"), "--snakefile", f"{workflow_root}/Snakefile.smk",
-        "--config", "config_file="+os.path.join(experiment_dir, "run_configs", f'omnomnomics.run.{run_date}.config.yaml'), "--jobs", max_jobs,
-        "--cores", max_cores, "--max-jobs-per-second", max_jobs_per_second, "--max-status-checks-per-second", max_status_checks_per_second,
-        "--default-resources", f"partition={config['partition']}", f"runtime={config['default_runtime']}", "--rerun-triggers", "mtime", "--keep-going"
-    ]
-
-    if dry_run:
-        cmd.append("--dry-run")
-
-    # Only force selected routines when the user explicitly asks to recompute them
-    if rerun_selected_steps:
-        cmd.append("--forcerun")
-        for i in mode_steps:
-            routine = config['routines'][i-1]
-            cmd.append(config[routine][selected_routines[f'selected_routine_{routine}']])
 
     controller_script = Path(experiment_dir) / "run_configs" / f"omnomnomics.run.{run_date}.controller.sh"
     write_controller_script(controller_script, experiment_dir, cmd)
