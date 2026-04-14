@@ -43,10 +43,13 @@ rule merge_wiggles:
                 f"RNA track colors are fixed to plus strand {RNA_PLUS_TRACK_COLOR} and minus strand {RNA_MINUS_TRACK_COLOR}.",
             )
 
+        bw_files_for_step = []
+        if os.path.isdir(params.inputfolder):
+            bw_files_for_step = [bw_name for bw_name in os.listdir(params.inputfolder) if bw_name.endswith(".bw")]
+
         estimated_copy_bytes = sum(
             os.path.getsize(os.path.join(params.inputfolder, bw_name))
-            for bw_name in os.listdir(params.inputfolder)
-            if bw_name.endswith(".bw")
+            for bw_name in bw_files_for_step
         )
         if evaluate_space_heavy_step(
             logfile,
@@ -57,6 +60,19 @@ rule merge_wiggles:
             os.makedirs(params.outputfolder, exist_ok=True)
             shell(f"""echo "necessity file for merge wiggle. can delete this." > {params.outputfolder}/extra_9.tmp""")
             log_it(logfile, "Skipping trackhub creation due to max project size constraint.")
+            return
+
+        if not bw_files_for_step:
+            os.makedirs(params.outputfolder, exist_ok=True)
+            log_it(
+                logfile,
+                (
+                    f"No .bw files found in {params.inputfolder}. "
+                    "Skipping trackhub creation for step 9."
+                ),
+                "WARNING",
+            )
+            shell(f"""echo "necessity file for merge wiggle. can delete this." > {params.outputfolder}/extra_9.tmp""")
             return
 
         def ensure_hub_structure(hub_folder, genome_folder, hub_name, genome, hub_mail, overlay):
@@ -124,8 +140,6 @@ rule merge_wiggles:
                     trackdb_file.write("negateValues on\n")
 
         def merge_wig(input_folder, output_folder, thetype, col_table, appendix, genome, hub_mail, overlay):
-            sanity_check_dir(logfile, input_folder, master_config['input_file_types'][master_config['mergewig_rule_num'] - 1], "step9.sanity")
-
             col_array = []
             if col_table.endswith(".txt"):
                 log_it(logfile, f"Color table file: {col_table}")
