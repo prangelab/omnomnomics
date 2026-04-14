@@ -24,9 +24,11 @@ import select
 import termios
 import tty
 import csv
+import json
 from pathlib import Path
 from datetime import date, datetime
 
+from omnomnomics.de_config import DEConfigError, resolve_de_config
 from omnomnomics.genomes import genomes_main
 from omnomnomics.helpers import create_track_color_table_main, display_track_color_table_main
 from omnomnomics.metadata import (
@@ -426,6 +428,8 @@ def parse_arguments():
    parser.add_argument('-T', '--trim-tool', help='Trimming tool choice. Can be fastp or skewer. \n \t Default: fastp')
    parser.add_argument('-M', '--map-tool', help='Mapping tool choice. Can be HISAT2, STAR, or STAR_TE. STAR(_TE) can only be used for RNA-seq data. \n \t Default: HISAT2')
    parser.add_argument('--de-formula', help='Explicit DESeq2 design formula for step 12. If provided, it overrides --de-columns and --de-block.')
+   parser.add_argument('--de-config', help='Optional YAML file with DE analysis settings for step 12.')
+   parser.add_argument('--de-out-dir', help='Optional DE output subdirectory inside the DE_calling folder. Overrides de_config io.out_dir.')
    parser.add_argument('-I', '--input', help='Input BAM file used for ChIP peak calling with MACS3. \n \t Default: do not use input')
    parser.add_argument('-m', '--metadata', help='Tabular metadata file. The first column must be named filename. Metadata drives sample naming, peak grouping, trackhub grouping, and DE design.')
    parser.add_argument('-b', '--broad', action='store_true', help='ChIP: Call broad histone marks with MACS3 --broad mode. Default is TF / narrow peaks.')
@@ -614,7 +618,7 @@ def set_user_subroutine_choices(trim_tool, map_tool, config):
 ##---------------------------------------------------------------------------------------------------------------
 ## Validate user defined variables
 ##---------------------------------------------------------------------------------------------------------------
-def validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, color_data_folder, col_table, overlay, the_type, map_tool, config):
+def validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, color_data_folder, col_table, overlay, the_type, map_tool, config, de_config):
     #Validate user-defined variables
     print("Validating options...")
 
@@ -626,6 +630,14 @@ def validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, c
             sys.exit(1)
         elif not metadata.endswith((".txt", ".tsv", ".csv")):
             print("Metadata file (-m) must be a .txt, .tsv, or .csv file. Aborting...", file=sys.stderr)
+            sys.exit(1)
+
+    if de_config and de_config != "NA":
+        if not os.path.isfile(de_config):
+            print("DE config file (--de-config) does not exist! Aborting...", file=sys.stderr)
+            sys.exit(1)
+        elif not de_config.endswith((".yaml", ".yml")):
+            print("DE config file (--de-config) must be a .yaml or .yml file. Aborting...", file=sys.stderr)
             sys.exit(1)
 
 
@@ -1160,6 +1172,8 @@ def main():
     map_tool = args.map_tool.lower() if args.map_tool else config.get('map_tool', "hisat2").lower()
     mode = args.mode.lower() if args.mode else config.get('mode', "auto")
     de_formula = args.de_formula if args.de_formula else config.get('de_formula', "NA")
+    de_config = str(Path(args.de_config).expanduser().resolve()) if args.de_config else config.get('de_config', "NA")
+    de_out_dir = args.de_out_dir if args.de_out_dir else config.get('de_out_dir', "")
     broad = args.broad if args.broad else config.get('broad', "NA")
     INPUT = args.input if args.input else config.get('input',"NA")
     metadata = args.metadata if args.metadata else config.get('metadata', "NA")
@@ -1219,7 +1233,7 @@ def main():
     selected_routines['selected_routine_de'] = config['selected_routine_de']
 
     # Validate user-defined variables
-    validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, color_data_folder, col_table, overlay, the_type, map_tool, config)
+    validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, color_data_folder, col_table, overlay, the_type, map_tool, config, de_config)
 
     # Setup variables
     run_date = setup_variables(experiment_dir, config)
@@ -1267,6 +1281,9 @@ def main():
     sample_color_columns = []
     de_columns_resolved = []
     de_block_resolved = []
+    resolved_de_config_path = "NA"
+    resolved_de_config = {}
+    de_config_file_path = "NA"
 
     if metadata_required:
         if metadata == "NA":
@@ -1326,6 +1343,27 @@ def main():
                 de_columns_resolved = list(de_context["de_columns"])
                 de_block_resolved = list(de_context["de_block"])
 
+                try:
+                    de_config_file_path, resolved_de_config = resolve_de_config(
+                        None if de_config == "NA" else de_config,
+                        resolved_de_formula,
+                        de_out_dir_override=de_out_dir or None,
+                    )
+                except DEConfigError as exc:
+                    raise MetadataError(str(exc)) from exc
+
+                resolved_de_formula = str(resolved_de_config["design"]["formula"])
+                if resolved_de_config["design"].get("formula") and de_config_file_path != "NA":
+                    de_design_mode = "config_formula"
+
+                resolved_de_config_path = os.path.join(
+                    experiment_dir,
+                    "run_configs",
+                    f"omnomnomics.run.{run_date}.de_config.resolved.yaml",
+                )
+                with open(resolved_de_config_path, "w") as handle:
+                    yaml.safe_dump(resolved_de_config, handle, sort_keys=False)
+
             derived_metadata_path = os.path.join(
                 experiment_dir,
                 "run_configs",
@@ -1379,6 +1417,9 @@ def main():
         'DE_BLOCK': de_block,
         'DE_INTERACTIONS': bool(de_interactions),
         'DE_DESIGN_MODE': de_design_mode,
+        'DE_CONFIG_FILE': de_config_file_path,
+        'DE_CONFIG_RESOLVED_FILE': resolved_de_config_path,
+        'DE_CONFIG_RESOLVED_JSON': json.dumps(resolved_de_config, sort_keys=True) if resolved_de_config else "{}",
         'MYMETADATA': metadata,
         'DERIVED_METADATA_FILE': derived_metadata_path,
         'METADATA_REQUIRED': metadata_required,

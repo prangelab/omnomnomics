@@ -1,0 +1,77 @@
+version: 1
+io:
+  out_dir: "results"
+  write_rendered_r_script: true
+  rendered_r_script_name: "DE_analysis.rendered.R"
+  save_r_session_image: false
+
+design:
+  formula: null
+  reference_levels: {}
+
+contrasts:
+  mode: "auto"
+  auto:
+    pairwise: true
+    primary_variable: null
+  explicit:
+    items: []
+
+filtering:
+  enabled: true
+  method: "min_count_samples"
+  min_count: 10
+  min_samples: 2
+
+deseq2:
+  fit_type: "parametric"
+  sf_type: "ratio"
+  beta_prior: false
+  parallel: true
+  lfc_shrink:
+    enabled: true
+    type: "apeglm"
+    use_for_tables: true
+
+thresholds:
+  alpha: 0.05
+  lfc_for_sig: 1.0
+  lfc_for_heatmap: 1.0
+  max_volcano_labels: 50
+
+qc:
+  enabled: true
+  vst_blind: true
+  top_variable_genes: 1000
+  distance_plot: true
+  variable_gene_heatmap: true
+  pca:
+    enabled: true
+    color_by: ["sample_type", "sample_color", "Replicate"]
+    shape_by: null
+    extra_pairs:
+      - [1, 2]
+      - [2, 3]
+
+plots:
+  ma_plot: true
+  volcano:
+    enabled: true
+    labeled: true
+    auto_scale_axes: true
+    max_xlim: 8
+    max_ylim: 50
+  sig_heatmap:
+    enabled: true
+    cluster_rows: true
+    cluster_cols: true
+
+tables:
+  write_full_results: true
+  write_sig_only_table: true
+  sig_only_name_suffix: ".sig_only.tsv"
+
+runtime:
+  seed: 1337
+  stop_on_error: true
+  verbose: true

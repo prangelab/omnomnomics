@@ -1,0 +1,424 @@
+#!/usr/bin/env Rscript
+
+# Rendered by omnomnomics step 12. Running this script should reproduce the DE result tree.
+
+suppressPackageStartupMessages({
+  required_packages <- c("DESeq2", "ggplot2", "pheatmap", "matrixStats", "RColorBrewer")
+  missing_required <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
+  if (length(missing_required) > 0) {
+    stop("Missing required R packages: ", paste(missing_required, collapse = ", "))
+  }
+})
+
+set.seed(__RUNTIME_SEED__)
+
+counts_path <- __COUNTS_PATH__
+metadata_path <- __METADATA_PATH__
+output_root <- __OUTPUT_ROOT__
+qc_dir <- __QC_DIR__
+de_dir <- __DE_DIR__
+
+design_formula_text <- __DESIGN_FORMULA_TEXT__
+contrast_mode <- __CONTRAST_MODE__
+auto_pairwise <- __AUTO_PAIRWISE__
+auto_primary_variable <- __AUTO_PRIMARY_VARIABLE__
+explicit_contrasts <- __EXPLICIT_CONTRASTS__
+
+filtering_enabled <- __FILTERING_ENABLED__
+filtering_method <- __FILTERING_METHOD__
+filtering_min_count <- __FILTERING_MIN_COUNT__
+filtering_min_samples <- __FILTERING_MIN_SAMPLES__
+
+deseq_fit_type <- __DESEQ_FIT_TYPE__
+deseq_sf_type <- __DESEQ_SF_TYPE__
+deseq_parallel <- __DESEQ_PARALLEL__
+shrink_enabled <- __SHRINK_ENABLED__
+shrink_type <- __SHRINK_TYPE__
+shrink_for_tables <- __SHRINK_FOR_TABLES__
+
+alpha <- __ALPHA__
+lfc_for_sig <- __LFC_FOR_SIG__
+lfc_for_heatmap <- __LFC_FOR_HEATMAP__
+max_volcano_labels <- __MAX_VOLCANO_LABELS__
+
+qc_enabled <- __QC_ENABLED__
+vst_blind <- __VST_BLIND__
+top_variable_genes <- __TOP_VARIABLE_GENES__
+distance_plot_enabled <- __DISTANCE_PLOT_ENABLED__
+variable_heatmap_enabled <- __VARIABLE_HEATMAP_ENABLED__
+pca_enabled <- __PCA_ENABLED__
+pca_color_by <- __PCA_COLOR_BY__
+pca_shape_by <- __PCA_SHAPE_BY__
+pca_extra_pairs <- __PCA_EXTRA_PAIRS__
+
+ma_plot_enabled <- __MA_PLOT_ENABLED__
+volcano_enabled <- __VOLCANO_ENABLED__
+volcano_labels_enabled <- __VOLCANO_LABELS_ENABLED__
+volcano_auto_axes <- __VOLCANO_AUTO_AXES__
+volcano_max_xlim <- __VOLCANO_MAX_XLIM__
+volcano_max_ylim <- __VOLCANO_MAX_YLIM__
+sig_heatmap_enabled <- __SIG_HEATMAP_ENABLED__
+sig_heatmap_cluster_rows <- __SIG_HEATMAP_CLUSTER_ROWS__
+sig_heatmap_cluster_cols <- __SIG_HEATMAP_CLUSTER_COLS__
+
+write_full_results <- __WRITE_FULL_RESULTS__
+write_sig_only <- __WRITE_SIG_ONLY__
+sig_suffix <- __SIG_SUFFIX__
+
+sanitize_name <- function(x) {
+  x <- gsub("[^A-Za-z0-9._-]+", "_", x)
+  x <- gsub("_+", "_", x)
+  x <- gsub("^[_\\.\\-]+|[_\\.\\-]+$", "", x)
+  if (!nzchar(x)) "contrast" else x
+}
+
+categorical_palette <- function(levels_vec) {
+  levels_vec <- unique(as.character(levels_vec))
+  levels_vec <- levels_vec[nzchar(levels_vec)]
+  if (length(levels_vec) == 0) {
+    return(c())
+  }
+  brewer_info <- RColorBrewer::brewer.pal.info
+  qualitative <- rownames(brewer_info[brewer_info$category == "qual", , drop = FALSE])
+  best_name <- qualitative[which.max(brewer_info[qualitative, "maxcolors"])]
+  base_n <- brewer_info[best_name, "maxcolors"]
+  base_palette <- RColorBrewer::brewer.pal(max(3, min(base_n, length(levels_vec))), best_name)
+  if (length(levels_vec) > length(base_palette)) {
+    base_palette <- grDevices::colorRampPalette(base_palette)(length(levels_vec))
+  } else {
+    base_palette <- base_palette[seq_len(length(levels_vec))]
+  }
+  stats::setNames(base_palette, levels_vec)
+}
+
+gradient_palette <- function(n, low = "#2166AC", mid = "#F7F7F7", high = "#B2182B") {
+  n <- max(3, as.integer(n))
+  if (requireNamespace("RColorSpacer", quietly = TRUE)) {
+    ns <- asNamespace("RColorSpacer")
+    candidate_fns <- c("gradient_steps", "color_gradient", "make_gradient")
+    for (fn in candidate_fns) {
+      if (exists(fn, envir = ns, mode = "function")) {
+        pal <- tryCatch(get(fn, envir = ns)(low, mid, high, n), error = function(e) NULL)
+        if (!is.null(pal) && length(pal) >= n) {
+          return(as.character(pal)[seq_len(n)])
+        }
+      }
+    }
+  }
+  grDevices::colorRampPalette(c(low, mid, high))(n)
+}
+
+counts_df <- utils::read.delim(counts_path, check.names = FALSE, stringsAsFactors = FALSE)
+metadata_df <- utils::read.delim(metadata_path, check.names = FALSE, stringsAsFactors = FALSE)
+
+if (ncol(counts_df) < 2) {
+  stop("Count table must contain a gene-id column and at least one sample column.")
+}
+
+if (!("sample_id" %in% colnames(metadata_df))) {
+  stop("Derived metadata must contain sample_id.")
+}
+
+sample_columns <- colnames(counts_df)[-1]
+if (all(metadata_df$sample_id %in% sample_columns)) {
+  match_key <- "sample_id"
+} else if ("filename_key" %in% colnames(metadata_df) && all(metadata_df$filename_key %in% sample_columns)) {
+  match_key <- "filename_key"
+} else {
+  stop("Could not match count table sample columns to metadata sample_id or filename_key.")
+}
+
+metadata_df <- metadata_df[match(sample_columns, metadata_df[[match_key]]), , drop = FALSE]
+if (any(is.na(metadata_df[[match_key]]))) {
+  stop("Metadata matching produced missing rows.")
+}
+
+count_matrix <- as.matrix(counts_df[, sample_columns, drop = FALSE])
+rownames(count_matrix) <- counts_df[[1]]
+mode(count_matrix) <- "numeric"
+non_integer <- abs(count_matrix - round(count_matrix)) > 1e-8
+if (any(non_integer, na.rm = TRUE)) {
+  stop("Count table contains non-integer values. DESeq2 requires raw integer counts.")
+}
+storage.mode(count_matrix) <- "integer"
+
+col_data <- metadata_df
+rownames(col_data) <- sample_columns
+
+if (filtering_enabled && filtering_method == "min_count_samples") {
+  keep <- rowSums(count_matrix >= filtering_min_count) >= filtering_min_samples
+  count_matrix <- count_matrix[keep, , drop = FALSE]
+}
+
+design_formula <- stats::as.formula(design_formula_text)
+dds <- DESeq2::DESeqDataSetFromMatrix(
+  countData = count_matrix,
+  colData = col_data,
+  design = design_formula
+)
+dds <- DESeq2::DESeq(dds, fitType = deseq_fit_type, sfType = deseq_sf_type, parallel = deseq_parallel)
+vst_obj <- DESeq2::vst(dds, blind = vst_blind)
+
+dir.create(output_root, recursive = TRUE, showWarnings = FALSE)
+dir.create(qc_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(de_dir, recursive = TRUE, showWarnings = FALSE)
+
+palette_rows <- list()
+add_palette_rows <- function(column_name) {
+  if (!(column_name %in% colnames(col_data))) {
+    return()
+  }
+  column_values <- as.character(col_data[[column_name]])
+  levels_vec <- unique(column_values)
+  pal <- categorical_palette(levels_vec)
+  if (length(pal) == 0) {
+    return()
+  }
+  palette_rows[[length(palette_rows) + 1]] <<- data.frame(
+    column = column_name,
+    level = names(pal),
+    color = as.vector(pal),
+    stringsAsFactors = FALSE
+  )
+}
+
+add_palette_rows("sample_type")
+add_palette_rows("sample_color")
+for (column_name in pca_color_by) {
+  add_palette_rows(column_name)
+}
+if (nzchar(pca_shape_by)) {
+  add_palette_rows(pca_shape_by)
+}
+if (length(palette_rows) > 0) {
+  palette_table <- do.call(rbind, palette_rows)
+  utils::write.table(
+    palette_table,
+    file = file.path(qc_dir, "color_mappings.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+}
+
+if (qc_enabled) {
+  if (distance_plot_enabled) {
+    dist_mat <- as.matrix(stats::dist(t(SummarizedExperiment::assay(vst_obj))))
+    grDevices::pdf(file.path(qc_dir, "top_variable_genes.distance_plot.pdf"), width = 10, height = 10)
+    pheatmap::pheatmap(dist_mat, main = "Sample distance")
+    grDevices::dev.off()
+  }
+
+  if (variable_heatmap_enabled) {
+    top_idx <- head(order(-matrixStats::rowVars(SummarizedExperiment::assay(vst_obj))), top_variable_genes)
+    top_mat <- SummarizedExperiment::assay(vst_obj)[top_idx, , drop = FALSE]
+    hm_colors <- gradient_palette(255)
+    grDevices::pdf(file.path(qc_dir, "top_variable_genes.kmeans_heatmap.pdf"), width = 12, height = 10)
+    pheatmap::pheatmap(top_mat, color = hm_colors, show_rownames = FALSE, main = "Top variable genes")
+    grDevices::dev.off()
+  }
+
+  if (pca_enabled) {
+    pca <- stats::prcomp(t(SummarizedExperiment::assay(vst_obj)))
+    pca_df <- as.data.frame(pca$x)
+    pca_df$sample <- rownames(pca_df)
+    for (column_name in colnames(col_data)) {
+      pca_df[[column_name]] <- col_data[[column_name]]
+    }
+    pct <- round(100 * (pca$sdev^2 / sum(pca$sdev^2)), 2)
+
+    plot_pca_pair <- function(pc_x, pc_y, color_col) {
+      xcol <- paste0("PC", pc_x)
+      ycol <- paste0("PC", pc_y)
+      if (!(xcol %in% colnames(pca_df)) || !(ycol %in% colnames(pca_df))) {
+        return()
+      }
+      if (!(color_col %in% colnames(pca_df))) {
+        return()
+      }
+      plot_df <- pca_df
+      plot_df[[color_col]] <- as.factor(plot_df[[color_col]])
+      p <- ggplot2::ggplot(plot_df, ggplot2::aes_string(x = xcol, y = ycol, color = color_col))
+      if (nzchar(pca_shape_by) && pca_shape_by %in% colnames(plot_df)) {
+        p <- p + ggplot2::geom_point(ggplot2::aes_string(shape = pca_shape_by), size = 3)
+      } else {
+        p <- p + ggplot2::geom_point(size = 3)
+      }
+      p <- p +
+        ggplot2::xlab(paste0(xcol, ": ", pct[pc_x], "% variance")) +
+        ggplot2::ylab(paste0(ycol, ": ", pct[pc_y], "% variance")) +
+        ggplot2::theme_light() +
+        ggplot2::theme(panel.grid = ggplot2::element_blank(), aspect.ratio = 1)
+      ggplot2::ggsave(
+        filename = file.path(qc_dir, paste0("top_variable_genes.PCA_plot_", color_col, "_PC", pc_x, "_PC", pc_y, ".pdf")),
+        plot = p,
+        width = 8,
+        height = 8
+      )
+    }
+
+    for (color_col in pca_color_by) {
+      plot_pca_pair(1, 2, color_col)
+      if (length(pca_extra_pairs) > 0) {
+        for (pair in pca_extra_pairs) {
+          plot_pca_pair(pair[1], pair[2], color_col)
+        }
+      }
+    }
+  }
+}
+
+build_auto_contrasts <- function() {
+  candidate <- auto_primary_variable
+  if (!nzchar(candidate)) {
+    terms_vec <- attr(stats::terms(design_formula), "term.labels")
+    terms_vec <- terms_vec[!grepl(":", terms_vec, fixed = TRUE)]
+    if (length(terms_vec) == 0) {
+      stop("Could not infer an auto contrast variable from the design formula.")
+    }
+    candidate <- terms_vec[length(terms_vec)]
+  }
+  if (!(candidate %in% colnames(col_data))) {
+    stop("Auto contrast variable '", candidate, "' is not present in metadata.")
+  }
+  values <- as.factor(col_data[[candidate]])
+  levels_vec <- levels(values)
+  if (length(levels_vec) < 2) {
+    stop("Auto contrast variable '", candidate, "' has fewer than two levels.")
+  }
+  contrast_list <- list()
+  if (auto_pairwise) {
+    for (i in seq_len(length(levels_vec) - 1)) {
+      for (j in seq((i + 1), length(levels_vec))) {
+        contrast_list[[length(contrast_list) + 1]] <- list(
+          factor = candidate,
+          numerator = levels_vec[i],
+          denominator = levels_vec[j]
+        )
+      }
+    }
+  }
+  contrast_list
+}
+
+contrast_plan <- if (contrast_mode == "explicit") explicit_contrasts else build_auto_contrasts()
+if (length(contrast_plan) == 0) {
+  stop("No DE contrasts were resolved.")
+}
+
+for (contrast_cfg in contrast_plan) {
+  factor_name <- contrast_cfg$factor
+  numerator <- contrast_cfg$numerator
+  denominator <- contrast_cfg$denominator
+  contrast_label <- sanitize_name(paste(numerator, "vs", denominator, sep = "_"))
+  contrast_dir <- file.path(de_dir, contrast_label)
+  dir.create(contrast_dir, recursive = TRUE, showWarnings = FALSE)
+
+  base_res <- DESeq2::results(dds, contrast = c(factor_name, numerator, denominator), alpha = alpha)
+  res_for_table <- base_res
+
+  if (shrink_enabled) {
+    shrunk <- tryCatch(
+      DESeq2::lfcShrink(dds, contrast = c(factor_name, numerator, denominator), type = shrink_type),
+      error = function(e) {
+        message("lfcShrink failed for ", contrast_label, ": ", conditionMessage(e), ". Falling back to unshrunk results.")
+        base_res
+      }
+    )
+    if (shrink_for_tables) {
+      res_for_table <- shrunk
+    }
+  }
+
+  res_df <- as.data.frame(res_for_table)
+  res_df$gene_id <- rownames(res_df)
+  res_df <- res_df[, c("gene_id", setdiff(colnames(res_df), "gene_id"))]
+  res_df <- res_df[order(res_df$padj, na.last = TRUE), , drop = FALSE]
+
+  if (write_full_results) {
+    utils::write.table(
+      res_df,
+      file = file.path(contrast_dir, paste0(contrast_label, ".diff_genes.DESeq2.txt")),
+      sep = "\t",
+      quote = FALSE,
+      row.names = FALSE
+    )
+  }
+
+  sig_df <- subset(res_df, !is.na(padj) & padj < alpha & abs(log2FoldChange) >= lfc_for_sig)
+  if (write_sig_only) {
+    utils::write.table(
+      sig_df,
+      file = file.path(contrast_dir, paste0(contrast_label, sig_suffix)),
+      sep = "\t",
+      quote = FALSE,
+      row.names = FALSE
+    )
+  }
+
+  if (ma_plot_enabled) {
+    grDevices::pdf(file.path(contrast_dir, "MA Plot.pdf"), width = 8, height = 6)
+    DESeq2::plotMA(res_for_table, ylim = c(-8, 8))
+    grDevices::dev.off()
+  }
+
+  if (volcano_enabled) {
+    vdf <- res_df
+    vdf$padj[is.na(vdf$padj)] <- 1
+    vdf$log2FoldChange[is.na(vdf$log2FoldChange)] <- 0
+    vdf$neglog10padj <- -log10(vdf$padj)
+    vdf$is_sig <- vdf$padj < alpha & abs(vdf$log2FoldChange) >= lfc_for_sig
+    if (volcano_auto_axes) {
+      x_lim <- max(abs(vdf$log2FoldChange), na.rm = TRUE)
+      y_lim <- stats::quantile(vdf$neglog10padj, probs = 0.99, na.rm = TRUE)
+    } else {
+      x_lim <- volcano_max_xlim
+      y_lim <- volcano_max_ylim
+    }
+    x_lim <- max(x_lim, 1)
+    y_lim <- max(y_lim, 1)
+    p <- ggplot2::ggplot(vdf, ggplot2::aes(x = log2FoldChange, y = neglog10padj, color = is_sig)) +
+      ggplot2::geom_point(alpha = 0.7, size = 1.2) +
+      ggplot2::scale_color_manual(values = c("FALSE" = "grey60", "TRUE" = "firebrick")) +
+      ggplot2::geom_vline(xintercept = c(-lfc_for_sig, 0, lfc_for_sig), linetype = c("dashed", "solid", "dashed")) +
+      ggplot2::geom_hline(yintercept = -log10(alpha), linetype = "dashed") +
+      ggplot2::coord_cartesian(xlim = c(-x_lim, x_lim), ylim = c(0, y_lim)) +
+      ggplot2::theme_light() +
+      ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none") +
+      ggplot2::xlab("log2 Fold Change") +
+      ggplot2::ylab("-log10 adjusted P-value")
+    ggplot2::ggsave(file.path(contrast_dir, paste0(contrast_label, ".volcano_plot.pdf")), p, width = 8, height = 6)
+    if (volcano_labels_enabled && requireNamespace("ggrepel", quietly = TRUE)) {
+      label_df <- subset(vdf, is_sig)
+      label_df <- label_df[order(label_df$padj), , drop = FALSE]
+      label_df <- head(label_df, max_volcano_labels)
+      p_labels <- p + ggrepel::geom_text_repel(
+        data = label_df,
+        ggplot2::aes(label = gene_id),
+        size = 3,
+        max.overlaps = max_volcano_labels
+      )
+      ggplot2::ggsave(file.path(contrast_dir, paste0(contrast_label, ".volcano_plot_labels.pdf")), p_labels, width = 10, height = 7)
+    }
+  }
+
+  if (sig_heatmap_enabled) {
+    sig_genes <- subset(res_df, !is.na(padj) & padj < alpha & abs(log2FoldChange) >= lfc_for_heatmap)$gene_id
+    sig_genes <- unique(sig_genes)
+    if (length(sig_genes) >= 2) {
+      hm <- SummarizedExperiment::assay(vst_obj)[sig_genes, , drop = FALSE]
+      hm_colors <- gradient_palette(255)
+      grDevices::pdf(file.path(contrast_dir, paste0(contrast_label, ".sig_diff_genes.heatmap.pdf")), width = 10, height = 10)
+      pheatmap::pheatmap(
+        hm,
+        color = hm_colors,
+        cluster_rows = sig_heatmap_cluster_rows,
+        cluster_cols = sig_heatmap_cluster_cols,
+        show_rownames = FALSE
+      )
+      grDevices::dev.off()
+    }
+  }
+}
+
+writeLines(capture.output(sessionInfo()), con = file.path(qc_dir, "sessionInfo.txt"))
