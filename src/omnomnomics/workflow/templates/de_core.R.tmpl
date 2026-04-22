@@ -183,23 +183,35 @@ map_gene_symbols <- function(gene_ids, fallback_to_ids = TRUE) {
     is_mouse <- grepl("^ENSMUSG", ids_no_version)
 
     if (any(is_human) && requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
-      mapped <- AnnotationDbi::mapIds(
-        org.Hs.eg.db::org.Hs.eg.db,
-        keys = unique(ids_no_version[is_human]),
-        column = "SYMBOL",
-        keytype = "ENSEMBL",
-        multiVals = "first"
+      mapped <- tryCatch(
+        AnnotationDbi::mapIds(
+          org.Hs.eg.db::org.Hs.eg.db,
+          keys = unique(ids_no_version[is_human]),
+          column = "SYMBOL",
+          keytype = "ENSEMBL",
+          multiVals = "first"
+        ),
+        error = function(e) {
+          message("Symbol mapping warning (human): ", conditionMessage(e))
+          stats::setNames(rep(NA_character_, length(unique(ids_no_version[is_human]))), unique(ids_no_version[is_human]))
+        }
       )
       symbols[is_human] <- unname(mapped[ids_no_version[is_human]])
     }
 
     if (any(is_mouse) && requireNamespace("org.Mm.eg.db", quietly = TRUE)) {
-      mapped <- AnnotationDbi::mapIds(
-        org.Mm.eg.db::org.Mm.eg.db,
-        keys = unique(ids_no_version[is_mouse]),
-        column = "SYMBOL",
-        keytype = "ENSEMBL",
-        multiVals = "first"
+      mapped <- tryCatch(
+        AnnotationDbi::mapIds(
+          org.Mm.eg.db::org.Mm.eg.db,
+          keys = unique(ids_no_version[is_mouse]),
+          column = "SYMBOL",
+          keytype = "ENSEMBL",
+          multiVals = "first"
+        ),
+        error = function(e) {
+          message("Symbol mapping warning (mouse): ", conditionMessage(e))
+          stats::setNames(rep(NA_character_, length(unique(ids_no_version[is_mouse]))), unique(ids_no_version[is_mouse]))
+        }
       )
       symbols[is_mouse] <- unname(mapped[ids_no_version[is_mouse]])
     }
@@ -271,6 +283,7 @@ all_gene_ids <- rownames(dds)
 all_gene_ids_no_version <- strip_ensembl_version(all_gene_ids)
 all_gene_symbols <- map_gene_symbols(all_gene_ids, fallback_to_ids = FALSE)
 symbol_lookup <- stats::setNames(all_gene_symbols, all_gene_ids)
+symbol_lookup_no_version <- stats::setNames(all_gene_symbols, all_gene_ids_no_version)
 
 ensembl_like <- grepl("^ENS(?:MUSG|G)[0-9]+$", all_gene_ids_no_version)
 ensembl_like_fraction <- mean(ensembl_like)
@@ -299,10 +312,21 @@ message(mapping_message)
 
 symbols_for_ids <- function(gene_ids, fallback_to_ids = FALSE) {
   gid <- as.character(gene_ids)
+  gid_no_version <- strip_ensembl_version(gid)
   symbols <- unname(symbol_lookup[gid])
   missing <- is.na(symbols) | !nzchar(symbols)
   if (any(missing)) {
-    symbols_missing <- map_gene_symbols(gid[missing], fallback_to_ids = fallback_to_ids)
+    symbols[missing] <- unname(symbol_lookup_no_version[gid_no_version[missing]])
+  }
+  missing <- is.na(symbols) | !nzchar(symbols)
+  if (any(missing)) {
+    symbols_missing <- tryCatch(
+      map_gene_symbols(gid[missing], fallback_to_ids = fallback_to_ids),
+      error = function(e) {
+        message("Symbol remap fallback warning: ", conditionMessage(e))
+        rep(NA_character_, sum(missing))
+      }
+    )
     symbols[missing] <- symbols_missing
   }
   if (fallback_to_ids) {
