@@ -89,6 +89,23 @@ decoupler_top_features_heatmap <- __DECOUPLER_TOP_FEATURES_HEATMAP__
 decoupler_top_regulators_barplot <- __DECOUPLER_TOP_REGULATORS_BARPLOT__
 decoupler_top_regulators_detail_each_side <- __DECOUPLER_TOP_REGULATORS_DETAIL_EACH_SIDE__
 
+custom_modules_enabled <- __CUSTOM_MODULES_ENABLED__
+custom_modules_gmt <- __CUSTOM_MODULES_GMT__
+custom_modules_name <- __CUSTOM_MODULES_NAME__
+custom_modules_run_ora <- __CUSTOM_MODULES_RUN_ORA__
+custom_modules_run_gsea <- __CUSTOM_MODULES_RUN_GSEA__
+
+if (!nzchar(custom_modules_gmt)) {
+  custom_modules_gmt <- NA_character_
+}
+
+# Optional custom module enrichment block:
+# - Default is off for pipeline runs.
+# - For interactive reruns in RStudio, set:
+#   custom_modules_enabled <- TRUE
+#   custom_modules_gmt <- "/absolute/path/to/modules.gmt"
+# - Then run this script to create per-contrast custom module outputs.
+
 sanitize_name <- function(x) {
   x <- gsub("[^A-Za-z0-9._-]+", "_", x)
   x <- gsub("_+", "_", x)
@@ -422,6 +439,38 @@ safe_cp_result_table <- function(cp_obj) {
   df
 }
 
+read_gmt_term2gene <- function(gmt_path) {
+  lines <- readLines(gmt_path, warn = FALSE)
+  lines <- lines[nzchar(lines)]
+  if (length(lines) == 0) {
+    return(data.frame(term = character(0), gene = character(0), stringsAsFactors = FALSE))
+  }
+  rows <- vector("list", length(lines))
+  out_idx <- 0L
+  for (line in lines) {
+    parts <- strsplit(line, "\t", fixed = TRUE)[[1]]
+    if (length(parts) < 3) {
+      next
+    }
+    term <- as.character(parts[[1]])
+    genes <- unique(as.character(parts[-c(1, 2)]))
+    genes <- genes[nzchar(genes)]
+    if (!nzchar(term) || length(genes) == 0) {
+      next
+    }
+    out_idx <- out_idx + 1L
+    rows[[out_idx]] <- data.frame(
+      term = rep(term, length(genes)),
+      gene = genes,
+      stringsAsFactors = FALSE
+    )
+  }
+  if (out_idx == 0L) {
+    return(data.frame(term = character(0), gene = character(0), stringsAsFactors = FALSE))
+  }
+  do.call(rbind, rows[seq_len(out_idx)])
+}
+
 aggregate_symbol_matrix <- function(mat, symbols) {
   keep <- !is.na(symbols) & nzchar(symbols)
   mat <- mat[keep, , drop = FALSE]
@@ -565,6 +614,29 @@ if (cp_available && enrichment_enabled && enrichment_cp_enabled) {
       message("None of the configured MSigDB sets could be loaded. Skipping clusterProfiler enrichment.")
     }
   }
+}
+
+custom_modules_term2gene <- NULL
+if (enrichment_enabled && custom_modules_enabled) {
+  if (is.na(custom_modules_gmt) || !nzchar(custom_modules_gmt)) {
+    stop("custom_modules_enabled is TRUE but no custom_modules_gmt path was provided.")
+  }
+  if (!file.exists(custom_modules_gmt)) {
+    stop("Custom modules GMT file does not exist: ", custom_modules_gmt)
+  }
+  custom_modules_term2gene <- tryCatch(
+    read_gmt_term2gene(custom_modules_gmt),
+    error = function(e) {
+      stop("Could not parse custom modules GMT file: ", conditionMessage(e))
+    }
+  )
+  if (is.null(custom_modules_term2gene) || nrow(custom_modules_term2gene) == 0) {
+    stop("Custom modules GMT file has no usable term-to-gene entries: ", custom_modules_gmt)
+  }
+  message(
+    "Loaded custom modules GMT: ", custom_modules_gmt,
+    " (", length(unique(custom_modules_term2gene$term)), " terms)"
+  )
 }
 
 design_terms <- attr(stats::terms(design_formula), "term.labels")
@@ -1169,7 +1241,7 @@ for (contrast_cfg in contrast_plan) {
     ranked_stats <- ranked_stats[!is.na(names(ranked_stats)) & is.finite(ranked_stats)]
     ranked_stats <- deduplicate_ranked_vector(ranked_stats)
 
-    run_ora_term2gene <- function(gene_symbols, term2gene_tbl, set_name, direction_label) {
+    run_ora_term2gene <- function(gene_symbols, term2gene_tbl, set_name, direction_label, output_dir = cp_dir) {
       if (length(gene_symbols) < 2 || is.null(term2gene_tbl) || nrow(term2gene_tbl) == 0) {
         return(NULL)
       }
@@ -1194,7 +1266,7 @@ for (contrast_cfg in contrast_plan) {
       }
       utils::write.table(
         ora_tbl,
-        file = file.path(cp_dir, paste0(contrast_label, ".", set_name, ".", direction_label, ".ORA.tsv")),
+        file = file.path(output_dir, paste0(contrast_label, ".", set_name, ".", direction_label, ".ORA.tsv")),
         sep = "\t",
         quote = FALSE,
         row.names = FALSE
@@ -1206,7 +1278,7 @@ for (contrast_cfg in contrast_plan) {
       )
       save_enrichment_plot(
         dot_plot,
-        file.path(cp_dir, paste0(contrast_label, ".", set_name, ".", direction_label, ".dotplot.ORA.pdf"))
+        file.path(output_dir, paste0(contrast_label, ".", set_name, ".", direction_label, ".dotplot.ORA.pdf"))
       )
       bar_plot <- tryCatch(
         clusterProfiler::barplot(ora_obj, showCategory = enrichment_top_terms) +
@@ -1215,7 +1287,7 @@ for (contrast_cfg in contrast_plan) {
       )
       save_enrichment_plot(
         bar_plot,
-        file.path(cp_dir, paste0(contrast_label, ".", set_name, ".", direction_label, ".barplot.ORA.pdf"))
+        file.path(output_dir, paste0(contrast_label, ".", set_name, ".", direction_label, ".barplot.ORA.pdf"))
       )
       enrichment_rows[[length(enrichment_rows) + 1]] <<- data.frame(
         contrast = contrast_label,
@@ -1230,7 +1302,7 @@ for (contrast_cfg in contrast_plan) {
       ora_tbl
     }
 
-    run_gsea_term2gene <- function(ranked_vec, term2gene_tbl, set_name) {
+    run_gsea_term2gene <- function(ranked_vec, term2gene_tbl, set_name, output_dir = cp_dir) {
       if (length(ranked_vec) < 10 || is.null(term2gene_tbl) || nrow(term2gene_tbl) == 0) {
         return(NULL)
       }
@@ -1258,7 +1330,7 @@ for (contrast_cfg in contrast_plan) {
       }
       utils::write.table(
         gsea_tbl,
-        file = file.path(cp_dir, paste0(contrast_label, ".", set_name, ".GSEA.tsv")),
+        file = file.path(output_dir, paste0(contrast_label, ".", set_name, ".GSEA.tsv")),
         sep = "\t",
         quote = FALSE,
         row.names = FALSE
@@ -1270,7 +1342,7 @@ for (contrast_cfg in contrast_plan) {
       )
       save_enrichment_plot(
         dot_plot,
-        file.path(cp_dir, paste0(contrast_label, ".", set_name, ".dotplot.GSEA.pdf"))
+        file.path(output_dir, paste0(contrast_label, ".", set_name, ".dotplot.GSEA.pdf"))
       )
       ridge_plot <- tryCatch(
         enrichplot::ridgeplot(gsea_obj, showCategory = enrichment_top_terms) +
@@ -1279,7 +1351,7 @@ for (contrast_cfg in contrast_plan) {
       )
       save_enrichment_plot(
         ridge_plot,
-        file.path(cp_dir, paste0(contrast_label, ".", set_name, ".ridgeplot.GSEA.pdf"))
+        file.path(output_dir, paste0(contrast_label, ".", set_name, ".ridgeplot.GSEA.pdf"))
       )
       top_ids <- head(as.character(gsea_tbl$ID), min(10, nrow(gsea_tbl)))
       if (length(top_ids) > 0) {
@@ -1291,7 +1363,7 @@ for (contrast_cfg in contrast_plan) {
           save_enrichment_plot(
             gp,
             file.path(
-              cp_dir,
+              output_dir,
               paste0(contrast_label, ".", set_name, ".nesplot.", sanitize_file_component(term_id, "term"), ".GSEA.pdf")
             ),
             width = 10,
@@ -1323,6 +1395,38 @@ for (contrast_cfg in contrast_plan) {
       for (set_name in names(msig_term2gene)) {
         run_gsea_term2gene(ranked_stats, msig_term2gene[[set_name]], set_name)
       }
+    }
+  }
+
+  if (enrichment_enabled && custom_modules_enabled && !is.null(custom_modules_term2gene)) {
+    cm_dir <- file.path(contrast_dir, "custom_modules")
+    dir.create(cm_dir, recursive = TRUE, showWarnings = FALSE)
+    cm_set_name <- sanitize_file_component(custom_modules_name, "custom_modules")
+
+    if (custom_modules_run_ora) {
+      run_ora_term2gene(
+        pos_symbols,
+        custom_modules_term2gene,
+        cm_set_name,
+        "up",
+        output_dir = cm_dir
+      )
+      run_ora_term2gene(
+        neg_symbols,
+        custom_modules_term2gene,
+        cm_set_name,
+        "down",
+        output_dir = cm_dir
+      )
+    }
+
+    if (custom_modules_run_gsea) {
+      run_gsea_term2gene(
+        ranked_stats,
+        custom_modules_term2gene,
+        cm_set_name,
+        output_dir = cm_dir
+      )
     }
   }
 

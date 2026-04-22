@@ -185,6 +185,7 @@ rule call_DE:
             enrichment_cp_cfg = enrichment_cfg.get("clusterprofiler", {})
             enrichment_msigdb_sets_cfg = enrichment_cp_cfg.get("msigdb_sets", [])
             enrichment_dc_cfg = enrichment_cfg.get("decoupler", {})
+            enrichment_cm_cfg = enrichment_cfg.get("custom_modules", {})
             runtime_cfg = resolved_de_config.get("runtime", {})
 
             pca_shape_cfg = pca_cfg.get("shape_by", [])
@@ -267,6 +268,11 @@ rule call_DE:
                 "__DECOUPLER_TOP_FEATURES_HEATMAP__": str(int(enrichment_dc_cfg.get("top_features_heatmap", 25))),
                 "__DECOUPLER_TOP_REGULATORS_BARPLOT__": str(int(enrichment_dc_cfg.get("top_regulators_barplot", 25))),
                 "__DECOUPLER_TOP_REGULATORS_DETAIL_EACH_SIDE__": str(int(enrichment_dc_cfg.get("top_regulators_detail_each_side", 2))),
+                "__CUSTOM_MODULES_ENABLED__": _r_bool(enrichment_cm_cfg.get("enabled", False)),
+                "__CUSTOM_MODULES_GMT__": _r_string(str(enrichment_cm_cfg.get("gmt_file") or "")),
+                "__CUSTOM_MODULES_NAME__": _r_string(str(enrichment_cm_cfg.get("name", "custom_modules"))),
+                "__CUSTOM_MODULES_RUN_ORA__": _r_bool(enrichment_cm_cfg.get("run_ora", True)),
+                "__CUSTOM_MODULES_RUN_GSEA__": _r_bool(enrichment_cm_cfg.get("run_gsea", True)),
                 "__RUNTIME_SEED__": str(int(runtime_cfg.get("seed", 1337))),
             }
 

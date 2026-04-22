@@ -116,6 +116,13 @@ DEFAULT_DE_CONFIG: dict = {
             "top_regulators_barplot": 25,
             "top_regulators_detail_each_side": 2,
         },
+        "custom_modules": {
+            "enabled": False,
+            "gmt_file": None,
+            "name": "custom_modules",
+            "run_ora": True,
+            "run_gsea": True,
+        },
     },
     "runtime": {
         "seed": 1337,
@@ -158,6 +165,8 @@ def resolve_de_config(
     config_path: str | None,
     resolved_formula: str,
     de_out_dir_override: str | None = None,
+    custom_modules_gmt: str | None = None,
+    enable_custom_modules: bool = False,
 ) -> tuple[str, dict]:
     resolved_path, user_config = load_de_config_file(config_path)
     resolved = _deep_merge(DEFAULT_DE_CONFIG, user_config)
@@ -184,6 +193,13 @@ def resolve_de_config(
 
     if de_out_dir_override:
         resolved["io"]["out_dir"] = str(de_out_dir_override).strip()
+
+    cm_cfg = resolved.setdefault("enrichment", {}).setdefault("custom_modules", {})
+    if custom_modules_gmt:
+        cm_cfg["gmt_file"] = str(Path(custom_modules_gmt).expanduser().resolve())
+        cm_cfg["enabled"] = True
+    if enable_custom_modules:
+        cm_cfg["enabled"] = True
 
     _validate_resolved_de_config(resolved)
     return resolved_path, resolved
@@ -308,3 +324,26 @@ def _validate_resolved_de_config(config: dict) -> None:
             raise DEConfigError(
                 "DE config enrichment.decoupler.top_regulators_detail_each_side must be >= 1."
             )
+
+    cm_cfg = enrichment_cfg.get("custom_modules", {})
+    if cm_cfg:
+        cm_name = str(cm_cfg.get("name", "custom_modules")).strip()
+        if not cm_name:
+            raise DEConfigError("DE config enrichment.custom_modules.name must not be empty.")
+        cm_enabled = bool(cm_cfg.get("enabled", False))
+        cm_gmt = cm_cfg.get("gmt_file")
+        if cm_enabled:
+            if not cm_gmt or not str(cm_gmt).strip():
+                raise DEConfigError(
+                    "DE config enrichment.custom_modules.gmt_file is required when custom_modules.enabled is true."
+                )
+            cm_path = Path(str(cm_gmt)).expanduser().resolve()
+            if not cm_path.is_file():
+                raise DEConfigError(
+                    f"DE config enrichment.custom_modules.gmt_file does not exist: {cm_path}"
+                )
+            if cm_path.suffix.lower() != ".gmt":
+                raise DEConfigError(
+                    "DE config enrichment.custom_modules.gmt_file must have a .gmt extension."
+                )
+            cm_cfg["gmt_file"] = str(cm_path)

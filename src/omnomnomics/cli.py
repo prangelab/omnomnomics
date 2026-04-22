@@ -430,6 +430,8 @@ def parse_arguments():
    parser.add_argument('--de-formula', help='Explicit DESeq2 design formula for step 12. If provided, it overrides --de-columns and --de-block.')
    parser.add_argument('--de-config', help='Optional YAML file with DE analysis settings for step 12.')
    parser.add_argument('--de-out-dir', help='Optional DE output subdirectory inside the DE_calling folder. Overrides de_config io.out_dir.')
+   parser.add_argument('--de-enable-custom-modules', action='store_true', help='Enable optional custom module enrichment (phase 3) in step 12. Requires a GMT file from --de-custom-modules-gmt or de_config enrichment.custom_modules.gmt_file.')
+   parser.add_argument('--de-custom-modules-gmt', help='Path to a custom GMT file for optional custom module enrichment in step 12.')
    parser.add_argument('-I', '--input', help='Input BAM file used for ChIP peak calling with MACS3. \n \t Default: do not use input')
    parser.add_argument('-m', '--metadata', help='Tabular metadata file. The first column must be named filename. Metadata drives sample naming, peak grouping, trackhub grouping, and DE design.')
    parser.add_argument('-b', '--broad', action='store_true', help='ChIP: Call broad histone marks with MACS3 --broad mode. Default is TF / narrow peaks.')
@@ -1174,6 +1176,16 @@ def main():
     de_formula = args.de_formula if args.de_formula else config.get('de_formula', "NA")
     de_config = str(Path(args.de_config).expanduser().resolve()) if args.de_config else config.get('de_config', "NA")
     de_out_dir = args.de_out_dir if args.de_out_dir else config.get('de_out_dir', "")
+    de_enable_custom_modules = args.de_enable_custom_modules or config.get('de_enable_custom_modules', False)
+    de_custom_modules_gmt = (
+        str(Path(args.de_custom_modules_gmt).expanduser().resolve())
+        if args.de_custom_modules_gmt
+        else str(config.get('de_custom_modules_gmt', "")).strip()
+    )
+    if de_custom_modules_gmt and de_custom_modules_gmt != "NA":
+        de_custom_modules_gmt = str(Path(de_custom_modules_gmt).expanduser().resolve())
+    else:
+        de_custom_modules_gmt = ""
     broad = args.broad if args.broad else config.get('broad', "NA")
     INPUT = args.input if args.input else config.get('input',"NA")
     metadata = args.metadata if args.metadata else config.get('metadata', "NA")
@@ -1348,6 +1360,8 @@ def main():
                         None if de_config == "NA" else de_config,
                         resolved_de_formula,
                         de_out_dir_override=de_out_dir or None,
+                        custom_modules_gmt=de_custom_modules_gmt or None,
+                        enable_custom_modules=bool(de_enable_custom_modules),
                     )
                 except DEConfigError as exc:
                     raise MetadataError(str(exc)) from exc
