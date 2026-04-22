@@ -19,6 +19,15 @@ dependencies:
   - bioconductor-org.hs.eg.db
   - bioconductor-org.mm.eg.db
   - bioconductor-apeglm
+  - bioconductor-clusterprofiler
+  - bioconductor-enrichplot
+  - bioconductor-fgsea
+  - bioconductor-decoupler
+  - bioconductor-omnipathr
+  - r-msigdbr
+  - r-dplyr
+  - r-tidyr
+  - r-tibble
   - genomepy>=0.16
   - snakemake>=7.25,<8
   - multiqc

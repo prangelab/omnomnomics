@@ -71,6 +71,35 @@ tables:
   write_sig_only_table: true
   sig_only_name_suffix: ".sig_only.tsv"
 
+enrichment:
+  enabled: true
+  clusterprofiler:
+    enabled: true
+    run_ora: true
+    run_gsea: true
+    msigdb_sets:
+      - name: msig_hallmark
+        category: H
+      - name: msig_reactome
+        category: C2
+        subcategory: CP:REACTOME
+    pvalue_cutoff: 0.05
+    qvalue_cutoff: 0.2
+    min_gs_size: 10
+    max_gs_size: 500
+    top_terms: 20
+    gsea_permutations: 1000
+  decoupler:
+    enabled: true
+    run_progeny: true
+    run_tf_network: true
+    progeny_top: 500
+    tf_split_complexes: false
+    minsize: 5
+    top_features_heatmap: 25
+    top_regulators_barplot: 25
+    top_regulators_detail_each_side: 2
+
 runtime:
   seed: 1337
   stop_on_error: true

@@ -61,6 +61,31 @@ def _r_numeric_pair_list(items):
     return "list(" + ", ".join(pairs) + ")"
 
 
+def _r_msigdb_set_list(items):
+    if not isinstance(items, list) or not items:
+        return "list()"
+    rows = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name", "")).strip()
+        category = str(item.get("category", "")).strip()
+        if not name or not category:
+            continue
+        subcategory = item.get("subcategory")
+        if subcategory is None or not str(subcategory).strip():
+            rows.append(
+                f"list(name={_r_string(name)}, category={_r_string(category)}, subcategory=NA_character_)"
+            )
+        else:
+            rows.append(
+                f"list(name={_r_string(name)}, category={_r_string(category)}, subcategory={_r_string(str(subcategory).strip())})"
+            )
+    if not rows:
+        return "list()"
+    return "list(\n  " + ",\n  ".join(rows) + "\n)"
+
+
 def _add_tree_to_zip(archive, path_on_disk, archive_prefix):
     for root, _, files in os.walk(path_on_disk):
         for file_name in files:
@@ -156,6 +181,10 @@ rule call_DE:
             volcano_cfg = plots_cfg.get("volcano", {})
             sig_heatmap_cfg = plots_cfg.get("sig_heatmap", {})
             tables_cfg = resolved_de_config.get("tables", {})
+            enrichment_cfg = resolved_de_config.get("enrichment", {})
+            enrichment_cp_cfg = enrichment_cfg.get("clusterprofiler", {})
+            enrichment_msigdb_sets_cfg = enrichment_cp_cfg.get("msigdb_sets", [])
+            enrichment_dc_cfg = enrichment_cfg.get("decoupler", {})
             runtime_cfg = resolved_de_config.get("runtime", {})
 
             pca_shape_cfg = pca_cfg.get("shape_by", [])
@@ -218,6 +247,26 @@ rule call_DE:
                 "__WRITE_FULL_RESULTS__": _r_bool(tables_cfg.get("write_full_results", True)),
                 "__WRITE_SIG_ONLY__": _r_bool(tables_cfg.get("write_sig_only_table", True)),
                 "__SIG_SUFFIX__": _r_string(str(tables_cfg.get("sig_only_name_suffix", ".sig_only.tsv"))),
+                "__ENRICHMENT_ENABLED__": _r_bool(enrichment_cfg.get("enabled", True)),
+                "__ENRICHMENT_CP_ENABLED__": _r_bool(enrichment_cp_cfg.get("enabled", True)),
+                "__ENRICHMENT_CP_RUN_ORA__": _r_bool(enrichment_cp_cfg.get("run_ora", True)),
+                "__ENRICHMENT_CP_RUN_GSEA__": _r_bool(enrichment_cp_cfg.get("run_gsea", True)),
+                "__ENRICHMENT_MSIGDB_SETS__": _r_msigdb_set_list(enrichment_msigdb_sets_cfg),
+                "__ENRICHMENT_PVALUE_CUTOFF__": str(float(enrichment_cp_cfg.get("pvalue_cutoff", 0.05))),
+                "__ENRICHMENT_QVALUE_CUTOFF__": str(float(enrichment_cp_cfg.get("qvalue_cutoff", 0.2))),
+                "__ENRICHMENT_MIN_GS_SIZE__": str(int(enrichment_cp_cfg.get("min_gs_size", 10))),
+                "__ENRICHMENT_MAX_GS_SIZE__": str(int(enrichment_cp_cfg.get("max_gs_size", 500))),
+                "__ENRICHMENT_TOP_TERMS__": str(int(enrichment_cp_cfg.get("top_terms", 20))),
+                "__ENRICHMENT_GSEA_PERMUTATIONS__": str(int(enrichment_cp_cfg.get("gsea_permutations", 1000))),
+                "__DECOUPLER_ENABLED__": _r_bool(enrichment_dc_cfg.get("enabled", True)),
+                "__DECOUPLER_RUN_PROGENY__": _r_bool(enrichment_dc_cfg.get("run_progeny", True)),
+                "__DECOUPLER_RUN_TF_NETWORK__": _r_bool(enrichment_dc_cfg.get("run_tf_network", True)),
+                "__DECOUPLER_PROGENY_TOP__": str(int(enrichment_dc_cfg.get("progeny_top", 500))),
+                "__DECOUPLER_TF_SPLIT_COMPLEXES__": _r_bool(enrichment_dc_cfg.get("tf_split_complexes", False)),
+                "__DECOUPLER_MINSIZE__": str(int(enrichment_dc_cfg.get("minsize", 5))),
+                "__DECOUPLER_TOP_FEATURES_HEATMAP__": str(int(enrichment_dc_cfg.get("top_features_heatmap", 25))),
+                "__DECOUPLER_TOP_REGULATORS_BARPLOT__": str(int(enrichment_dc_cfg.get("top_regulators_barplot", 25))),
+                "__DECOUPLER_TOP_REGULATORS_DETAIL_EACH_SIDE__": str(int(enrichment_dc_cfg.get("top_regulators_detail_each_side", 2))),
                 "__RUNTIME_SEED__": str(int(runtime_cfg.get("seed", 1337))),
             }
 

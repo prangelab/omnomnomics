@@ -88,6 +88,35 @@ DEFAULT_DE_CONFIG: dict = {
         "write_sig_only_table": True,
         "sig_only_name_suffix": ".sig_only.tsv",
     },
+    "enrichment": {
+        "enabled": True,
+        "clusterprofiler": {
+            "enabled": True,
+            "run_ora": True,
+            "run_gsea": True,
+            "msigdb_sets": [
+                {"name": "msig_hallmark", "category": "H"},
+                {"name": "msig_reactome", "category": "C2", "subcategory": "CP:REACTOME"},
+            ],
+            "pvalue_cutoff": 0.05,
+            "qvalue_cutoff": 0.2,
+            "min_gs_size": 10,
+            "max_gs_size": 500,
+            "top_terms": 20,
+            "gsea_permutations": 1000,
+        },
+        "decoupler": {
+            "enabled": True,
+            "run_progeny": True,
+            "run_tf_network": True,
+            "progeny_top": 500,
+            "tf_split_complexes": False,
+            "minsize": 5,
+            "top_features_heatmap": 25,
+            "top_regulators_barplot": 25,
+            "top_regulators_detail_each_side": 2,
+        },
+    },
     "runtime": {
         "seed": 1337,
         "stop_on_error": True,
@@ -132,6 +161,18 @@ def resolve_de_config(
 ) -> tuple[str, dict]:
     resolved_path, user_config = load_de_config_file(config_path)
     resolved = _deep_merge(DEFAULT_DE_CONFIG, user_config)
+
+    # Backward compatibility for older enrichment.gene_sets boolean config.
+    cp_cfg = resolved.get("enrichment", {}).get("clusterprofiler", {})
+    if "msigdb_sets" not in cp_cfg:
+        legacy_gene_sets = cp_cfg.get("gene_sets", {}) if isinstance(cp_cfg.get("gene_sets", {}), dict) else {}
+        msigdb_sets = []
+        if legacy_gene_sets.get("msig_hallmark", False):
+            msigdb_sets.append({"name": "msig_hallmark", "category": "H"})
+        if legacy_gene_sets.get("msig_c2_cp", False):
+            msigdb_sets.append({"name": "msig_c2_cp", "category": "C2", "subcategory": "CP"})
+        if msigdb_sets:
+            cp_cfg["msigdb_sets"] = msigdb_sets
 
     configured_formula = resolved.get("design", {}).get("formula")
     if configured_formula in ("", "NA"):
@@ -188,3 +229,82 @@ def _validate_resolved_de_config(config: dict) -> None:
         raise DEConfigError("DE config filtering.min_count must be >= 0.")
     if min_samples < 1:
         raise DEConfigError("DE config filtering.min_samples must be >= 1.")
+
+    enrichment_cfg = config.get("enrichment", {})
+    cp_cfg = enrichment_cfg.get("clusterprofiler", {})
+    if cp_cfg:
+        min_gs_size = int(cp_cfg.get("min_gs_size", 10))
+        max_gs_size = int(cp_cfg.get("max_gs_size", 500))
+        top_terms = int(cp_cfg.get("top_terms", 20))
+        pvalue_cutoff = float(cp_cfg.get("pvalue_cutoff", 0.05))
+        qvalue_cutoff = float(cp_cfg.get("qvalue_cutoff", 0.2))
+        gsea_permutations = int(cp_cfg.get("gsea_permutations", 1000))
+        if min_gs_size < 1:
+            raise DEConfigError("DE config enrichment.clusterprofiler.min_gs_size must be >= 1.")
+        if max_gs_size < min_gs_size:
+            raise DEConfigError(
+                "DE config enrichment.clusterprofiler.max_gs_size must be >= min_gs_size."
+            )
+        if top_terms < 1:
+            raise DEConfigError("DE config enrichment.clusterprofiler.top_terms must be >= 1.")
+        if pvalue_cutoff <= 0 or pvalue_cutoff > 1:
+            raise DEConfigError(
+                "DE config enrichment.clusterprofiler.pvalue_cutoff must be in (0, 1]."
+            )
+        if qvalue_cutoff <= 0 or qvalue_cutoff > 1:
+            raise DEConfigError(
+                "DE config enrichment.clusterprofiler.qvalue_cutoff must be in (0, 1]."
+            )
+        if gsea_permutations < 100:
+            raise DEConfigError(
+                "DE config enrichment.clusterprofiler.gsea_permutations must be >= 100."
+            )
+        msigdb_sets = cp_cfg.get("msigdb_sets", [])
+        if not isinstance(msigdb_sets, list) or len(msigdb_sets) == 0:
+            raise DEConfigError(
+                "DE config enrichment.clusterprofiler.msigdb_sets must be a non-empty list."
+            )
+        for idx, entry in enumerate(msigdb_sets):
+            if not isinstance(entry, dict):
+                raise DEConfigError(
+                    f"DE config enrichment.clusterprofiler.msigdb_sets[{idx}] must be a mapping."
+                )
+            name = str(entry.get("name", "")).strip()
+            category = str(entry.get("category", "")).strip().upper()
+            if not name:
+                raise DEConfigError(
+                    f"DE config enrichment.clusterprofiler.msigdb_sets[{idx}].name must not be empty."
+                )
+            if not category:
+                raise DEConfigError(
+                    f"DE config enrichment.clusterprofiler.msigdb_sets[{idx}].category must not be empty."
+                )
+            subcategory = entry.get("subcategory")
+            if subcategory is not None and not str(subcategory).strip():
+                raise DEConfigError(
+                    f"DE config enrichment.clusterprofiler.msigdb_sets[{idx}].subcategory must be non-empty when provided."
+                )
+
+    dc_cfg = enrichment_cfg.get("decoupler", {})
+    if dc_cfg:
+        progeny_top = int(dc_cfg.get("progeny_top", 500))
+        minsize = int(dc_cfg.get("minsize", 5))
+        top_features_heatmap = int(dc_cfg.get("top_features_heatmap", 25))
+        top_regulators_barplot = int(dc_cfg.get("top_regulators_barplot", 25))
+        top_regulators_detail_each_side = int(dc_cfg.get("top_regulators_detail_each_side", 2))
+        if progeny_top < 50:
+            raise DEConfigError("DE config enrichment.decoupler.progeny_top must be >= 50.")
+        if minsize < 1:
+            raise DEConfigError("DE config enrichment.decoupler.minsize must be >= 1.")
+        if top_features_heatmap < 2:
+            raise DEConfigError(
+                "DE config enrichment.decoupler.top_features_heatmap must be >= 2."
+            )
+        if top_regulators_barplot < 2:
+            raise DEConfigError(
+                "DE config enrichment.decoupler.top_regulators_barplot must be >= 2."
+            )
+        if top_regulators_detail_each_side < 1:
+            raise DEConfigError(
+                "DE config enrichment.decoupler.top_regulators_detail_each_side must be >= 1."
+            )

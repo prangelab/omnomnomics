@@ -67,6 +67,28 @@ write_full_results <- __WRITE_FULL_RESULTS__
 write_sig_only <- __WRITE_SIG_ONLY__
 sig_suffix <- __SIG_SUFFIX__
 
+enrichment_enabled <- __ENRICHMENT_ENABLED__
+enrichment_cp_enabled <- __ENRICHMENT_CP_ENABLED__
+enrichment_cp_run_ora <- __ENRICHMENT_CP_RUN_ORA__
+enrichment_cp_run_gsea <- __ENRICHMENT_CP_RUN_GSEA__
+enrichment_msigdb_sets <- __ENRICHMENT_MSIGDB_SETS__
+enrichment_pvalue_cutoff <- __ENRICHMENT_PVALUE_CUTOFF__
+enrichment_qvalue_cutoff <- __ENRICHMENT_QVALUE_CUTOFF__
+enrichment_min_gs_size <- __ENRICHMENT_MIN_GS_SIZE__
+enrichment_max_gs_size <- __ENRICHMENT_MAX_GS_SIZE__
+enrichment_top_terms <- __ENRICHMENT_TOP_TERMS__
+enrichment_gsea_permutations <- __ENRICHMENT_GSEA_PERMUTATIONS__
+
+decoupler_enabled <- __DECOUPLER_ENABLED__
+decoupler_run_progeny <- __DECOUPLER_RUN_PROGENY__
+decoupler_run_tf_network <- __DECOUPLER_RUN_TF_NETWORK__
+decoupler_progeny_top <- __DECOUPLER_PROGENY_TOP__
+decoupler_tf_split_complexes <- __DECOUPLER_TF_SPLIT_COMPLEXES__
+decoupler_minsize <- __DECOUPLER_MINSIZE__
+decoupler_top_features_heatmap <- __DECOUPLER_TOP_FEATURES_HEATMAP__
+decoupler_top_regulators_barplot <- __DECOUPLER_TOP_REGULATORS_BARPLOT__
+decoupler_top_regulators_detail_each_side <- __DECOUPLER_TOP_REGULATORS_DETAIL_EACH_SIDE__
+
 sanitize_name <- function(x) {
   x <- gsub("[^A-Za-z0-9._-]+", "_", x)
   x <- gsub("_+", "_", x)
@@ -334,6 +356,215 @@ symbols_for_ids <- function(gene_ids, fallback_to_ids = FALSE) {
     symbols[missing] <- strip_ensembl_version(gid[missing])
   }
   symbols
+}
+
+detect_species_from_gene_ids <- function(gene_ids) {
+  ids_no_version <- strip_ensembl_version(gene_ids)
+  frac_human <- mean(grepl("^ENSG[0-9]+$", ids_no_version))
+  frac_mouse <- mean(grepl("^ENSMUSG[0-9]+$", ids_no_version))
+  if (is.finite(frac_human) && frac_human >= 0.5) {
+    return(list(
+      species_label = "human",
+      msig_species = "Homo sapiens",
+      orgdb = if (requireNamespace("org.Hs.eg.db", quietly = TRUE)) org.Hs.eg.db::org.Hs.eg.db else NULL
+    ))
+  }
+  if (is.finite(frac_mouse) && frac_mouse >= 0.5) {
+    return(list(
+      species_label = "mouse",
+      msig_species = "Mus musculus",
+      orgdb = if (requireNamespace("org.Mm.eg.db", quietly = TRUE)) org.Mm.eg.db::org.Mm.eg.db else NULL
+    ))
+  }
+  list(species_label = "unknown", msig_species = NULL, orgdb = NULL)
+}
+
+is_valid_symbol <- function(x) {
+  x <- as.character(x)
+  !is.na(x) & nzchar(x) & !grepl("^ENS(?:MUSG|G)[0-9]+$", strip_ensembl_version(x))
+}
+
+deduplicate_ranked_vector <- function(gene_stats) {
+  gene_stats <- gene_stats[is.finite(gene_stats)]
+  if (length(gene_stats) == 0) {
+    return(gene_stats)
+  }
+  split_vals <- split(as.numeric(gene_stats), names(gene_stats))
+  collapsed <- vapply(
+    split_vals,
+    function(vals) vals[which.max(abs(vals))],
+    numeric(1)
+  )
+  sort(collapsed, decreasing = TRUE)
+}
+
+save_enrichment_plot <- function(plot_obj, out_path, width = 11, height = 8) {
+  if (is.null(plot_obj)) {
+    return(FALSE)
+  }
+  tryCatch({
+    ggplot2::ggsave(filename = out_path, plot = plot_obj, width = width, height = height)
+    TRUE
+  }, error = function(e) {
+    message("Could not save plot ", out_path, ": ", conditionMessage(e))
+    FALSE
+  })
+}
+
+safe_cp_result_table <- function(cp_obj) {
+  if (is.null(cp_obj)) {
+    return(NULL)
+  }
+  df <- tryCatch(as.data.frame(cp_obj), error = function(e) NULL)
+  if (is.null(df) || nrow(df) == 0) {
+    return(NULL)
+  }
+  df
+}
+
+aggregate_symbol_matrix <- function(mat, symbols) {
+  keep <- !is.na(symbols) & nzchar(symbols)
+  mat <- mat[keep, , drop = FALSE]
+  symbols <- symbols[keep]
+  keep2 <- !duplicated(cbind(symbols, rownames(mat)))
+  mat <- mat[keep2, , drop = FALSE]
+  symbols <- symbols[keep2]
+  if (nrow(mat) == 0) {
+    return(mat)
+  }
+  summed <- rowsum(mat, group = symbols, reorder = FALSE)
+  symbol_counts <- table(symbols)
+  denom <- as.numeric(symbol_counts[rownames(summed)])
+  denom[!is.finite(denom) | denom <= 0] <- 1
+  swept <- sweep(summed, 1, denom, "/")
+  swept
+}
+
+decoupler_to_matrix <- function(activity_df) {
+  needed <- c("condition", "source", "score")
+  if (!all(needed %in% colnames(activity_df))) {
+    return(NULL)
+  }
+  xtabs(score ~ condition + source, data = activity_df)
+}
+
+plot_decoupler_bar <- function(activity_df, out_file, title, top_n = 25) {
+  needed <- c("source", "score")
+  if (!all(needed %in% colnames(activity_df))) {
+    return(NULL)
+  }
+  plot_df <- activity_df[, needed, drop = FALSE]
+  plot_df <- plot_df[is.finite(plot_df$score), , drop = FALSE]
+  if (nrow(plot_df) == 0) {
+    return(NULL)
+  }
+  plot_df <- plot_df[order(-abs(plot_df$score)), , drop = FALSE]
+  plot_df <- head(plot_df, top_n)
+  cols <- rev(RColorBrewer::brewer.pal(n = 11, name = "RdBu")[c(2, 10)])
+  p <- ggplot2::ggplot(
+    plot_df,
+    ggplot2::aes(x = stats::reorder(source, score), y = score, fill = score)
+  ) +
+    ggplot2::geom_col(color = "black") +
+    ggplot2::coord_flip() +
+    ggplot2::scale_fill_gradient2(low = cols[1], mid = "whitesmoke", high = cols[2], midpoint = 0) +
+    ggplot2::theme_light() +
+    ggplot2::theme(panel.grid = ggplot2::element_blank()) +
+    ggplot2::xlab(NULL) +
+    ggplot2::ylab("Activity score") +
+    ggplot2::ggtitle(title)
+  save_enrichment_plot(p, out_file, width = 10, height = 8)
+}
+
+plot_decoupler_heatmap <- function(activity_mat, out_file, title, top_features = 25) {
+  if (is.null(activity_mat) || nrow(activity_mat) < 2 || ncol(activity_mat) < 2) {
+    return(NULL)
+  }
+  feature_sd <- apply(activity_mat, 2, stats::sd, na.rm = TRUE)
+  feature_sd[!is.finite(feature_sd)] <- 0
+  keep_cols <- names(sort(feature_sd, decreasing = TRUE))[seq_len(min(top_features, ncol(activity_mat)))]
+  mat <- activity_mat[, keep_cols, drop = FALSE]
+  mat <- scale(mat)
+  mat[is.na(mat)] <- 0
+  cols <- rev(RColorBrewer::brewer.pal(n = 11, name = "RdBu"))
+  cols <- grDevices::colorRampPalette(cols)(100)
+  breaks <- c(seq(-2, 0, length.out = 51), seq(0.05, 2, length.out = 49))
+  grDevices::pdf(out_file, width = 12, height = 8)
+  pheatmap::pheatmap(
+    mat = mat,
+    color = cols,
+    breaks = breaks,
+    border_color = "white",
+    main = title
+  )
+  grDevices::dev.off()
+}
+
+enrichment_rows <- list()
+cp_available <- enrichment_enabled && enrichment_cp_enabled &&
+  requireNamespace("clusterProfiler", quietly = TRUE) &&
+  requireNamespace("enrichplot", quietly = TRUE)
+if (enrichment_enabled && enrichment_cp_enabled && !cp_available) {
+  message("Enrichment requested but clusterProfiler/enrichplot are not available. Skipping enrichment.")
+}
+
+decoupler_available <- enrichment_enabled && decoupler_enabled &&
+  requireNamespace("decoupleR", quietly = TRUE)
+if (enrichment_enabled && decoupler_enabled && !decoupler_available) {
+  message("Decoupler enrichment requested but decoupleR is not available. Skipping decoupler outputs.")
+}
+
+species_info <- detect_species_from_gene_ids(rownames(dds))
+msig_term2gene <- list()
+if (cp_available && enrichment_enabled && enrichment_cp_enabled) {
+  if (!requireNamespace("msigdbr", quietly = TRUE) || is.null(species_info$msig_species)) {
+    message("MSigDB enrichment requested but msigdbr and/or species detection is unavailable. MSigDB enrichment will be skipped.")
+  } else if (!is.list(enrichment_msigdb_sets) || length(enrichment_msigdb_sets) == 0) {
+    message("No MSigDB sets configured for clusterProfiler enrichment. Skipping clusterProfiler enrichment.")
+  } else {
+    for (set_cfg in enrichment_msigdb_sets) {
+      set_name <- as.character(set_cfg$name)
+      set_category <- toupper(as.character(set_cfg$category))
+      set_subcategory <- set_cfg$subcategory
+      if (length(set_name) == 0 || !nzchar(set_name) || length(set_category) == 0 || !nzchar(set_category)) {
+        next
+      }
+      msig_tbl <- tryCatch(
+        {
+          if (is.null(set_subcategory) || is.na(set_subcategory) || !nzchar(as.character(set_subcategory))) {
+            msigdbr::msigdbr(species = species_info$msig_species, category = set_category)
+          } else {
+            msigdbr::msigdbr(
+              species = species_info$msig_species,
+              category = set_category,
+              subcategory = as.character(set_subcategory)
+            )
+          }
+        },
+        error = function(e) {
+          message(
+            "msigdbr loading failed for set '", set_name, "' (", set_category,
+            if (!is.null(set_subcategory) && !is.na(set_subcategory) && nzchar(as.character(set_subcategory))) {
+              paste0(":", as.character(set_subcategory))
+            } else {
+              ""
+            },
+            "): ", conditionMessage(e)
+          )
+          NULL
+        }
+      )
+      if (is.null(msig_tbl) || nrow(msig_tbl) == 0) {
+        next
+      }
+      term2gene <- unique(msig_tbl[, c("gs_name", "gene_symbol"), drop = FALSE])
+      colnames(term2gene) <- c("term", "gene")
+      msig_term2gene[[set_name]] <- term2gene
+    }
+    if (length(msig_term2gene) == 0) {
+      message("None of the configured MSigDB sets could be loaded. Skipping clusterProfiler enrichment.")
+    }
+  }
 }
 
 design_terms <- attr(stats::terms(design_formula), "term.labels")
@@ -746,6 +977,9 @@ for (contrast_cfg in contrast_plan) {
   }
 
   sig_df <- subset(res_df, !is.na(padj) & padj < alpha & abs(log2FoldChange) >= lfc_for_sig)
+  enrich_df <- res_df
+  enrich_df$gene_symbol_clean <- enrich_df$gene_symbol
+  enrich_df$gene_symbol_clean[!is_valid_symbol(enrich_df$gene_symbol_clean)] <- NA_character_
   if (write_sig_only) {
     utils::write.table(
       sig_df,
@@ -920,6 +1154,429 @@ for (contrast_cfg in contrast_plan) {
       ggplot2::ggsave(plot_file, p_box, width = 7, height = 5)
     }
   }
+
+  if (enrichment_enabled && enrichment_cp_enabled && cp_available) {
+    cp_dir <- file.path(contrast_dir, "clusterProfiler")
+    dir.create(cp_dir, recursive = TRUE, showWarnings = FALSE)
+
+    universe_symbols <- unique(enrich_df$gene_symbol_clean[!is.na(enrich_df$gene_symbol_clean)])
+    sig_for_enrich <- subset(enrich_df, !is.na(padj) & padj < enrichment_pvalue_cutoff)
+    pos_symbols <- unique(sig_for_enrich$gene_symbol_clean[sig_for_enrich$log2FoldChange > 0 & !is.na(sig_for_enrich$gene_symbol_clean)])
+    neg_symbols <- unique(sig_for_enrich$gene_symbol_clean[sig_for_enrich$log2FoldChange < 0 & !is.na(sig_for_enrich$gene_symbol_clean)])
+
+    ranked_stats <- enrich_df$log2FoldChange
+    names(ranked_stats) <- enrich_df$gene_symbol_clean
+    ranked_stats <- ranked_stats[!is.na(names(ranked_stats)) & is.finite(ranked_stats)]
+    ranked_stats <- deduplicate_ranked_vector(ranked_stats)
+
+    run_ora_term2gene <- function(gene_symbols, term2gene_tbl, set_name, direction_label) {
+      if (length(gene_symbols) < 2 || is.null(term2gene_tbl) || nrow(term2gene_tbl) == 0) {
+        return(NULL)
+      }
+      ora_obj <- tryCatch(
+        clusterProfiler::enricher(
+          gene = gene_symbols,
+          universe = universe_symbols,
+          TERM2GENE = term2gene_tbl,
+          pvalueCutoff = enrichment_pvalue_cutoff,
+          qvalueCutoff = enrichment_qvalue_cutoff,
+          minGSSize = enrichment_min_gs_size,
+          maxGSSize = enrichment_max_gs_size
+        ),
+        error = function(e) {
+          message("ORA failed for ", contrast_label, " [", set_name, ", ", direction_label, "]: ", conditionMessage(e))
+          NULL
+        }
+      )
+      ora_tbl <- safe_cp_result_table(ora_obj)
+      if (is.null(ora_tbl)) {
+        return(NULL)
+      }
+      utils::write.table(
+        ora_tbl,
+        file = file.path(cp_dir, paste0(contrast_label, ".", set_name, ".", direction_label, ".ORA.tsv")),
+        sep = "\t",
+        quote = FALSE,
+        row.names = FALSE
+      )
+      dot_plot <- tryCatch(
+        enrichplot::dotplot(ora_obj, showCategory = enrichment_top_terms) +
+          ggplot2::ggtitle(paste0(contrast_label, " ", set_name, " ORA (", direction_label, ")")),
+        error = function(e) NULL
+      )
+      save_enrichment_plot(
+        dot_plot,
+        file.path(cp_dir, paste0(contrast_label, ".", set_name, ".", direction_label, ".dotplot.ORA.pdf"))
+      )
+      bar_plot <- tryCatch(
+        clusterProfiler::barplot(ora_obj, showCategory = enrichment_top_terms) +
+          ggplot2::ggtitle(paste0(contrast_label, " ", set_name, " ORA (", direction_label, ")")),
+        error = function(e) NULL
+      )
+      save_enrichment_plot(
+        bar_plot,
+        file.path(cp_dir, paste0(contrast_label, ".", set_name, ".", direction_label, ".barplot.ORA.pdf"))
+      )
+      enrichment_rows[[length(enrichment_rows) + 1]] <<- data.frame(
+        contrast = contrast_label,
+        method = "ORA",
+        gene_set = set_name,
+        direction = direction_label,
+        terms = nrow(ora_tbl),
+        top_term = as.character(ora_tbl$Description[[1]]),
+        top_padj = as.numeric(ora_tbl$p.adjust[[1]]),
+        stringsAsFactors = FALSE
+      )
+      ora_tbl
+    }
+
+    run_gsea_term2gene <- function(ranked_vec, term2gene_tbl, set_name) {
+      if (length(ranked_vec) < 10 || is.null(term2gene_tbl) || nrow(term2gene_tbl) == 0) {
+        return(NULL)
+      }
+      gsea_args <- list(
+        geneList = ranked_vec,
+        TERM2GENE = term2gene_tbl,
+        pvalueCutoff = enrichment_pvalue_cutoff,
+        minGSSize = enrichment_min_gs_size,
+        maxGSSize = enrichment_max_gs_size,
+        verbose = FALSE
+      )
+      if ("nPermSimple" %in% names(formals(clusterProfiler::GSEA))) {
+        gsea_args$nPermSimple <- enrichment_gsea_permutations
+      }
+      gsea_obj <- tryCatch(
+        do.call(clusterProfiler::GSEA, gsea_args),
+        error = function(e) {
+          message("GSEA failed for ", contrast_label, " [", set_name, "]: ", conditionMessage(e))
+          NULL
+        }
+      )
+      gsea_tbl <- safe_cp_result_table(gsea_obj)
+      if (is.null(gsea_tbl)) {
+        return(NULL)
+      }
+      utils::write.table(
+        gsea_tbl,
+        file = file.path(cp_dir, paste0(contrast_label, ".", set_name, ".GSEA.tsv")),
+        sep = "\t",
+        quote = FALSE,
+        row.names = FALSE
+      )
+      dot_plot <- tryCatch(
+        enrichplot::dotplot(gsea_obj, showCategory = enrichment_top_terms) +
+          ggplot2::ggtitle(paste0(contrast_label, " ", set_name, " GSEA")),
+        error = function(e) NULL
+      )
+      save_enrichment_plot(
+        dot_plot,
+        file.path(cp_dir, paste0(contrast_label, ".", set_name, ".dotplot.GSEA.pdf"))
+      )
+      ridge_plot <- tryCatch(
+        enrichplot::ridgeplot(gsea_obj, showCategory = enrichment_top_terms) +
+          ggplot2::ggtitle(paste0(contrast_label, " ", set_name, " GSEA")),
+        error = function(e) NULL
+      )
+      save_enrichment_plot(
+        ridge_plot,
+        file.path(cp_dir, paste0(contrast_label, ".", set_name, ".ridgeplot.GSEA.pdf"))
+      )
+      top_ids <- head(as.character(gsea_tbl$ID), min(10, nrow(gsea_tbl)))
+      if (length(top_ids) > 0) {
+        for (term_id in top_ids) {
+          gp <- tryCatch(
+            enrichplot::gseaplot2(gsea_obj, geneSetID = term_id, title = term_id),
+            error = function(e) NULL
+          )
+          save_enrichment_plot(
+            gp,
+            file.path(
+              cp_dir,
+              paste0(contrast_label, ".", set_name, ".nesplot.", sanitize_file_component(term_id, "term"), ".GSEA.pdf")
+            ),
+            width = 10,
+            height = 6
+          )
+        }
+      }
+      enrichment_rows[[length(enrichment_rows) + 1]] <<- data.frame(
+        contrast = contrast_label,
+        method = "GSEA",
+        gene_set = set_name,
+        direction = "ranked",
+        terms = nrow(gsea_tbl),
+        top_term = as.character(gsea_tbl$Description[[1]]),
+        top_padj = as.numeric(gsea_tbl$p.adjust[[1]]),
+        stringsAsFactors = FALSE
+      )
+      gsea_tbl
+    }
+
+    if (enrichment_cp_run_ora) {
+      for (set_name in names(msig_term2gene)) {
+        run_ora_term2gene(pos_symbols, msig_term2gene[[set_name]], set_name, "up")
+        run_ora_term2gene(neg_symbols, msig_term2gene[[set_name]], set_name, "down")
+      }
+    }
+
+    if (enrichment_cp_run_gsea) {
+      for (set_name in names(msig_term2gene)) {
+        run_gsea_term2gene(ranked_stats, msig_term2gene[[set_name]], set_name)
+      }
+    }
+  }
+
+  if (enrichment_enabled && decoupler_enabled && decoupler_available &&
+      (decoupler_run_progeny || decoupler_run_tf_network)) {
+    dc_dir <- file.path(contrast_dir, "decoupler")
+    dir.create(dc_dir, recursive = TRUE, showWarnings = FALSE)
+
+    sample_symbol_ids <- symbols_for_ids(rownames(SummarizedExperiment::assay(vst_obj)), fallback_to_ids = FALSE)
+    sample_symbol_ids[!is_valid_symbol(sample_symbol_ids)] <- NA_character_
+    dc_sample_mat <- aggregate_symbol_matrix(SummarizedExperiment::assay(vst_obj), sample_symbol_ids)
+
+    deg_symbol_ids <- enrich_df$gene_symbol_clean
+    dc_deg_mat_raw <- matrix(
+      enrich_df$log2FoldChange,
+      ncol = 1,
+      dimnames = list(deg_symbol_ids, contrast_label)
+    )
+    dc_deg_mat <- aggregate_symbol_matrix(dc_deg_mat_raw, rownames(dc_deg_mat_raw))
+
+    dc_deg_stats <- enrich_df[, c("gene_symbol_clean", "log2FoldChange", "pvalue"), drop = FALSE]
+    dc_deg_stats <- dc_deg_stats[!is.na(dc_deg_stats$gene_symbol_clean), , drop = FALSE]
+    dc_deg_stats <- dc_deg_stats[order(abs(dc_deg_stats$log2FoldChange), decreasing = TRUE), , drop = FALSE]
+    dc_deg_stats <- dc_deg_stats[!duplicated(dc_deg_stats$gene_symbol_clean), , drop = FALSE]
+    rownames(dc_deg_stats) <- dc_deg_stats$gene_symbol_clean
+
+    species_dc <- if (species_info$species_label %in% c("human", "mouse")) species_info$species_label else "human"
+
+    safe_decouple_run <- function(fun_name, mat, net, mor_col) {
+      if (!(fun_name %in% getNamespaceExports("decoupleR"))) {
+        return(NULL)
+      }
+      fun <- get(fun_name, envir = asNamespace("decoupleR"))
+      tryCatch(
+        fun(
+          mat = mat,
+          net = net,
+          .source = "source",
+          .target = "target",
+          .mor = mor_col,
+          minsize = decoupler_minsize
+        ),
+        error = function(e) {
+          message("decoupleR ", fun_name, " failed in ", contrast_label, ": ", conditionMessage(e))
+          NULL
+        }
+      )
+    }
+
+    plot_decoupler_detail <- function(net_tbl, activity_tbl, mor_col, out_prefix, label_suffix) {
+      if (is.null(activity_tbl) || nrow(activity_tbl) == 0) {
+        return()
+      }
+      activity_tbl <- activity_tbl[is.finite(activity_tbl$score), , drop = FALSE]
+      if (nrow(activity_tbl) == 0) {
+        return()
+      }
+      activity_tbl <- activity_tbl[order(activity_tbl$score), , drop = FALSE]
+      n_each <- min(decoupler_top_regulators_detail_each_side, floor(nrow(activity_tbl) / 2))
+      if (n_each < 1) {
+        return()
+      }
+      top_regs <- c(
+        head(activity_tbl$source, n_each),
+        tail(activity_tbl$source, n_each)
+      )
+      top_regs <- unique(as.character(top_regs))
+      cols <- rev(RColorBrewer::brewer.pal(n = 11, name = "RdBu")[c(2, 10)])
+      for (reg in top_regs) {
+        reg_net <- net_tbl[net_tbl$source == reg, c("target", mor_col), drop = FALSE]
+        colnames(reg_net) <- c("target", "mor_value")
+        reg_net <- reg_net[!is.na(reg_net$target), , drop = FALSE]
+        if (nrow(reg_net) == 0) {
+          next
+        }
+        inter <- intersect(reg_net$target, rownames(dc_deg_stats))
+        if (length(inter) < 3) {
+          next
+        }
+        plot_df <- data.frame(
+          target = inter,
+          mor = reg_net$mor_value[match(inter, reg_net$target)],
+          logfc = dc_deg_stats[inter, "log2FoldChange"],
+          pvalue = dc_deg_stats[inter, "pvalue"],
+          stringsAsFactors = FALSE
+        )
+        plot_df$color_class <- "neutral"
+        plot_df$color_class[plot_df$mor > 0 & plot_df$logfc > 0] <- "concordant"
+        plot_df$color_class[plot_df$mor < 0 & plot_df$logfc < 0] <- "concordant"
+        plot_df$color_class[plot_df$mor > 0 & plot_df$logfc < 0] <- "discordant"
+        plot_df$color_class[plot_df$mor < 0 & plot_df$logfc > 0] <- "discordant"
+        p <- ggplot2::ggplot(
+          plot_df,
+          ggplot2::aes(x = mor, y = logfc, color = color_class)
+        ) +
+          ggplot2::geom_point(size = 2) +
+          ggplot2::scale_color_manual(values = c("concordant" = cols[2], "discordant" = cols[1], "neutral" = "grey60")) +
+          ggplot2::geom_vline(xintercept = 0, linetype = "dotted") +
+          ggplot2::geom_hline(yintercept = 0, linetype = "dotted") +
+          ggplot2::theme_light() +
+          ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none") +
+          ggplot2::xlab("Network weight") +
+          ggplot2::ylab("log2 fold change") +
+          ggplot2::ggtitle(reg)
+        if (requireNamespace("ggrepel", quietly = TRUE)) {
+          p <- p + ggrepel::geom_text_repel(
+            data = head(plot_df[order(abs(plot_df$logfc), decreasing = TRUE), , drop = FALSE], 20),
+            ggplot2::aes(label = target),
+            size = 3
+          )
+        }
+        save_enrichment_plot(
+          p,
+          file.path(dc_dir, paste0(out_prefix, ".DE_genes.in.", sanitize_file_component(reg, "regulator"), ".", label_suffix, ".pdf")),
+          width = 9,
+          height = 7
+        )
+      }
+    }
+
+    if (decoupler_run_progeny && nrow(dc_sample_mat) >= 20 && nrow(dc_deg_mat) >= 20 &&
+        "get_progeny" %in% getNamespaceExports("decoupleR")) {
+      prog_net <- tryCatch(
+        decoupleR::get_progeny(organism = species_dc, top = decoupler_progeny_top),
+        error = function(e) {
+          message("get_progeny failed in ", contrast_label, ": ", conditionMessage(e))
+          NULL
+        }
+      )
+      if (!is.null(prog_net) && nrow(prog_net) > 0) {
+        prog_all <- safe_decouple_run("run_mlm", dc_sample_mat, prog_net, "weight")
+        prog_deg <- safe_decouple_run("run_mlm", dc_deg_mat, prog_net, "weight")
+        if (!is.null(prog_all)) {
+          utils::write.table(
+            prog_all,
+            file = file.path(dc_dir, paste0(contrast_label, ".all_genes.progeny_pathways.tsv")),
+            sep = "\t",
+            quote = FALSE,
+            row.names = FALSE
+          )
+          prog_all_mat <- decoupler_to_matrix(as.data.frame(prog_all))
+          plot_decoupler_heatmap(
+            prog_all_mat,
+            file.path(dc_dir, paste0(contrast_label, ".all_genes.progeny_pathways.pdf")),
+            paste0(contrast_label, " progeny pathway activity"),
+            top_features = decoupler_top_features_heatmap
+          )
+        }
+        if (!is.null(prog_deg)) {
+          utils::write.table(
+            prog_deg,
+            file = file.path(dc_dir, paste0(contrast_label, ".DE_genes.progeny_pathways.tsv")),
+            sep = "\t",
+            quote = FALSE,
+            row.names = FALSE
+          )
+          plot_decoupler_bar(
+            as.data.frame(prog_deg),
+            file.path(dc_dir, paste0(contrast_label, ".DE_genes.progeny_pathways.pdf")),
+            paste0(contrast_label, " progeny pathway activity (DE genes)"),
+            top_n = decoupler_top_regulators_barplot
+          )
+          plot_decoupler_detail(
+            net_tbl = prog_net,
+            activity_tbl = as.data.frame(prog_deg),
+            mor_col = "weight",
+            out_prefix = contrast_label,
+            label_suffix = "progeny_pathway"
+          )
+          prog_deg_tbl <- as.data.frame(prog_deg)
+          if (all(c("source", "score") %in% colnames(prog_deg_tbl))) {
+            top_prog <- prog_deg_tbl[order(-abs(prog_deg_tbl$score)), , drop = FALSE]
+            enrichment_rows[[length(enrichment_rows) + 1]] <- data.frame(
+              contrast = contrast_label,
+              method = "decoupleR_MLM",
+              gene_set = "progeny",
+              direction = "ranked",
+              terms = nrow(prog_deg_tbl),
+              top_term = as.character(top_prog$source[[1]]),
+              top_padj = NA_real_,
+              stringsAsFactors = FALSE
+            )
+          }
+        }
+      }
+    }
+
+    if (decoupler_run_tf_network && nrow(dc_sample_mat) >= 20 && nrow(dc_deg_mat) >= 20 &&
+        "get_collectri" %in% getNamespaceExports("decoupleR")) {
+      tf_net <- tryCatch(
+        decoupleR::get_collectri(organism = species_dc, split_complexes = decoupler_tf_split_complexes),
+        error = function(e) {
+          message("get_collectri failed in ", contrast_label, ": ", conditionMessage(e))
+          NULL
+        }
+      )
+      if (!is.null(tf_net) && nrow(tf_net) > 0) {
+        tf_all <- safe_decouple_run("run_ulm", dc_sample_mat, tf_net, "mor")
+        tf_deg <- safe_decouple_run("run_ulm", dc_deg_mat, tf_net, "mor")
+        if (!is.null(tf_all)) {
+          utils::write.table(
+            tf_all,
+            file = file.path(dc_dir, paste0(contrast_label, ".all_genes.TF_network_activity.tsv")),
+            sep = "\t",
+            quote = FALSE,
+            row.names = FALSE
+          )
+          tf_all_mat <- decoupler_to_matrix(as.data.frame(tf_all))
+          plot_decoupler_heatmap(
+            tf_all_mat,
+            file.path(dc_dir, paste0(contrast_label, ".all_genes.TF_network_activity.pdf")),
+            paste0(contrast_label, " TF network activity"),
+            top_features = decoupler_top_features_heatmap
+          )
+        }
+        if (!is.null(tf_deg)) {
+          utils::write.table(
+            tf_deg,
+            file = file.path(dc_dir, paste0(contrast_label, ".DE_genes.TF_network_activity.tsv")),
+            sep = "\t",
+            quote = FALSE,
+            row.names = FALSE
+          )
+          plot_decoupler_bar(
+            as.data.frame(tf_deg),
+            file.path(dc_dir, paste0(contrast_label, ".DE_genes.TF_network_activity.pdf")),
+            paste0(contrast_label, " TF network activity (DE genes)"),
+            top_n = decoupler_top_regulators_barplot
+          )
+          plot_decoupler_detail(
+            net_tbl = tf_net,
+            activity_tbl = as.data.frame(tf_deg),
+            mor_col = "mor",
+            out_prefix = contrast_label,
+            label_suffix = "TF_network_activity"
+          )
+          tf_deg_tbl <- as.data.frame(tf_deg)
+          if (all(c("source", "score") %in% colnames(tf_deg_tbl))) {
+            top_tf <- tf_deg_tbl[order(-abs(tf_deg_tbl$score)), , drop = FALSE]
+            enrichment_rows[[length(enrichment_rows) + 1]] <- data.frame(
+              contrast = contrast_label,
+              method = "decoupleR_ULM",
+              gene_set = "collectri_tf",
+              direction = "ranked",
+              terms = nrow(tf_deg_tbl),
+              top_term = as.character(top_tf$source[[1]]),
+              top_padj = NA_real_,
+              stringsAsFactors = FALSE
+            )
+          }
+        }
+      }
+    }
+  }
 }
 
 if (length(contrast_summaries) > 0) {
@@ -968,6 +1625,18 @@ if (length(contrast_summaries) > 0) {
     plot = p_summary,
     width = 10,
     height = 6
+  )
+}
+
+if (length(enrichment_rows) > 0) {
+  enrichment_summary <- do.call(rbind, enrichment_rows)
+  enrichment_summary <- enrichment_summary[order(enrichment_summary$contrast, enrichment_summary$method, enrichment_summary$gene_set), , drop = FALSE]
+  utils::write.table(
+    enrichment_summary,
+    file = file.path(de_dir, "enrichment_summary.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
   )
 }
 
