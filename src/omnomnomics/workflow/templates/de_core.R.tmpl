@@ -79,17 +79,38 @@ sanitize_file_component <- function(x, fallback = "item") {
   if (!nzchar(x)) fallback else x
 }
 
-categorical_palette <- function(levels_vec) {
+is_informative_column <- function(df, column_name) {
+  if (!(column_name %in% colnames(df))) {
+    return(FALSE)
+  }
+  values <- as.character(df[[column_name]])
+  values <- values[!is.na(values) & nzchar(values)]
+  length(unique(values)) >= 2
+}
+
+qualitative_palette_names <- c("Set1", "Dark2", "Paired", "Set2", "Accent", "Pastel1", "Pastel2", "Set3")
+
+palette_name_for_column <- function(column_name) {
+  if (!nzchar(column_name)) {
+    return(qualitative_palette_names[[1]])
+  }
+  idx <- (sum(utf8ToInt(column_name)) %% length(qualitative_palette_names)) + 1
+  qualitative_palette_names[[idx]]
+}
+
+categorical_palette <- function(levels_vec, palette_name = NULL) {
   levels_vec <- unique(as.character(levels_vec))
   levels_vec <- levels_vec[nzchar(levels_vec)]
   if (length(levels_vec) == 0) {
     return(c())
   }
   brewer_info <- RColorBrewer::brewer.pal.info
-  qualitative <- rownames(brewer_info[brewer_info$category == "qual", , drop = FALSE])
-  best_name <- qualitative[which.max(brewer_info[qualitative, "maxcolors"])]
-  base_n <- brewer_info[best_name, "maxcolors"]
-  base_palette <- RColorBrewer::brewer.pal(max(3, min(base_n, length(levels_vec))), best_name)
+  if (is.null(palette_name) || !(palette_name %in% rownames(brewer_info))) {
+    qualitative <- rownames(brewer_info[brewer_info$category == "qual", , drop = FALSE])
+    palette_name <- qualitative[which.max(brewer_info[qualitative, "maxcolors"])]
+  }
+  base_n <- brewer_info[palette_name, "maxcolors"]
+  base_palette <- RColorBrewer::brewer.pal(max(3, min(base_n, length(levels_vec))), palette_name)
   if (length(levels_vec) > length(base_palette)) {
     base_palette <- grDevices::colorRampPalette(base_palette)(length(levels_vec))
   } else {
@@ -119,7 +140,7 @@ strip_ensembl_version <- function(ids) {
   sub("\\..*$", "", as.character(ids))
 }
 
-map_gene_symbols <- function(gene_ids) {
+map_gene_symbols <- function(gene_ids, fallback_to_ids = TRUE) {
   gene_ids <- as.character(gene_ids)
   ids_no_version <- strip_ensembl_version(gene_ids)
   symbols <- rep(NA_character_, length(ids_no_version))
@@ -153,7 +174,11 @@ map_gene_symbols <- function(gene_ids) {
   }
 
   missing <- is.na(symbols) | !nzchar(symbols)
-  symbols[missing] <- ids_no_version[missing]
+  if (fallback_to_ids) {
+    symbols[missing] <- ids_no_version[missing]
+  } else {
+    symbols[missing] <- NA_character_
+  }
   symbols
 }
 
@@ -222,11 +247,24 @@ annotation_columns <- annotation_columns[annotation_columns %in% colnames(col_da
 
 annotation_df <- NULL
 annotation_colors <- list()
-if (length(annotation_columns) > 0) {
+informative_annotation_columns <- character(0)
+annotation_df_informative <- NULL
+annotation_colors_informative <- list()
+  if (length(annotation_columns) > 0) {
   annotation_df <- as.data.frame(col_data[, annotation_columns, drop = FALSE], stringsAsFactors = FALSE)
   for (column_name in colnames(annotation_df)) {
     annotation_df[[column_name]] <- as.factor(as.character(annotation_df[[column_name]]))
-    annotation_colors[[column_name]] <- categorical_palette(levels(annotation_df[[column_name]]))
+    annotation_colors[[column_name]] <- categorical_palette(
+      levels(annotation_df[[column_name]]),
+      palette_name = palette_name_for_column(column_name)
+    )
+  }
+  informative_annotation_columns <- colnames(annotation_df)[
+    vapply(colnames(annotation_df), function(x) is_informative_column(annotation_df, x), logical(1))
+  ]
+  if (length(informative_annotation_columns) > 0) {
+    annotation_df_informative <- annotation_df[, informative_annotation_columns, drop = FALSE]
+    annotation_colors_informative <- annotation_colors[informative_annotation_columns]
   }
 }
 
@@ -241,7 +279,14 @@ add_palette_rows <- function(column_name) {
   }
   column_values <- as.character(col_data[[column_name]])
   levels_vec <- unique(column_values)
-  pal <- categorical_palette(levels_vec)
+  levels_vec <- levels_vec[!is.na(levels_vec) & nzchar(levels_vec)]
+  if (length(levels_vec) < 2) {
+    return()
+  }
+  pal <- categorical_palette(
+    levels_vec,
+    palette_name = palette_name_for_column(column_name)
+  )
   if (length(pal) == 0) {
     return()
   }
@@ -352,9 +397,18 @@ if (!is.null(cooks_mat)) {
 }
 
 if (qc_enabled) {
+  pca_color_by_use <- pca_color_by[
+    pca_color_by %in% colnames(col_data) &
+      vapply(pca_color_by, function(x) is_informative_column(col_data, x), logical(1))
+  ]
+  pca_shape_by_values_use <- pca_shape_by_values[
+    pca_shape_by_values %in% colnames(col_data) &
+      vapply(pca_shape_by_values, function(x) is_informative_column(col_data, x), logical(1))
+  ]
+
   if (distance_plot_enabled) {
     dist_mat <- as.matrix(stats::dist(t(SummarizedExperiment::assay(vst_obj))))
-    label_columns <- annotation_columns[annotation_columns %in% colnames(col_data)]
+    label_columns <- informative_annotation_columns
     label_columns <- label_columns[seq_len(min(3, length(label_columns)))]
     if (length(label_columns) > 0) {
       sample_labels <- apply(
@@ -394,8 +448,8 @@ if (qc_enabled) {
       cluster_cols = TRUE,
       breaks = hm_breaks,
       color = hm_colors,
-      annotation_col = annotation_df,
-      annotation_colors = annotation_colors,
+      annotation_col = annotation_df_informative,
+      annotation_colors = annotation_colors_informative,
       show_rownames = FALSE,
       show_colnames = TRUE,
       main = "Top variable genes"
@@ -423,7 +477,10 @@ if (qc_enabled) {
       }
       plot_df <- pca_df
       plot_df[[color_col]] <- as.factor(as.character(plot_df[[color_col]]))
-      color_map <- categorical_palette(levels(plot_df[[color_col]]))
+      color_map <- categorical_palette(
+        levels(plot_df[[color_col]]),
+        palette_name = palette_name_for_column(color_col)
+      )
       if (length(color_map) == 0) {
         return()
       }
@@ -445,14 +502,8 @@ if (qc_enabled) {
       ggplot2::ggsave(filename = file.path(qc_dir, out_name), plot = p, width = 8, height = 8)
     }
 
-    if (length(pca_shape_by_values) == 0) {
-      pca_shape_by_values <- character(0)
-    } else {
-      pca_shape_by_values <- unique(pca_shape_by_values[pca_shape_by_values %in% colnames(col_data)])
-    }
-
-    for (color_col in pca_color_by) {
-      shape_options <- c("", pca_shape_by_values)
+    for (color_col in pca_color_by_use) {
+      shape_options <- c("", pca_shape_by_values_use)
       for (shape_col in shape_options) {
         plot_pca_pair(1, 2, color_col, shape_col)
         if (length(pca_extra_pairs) > 0) {
@@ -590,15 +641,18 @@ for (contrast_cfg in contrast_plan) {
     if (volcano_labels_enabled && requireNamespace("ggrepel", quietly = TRUE)) {
       label_df <- subset(vdf, is_sig)
       label_df <- label_df[order(label_df$padj, -abs(label_df$log2FoldChange)), , drop = FALSE]
-      label_df$gene_symbol <- map_gene_symbols(label_df$gene_id)
+      label_df$gene_symbol <- map_gene_symbols(label_df$gene_id, fallback_to_ids = FALSE)
+      label_df <- label_df[!is.na(label_df$gene_symbol) & nzchar(label_df$gene_symbol), , drop = FALSE]
       label_df <- head(label_df, max_volcano_labels)
-      p_labels <- p + ggrepel::geom_text_repel(
-        data = label_df,
-        ggplot2::aes(label = gene_symbol),
-        size = 3,
-        max.overlaps = max_volcano_labels
-      )
-      ggplot2::ggsave(file.path(contrast_dir, paste0(contrast_label, ".volcano_plot_labels.pdf")), p_labels, width = 10, height = 7)
+      if (nrow(label_df) > 0) {
+        p_labels <- p + ggrepel::geom_text_repel(
+          data = label_df,
+          ggplot2::aes(label = gene_symbol),
+          size = 3,
+          max.overlaps = max_volcano_labels
+        )
+        ggplot2::ggsave(file.path(contrast_dir, paste0(contrast_label, ".volcano_plot_labels.pdf")), p_labels, width = 10, height = 7)
+      }
     }
   }
 
@@ -631,8 +685,8 @@ for (contrast_cfg in contrast_plan) {
       pheatmap::pheatmap(
         hm,
         color = hm_colors,
-        annotation_col = annotation_df,
-        annotation_colors = annotation_colors,
+        annotation_col = annotation_df_informative,
+        annotation_colors = annotation_colors_informative,
         cluster_rows = sig_heatmap_cluster_rows,
         cluster_cols = sig_heatmap_cluster_cols,
         show_rownames = TRUE,
@@ -669,20 +723,25 @@ for (contrast_cfg in contrast_plan) {
 
   top10_df <- subset(res_df, !is.na(padj) & abs(log2FoldChange) >= lfc_for_sig)
   top10_df <- top10_df[order(top10_df$padj, -abs(top10_df$log2FoldChange)), , drop = FALSE]
+  top10_df$gene_symbol_plot <- map_gene_symbols(top10_df$gene_id, fallback_to_ids = FALSE)
+  top10_df <- top10_df[!is.na(top10_df$gene_symbol_plot) & nzchar(top10_df$gene_symbol_plot), , drop = FALSE]
   top10_df <- head(top10_df, 10)
   if (nrow(top10_df) > 0 && factor_name %in% colnames(col_data)) {
     boxplot_dir <- file.path(contrast_dir, "top10_boxplots")
     dir.create(boxplot_dir, recursive = TRUE, showWarnings = FALSE)
     group_values <- as.factor(as.character(col_data[[factor_name]]))
-    group_palette <- categorical_palette(levels(group_values))
+    group_palette <- categorical_palette(
+      levels(group_values),
+      palette_name = palette_name_for_column(factor_name)
+    )
     for (idx in seq_len(nrow(top10_df))) {
       gene_id <- top10_df$gene_id[idx]
       if (!(gene_id %in% rownames(SummarizedExperiment::assay(vst_obj)))) {
         next
       }
-      gene_symbol <- top10_df$gene_symbol[idx]
+      gene_symbol <- top10_df$gene_symbol_plot[idx]
       if (is.na(gene_symbol) || !nzchar(gene_symbol)) {
-        gene_symbol <- gene_id
+        next
       }
       plot_df <- data.frame(
         sample = rownames(col_data),
