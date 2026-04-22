@@ -15,6 +15,9 @@ dependencies:
   - r-matrixstats
   - r-rcolorbrewer
   - r-ggrepel
+  - bioconductor-annotationdbi
+  - bioconductor-org.hs.eg.db
+  - bioconductor-org.mm.eg.db
   - genomepy>=0.16
   - snakemake>=7.25,<8
   - multiqc

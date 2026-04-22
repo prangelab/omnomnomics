@@ -156,6 +156,14 @@ rule call_DE:
             tables_cfg = resolved_de_config.get("tables", {})
             runtime_cfg = resolved_de_config.get("runtime", {})
 
+            pca_shape_cfg = pca_cfg.get("shape_by", [])
+            if isinstance(pca_shape_cfg, list):
+                pca_shape_values = [str(item) for item in pca_shape_cfg if str(item).strip()]
+            elif pca_shape_cfg:
+                pca_shape_values = [str(pca_shape_cfg).strip()]
+            else:
+                pca_shape_values = []
+
             template_path = os.path.join(workflow_root, "templates", "de_core.R.tmpl")
             if not os.path.isfile(template_path):
                 raise FileNotFoundError(f"DE template file not found: {template_path}")
@@ -192,7 +200,7 @@ rule call_DE:
                 "__VARIABLE_HEATMAP_ENABLED__": _r_bool(qc_cfg.get("variable_gene_heatmap", True)),
                 "__PCA_ENABLED__": _r_bool(pca_cfg.get("enabled", True)),
                 "__PCA_COLOR_BY__": _r_char_vector(pca_cfg.get("color_by", [])),
-                "__PCA_SHAPE_BY__": _r_string(str(pca_cfg.get("shape_by") or "")),
+                "__PCA_SHAPE_BY_VALUES__": _r_char_vector(pca_shape_values),
                 "__PCA_EXTRA_PAIRS__": _r_numeric_pair_list(pca_cfg.get("extra_pairs", [[1, 2], [2, 3]])),
                 "__MA_PLOT_ENABLED__": _r_bool(plots_cfg.get("ma_plot", True)),
                 "__VOLCANO_ENABLED__": _r_bool(volcano_cfg.get("enabled", True)),

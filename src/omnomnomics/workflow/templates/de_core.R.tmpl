@@ -48,7 +48,7 @@ distance_plot_enabled <- __DISTANCE_PLOT_ENABLED__
 variable_heatmap_enabled <- __VARIABLE_HEATMAP_ENABLED__
 pca_enabled <- __PCA_ENABLED__
 pca_color_by <- __PCA_COLOR_BY__
-pca_shape_by <- __PCA_SHAPE_BY__
+pca_shape_by_values <- __PCA_SHAPE_BY_VALUES__
 pca_extra_pairs <- __PCA_EXTRA_PAIRS__
 
 ma_plot_enabled <- __MA_PLOT_ENABLED__
@@ -70,6 +70,13 @@ sanitize_name <- function(x) {
   x <- gsub("_+", "_", x)
   x <- gsub("^[_\\.\\-]+|[_\\.\\-]+$", "", x)
   if (!nzchar(x)) "contrast" else x
+}
+
+sanitize_file_component <- function(x, fallback = "item") {
+  x <- gsub("[^A-Za-z0-9._-]+", "_", x)
+  x <- gsub("_+", "_", x)
+  x <- gsub("^[_\\.\\-]+|[_\\.\\-]+$", "", x)
+  if (!nzchar(x)) fallback else x
 }
 
 categorical_palette <- function(levels_vec) {
@@ -100,6 +107,54 @@ gradient_palette <- function(n) {
     return(grDevices::colorRampPalette(base_palette)(n))
   }
   stats::setNames(base_palette[seq_len(n)], NULL)
+}
+
+row_zscore <- function(mat) {
+  scaled <- t(scale(t(mat)))
+  scaled[is.na(scaled)] <- 0
+  scaled
+}
+
+strip_ensembl_version <- function(ids) {
+  sub("\\..*$", "", as.character(ids))
+}
+
+map_gene_symbols <- function(gene_ids) {
+  gene_ids <- as.character(gene_ids)
+  ids_no_version <- strip_ensembl_version(gene_ids)
+  symbols <- rep(NA_character_, length(ids_no_version))
+
+  has_annotationdbi <- requireNamespace("AnnotationDbi", quietly = TRUE)
+  if (has_annotationdbi) {
+    is_human <- grepl("^ENSG", ids_no_version)
+    is_mouse <- grepl("^ENSMUSG", ids_no_version)
+
+    if (any(is_human) && requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
+      mapped <- AnnotationDbi::mapIds(
+        org.Hs.eg.db::org.Hs.eg.db,
+        keys = unique(ids_no_version[is_human]),
+        column = "SYMBOL",
+        keytype = "ENSEMBL",
+        multiVals = "first"
+      )
+      symbols[is_human] <- unname(mapped[ids_no_version[is_human]])
+    }
+
+    if (any(is_mouse) && requireNamespace("org.Mm.eg.db", quietly = TRUE)) {
+      mapped <- AnnotationDbi::mapIds(
+        org.Mm.eg.db::org.Mm.eg.db,
+        keys = unique(ids_no_version[is_mouse]),
+        column = "SYMBOL",
+        keytype = "ENSEMBL",
+        multiVals = "first"
+      )
+      symbols[is_mouse] <- unname(mapped[ids_no_version[is_mouse]])
+    }
+  }
+
+  missing <- is.na(symbols) | !nzchar(symbols)
+  symbols[missing] <- ids_no_version[missing]
+  symbols
 }
 
 counts_df <- utils::read.delim(counts_path, check.names = FALSE, stringsAsFactors = FALSE)
@@ -135,6 +190,7 @@ if (any(non_integer, na.rm = TRUE)) {
   stop("Count table contains non-integer values. DESeq2 requires raw integer counts.")
 }
 storage.mode(count_matrix) <- "integer"
+genes_before_filter <- nrow(count_matrix)
 
 col_data <- metadata_df
 rownames(col_data) <- sample_columns
@@ -143,6 +199,7 @@ if (filtering_enabled && filtering_method == "min_count_samples") {
   keep <- rowSums(count_matrix >= filtering_min_count) >= filtering_min_samples
   count_matrix <- count_matrix[keep, , drop = FALSE]
 }
+genes_after_filter <- nrow(count_matrix)
 
 design_formula <- stats::as.formula(design_formula_text)
 dds <- DESeq2::DESeqDataSetFromMatrix(
@@ -152,6 +209,26 @@ dds <- DESeq2::DESeqDataSetFromMatrix(
 )
 dds <- DESeq2::DESeq(dds, fitType = deseq_fit_type, sfType = deseq_sf_type, parallel = deseq_parallel)
 vst_obj <- DESeq2::vst(dds, blind = vst_blind)
+
+design_terms <- attr(stats::terms(design_formula), "term.labels")
+annotation_columns <- unique(unlist(strsplit(design_terms, ":", fixed = TRUE)))
+annotation_columns <- annotation_columns[nzchar(annotation_columns)]
+annotation_columns <- unique(c(
+  annotation_columns,
+  pca_color_by,
+  pca_shape_by_values
+))
+annotation_columns <- annotation_columns[annotation_columns %in% colnames(col_data)]
+
+annotation_df <- NULL
+annotation_colors <- list()
+if (length(annotation_columns) > 0) {
+  annotation_df <- as.data.frame(col_data[, annotation_columns, drop = FALSE], stringsAsFactors = FALSE)
+  for (column_name in colnames(annotation_df)) {
+    annotation_df[[column_name]] <- as.factor(as.character(annotation_df[[column_name]]))
+    annotation_colors[[column_name]] <- categorical_palette(levels(annotation_df[[column_name]]))
+  }
+}
 
 dir.create(output_root, recursive = TRUE, showWarnings = FALSE)
 dir.create(qc_dir, recursive = TRUE, showWarnings = FALSE)
@@ -181,8 +258,8 @@ add_palette_rows("sample_color")
 for (column_name in pca_color_by) {
   add_palette_rows(column_name)
 }
-if (nzchar(pca_shape_by)) {
-  add_palette_rows(pca_shape_by)
+for (column_name in pca_shape_by_values) {
+  add_palette_rows(column_name)
 }
 if (length(palette_rows) > 0) {
   palette_table <- do.call(rbind, palette_rows)
@@ -195,9 +272,99 @@ if (length(palette_rows) > 0) {
   )
 }
 
+filter_summary <- data.frame(
+  filtering_enabled = filtering_enabled,
+  filtering_method = filtering_method,
+  min_count = filtering_min_count,
+  min_samples = filtering_min_samples,
+  genes_before = genes_before_filter,
+  genes_after = genes_after_filter,
+  genes_removed = genes_before_filter - genes_after_filter,
+  percent_kept = round(100 * genes_after_filter / max(genes_before_filter, 1), 3),
+  stringsAsFactors = FALSE
+)
+utils::write.table(
+  filter_summary,
+  file = file.path(qc_dir, "filtering_summary.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+norm_counts <- DESeq2::counts(dds, normalized = TRUE)
+utils::write.table(
+  data.frame(gene_id = rownames(norm_counts), norm_counts, check.names = FALSE),
+  file = file.path(qc_dir, "normalized_counts.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+vst_mat <- SummarizedExperiment::assay(vst_obj)
+utils::write.table(
+  data.frame(gene_id = rownames(vst_mat), vst_mat, check.names = FALSE),
+  file = file.path(qc_dir, "vst_matrix.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+grDevices::pdf(file.path(qc_dir, "dispersion_plot.pdf"), width = 8, height = 6)
+DESeq2::plotDispEsts(dds)
+grDevices::dev.off()
+
+cooks_mat <- tryCatch(SummarizedExperiment::assay(dds, "cooks"), error = function(e) NULL)
+if (!is.null(cooks_mat)) {
+  cooks_sample_summary <- data.frame(
+    sample = colnames(cooks_mat),
+    genes_cooks_gt_10 = colSums(cooks_mat > 10, na.rm = TRUE),
+    max_cooks = apply(cooks_mat, 2, max, na.rm = TRUE),
+    q99_cooks = apply(cooks_mat, 2, stats::quantile, probs = 0.99, na.rm = TRUE),
+    stringsAsFactors = FALSE
+  )
+  utils::write.table(
+    cooks_sample_summary,
+    file = file.path(qc_dir, "cooks_distance_sample_summary.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+
+  cooks_global <- data.frame(
+    metric = c("num_values", "num_gt_1", "num_gt_5", "num_gt_10", "global_max", "global_q99"),
+    value = c(
+      sum(is.finite(cooks_mat)),
+      sum(cooks_mat > 1, na.rm = TRUE),
+      sum(cooks_mat > 5, na.rm = TRUE),
+      sum(cooks_mat > 10, na.rm = TRUE),
+      max(cooks_mat, na.rm = TRUE),
+      stats::quantile(cooks_mat, probs = 0.99, na.rm = TRUE)
+    ),
+    stringsAsFactors = FALSE
+  )
+  utils::write.table(
+    cooks_global,
+    file = file.path(qc_dir, "cooks_distance_global_summary.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+}
+
 if (qc_enabled) {
   if (distance_plot_enabled) {
     dist_mat <- as.matrix(stats::dist(t(SummarizedExperiment::assay(vst_obj))))
+    label_columns <- annotation_columns[annotation_columns %in% colnames(col_data)]
+    label_columns <- label_columns[seq_len(min(3, length(label_columns)))]
+    if (length(label_columns) > 0) {
+      sample_labels <- apply(
+        cbind(sample = rownames(col_data), col_data[, label_columns, drop = FALSE]),
+        1,
+        function(x) paste(x, collapse = " : ")
+      )
+      rownames(dist_mat) <- sample_labels
+      colnames(dist_mat) <- sample_labels
+    }
     grDevices::pdf(file.path(qc_dir, "top_variable_genes.distance_plot.pdf"), width = 10, height = 10)
     pheatmap::pheatmap(dist_mat, main = "Sample distance")
     grDevices::dev.off()
@@ -206,9 +373,33 @@ if (qc_enabled) {
   if (variable_heatmap_enabled) {
     top_idx <- head(order(-matrixStats::rowVars(SummarizedExperiment::assay(vst_obj))), top_variable_genes)
     top_mat <- SummarizedExperiment::assay(vst_obj)[top_idx, , drop = FALSE]
+    top_mat <- row_zscore(top_mat)
+    keep_rows <- is.finite(rowMeans(top_mat))
+    top_mat <- top_mat[keep_rows, , drop = FALSE]
+    if (nrow(top_mat) > 1) {
+      k <- min(5, nrow(top_mat))
+      km <- stats::kmeans(top_mat, centers = k, iter.max = 20, nstart = 20)
+      top_mat <- top_mat[names(sort(km$cluster)), , drop = FALSE]
+    }
     hm_colors <- gradient_palette(255)
+    max_abs <- max(abs(top_mat), na.rm = TRUE)
+    if (!is.finite(max_abs) || max_abs <= 0) {
+      max_abs <- 1
+    }
+    hm_breaks <- seq(-max_abs, max_abs, length.out = 256)
     grDevices::pdf(file.path(qc_dir, "top_variable_genes.kmeans_heatmap.pdf"), width = 12, height = 10)
-    pheatmap::pheatmap(top_mat, color = hm_colors, show_rownames = FALSE, main = "Top variable genes")
+    pheatmap::pheatmap(
+      top_mat,
+      cluster_rows = FALSE,
+      cluster_cols = TRUE,
+      breaks = hm_breaks,
+      color = hm_colors,
+      annotation_col = annotation_df,
+      annotation_colors = annotation_colors,
+      show_rownames = FALSE,
+      show_colnames = TRUE,
+      main = "Top variable genes"
+    )
     grDevices::dev.off()
   }
 
@@ -221,7 +412,7 @@ if (qc_enabled) {
     }
     pct <- round(100 * (pca$sdev^2 / sum(pca$sdev^2)), 2)
 
-    plot_pca_pair <- function(pc_x, pc_y, color_col) {
+    plot_pca_pair <- function(pc_x, pc_y, color_col, shape_col = "") {
       xcol <- paste0("PC", pc_x)
       ycol <- paste0("PC", pc_y)
       if (!(xcol %in% colnames(pca_df)) || !(ycol %in% colnames(pca_df))) {
@@ -231,31 +422,43 @@ if (qc_enabled) {
         return()
       }
       plot_df <- pca_df
-      plot_df[[color_col]] <- as.factor(plot_df[[color_col]])
+      plot_df[[color_col]] <- as.factor(as.character(plot_df[[color_col]]))
+      color_map <- categorical_palette(levels(plot_df[[color_col]]))
+      if (length(color_map) == 0) {
+        return()
+      }
       p <- ggplot2::ggplot(plot_df, ggplot2::aes_string(x = xcol, y = ycol, color = color_col))
-      if (nzchar(pca_shape_by) && pca_shape_by %in% colnames(plot_df)) {
-        p <- p + ggplot2::geom_point(ggplot2::aes_string(shape = pca_shape_by), size = 3)
+      if (nzchar(shape_col) && shape_col %in% colnames(plot_df)) {
+        plot_df[[shape_col]] <- as.factor(as.character(plot_df[[shape_col]]))
+        p <- p + ggplot2::geom_point(ggplot2::aes_string(shape = shape_col), size = 3)
       } else {
         p <- p + ggplot2::geom_point(size = 3)
       }
       p <- p +
+        ggplot2::scale_color_manual(values = color_map, drop = FALSE) +
         ggplot2::xlab(paste0(xcol, ": ", pct[pc_x], "% variance")) +
         ggplot2::ylab(paste0(ycol, ": ", pct[pc_y], "% variance")) +
         ggplot2::theme_light() +
         ggplot2::theme(panel.grid = ggplot2::element_blank(), aspect.ratio = 1)
-      ggplot2::ggsave(
-        filename = file.path(qc_dir, paste0("top_variable_genes.PCA_plot_", color_col, "_PC", pc_x, "_PC", pc_y, ".pdf")),
-        plot = p,
-        width = 8,
-        height = 8
-      )
+      shape_suffix <- if (nzchar(shape_col)) paste0("_shape_", sanitize_file_component(shape_col, "shape")) else ""
+      out_name <- paste0("top_variable_genes.PCA_plot_", color_col, shape_suffix, "_PC", pc_x, "_PC", pc_y, ".pdf")
+      ggplot2::ggsave(filename = file.path(qc_dir, out_name), plot = p, width = 8, height = 8)
+    }
+
+    if (length(pca_shape_by_values) == 0) {
+      pca_shape_by_values <- character(0)
+    } else {
+      pca_shape_by_values <- unique(pca_shape_by_values[pca_shape_by_values %in% colnames(col_data)])
     }
 
     for (color_col in pca_color_by) {
-      plot_pca_pair(1, 2, color_col)
-      if (length(pca_extra_pairs) > 0) {
-        for (pair in pca_extra_pairs) {
-          plot_pca_pair(pair[1], pair[2], color_col)
+      shape_options <- c("", pca_shape_by_values)
+      for (shape_col in shape_options) {
+        plot_pca_pair(1, 2, color_col, shape_col)
+        if (length(pca_extra_pairs) > 0) {
+          for (pair in pca_extra_pairs) {
+            plot_pca_pair(pair[1], pair[2], color_col, shape_col)
+          }
         }
       }
     }
@@ -300,6 +503,7 @@ if (length(contrast_plan) == 0) {
   stop("No DE contrasts were resolved.")
 }
 
+contrast_summaries <- list()
 for (contrast_cfg in contrast_plan) {
   factor_name <- contrast_cfg$factor
   numerator <- contrast_cfg$numerator
@@ -326,7 +530,8 @@ for (contrast_cfg in contrast_plan) {
 
   res_df <- as.data.frame(res_for_table)
   res_df$gene_id <- rownames(res_df)
-  res_df <- res_df[, c("gene_id", setdiff(colnames(res_df), "gene_id"))]
+  res_df$gene_symbol <- map_gene_symbols(res_df$gene_id)
+  res_df <- res_df[, c("gene_id", "gene_symbol", setdiff(colnames(res_df), c("gene_id", "gene_symbol")))]
   res_df <- res_df[order(res_df$padj, na.last = TRUE), , drop = FALSE]
 
   if (write_full_results) {
@@ -363,8 +568,8 @@ for (contrast_cfg in contrast_plan) {
     vdf$neglog10padj <- -log10(vdf$padj)
     vdf$is_sig <- vdf$padj < alpha & abs(vdf$log2FoldChange) >= lfc_for_sig
     if (volcano_auto_axes) {
-      x_lim <- max(abs(vdf$log2FoldChange), na.rm = TRUE)
-      y_lim <- stats::quantile(vdf$neglog10padj, probs = 0.99, na.rm = TRUE)
+      x_lim <- max(abs(vdf$log2FoldChange), na.rm = TRUE) * 1.05
+      y_lim <- max(vdf$neglog10padj[is.finite(vdf$neglog10padj)], na.rm = TRUE) * 1.05
     } else {
       x_lim <- volcano_max_xlim
       y_lim <- volcano_max_ylim
@@ -384,11 +589,12 @@ for (contrast_cfg in contrast_plan) {
     ggplot2::ggsave(file.path(contrast_dir, paste0(contrast_label, ".volcano_plot.pdf")), p, width = 8, height = 6)
     if (volcano_labels_enabled && requireNamespace("ggrepel", quietly = TRUE)) {
       label_df <- subset(vdf, is_sig)
-      label_df <- label_df[order(label_df$padj), , drop = FALSE]
+      label_df <- label_df[order(label_df$padj, -abs(label_df$log2FoldChange)), , drop = FALSE]
+      label_df$gene_symbol <- map_gene_symbols(label_df$gene_id)
       label_df <- head(label_df, max_volcano_labels)
       p_labels <- p + ggrepel::geom_text_repel(
         data = label_df,
-        ggplot2::aes(label = gene_id),
+        ggplot2::aes(label = gene_symbol),
         size = 3,
         max.overlaps = max_volcano_labels
       )
@@ -396,23 +602,159 @@ for (contrast_cfg in contrast_plan) {
     }
   }
 
+  finite_p <- res_df$pvalue[is.finite(res_df$pvalue)]
+  if (length(finite_p) > 0) {
+    grDevices::pdf(file.path(contrast_dir, paste0(contrast_label, ".pvalue_histogram.pdf")), width = 8, height = 6)
+    graphics::hist(
+      finite_p,
+      breaks = 50,
+      main = paste0("P-value distribution: ", contrast_label),
+      xlab = "p-value",
+      col = "grey70",
+      border = "white"
+    )
+    grDevices::dev.off()
+  }
+
   if (sig_heatmap_enabled) {
-    sig_genes <- subset(res_df, !is.na(padj) & padj < alpha & abs(log2FoldChange) >= lfc_for_heatmap)$gene_id
-    sig_genes <- unique(sig_genes)
+    sig_for_heatmap <- subset(res_df, !is.na(padj) & padj < alpha & abs(log2FoldChange) >= lfc_for_heatmap)
+    sig_for_heatmap <- sig_for_heatmap[order(sig_for_heatmap$padj, -abs(sig_for_heatmap$log2FoldChange)), , drop = FALSE]
+    sig_for_heatmap <- head(sig_for_heatmap, 50)
+    sig_genes <- unique(sig_for_heatmap$gene_id)
     if (length(sig_genes) >= 2) {
       hm <- SummarizedExperiment::assay(vst_obj)[sig_genes, , drop = FALSE]
+      gene_labels <- sig_for_heatmap$gene_symbol[match(sig_genes, sig_for_heatmap$gene_id)]
+      gene_labels[is.na(gene_labels) | !nzchar(gene_labels)] <- sig_genes[is.na(gene_labels) | !nzchar(gene_labels)]
+      rownames(hm) <- make.unique(gene_labels)
       hm_colors <- gradient_palette(255)
       grDevices::pdf(file.path(contrast_dir, paste0(contrast_label, ".sig_diff_genes.heatmap.pdf")), width = 10, height = 10)
       pheatmap::pheatmap(
         hm,
         color = hm_colors,
+        annotation_col = annotation_df,
+        annotation_colors = annotation_colors,
         cluster_rows = sig_heatmap_cluster_rows,
         cluster_cols = sig_heatmap_cluster_cols,
-        show_rownames = FALSE
+        show_rownames = TRUE,
+        show_colnames = FALSE
       )
       grDevices::dev.off()
     }
   }
+
+  genes_tested <- sum(!is.na(res_df$padj))
+  sig_up <- sum(!is.na(res_df$padj) & res_df$padj < alpha & res_df$log2FoldChange >= lfc_for_sig)
+  sig_down <- sum(!is.na(res_df$padj) & res_df$padj < alpha & res_df$log2FoldChange <= -lfc_for_sig)
+  contrast_summary <- data.frame(
+    contrast = contrast_label,
+    factor = factor_name,
+    numerator = numerator,
+    denominator = denominator,
+    genes_tested = genes_tested,
+    sig_total = nrow(sig_df),
+    sig_up = sig_up,
+    sig_down = sig_down,
+    alpha = alpha,
+    lfc_threshold = lfc_for_sig,
+    stringsAsFactors = FALSE
+  )
+  utils::write.table(
+    contrast_summary,
+    file = file.path(contrast_dir, paste0(contrast_label, ".summary.tsv")),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+  contrast_summaries[[length(contrast_summaries) + 1]] <- contrast_summary
+
+  top10_df <- subset(res_df, !is.na(padj) & abs(log2FoldChange) >= lfc_for_sig)
+  top10_df <- top10_df[order(top10_df$padj, -abs(top10_df$log2FoldChange)), , drop = FALSE]
+  top10_df <- head(top10_df, 10)
+  if (nrow(top10_df) > 0 && factor_name %in% colnames(col_data)) {
+    boxplot_dir <- file.path(contrast_dir, "top10_boxplots")
+    dir.create(boxplot_dir, recursive = TRUE, showWarnings = FALSE)
+    group_values <- as.factor(as.character(col_data[[factor_name]]))
+    group_palette <- categorical_palette(levels(group_values))
+    for (idx in seq_len(nrow(top10_df))) {
+      gene_id <- top10_df$gene_id[idx]
+      if (!(gene_id %in% rownames(SummarizedExperiment::assay(vst_obj)))) {
+        next
+      }
+      gene_symbol <- top10_df$gene_symbol[idx]
+      if (is.na(gene_symbol) || !nzchar(gene_symbol)) {
+        gene_symbol <- gene_id
+      }
+      plot_df <- data.frame(
+        sample = rownames(col_data),
+        expression = as.numeric(SummarizedExperiment::assay(vst_obj)[gene_id, ]),
+        group = group_values,
+        stringsAsFactors = FALSE
+      )
+      p_box <- ggplot2::ggplot(plot_df, ggplot2::aes(x = group, y = expression, color = group)) +
+        ggplot2::geom_boxplot(outlier.shape = NA) +
+        ggplot2::geom_jitter(width = 0.15, size = 2, alpha = 0.8) +
+        ggplot2::scale_color_manual(values = group_palette, drop = FALSE) +
+        ggplot2::xlab(factor_name) +
+        ggplot2::ylab("VST expression") +
+        ggplot2::ggtitle(gene_symbol) +
+        ggplot2::theme_light() +
+        ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none")
+      plot_file <- file.path(
+        boxplot_dir,
+        paste0(sanitize_file_component(gene_symbol, fallback = sanitize_file_component(gene_id)), ".boxplot.pdf")
+      )
+      ggplot2::ggsave(plot_file, p_box, width = 7, height = 5)
+    }
+  }
+}
+
+if (length(contrast_summaries) > 0) {
+  contrast_summary_table <- do.call(rbind, contrast_summaries)
+  utils::write.table(
+    contrast_summary_table,
+    file = file.path(de_dir, "contrast_summary.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+
+  summary_plot_df <- rbind(
+    data.frame(
+      contrast = contrast_summary_table$contrast,
+      direction = "up",
+      count = contrast_summary_table$sig_up,
+      stringsAsFactors = FALSE
+    ),
+    data.frame(
+      contrast = contrast_summary_table$contrast,
+      direction = "down",
+      count = contrast_summary_table$sig_down,
+      stringsAsFactors = FALSE
+    )
+  )
+  summary_plot_df$contrast <- factor(
+    summary_plot_df$contrast,
+    levels = contrast_summary_table$contrast[order(contrast_summary_table$sig_total, decreasing = TRUE)]
+  )
+  summary_plot_df$direction <- factor(summary_plot_df$direction, levels = c("up", "down"))
+
+  p_summary <- ggplot2::ggplot(summary_plot_df, ggplot2::aes(x = contrast, y = count, fill = direction)) +
+    ggplot2::geom_col(position = "dodge") +
+    ggplot2::scale_fill_manual(values = c("up" = "firebrick", "down" = "steelblue")) +
+    ggplot2::xlab("Contrast") +
+    ggplot2::ylab("Significant genes") +
+    ggplot2::theme_light() +
+    ggplot2::theme(
+      panel.grid = ggplot2::element_blank(),
+      axis.text.x = ggplot2::element_text(angle = 30, hjust = 1),
+      legend.title = ggplot2::element_blank()
+    )
+  ggplot2::ggsave(
+    filename = file.path(de_dir, "contrast_summary.sig_up_down_barplot.pdf"),
+    plot = p_summary,
+    width = 10,
+    height = 6
+  )
 }
 
 writeLines(capture.output(sessionInfo()), con = file.path(qc_dir, "sessionInfo.txt"))

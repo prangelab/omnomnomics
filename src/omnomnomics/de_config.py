@@ -53,7 +53,7 @@ DEFAULT_DE_CONFIG: dict = {
         "alpha": 0.05,
         "lfc_for_sig": 1.0,
         "lfc_for_heatmap": 1.0,
-        "max_volcano_labels": 50,
+        "max_volcano_labels": 20,
     },
     "qc": {
         "enabled": True,
@@ -63,8 +63,8 @@ DEFAULT_DE_CONFIG: dict = {
         "variable_gene_heatmap": True,
         "pca": {
             "enabled": True,
-            "color_by": ["sample_type", "sample_color", "Replicate"],
-            "shape_by": None,
+            "color_by": ["sample_type", "sample_color", "replicate"],
+            "shape_by": ["donor", "replicate"],
             "extra_pairs": [[1, 2], [2, 3]],
         },
     },
