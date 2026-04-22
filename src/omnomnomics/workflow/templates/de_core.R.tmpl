@@ -50,6 +50,8 @@ pca_enabled <- __PCA_ENABLED__
 pca_color_by <- __PCA_COLOR_BY__
 pca_shape_by_values <- __PCA_SHAPE_BY_VALUES__
 pca_extra_pairs <- __PCA_EXTRA_PAIRS__
+de_columns_resolved <- __DE_COLUMNS_RESOLVED__
+de_block_resolved <- __DE_BLOCK_RESOLVED__
 
 ma_plot_enabled <- __MA_PLOT_ENABLED__
 volcano_enabled <- __VOLCANO_ENABLED__
@@ -85,7 +87,19 @@ is_informative_column <- function(df, column_name) {
   }
   values <- as.character(df[[column_name]])
   values <- values[!is.na(values) & nzchar(values)]
-  length(unique(values)) >= 2
+  n_unique <- length(unique(values))
+  n_unique >= 2 && n_unique < nrow(df)
+}
+
+is_categorical_grouping_column <- function(df, column_name) {
+  if (!(column_name %in% colnames(df))) {
+    return(FALSE)
+  }
+  values_raw <- df[[column_name]]
+  if (is.numeric(values_raw) || is.integer(values_raw)) {
+    return(FALSE)
+  }
+  is_informative_column(df, column_name)
 }
 
 qualitative_palette_names <- c("Set1", "Dark2", "Paired", "Set2", "Accent", "Pastel1", "Pastel2", "Set3")
@@ -235,13 +249,64 @@ dds <- DESeq2::DESeqDataSetFromMatrix(
 dds <- DESeq2::DESeq(dds, fitType = deseq_fit_type, sfType = deseq_sf_type, parallel = deseq_parallel)
 vst_obj <- DESeq2::vst(dds, blind = vst_blind)
 
+all_gene_ids <- rownames(dds)
+all_gene_ids_no_version <- strip_ensembl_version(all_gene_ids)
+all_gene_symbols <- map_gene_symbols(all_gene_ids, fallback_to_ids = FALSE)
+symbol_lookup <- stats::setNames(all_gene_symbols, all_gene_ids)
+
+ensembl_like <- grepl("^ENS(?:MUSG|G)[0-9]+$", all_gene_ids_no_version)
+ensembl_like_fraction <- mean(ensembl_like)
+mapped_symbol_fraction <- mean(!is.na(all_gene_symbols) & nzchar(all_gene_symbols))
+unmapped_gene_ids <- all_gene_ids[is.na(all_gene_symbols) | !nzchar(all_gene_symbols)]
+mapping_status <- "ok"
+mapping_message <- "Gene symbol mapping succeeded for most genes."
+if (length(unmapped_gene_ids) > 0) {
+  mapping_status <- "fallback_to_ensembl"
+  mapping_message <- paste0(
+    "Falling back to Ensembl IDs for ", length(unmapped_gene_ids),
+    " genes without mapped symbols."
+  )
+}
+if (is.finite(ensembl_like_fraction) && is.finite(mapped_symbol_fraction) &&
+    ensembl_like_fraction >= 0.5 && mapped_symbol_fraction < 0.05) {
+  mapping_status <- "fallback_likely_missing_annotation_packages"
+  mapping_message <- paste0(
+    "Symbol mapping is very low for Ensembl-like IDs (mapped fraction=",
+    round(mapped_symbol_fraction, 4),
+    "). Falling back to Ensembl IDs. ",
+    "Likely cause: missing org.Hs.eg.db/org.Mm.eg.db and/or AnnotationDbi packages."
+  )
+}
+message(mapping_message)
+
+symbols_for_ids <- function(gene_ids, fallback_to_ids = FALSE) {
+  gid <- as.character(gene_ids)
+  symbols <- unname(symbol_lookup[gid])
+  missing <- is.na(symbols) | !nzchar(symbols)
+  if (any(missing)) {
+    symbols_missing <- map_gene_symbols(gid[missing], fallback_to_ids = fallback_to_ids)
+    symbols[missing] <- symbols_missing
+  }
+  if (fallback_to_ids) {
+    missing <- is.na(symbols) | !nzchar(symbols)
+    symbols[missing] <- strip_ensembl_version(gid[missing])
+  }
+  symbols
+}
+
 design_terms <- attr(stats::terms(design_formula), "term.labels")
 annotation_columns <- unique(unlist(strsplit(design_terms, ":", fixed = TRUE)))
 annotation_columns <- annotation_columns[nzchar(annotation_columns)]
+auto_categorical_columns <- colnames(col_data)[
+  vapply(colnames(col_data), function(x) is_categorical_grouping_column(col_data, x), logical(1))
+]
 annotation_columns <- unique(c(
   annotation_columns,
   pca_color_by,
-  pca_shape_by_values
+  pca_shape_by_values,
+  de_columns_resolved,
+  de_block_resolved,
+  auto_categorical_columns
 ))
 annotation_columns <- annotation_columns[annotation_columns %in% colnames(col_data)]
 
@@ -336,6 +401,33 @@ utils::write.table(
   row.names = FALSE
 )
 
+symbol_mapping_summary <- data.frame(
+  total_genes = length(all_gene_ids),
+  ensembl_like_fraction = round(ensembl_like_fraction, 6),
+  mapped_symbol_fraction = round(mapped_symbol_fraction, 6),
+  mapped_symbols = sum(!is.na(all_gene_symbols) & nzchar(all_gene_symbols)),
+  fallback_to_ensembl_genes = length(unmapped_gene_ids),
+  mapping_status = mapping_status,
+  mapping_message = mapping_message,
+  stringsAsFactors = FALSE
+)
+utils::write.table(
+  symbol_mapping_summary,
+  file = file.path(qc_dir, "gene_symbol_mapping_summary.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+if (length(unmapped_gene_ids) > 0) {
+  utils::write.table(
+    data.frame(gene_id = unmapped_gene_ids, stringsAsFactors = FALSE),
+    file = file.path(qc_dir, "gene_symbol_mapping_unmapped_gene_ids.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+}
+
 norm_counts <- DESeq2::counts(dds, normalized = TRUE)
 utils::write.table(
   data.frame(gene_id = rownames(norm_counts), norm_counts, check.names = FALSE),
@@ -405,6 +497,8 @@ if (qc_enabled) {
     pca_shape_by_values %in% colnames(col_data) &
       vapply(pca_shape_by_values, function(x) is_informative_column(col_data, x), logical(1))
   ]
+  pca_color_by_use <- unique(c(pca_color_by_use, auto_categorical_columns))
+  pca_color_by_use <- unique(c(de_columns_resolved, pca_color_by_use))
 
   if (distance_plot_enabled) {
     dist_mat <- as.matrix(stats::dist(t(SummarizedExperiment::assay(vst_obj))))
@@ -581,7 +675,7 @@ for (contrast_cfg in contrast_plan) {
 
   res_df <- as.data.frame(res_for_table)
   res_df$gene_id <- rownames(res_df)
-  res_df$gene_symbol <- map_gene_symbols(res_df$gene_id)
+  res_df$gene_symbol <- symbols_for_ids(res_df$gene_id, fallback_to_ids = TRUE)
   res_df <- res_df[, c("gene_id", "gene_symbol", setdiff(colnames(res_df), c("gene_id", "gene_symbol")))]
   res_df <- res_df[order(res_df$padj, na.last = TRUE), , drop = FALSE]
 
@@ -641,7 +735,7 @@ for (contrast_cfg in contrast_plan) {
     if (volcano_labels_enabled && requireNamespace("ggrepel", quietly = TRUE)) {
       label_df <- subset(vdf, is_sig)
       label_df <- label_df[order(label_df$padj, -abs(label_df$log2FoldChange)), , drop = FALSE]
-      label_df$gene_symbol <- map_gene_symbols(label_df$gene_id, fallback_to_ids = FALSE)
+      label_df$gene_symbol <- symbols_for_ids(label_df$gene_id, fallback_to_ids = TRUE)
       label_df <- label_df[!is.na(label_df$gene_symbol) & nzchar(label_df$gene_symbol), , drop = FALSE]
       label_df <- head(label_df, max_volcano_labels)
       if (nrow(label_df) > 0) {
@@ -672,13 +766,18 @@ for (contrast_cfg in contrast_plan) {
 
   if (sig_heatmap_enabled) {
     sig_for_heatmap <- subset(res_df, !is.na(padj) & padj < alpha & abs(log2FoldChange) >= lfc_for_heatmap)
+    sig_for_heatmap$gene_symbol_plot <- symbols_for_ids(sig_for_heatmap$gene_id, fallback_to_ids = TRUE)
+    sig_for_heatmap <- sig_for_heatmap[
+      !is.na(sig_for_heatmap$gene_symbol_plot) & nzchar(sig_for_heatmap$gene_symbol_plot),
+      ,
+      drop = FALSE
+    ]
     sig_for_heatmap <- sig_for_heatmap[order(sig_for_heatmap$padj, -abs(sig_for_heatmap$log2FoldChange)), , drop = FALSE]
     sig_for_heatmap <- head(sig_for_heatmap, 50)
     sig_genes <- unique(sig_for_heatmap$gene_id)
     if (length(sig_genes) >= 2) {
       hm <- SummarizedExperiment::assay(vst_obj)[sig_genes, , drop = FALSE]
-      gene_labels <- sig_for_heatmap$gene_symbol[match(sig_genes, sig_for_heatmap$gene_id)]
-      gene_labels[is.na(gene_labels) | !nzchar(gene_labels)] <- sig_genes[is.na(gene_labels) | !nzchar(gene_labels)]
+      gene_labels <- sig_for_heatmap$gene_symbol_plot[match(sig_genes, sig_for_heatmap$gene_id)]
       rownames(hm) <- make.unique(gene_labels)
       hm_colors <- gradient_palette(255)
       grDevices::pdf(file.path(contrast_dir, paste0(contrast_label, ".sig_diff_genes.heatmap.pdf")), width = 10, height = 10)
@@ -723,7 +822,7 @@ for (contrast_cfg in contrast_plan) {
 
   top10_df <- subset(res_df, !is.na(padj) & abs(log2FoldChange) >= lfc_for_sig)
   top10_df <- top10_df[order(top10_df$padj, -abs(top10_df$log2FoldChange)), , drop = FALSE]
-  top10_df$gene_symbol_plot <- map_gene_symbols(top10_df$gene_id, fallback_to_ids = FALSE)
+  top10_df$gene_symbol_plot <- symbols_for_ids(top10_df$gene_id, fallback_to_ids = TRUE)
   top10_df <- top10_df[!is.na(top10_df$gene_symbol_plot) & nzchar(top10_df$gene_symbol_plot), , drop = FALSE]
   top10_df <- head(top10_df, 10)
   if (nrow(top10_df) > 0 && factor_name %in% colnames(col_data)) {

@@ -96,6 +96,8 @@ rule call_DE:
         design_mode=config.get("DE_DESIGN_MODE", "NA"),
         resolved_de_config_file=config.get("DE_CONFIG_RESOLVED_FILE", "NA"),
         resolved_de_config_json=config.get("DE_CONFIG_RESOLVED_JSON", "{}"),
+        de_columns_resolved=config.get("DE_COLUMNS_RESOLVED", []),
+        de_block_resolved=config.get("DE_BLOCK_RESOLVED", []),
     threads:
         Threads_Per_Rule[str(master_config['de_rule_num'])]
     resources:
@@ -202,6 +204,8 @@ rule call_DE:
                 "__PCA_COLOR_BY__": _r_char_vector(pca_cfg.get("color_by", [])),
                 "__PCA_SHAPE_BY_VALUES__": _r_char_vector(pca_shape_values),
                 "__PCA_EXTRA_PAIRS__": _r_numeric_pair_list(pca_cfg.get("extra_pairs", [[1, 2], [2, 3]])),
+                "__DE_COLUMNS_RESOLVED__": _r_char_vector(params.de_columns_resolved),
+                "__DE_BLOCK_RESOLVED__": _r_char_vector(params.de_block_resolved),
                 "__MA_PLOT_ENABLED__": _r_bool(plots_cfg.get("ma_plot", True)),
                 "__VOLCANO_ENABLED__": _r_bool(volcano_cfg.get("enabled", True)),
                 "__VOLCANO_LABELS_ENABLED__": _r_bool(volcano_cfg.get("labeled", True)),
