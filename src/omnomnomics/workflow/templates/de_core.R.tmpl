@@ -103,13 +103,31 @@ is_categorical_grouping_column <- function(df, column_name) {
 }
 
 qualitative_palette_names <- c("Set1", "Dark2", "Paired", "Set2", "Accent", "Pastel1", "Pastel2", "Set3")
+palette_cache <- new.env(parent = emptyenv())
+palette_assignment_rows <- list()
 
 palette_name_for_column <- function(column_name) {
+  column_name <- as.character(column_name)
   if (!nzchar(column_name)) {
     return(qualitative_palette_names[[1]])
   }
-  idx <- (sum(utf8ToInt(column_name)) %% length(qualitative_palette_names)) + 1
-  qualitative_palette_names[[idx]]
+  if (exists(column_name, envir = palette_cache, inherits = FALSE)) {
+    return(get(column_name, envir = palette_cache, inherits = FALSE))
+  }
+  used <- unlist(as.list(palette_cache), use.names = FALSE)
+  available <- setdiff(qualitative_palette_names, used)
+  if (length(available) == 0) {
+    available <- qualitative_palette_names
+  }
+  idx <- (sum(utf8ToInt(column_name)) %% length(available)) + 1
+  selected <- available[[idx]]
+  assign(column_name, selected, envir = palette_cache)
+  palette_assignment_rows[[length(palette_assignment_rows) + 1]] <<- data.frame(
+    column = column_name,
+    palette = selected,
+    stringsAsFactors = FALSE
+  )
+  selected
 }
 
 categorical_palette <- function(levels_vec, palette_name = NULL) {
@@ -418,10 +436,24 @@ utils::write.table(
   quote = FALSE,
   row.names = FALSE
 )
+writeLines(
+  paste0("[gene_symbol_mapping] ", mapping_status, " - ", mapping_message),
+  con = file.path(qc_dir, "gene_symbol_mapping_status.log")
+)
 if (length(unmapped_gene_ids) > 0) {
   utils::write.table(
     data.frame(gene_id = unmapped_gene_ids, stringsAsFactors = FALSE),
     file = file.path(qc_dir, "gene_symbol_mapping_unmapped_gene_ids.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+}
+if (length(palette_assignment_rows) > 0) {
+  palette_assignment_table <- do.call(rbind, palette_assignment_rows)
+  utils::write.table(
+    palette_assignment_table,
+    file = file.path(qc_dir, "palette_assignments.tsv"),
     sep = "\t",
     quote = FALSE,
     row.names = FALSE

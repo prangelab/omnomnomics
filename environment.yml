@@ -18,6 +18,7 @@ dependencies:
   - bioconductor-annotationdbi
   - bioconductor-org.hs.eg.db
   - bioconductor-org.mm.eg.db
+  - bioconductor-apeglm
   - genomepy>=0.16
   - snakemake>=7.25,<8
   - multiqc
