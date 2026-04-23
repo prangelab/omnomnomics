@@ -382,7 +382,7 @@ utils::write.table(
   quote = FALSE,
   row.names = FALSE
 )
-validate_contrast_plan(contrast_plan, results_names_tbl$coefficient, col_data)
+contrast_plan <- validate_contrast_plan(contrast_plan, results_names_tbl$coefficient, col_data)
 
 all_gene_ids <- rownames(dds)
 all_gene_ids_no_version <- strip_ensembl_version(all_gene_ids)
@@ -1405,7 +1405,47 @@ if (length(contrast_plan) == 0) {
   stop("No DE contrasts were resolved.")
 }
 
+resolve_coefficient_shorthand <- function(raw_name, available_coefficients) {
+  name <- trimws(as.character(raw_name))
+  if (!nzchar(name)) {
+    return(NULL)
+  }
+  if (name %in% available_coefficients) {
+    return(name)
+  }
+  if (!grepl(":", name, fixed = TRUE)) {
+    return(NULL)
+  }
+  term_tokens <- unlist(strsplit(name, ":", fixed = TRUE))
+  term_tokens <- trimws(term_tokens)
+  term_tokens <- term_tokens[nzchar(term_tokens)]
+  if (length(term_tokens) < 2) {
+    return(NULL)
+  }
+  idx <- rep(TRUE, length(available_coefficients))
+  for (tok in term_tokens) {
+    idx <- idx & grepl(tok, available_coefficients, fixed = TRUE)
+  }
+  candidates <- available_coefficients[idx]
+  if (length(candidates) == 1) {
+    return(candidates[[1]])
+  }
+  if (length(candidates) > 1) {
+    forward_pattern <- paste(term_tokens, collapse = ".*")
+    reverse_pattern <- paste(rev(term_tokens), collapse = ".*")
+    forward <- candidates[grepl(forward_pattern, candidates)]
+    reverse <- candidates[grepl(reverse_pattern, candidates)]
+    narrowed <- unique(c(forward, reverse))
+    if (length(narrowed) == 1) {
+      return(narrowed[[1]])
+    }
+  }
+  NULL
+}
+
 validate_contrast_plan <- function(plan, available_coefficients, metadata_df) {
+  available_coefficients <- unique(as.character(available_coefficients))
+  available_coefficients <- available_coefficients[!is.na(available_coefficients) & nzchar(available_coefficients)]
   for (i in seq_along(plan)) {
     item <- plan[[i]]
     ctype <- as.character(item$contrast_type)
@@ -1431,6 +1471,17 @@ validate_contrast_plan <- function(plan, available_coefficients, metadata_df) {
       if (!nzchar(coef_name)) {
         stop("Coefficient contrast ", i, " has empty coefficient_name.")
       }
+      resolved_coef <- resolve_coefficient_shorthand(coef_name, available_coefficients)
+      if (!is.null(resolved_coef) && nzchar(resolved_coef)) {
+        if (!identical(resolved_coef, coef_name)) {
+          message(
+            "Resolved coefficient shorthand for contrast ", i, ": '", coef_name,
+            "' -> '", resolved_coef, "'."
+          )
+        }
+        plan[[i]]$coefficient_name <- resolved_coef
+        coef_name <- resolved_coef
+      }
       if (!(coef_name %in% available_coefficients)) {
         tokens <- unique(unlist(strsplit(gsub("[^A-Za-z0-9]+", " ", coef_name), "\\s+")))
         tokens <- tokens[nzchar(tokens)]
@@ -1455,6 +1506,7 @@ validate_contrast_plan <- function(plan, available_coefficients, metadata_df) {
     }
     stop("Contrast ", i, " has unsupported contrast_type '", ctype, "'.")
   }
+  plan
 }
 
 safe_pkg_version <- function(pkg_name) {

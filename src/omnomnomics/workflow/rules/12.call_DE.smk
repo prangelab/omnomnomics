@@ -170,6 +170,8 @@ def _build_de_customization_guide(
 #        denominator = NA_character_, coefficient_name = "typeKD24.treatmentL",
 #        label = "interaction_typeKD24_treatmentL")
 # )
+# You can also provide shorthand in de_config coefficient_name (for example "type:treatment").
+# The pipeline resolves shorthand to an exact DESeq2 coefficient when unique.
 #
 # 3) Mixed contrast plan (factor + coefficient)
 # contrast_plan <- list(

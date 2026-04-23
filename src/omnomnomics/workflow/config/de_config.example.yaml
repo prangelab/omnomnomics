@@ -24,6 +24,9 @@ contrasts:
     #   - contrast_type: coefficient
     #     coefficient_name: typeKD24.treatmentL
     #     label: interaction_typeKD24_treatmentL
+    #   - contrast_type: coefficient
+    #     coefficient_name: type:treatment  # shorthand; auto-resolves when unique
+    #     label: interaction_type_treatment
 
 filtering:
   enabled: true
