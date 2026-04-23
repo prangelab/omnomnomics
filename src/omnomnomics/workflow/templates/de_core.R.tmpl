@@ -382,8 +382,6 @@ utils::write.table(
   quote = FALSE,
   row.names = FALSE
 )
-contrast_plan <- validate_contrast_plan(contrast_plan, results_names_tbl$coefficient, col_data)
-
 all_gene_ids <- rownames(dds)
 all_gene_ids_no_version <- strip_ensembl_version(all_gene_ids)
 all_gene_symbols <- map_gene_symbols(all_gene_ids, fallback_to_ids = FALSE)
@@ -1508,6 +1506,8 @@ validate_contrast_plan <- function(plan, available_coefficients, metadata_df) {
   }
   plan
 }
+
+contrast_plan <- validate_contrast_plan(contrast_plan, results_names_tbl$coefficient, col_data)
 
 safe_pkg_version <- function(pkg_name) {
   if (!requireNamespace(pkg_name, quietly = TRUE)) {
