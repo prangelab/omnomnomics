@@ -173,6 +173,7 @@ rule call_DE:
             contrasts_cfg = resolved_de_config.get("contrasts", {})
             filtering_cfg = resolved_de_config.get("filtering", {})
             deseq2_cfg = resolved_de_config.get("deseq2", {})
+            latent_cfg = deseq2_cfg.get("latent_factors", {})
             lfc_cfg = deseq2_cfg.get("lfc_shrink", {})
             thresholds_cfg = resolved_de_config.get("thresholds", {})
             qc_cfg = resolved_de_config.get("qc", {})
@@ -218,6 +219,13 @@ rule call_DE:
                 "__DESEQ_FIT_TYPE__": _r_string(str(deseq2_cfg.get("fit_type", "parametric"))),
                 "__DESEQ_SF_TYPE__": _r_string(str(deseq2_cfg.get("sf_type", "ratio"))),
                 "__DESEQ_PARALLEL__": _r_bool(deseq2_cfg.get("parallel", True)),
+                "__LATENT_ENABLED__": _r_bool(latent_cfg.get("enabled", False)),
+                "__LATENT_METHOD__": _r_string(str(latent_cfg.get("method", "sva"))),
+                "__LATENT_N_SV__": (
+                    str(int(latent_cfg.get("n_sv")))
+                    if latent_cfg.get("n_sv") not in (None, "", "NA")
+                    else "NA_integer_"
+                ),
                 "__SHRINK_ENABLED__": _r_bool(lfc_cfg.get("enabled", True)),
                 "__SHRINK_TYPE__": _r_string(str(lfc_cfg.get("type", "apeglm"))),
                 "__SHRINK_FOR_TABLES__": _r_bool(lfc_cfg.get("use_for_tables", True)),

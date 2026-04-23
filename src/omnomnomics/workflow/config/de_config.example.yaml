@@ -28,6 +28,10 @@ deseq2:
   sf_type: "ratio"
   beta_prior: false
   parallel: true
+  latent_factors:
+    enabled: false
+    method: "sva"
+    n_sv: null
   lfc_shrink:
     enabled: true
     type: "apeglm"

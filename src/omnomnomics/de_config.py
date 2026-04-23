@@ -43,6 +43,11 @@ DEFAULT_DE_CONFIG: dict = {
         "sf_type": "ratio",
         "beta_prior": False,
         "parallel": True,
+        "latent_factors": {
+            "enabled": False,
+            "method": "sva",
+            "n_sv": None,
+        },
         "lfc_shrink": {
             "enabled": True,
             "type": "apeglm",
@@ -245,6 +250,22 @@ def _validate_resolved_de_config(config: dict) -> None:
         raise DEConfigError("DE config filtering.min_count must be >= 0.")
     if min_samples < 1:
         raise DEConfigError("DE config filtering.min_samples must be >= 1.")
+
+    latent_cfg = config.get("deseq2", {}).get("latent_factors", {})
+    if latent_cfg:
+        latent_method = str(latent_cfg.get("method", "sva")).strip().lower()
+        if latent_method not in {"sva"}:
+            raise DEConfigError("DE config deseq2.latent_factors.method must be 'sva'.")
+        latent_cfg["method"] = latent_method
+        latent_n_sv = latent_cfg.get("n_sv")
+        if latent_n_sv is not None:
+            try:
+                latent_n_sv = int(latent_n_sv)
+            except (TypeError, ValueError) as exc:
+                raise DEConfigError("DE config deseq2.latent_factors.n_sv must be an integer or null.") from exc
+            if latent_n_sv < 1:
+                raise DEConfigError("DE config deseq2.latent_factors.n_sv must be >= 1 when set.")
+            latent_cfg["n_sv"] = latent_n_sv
 
     enrichment_cfg = config.get("enrichment", {})
     cp_cfg = enrichment_cfg.get("clusterprofiler", {})

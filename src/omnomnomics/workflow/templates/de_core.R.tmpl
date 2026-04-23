@@ -32,6 +32,9 @@ filtering_min_samples <- __FILTERING_MIN_SAMPLES__
 deseq_fit_type <- __DESEQ_FIT_TYPE__
 deseq_sf_type <- __DESEQ_SF_TYPE__
 deseq_parallel <- __DESEQ_PARALLEL__
+latent_enabled <- __LATENT_ENABLED__
+latent_method <- __LATENT_METHOD__
+latent_n_sv <- __LATENT_N_SV__
 shrink_enabled <- __SHRINK_ENABLED__
 shrink_type <- __SHRINK_TYPE__
 shrink_for_tables <- __SHRINK_FOR_TABLES__
@@ -293,6 +296,7 @@ if (any(is.na(metadata_df[[match_key]]))) {
 count_matrix <- as.matrix(counts_df[, sample_columns, drop = FALSE])
 rownames(count_matrix) <- counts_df[[1]]
 mode(count_matrix) <- "numeric"
+raw_count_matrix <- count_matrix
 non_integer <- abs(count_matrix - round(count_matrix)) > 1e-8
 if (any(non_integer, na.rm = TRUE)) {
   stop("Count table contains non-integer values. DESeq2 requires raw integer counts.")
@@ -309,7 +313,57 @@ if (filtering_enabled && filtering_method == "min_count_samples") {
 }
 genes_after_filter <- nrow(count_matrix)
 
-design_formula <- stats::as.formula(design_formula_text)
+design_formula_base <- stats::as.formula(design_formula_text)
+design_formula <- design_formula_base
+design_formula_effective_text <- design_formula_text
+latent_sv_columns <- character(0)
+latent_message <- "Latent-factor correction disabled."
+if (isTRUE(latent_enabled)) {
+  latent_method <- tolower(trimws(as.character(latent_method)))
+  if (!nzchar(latent_method) || latent_method != "sva") {
+    stop("Unsupported latent factor method: ", latent_method, ". Currently supported: sva.")
+  }
+  if (!requireNamespace("sva", quietly = TRUE)) {
+    stop("Latent factors requested but missing required R package: sva")
+  }
+  full_mod <- stats::model.matrix(design_formula_base, data = col_data)
+  null_mod <- stats::model.matrix(~ 1, data = col_data)
+  n_sv_use <- if (is.na(latent_n_sv)) NULL else as.integer(latent_n_sv)
+  sv_obj <- tryCatch(
+    sva::svaseq(counts = as.matrix(count_matrix), mod = full_mod, mod0 = null_mod, n.sv = n_sv_use),
+    error = function(e) {
+      stop("Failed to estimate latent factors with sva::svaseq: ", conditionMessage(e))
+    }
+  )
+  sv_matrix <- sv_obj$sv
+  if (is.null(sv_matrix) || ncol(sv_matrix) == 0) {
+    latent_message <- "Latent-factor correction enabled, but sva returned zero surrogate variables."
+  } else {
+    sv_df <- as.data.frame(sv_matrix, stringsAsFactors = FALSE)
+    latent_sv_columns <- paste0("sv", seq_len(ncol(sv_df)))
+    colnames(sv_df) <- latent_sv_columns
+    for (sv_col in latent_sv_columns) {
+      col_data[[sv_col]] <- as.numeric(sv_df[[sv_col]])
+    }
+    design_formula_effective_text <- paste(design_formula_text, paste(latent_sv_columns, collapse = " + "), sep = " + ")
+    design_formula <- stats::as.formula(design_formula_effective_text)
+    latent_message <- paste0("Latent-factor correction enabled with ", length(latent_sv_columns), " surrogate variables.")
+    latent_factors_tbl <- data.frame(
+      sample_id = rownames(col_data),
+      col_data[, latent_sv_columns, drop = FALSE],
+      check.names = FALSE,
+      stringsAsFactors = FALSE
+    )
+    utils::write.table(
+      latent_factors_tbl,
+      file = file.path(qc_dir, "latent_factors.tsv"),
+      sep = "\t",
+      quote = FALSE,
+      row.names = FALSE
+    )
+  }
+}
+message(latent_message)
 dds <- DESeq2::DESeqDataSetFromMatrix(
   countData = count_matrix,
   colData = col_data,
@@ -439,6 +493,35 @@ safe_cp_result_table <- function(cp_obj) {
   df
 }
 
+build_rank_table <- function(df, score_col, id_col = "gene_symbol", fallback_id_col = "gene_id") {
+  if (!(score_col %in% colnames(df))) {
+    return(NULL)
+  }
+  scores <- suppressWarnings(as.numeric(df[[score_col]]))
+  ids <- as.character(df[[id_col]])
+  if (!(fallback_id_col %in% colnames(df))) {
+    fallback_ids <- rep(NA_character_, nrow(df))
+  } else {
+    fallback_ids <- strip_ensembl_version(as.character(df[[fallback_id_col]]))
+  }
+  use_ids <- ids
+  bad <- is.na(use_ids) | !nzchar(use_ids)
+  use_ids[bad] <- fallback_ids[bad]
+  keep <- !is.na(use_ids) & nzchar(use_ids) & is.finite(scores)
+  if (!any(keep)) {
+    return(NULL)
+  }
+  rank_df <- data.frame(
+    feature = use_ids[keep],
+    score = scores[keep],
+    stringsAsFactors = FALSE
+  )
+  rank_df <- rank_df[order(abs(rank_df$score), decreasing = TRUE), , drop = FALSE]
+  rank_df <- rank_df[!duplicated(rank_df$feature), , drop = FALSE]
+  rank_df <- rank_df[order(rank_df$score, decreasing = TRUE), , drop = FALSE]
+  rank_df
+}
+
 read_gmt_term2gene <- function(gmt_path) {
   lines <- readLines(gmt_path, warn = FALSE)
   lines <- lines[nzchar(lines)]
@@ -469,6 +552,77 @@ read_gmt_term2gene <- function(gmt_path) {
     return(data.frame(term = character(0), gene = character(0), stringsAsFactors = FALSE))
   }
   do.call(rbind, rows[seq_len(out_idx)])
+}
+
+normalize_term_tokens <- function(x) {
+  x <- tolower(as.character(x))
+  x <- gsub("[^a-z0-9 ]+", " ", x)
+  x <- gsub("\\s+", " ", x)
+  x <- trimws(x)
+  if (!nzchar(x)) {
+    return(character(0))
+  }
+  toks <- unique(strsplit(x, " ", fixed = TRUE)[[1]])
+  toks <- toks[nzchar(toks)]
+  # Remove low-information tokens commonly repeated across pathway names.
+  toks <- toks[!(toks %in% c("pathway", "signaling", "process", "response", "regulation"))]
+  toks
+}
+
+reduce_redundant_terms <- function(df, term_col = "term", score_col = "score", max_terms = 12, jaccard_cutoff = 0.6) {
+  if (nrow(df) == 0) {
+    return(df)
+  }
+  df <- df[order(df[[score_col]], decreasing = TRUE), , drop = FALSE]
+  keep_idx <- integer(0)
+  kept_tokens <- list()
+  for (i in seq_len(nrow(df))) {
+    term_tokens <- normalize_term_tokens(df[[term_col]][i])
+    is_redundant <- FALSE
+    if (length(term_tokens) > 0 && length(kept_tokens) > 0) {
+      for (tok in kept_tokens) {
+        inter <- length(intersect(term_tokens, tok))
+        union <- length(union(term_tokens, tok))
+        jaccard <- if (union > 0) inter / union else 0
+        if (jaccard >= jaccard_cutoff) {
+          is_redundant <- TRUE
+          break
+        }
+      }
+    }
+    if (!is_redundant) {
+      keep_idx <- c(keep_idx, i)
+      kept_tokens[[length(kept_tokens) + 1]] <- term_tokens
+    }
+    if (length(keep_idx) >= max_terms) {
+      break
+    }
+  }
+  if (length(keep_idx) == 0) {
+    return(head(df, min(max_terms, nrow(df))))
+  }
+  df[keep_idx, , drop = FALSE]
+}
+
+resolve_featurecounts_summary_path <- function(counts_table_path) {
+  candidate <- sub("\\.raw_read_quant\\.table\\.txt$", ".featureCounts.summary.txt", counts_table_path)
+  if (!identical(candidate, counts_table_path) && file.exists(candidate)) {
+    return(candidate)
+  }
+  search_dir <- dirname(counts_table_path)
+  candidates <- list.files(
+    search_dir,
+    pattern = "\\.featureCounts\\.summary\\.txt$",
+    full.names = TRUE
+  )
+  if (length(candidates) == 1) {
+    return(candidates[[1]])
+  }
+  if (length(candidates) > 1) {
+    ordered <- candidates[order(file.info(candidates)$mtime, decreasing = TRUE)]
+    return(ordered[[1]])
+  }
+  NA_character_
 }
 
 aggregate_symbol_matrix <- function(mat, symbols) {
@@ -639,7 +793,7 @@ if (enrichment_enabled && custom_modules_enabled) {
   )
 }
 
-design_terms <- attr(stats::terms(design_formula), "term.labels")
+design_terms <- attr(stats::terms(design_formula_base), "term.labels")
 annotation_columns <- unique(unlist(strsplit(design_terms, ":", fixed = TRUE)))
 annotation_columns <- annotation_columns[nzchar(annotation_columns)]
 auto_categorical_columns <- colnames(col_data)[
@@ -805,6 +959,82 @@ utils::write.table(
   row.names = FALSE
 )
 
+sample_qc <- data.frame(
+  sample = sample_columns,
+  library_size_raw = as.numeric(colSums(raw_count_matrix, na.rm = TRUE)),
+  genes_detected_raw = as.numeric(colSums(raw_count_matrix > 0, na.rm = TRUE)),
+  library_size_filtered = as.numeric(colSums(count_matrix, na.rm = TRUE)),
+  genes_detected_filtered = as.numeric(colSums(count_matrix > 0, na.rm = TRUE)),
+  size_factor = as.numeric(DESeq2::sizeFactors(dds)[sample_columns]),
+  stringsAsFactors = FALSE
+)
+
+fc_summary_path <- resolve_featurecounts_summary_path(counts_path)
+if (!is.na(fc_summary_path) && file.exists(fc_summary_path)) {
+  message("Using featureCounts summary for sample QC: ", fc_summary_path)
+  fc_summary <- tryCatch(
+    utils::read.delim(fc_summary_path, check.names = FALSE, stringsAsFactors = FALSE, row.names = 1),
+    error = function(e) NULL
+  )
+  if (!is.null(fc_summary) && ncol(fc_summary) > 0) {
+    fc_cols <- colnames(fc_summary)
+    fc_totals <- colSums(fc_summary, na.rm = TRUE)
+    assigned_row_name <- c("Assigned", "assigned")
+    assigned_row_name <- assigned_row_name[assigned_row_name %in% rownames(fc_summary)]
+    if (length(assigned_row_name) > 0) {
+      fc_assigned <- as.numeric(fc_summary[assigned_row_name[[1]], , drop = TRUE])
+    } else {
+      fc_assigned <- rep(NA_real_, length(fc_cols))
+    }
+    fc_assigned_pct <- 100 * fc_assigned / pmax(fc_totals, 1)
+    sample_qc$featurecounts_total <- as.numeric(fc_totals[match(sample_qc$sample, fc_cols)])
+    sample_qc$featurecounts_assigned <- as.numeric(fc_assigned[match(sample_qc$sample, fc_cols)])
+    sample_qc$featurecounts_assigned_pct <- as.numeric(fc_assigned_pct[match(sample_qc$sample, fc_cols)])
+  } else {
+    sample_qc$featurecounts_total <- NA_real_
+    sample_qc$featurecounts_assigned <- NA_real_
+    sample_qc$featurecounts_assigned_pct <- NA_real_
+  }
+} else {
+  message("No featureCounts summary file detected for sample QC. Assignment metrics will be NA.")
+  sample_qc$featurecounts_total <- NA_real_
+  sample_qc$featurecounts_assigned <- NA_real_
+  sample_qc$featurecounts_assigned_pct <- NA_real_
+}
+
+utils::write.table(
+  sample_qc,
+  file = file.path(qc_dir, "sample_qc_summary.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+project_qc <- data.frame(
+  metric = c(
+    "n_samples",
+    "median_library_size_raw",
+    "median_genes_detected_raw",
+    "median_size_factor",
+    "mean_featurecounts_assigned_pct"
+  ),
+  value = c(
+    nrow(sample_qc),
+    stats::median(sample_qc$library_size_raw, na.rm = TRUE),
+    stats::median(sample_qc$genes_detected_raw, na.rm = TRUE),
+    stats::median(sample_qc$size_factor, na.rm = TRUE),
+    mean(sample_qc$featurecounts_assigned_pct, na.rm = TRUE)
+  ),
+  stringsAsFactors = FALSE
+)
+utils::write.table(
+  project_qc,
+  file = file.path(qc_dir, "project_qc_summary.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
 grDevices::pdf(file.path(qc_dir, "dispersion_plot.pdf"), width = 8, height = 6)
 DESeq2::plotDispEsts(dds)
 grDevices::dev.off()
@@ -918,6 +1148,100 @@ if (qc_enabled) {
       pca_df[[column_name]] <- col_data[[column_name]]
     }
     pct <- round(100 * (pca$sdev^2 / sum(pca$sdev^2)), 2)
+    pca_var_df <- data.frame(
+      pc = paste0("PC", seq_along(pca$sdev)),
+      variance_explained_pct = as.numeric(100 * (pca$sdev^2 / sum(pca$sdev^2))),
+      cumulative_variance_explained_pct = as.numeric(cumsum(100 * (pca$sdev^2 / sum(pca$sdev^2)))),
+      stringsAsFactors = FALSE
+    )
+    utils::write.table(
+      pca_var_df,
+      file = file.path(qc_dir, "pca_variance_explained.tsv"),
+      sep = "\t",
+      quote = FALSE,
+      row.names = FALSE
+    )
+
+    assoc_columns <- unique(c(
+      de_columns_resolved,
+      de_block_resolved,
+      pca_color_by_use,
+      pca_shape_by_values_use,
+      auto_categorical_columns
+    ))
+    assoc_columns <- assoc_columns[assoc_columns %in% colnames(col_data)]
+    assoc_columns <- assoc_columns[
+      vapply(assoc_columns, function(x) is_informative_column(col_data, x), logical(1))
+    ]
+    n_pcs_assoc <- min(5, ncol(pca$x))
+    pca_assoc_rows <- list()
+    if (n_pcs_assoc >= 1 && length(assoc_columns) > 0) {
+      for (pc_idx in seq_len(n_pcs_assoc)) {
+        pc_name <- paste0("PC", pc_idx)
+        pc_vals <- as.numeric(pca_df[[pc_name]])
+        for (column_name in assoc_columns) {
+          var_vals <- col_data[[column_name]]
+          keep <- !is.na(pc_vals) & !is.na(var_vals)
+          if (sum(keep) < 4) {
+            next
+          }
+          df_model <- data.frame(
+            pc_value = pc_vals[keep],
+            variable = var_vals[keep],
+            stringsAsFactors = FALSE
+          )
+          n_unique <- length(unique(df_model$variable))
+          if (n_unique < 2) {
+            next
+          }
+          is_numeric_predictor <- is.numeric(df_model$variable) || is.integer(df_model$variable)
+          if (!is_numeric_predictor) {
+            df_model$variable <- as.factor(as.character(df_model$variable))
+          }
+          fit <- tryCatch(
+            stats::lm(pc_value ~ variable, data = df_model),
+            error = function(e) NULL
+          )
+          if (is.null(fit)) {
+            next
+          }
+          fit_anova <- tryCatch(stats::anova(fit), error = function(e) NULL)
+          if (is.null(fit_anova) || nrow(fit_anova) < 1) {
+            next
+          }
+          p_value <- suppressWarnings(as.numeric(fit_anova[1, "Pr(>F)"]))
+          r2 <- suppressWarnings(as.numeric(summary(fit)$r.squared))
+          pca_assoc_rows[[length(pca_assoc_rows) + 1]] <- data.frame(
+            factor = column_name,
+            pc = pc_name,
+            p_value = p_value,
+            r_squared = r2,
+            n_samples = nrow(df_model),
+            n_levels = if (is_numeric_predictor) NA_integer_ else n_unique,
+            predictor_type = if (is_numeric_predictor) "numeric" else "categorical",
+            stringsAsFactors = FALSE
+          )
+        }
+      }
+    }
+    if (length(pca_assoc_rows) > 0) {
+      pca_assoc_df <- do.call(rbind, pca_assoc_rows)
+      pca_assoc_df$fdr_bh <- NA_real_
+      for (pc_name in unique(pca_assoc_df$pc)) {
+        idx <- which(pca_assoc_df$pc == pc_name & is.finite(pca_assoc_df$p_value))
+        if (length(idx) > 0) {
+          pca_assoc_df$fdr_bh[idx] <- stats::p.adjust(pca_assoc_df$p_value[idx], method = "BH")
+        }
+      }
+      pca_assoc_df <- pca_assoc_df[order(pca_assoc_df$pc, pca_assoc_df$p_value), , drop = FALSE]
+      utils::write.table(
+        pca_assoc_df,
+        file = file.path(qc_dir, "pca_factor_association.tsv"),
+        sep = "\t",
+        quote = FALSE,
+        row.names = FALSE
+      )
+    }
 
     plot_pca_pair <- function(pc_x, pc_y, color_col, shape_col = "") {
       xcol <- paste0("PC", pc_x)
@@ -972,7 +1296,7 @@ if (qc_enabled) {
 build_auto_contrasts <- function() {
   candidate <- auto_primary_variable
   if (!nzchar(candidate)) {
-    terms_vec <- attr(stats::terms(design_formula), "term.labels")
+    terms_vec <- attr(stats::terms(design_formula_base), "term.labels")
     terms_vec <- terms_vec[!grepl(":", terms_vec, fixed = TRUE)]
     if (length(terms_vec) == 0) {
       stop("Could not infer an auto contrast variable from the design formula.")
@@ -1007,6 +1331,172 @@ if (length(contrast_plan) == 0) {
   stop("No DE contrasts were resolved.")
 }
 
+safe_pkg_version <- function(pkg_name) {
+  if (!requireNamespace(pkg_name, quietly = TRUE)) {
+    return(NA_character_)
+  }
+  as.character(utils::packageVersion(pkg_name))
+}
+
+de_run_manifest <- data.frame(
+  key = c(
+    "counts_path",
+    "metadata_path",
+    "output_root",
+    "qc_dir",
+    "de_dir",
+    "design_formula",
+    "contrast_mode",
+    "auto_pairwise",
+    "auto_primary_variable",
+    "filtering_enabled",
+    "filtering_method",
+    "filtering_min_count",
+    "filtering_min_samples",
+    "deseq_fit_type",
+    "deseq_sf_type",
+    "deseq_parallel",
+    "latent_enabled",
+    "latent_method",
+    "latent_n_sv_requested",
+    "latent_n_sv_used",
+    "design_formula_effective",
+    "shrink_enabled",
+    "shrink_type",
+    "shrink_for_tables",
+    "alpha",
+    "lfc_for_sig",
+    "lfc_for_heatmap",
+    "runtime_seed",
+    "n_samples",
+    "n_genes_after_filtering"
+  ),
+  value = c(
+    counts_path,
+    metadata_path,
+    output_root,
+    qc_dir,
+    de_dir,
+    design_formula_text,
+    contrast_mode,
+    as.character(auto_pairwise),
+    auto_primary_variable,
+    as.character(filtering_enabled),
+    filtering_method,
+    as.character(filtering_min_count),
+    as.character(filtering_min_samples),
+    deseq_fit_type,
+    deseq_sf_type,
+    as.character(deseq_parallel),
+    as.character(latent_enabled),
+    latent_method,
+    ifelse(is.na(latent_n_sv), "auto", as.character(latent_n_sv)),
+    as.character(length(latent_sv_columns)),
+    design_formula_effective_text,
+    as.character(shrink_enabled),
+    shrink_type,
+    as.character(shrink_for_tables),
+    as.character(alpha),
+    as.character(lfc_for_sig),
+    as.character(lfc_for_heatmap),
+    as.character(__RUNTIME_SEED__),
+    as.character(ncol(count_matrix)),
+    as.character(nrow(count_matrix))
+  ),
+  stringsAsFactors = FALSE
+)
+utils::write.table(
+  de_run_manifest,
+  file = file.path(qc_dir, "de_run_manifest.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+latent_factor_summary <- data.frame(
+  enabled = latent_enabled,
+  method = latent_method,
+  n_sv_requested = ifelse(is.na(latent_n_sv), NA_integer_, as.integer(latent_n_sv)),
+  n_sv_used = as.integer(length(latent_sv_columns)),
+  design_formula_base = design_formula_text,
+  design_formula_effective = design_formula_effective_text,
+  stringsAsFactors = FALSE
+)
+utils::write.table(
+  latent_factor_summary,
+  file = file.path(qc_dir, "latent_factor_summary.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+contrast_manifest <- do.call(
+  rbind,
+  lapply(contrast_plan, function(x) {
+    data.frame(
+      factor = as.character(x$factor),
+      numerator = as.character(x$numerator),
+      denominator = as.character(x$denominator),
+      contrast_label = sanitize_name(paste(x$numerator, "vs", x$denominator, sep = "_")),
+      stringsAsFactors = FALSE
+    )
+  })
+)
+utils::write.table(
+  contrast_manifest,
+  file = file.path(de_dir, "contrast_plan.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+pkg_versions <- data.frame(
+  package = c(
+    "DESeq2",
+    "ggplot2",
+    "pheatmap",
+    "matrixStats",
+    "RColorBrewer",
+    "ggrepel",
+    "AnnotationDbi",
+    "org.Hs.eg.db",
+    "org.Mm.eg.db",
+    "clusterProfiler",
+    "enrichplot",
+    "fgsea",
+    "sva",
+    "msigdbr",
+    "decoupleR",
+    "OmnipathR"
+  ),
+  version = c(
+    safe_pkg_version("DESeq2"),
+    safe_pkg_version("ggplot2"),
+    safe_pkg_version("pheatmap"),
+    safe_pkg_version("matrixStats"),
+    safe_pkg_version("RColorBrewer"),
+    safe_pkg_version("ggrepel"),
+    safe_pkg_version("AnnotationDbi"),
+    safe_pkg_version("org.Hs.eg.db"),
+    safe_pkg_version("org.Mm.eg.db"),
+    safe_pkg_version("clusterProfiler"),
+    safe_pkg_version("enrichplot"),
+    safe_pkg_version("fgsea"),
+    safe_pkg_version("sva"),
+    safe_pkg_version("msigdbr"),
+    safe_pkg_version("decoupleR"),
+    safe_pkg_version("OmnipathR")
+  ),
+  stringsAsFactors = FALSE
+)
+utils::write.table(
+  pkg_versions,
+  file = file.path(qc_dir, "package_versions.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
 contrast_summaries <- list()
 for (contrast_cfg in contrast_plan) {
   factor_name <- contrast_cfg$factor
@@ -1015,6 +1505,29 @@ for (contrast_cfg in contrast_plan) {
   contrast_label <- sanitize_name(paste(numerator, "vs", denominator, sep = "_"))
   contrast_dir <- file.path(de_dir, contrast_label)
   dir.create(contrast_dir, recursive = TRUE, showWarnings = FALSE)
+
+  contrast_sample_ids <- rownames(col_data)
+  if (factor_name %in% colnames(col_data)) {
+    contrast_factor_values <- as.character(col_data[[factor_name]])
+    keep_contrast_samples <- !is.na(contrast_factor_values) & contrast_factor_values %in% c(numerator, denominator)
+    contrast_sample_ids <- rownames(col_data)[keep_contrast_samples]
+    if (length(contrast_sample_ids) < 2) {
+      message(
+        "Contrast sample subsetting yielded <2 samples for ", contrast_label,
+        ". Falling back to all samples for plotting."
+      )
+      contrast_sample_ids <- rownames(col_data)
+    }
+  }
+  contrast_annotation_df <- NULL
+  contrast_annotation_colors <- NULL
+  if (!is.null(annotation_df_informative) && nrow(annotation_df_informative) > 0) {
+    ann_keep <- intersect(contrast_sample_ids, rownames(annotation_df_informative))
+    if (length(ann_keep) > 0) {
+      contrast_annotation_df <- annotation_df_informative[ann_keep, , drop = FALSE]
+      contrast_annotation_colors <- annotation_colors_informative
+    }
+  }
 
   base_res <- DESeq2::results(dds, contrast = c(factor_name, numerator, denominator), alpha = alpha)
   res_for_table <- base_res
@@ -1038,10 +1551,103 @@ for (contrast_cfg in contrast_plan) {
   res_df <- res_df[, c("gene_id", "gene_symbol", setdiff(colnames(res_df), c("gene_id", "gene_symbol")))]
   res_df <- res_df[order(res_df$padj, na.last = TRUE), , drop = FALSE]
 
+  res_meta <- tryCatch(S4Vectors::metadata(res_for_table), error = function(e) list())
+  independent_filtering_enabled <- if (!is.null(res_meta$independentFiltering)) {
+    as.logical(res_meta$independentFiltering)
+  } else {
+    NA
+  }
+  filter_threshold <- if (!is.null(res_meta$filterThreshold)) {
+    as.numeric(res_meta$filterThreshold)
+  } else {
+    NA_real_
+  }
+  cooks_cutoff <- if (!is.null(res_meta$cooksCutoff)) {
+    as.numeric(res_meta$cooksCutoff)
+  } else {
+    NA_real_
+  }
+  testing_summary <- data.frame(
+    contrast = contrast_label,
+    total_genes = nrow(res_df),
+    genes_with_pvalue = sum(!is.na(res_df$pvalue)),
+    genes_with_padj = sum(!is.na(res_df$padj)),
+    genes_pvalue_na = sum(is.na(res_df$pvalue)),
+    genes_padj_na = sum(is.na(res_df$padj)),
+    genes_padj_na_with_pvalue = sum(is.na(res_df$padj) & !is.na(res_df$pvalue)),
+    genes_lfc_na = sum(is.na(res_df$log2FoldChange)),
+    genes_lfcse_na = if ("lfcSE" %in% colnames(res_df)) sum(is.na(res_df$lfcSE)) else NA_integer_,
+    independent_filtering_enabled = independent_filtering_enabled,
+    filter_threshold = filter_threshold,
+    cooks_cutoff = cooks_cutoff,
+    alpha = alpha,
+    lfc_for_sig = lfc_for_sig,
+    stringsAsFactors = FALSE
+  )
+  utils::write.table(
+    testing_summary,
+    file = file.path(contrast_dir, paste0(contrast_label, ".testing_summary.tsv")),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+
   if (write_full_results) {
     utils::write.table(
       res_df,
       file = file.path(contrast_dir, paste0(contrast_label, ".diff_genes.DESeq2.txt")),
+      sep = "\t",
+      quote = FALSE,
+      row.names = FALSE
+    )
+  }
+
+  ranked_exports <- list()
+  rank_lfc <- build_rank_table(res_df, "log2FoldChange")
+  if (!is.null(rank_lfc) && nrow(rank_lfc) > 1) {
+    out_rnk <- file.path(contrast_dir, paste0(contrast_label, ".ranked.log2FoldChange.rnk"))
+    utils::write.table(rank_lfc, file = out_rnk, sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+    ranked_exports[[length(ranked_exports) + 1]] <- data.frame(
+      file = basename(out_rnk),
+      score = "log2FoldChange",
+      n_features = nrow(rank_lfc),
+      stringsAsFactors = FALSE
+    )
+  }
+  rank_stat <- build_rank_table(res_df, "stat")
+  if (!is.null(rank_stat) && nrow(rank_stat) > 1) {
+    out_rnk <- file.path(contrast_dir, paste0(contrast_label, ".ranked.stat.rnk"))
+    utils::write.table(rank_stat, file = out_rnk, sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+    ranked_exports[[length(ranked_exports) + 1]] <- data.frame(
+      file = basename(out_rnk),
+      score = "stat",
+      n_features = nrow(rank_stat),
+      stringsAsFactors = FALSE
+    )
+  }
+  if ("pvalue" %in% colnames(res_df)) {
+    pval <- as.numeric(res_df$pvalue)
+    lfc <- as.numeric(res_df$log2FoldChange)
+    signed_log10p <- sign(lfc) * (-log10(pmax(pval, 1e-300)))
+    rank_slp_df <- res_df
+    rank_slp_df$signed_log10_pvalue <- signed_log10p
+    rank_slp <- build_rank_table(rank_slp_df, "signed_log10_pvalue")
+    if (!is.null(rank_slp) && nrow(rank_slp) > 1) {
+      out_rnk <- file.path(contrast_dir, paste0(contrast_label, ".ranked.signed_log10_pvalue.rnk"))
+      utils::write.table(rank_slp, file = out_rnk, sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+      ranked_exports[[length(ranked_exports) + 1]] <- data.frame(
+        file = basename(out_rnk),
+        score = "signed_log10_pvalue",
+        n_features = nrow(rank_slp),
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+  if (length(ranked_exports) > 0) {
+    rank_manifest <- do.call(rbind, ranked_exports)
+    utils::write.table(
+      rank_manifest,
+      file = file.path(contrast_dir, paste0(contrast_label, ".ranked_exports.tsv")),
       sep = "\t",
       quote = FALSE,
       row.names = FALSE
@@ -1138,7 +1744,7 @@ for (contrast_cfg in contrast_plan) {
     sig_for_heatmap <- head(sig_for_heatmap, 50)
     sig_genes <- unique(sig_for_heatmap$gene_id)
     if (length(sig_genes) >= 2) {
-      hm <- SummarizedExperiment::assay(vst_obj)[sig_genes, , drop = FALSE]
+      hm <- SummarizedExperiment::assay(vst_obj)[sig_genes, contrast_sample_ids, drop = FALSE]
       gene_labels <- sig_for_heatmap$gene_symbol_plot[match(sig_genes, sig_for_heatmap$gene_id)]
       rownames(hm) <- make.unique(gene_labels)
       hm_colors <- gradient_palette(255)
@@ -1146,8 +1752,8 @@ for (contrast_cfg in contrast_plan) {
       pheatmap::pheatmap(
         hm,
         color = hm_colors,
-        annotation_col = annotation_df_informative,
-        annotation_colors = annotation_colors_informative,
+        annotation_col = contrast_annotation_df,
+        annotation_colors = contrast_annotation_colors,
         cluster_rows = sig_heatmap_cluster_rows,
         cluster_cols = sig_heatmap_cluster_cols,
         show_rownames = TRUE,
@@ -1166,6 +1772,9 @@ for (contrast_cfg in contrast_plan) {
     numerator = numerator,
     denominator = denominator,
     genes_tested = genes_tested,
+    genes_with_pvalue = testing_summary$genes_with_pvalue,
+    genes_with_padj = testing_summary$genes_with_padj,
+    genes_padj_na_with_pvalue = testing_summary$genes_padj_na_with_pvalue,
     sig_total = nrow(sig_df),
     sig_up = sig_up,
     sig_down = sig_down,
@@ -1190,9 +1799,10 @@ for (contrast_cfg in contrast_plan) {
   if (nrow(top10_df) > 0 && factor_name %in% colnames(col_data)) {
     boxplot_dir <- file.path(contrast_dir, "top10_boxplots")
     dir.create(boxplot_dir, recursive = TRUE, showWarnings = FALSE)
-    group_values <- as.factor(as.character(col_data[[factor_name]]))
+    boxplot_col_data <- col_data[contrast_sample_ids, , drop = FALSE]
+    group_values <- factor(as.character(boxplot_col_data[[factor_name]]), levels = c(numerator, denominator))
     group_palette <- categorical_palette(
-      levels(group_values),
+      c(numerator, denominator),
       palette_name = palette_name_for_column(factor_name)
     )
     for (idx in seq_len(nrow(top10_df))) {
@@ -1205,8 +1815,8 @@ for (contrast_cfg in contrast_plan) {
         next
       }
       plot_df <- data.frame(
-        sample = rownames(col_data),
-        expression = as.numeric(SummarizedExperiment::assay(vst_obj)[gene_id, ]),
+        sample = rownames(boxplot_col_data),
+        expression = as.numeric(SummarizedExperiment::assay(vst_obj)[gene_id, contrast_sample_ids]),
         group = group_values,
         stringsAsFactors = FALSE
       )
@@ -1435,9 +2045,10 @@ for (contrast_cfg in contrast_plan) {
     dc_dir <- file.path(contrast_dir, "decoupler")
     dir.create(dc_dir, recursive = TRUE, showWarnings = FALSE)
 
-    sample_symbol_ids <- symbols_for_ids(rownames(SummarizedExperiment::assay(vst_obj)), fallback_to_ids = FALSE)
+    contrast_vst <- SummarizedExperiment::assay(vst_obj)[, contrast_sample_ids, drop = FALSE]
+    sample_symbol_ids <- symbols_for_ids(rownames(contrast_vst), fallback_to_ids = FALSE)
     sample_symbol_ids[!is_valid_symbol(sample_symbol_ids)] <- NA_character_
-    dc_sample_mat <- aggregate_symbol_matrix(SummarizedExperiment::assay(vst_obj), sample_symbol_ids)
+    dc_sample_mat <- aggregate_symbol_matrix(contrast_vst, sample_symbol_ids)
 
     deg_symbol_ids <- enrich_df$gene_symbol_clean
     dc_deg_mat_raw <- matrix(
@@ -1681,6 +2292,178 @@ for (contrast_cfg in contrast_plan) {
       }
     }
   }
+
+  build_contrast_combined_summary <- function() {
+    panel_volcano <- NULL
+    panel_top_genes <- NULL
+    panel_top_paths <- NULL
+    panel_decoupler <- NULL
+
+    vdf <- res_df
+    vdf$padj[is.na(vdf$padj)] <- 1
+    vdf$log2FoldChange[is.na(vdf$log2FoldChange)] <- 0
+    vdf$neglog10padj <- -log10(pmax(vdf$padj, 1e-300))
+    vdf$is_sig <- vdf$padj < alpha & abs(vdf$log2FoldChange) >= lfc_for_sig
+    panel_volcano <- ggplot2::ggplot(vdf, ggplot2::aes(x = log2FoldChange, y = neglog10padj, color = is_sig)) +
+      ggplot2::geom_point(alpha = 0.6, size = 1.0) +
+      ggplot2::scale_color_manual(values = c("FALSE" = "grey70", "TRUE" = "firebrick")) +
+      ggplot2::geom_vline(xintercept = c(-lfc_for_sig, 0, lfc_for_sig), linetype = c("dashed", "solid", "dashed")) +
+      ggplot2::geom_hline(yintercept = -log10(alpha), linetype = "dashed") +
+      ggplot2::theme_light() +
+      ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none") +
+      ggplot2::xlab("log2 fold change") +
+      ggplot2::ylab("-log10 adjusted p-value") +
+      ggplot2::ggtitle(paste0(contrast_label, " volcano"))
+
+    tg <- sig_df
+    if (nrow(tg) > 0) {
+      tg <- tg[order(tg$padj, -abs(tg$log2FoldChange)), , drop = FALSE]
+      tg <- head(tg, 12)
+      tg$gene_plot <- tg$gene_symbol
+      tg$direction <- ifelse(tg$log2FoldChange >= 0, "up", "down")
+      tg$gene_plot <- factor(tg$gene_plot, levels = rev(tg$gene_plot))
+      panel_top_genes <- ggplot2::ggplot(
+        tg,
+        ggplot2::aes(x = gene_plot, y = log2FoldChange, fill = direction)
+      ) +
+        ggplot2::geom_col() +
+        ggplot2::coord_flip() +
+        ggplot2::scale_fill_manual(values = c("up" = "firebrick", "down" = "steelblue")) +
+        ggplot2::theme_light() +
+        ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none") +
+        ggplot2::xlab(NULL) +
+        ggplot2::ylab("log2 fold change") +
+        ggplot2::ggtitle("Top DE genes")
+    } else {
+      panel_top_genes <- ggplot2::ggplot() +
+        ggplot2::annotate("text", x = 0.5, y = 0.5, label = "No significant genes") +
+        ggplot2::theme_void() +
+        ggplot2::ggtitle("Top DE genes")
+    }
+
+    path_rows <- list()
+    cp_dir <- file.path(contrast_dir, "clusterProfiler")
+    if (dir.exists(cp_dir)) {
+      cp_tables <- list.files(cp_dir, pattern = "\\.(ORA|GSEA)\\.tsv$", full.names = TRUE)
+      for (tab in cp_tables) {
+        tab_df <- tryCatch(utils::read.delim(tab, stringsAsFactors = FALSE, check.names = FALSE), error = function(e) NULL)
+        if (is.null(tab_df) || nrow(tab_df) == 0) {
+          next
+        }
+        p_col <- if ("p.adjust" %in% colnames(tab_df)) "p.adjust" else if ("qvalue" %in% colnames(tab_df)) "qvalue" else NA_character_
+        d_col <- if ("Description" %in% colnames(tab_df)) "Description" else if ("ID" %in% colnames(tab_df)) "ID" else NA_character_
+        if (is.na(p_col) || is.na(d_col)) {
+          next
+        }
+        score <- -log10(pmax(as.numeric(tab_df[[p_col]]), 1e-300))
+        keep <- is.finite(score)
+        if (!any(keep)) {
+          next
+        }
+        top_idx <- order(score[keep], decreasing = TRUE)
+        top_labels <- as.character(tab_df[[d_col]][keep])[top_idx]
+        top_scores <- score[keep][top_idx]
+        n_take <- min(5, length(top_scores))
+        if (n_take < 1) {
+          next
+        }
+        path_rows[[length(path_rows) + 1]] <- data.frame(
+          term = top_labels[seq_len(n_take)],
+          score = top_scores[seq_len(n_take)],
+          source = sub(paste0("^", contrast_label, "\\."), "", basename(tab)),
+          stringsAsFactors = FALSE
+        )
+      }
+    }
+    if (length(path_rows) > 0) {
+      path_df <- do.call(rbind, path_rows)
+      path_df <- path_df[order(path_df$score, decreasing = TRUE), , drop = FALSE]
+      path_df <- reduce_redundant_terms(
+        path_df,
+        term_col = "term",
+        score_col = "score",
+        max_terms = 12,
+        jaccard_cutoff = 0.6
+      )
+      path_df$term <- factor(path_df$term, levels = rev(unique(path_df$term)))
+      panel_top_paths <- ggplot2::ggplot(path_df, ggplot2::aes(x = term, y = score, fill = source)) +
+        ggplot2::geom_col() +
+        ggplot2::coord_flip() +
+        ggplot2::theme_light() +
+        ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none") +
+        ggplot2::xlab(NULL) +
+        ggplot2::ylab("-log10 adjusted p-value") +
+        ggplot2::ggtitle("Top enriched pathways")
+    } else {
+      panel_top_paths <- ggplot2::ggplot() +
+        ggplot2::annotate("text", x = 0.5, y = 0.5, label = "No enrichment results") +
+        ggplot2::theme_void() +
+        ggplot2::ggtitle("Top enriched pathways")
+    }
+
+    dc_rows <- list()
+    dc_dir <- file.path(contrast_dir, "decoupler")
+    if (dir.exists(dc_dir)) {
+      dc_tables <- list.files(dc_dir, pattern = "\\.tsv$", full.names = TRUE)
+      for (tab in dc_tables) {
+        tab_df <- tryCatch(utils::read.delim(tab, stringsAsFactors = FALSE, check.names = FALSE), error = function(e) NULL)
+        if (is.null(tab_df) || nrow(tab_df) == 0) {
+          next
+        }
+        if (!all(c("source", "score") %in% colnames(tab_df))) {
+          next
+        }
+        keep <- is.finite(as.numeric(tab_df$score))
+        if (!any(keep)) {
+          next
+        }
+        tmp <- tab_df[keep, c("source", "score"), drop = FALSE]
+        tmp$score <- as.numeric(tmp$score)
+        tmp <- tmp[order(abs(tmp$score), decreasing = TRUE), , drop = FALSE]
+        tmp <- head(tmp, 5)
+        tmp$source_file <- sub(paste0("^", contrast_label, "\\."), "", basename(tab))
+        dc_rows[[length(dc_rows) + 1]] <- tmp
+      }
+    }
+    if (length(dc_rows) > 0) {
+      dc_df <- do.call(rbind, dc_rows)
+      dc_df <- dc_df[order(abs(dc_df$score), decreasing = TRUE), , drop = FALSE]
+      dc_df <- head(dc_df, 12)
+      dc_df$regulator <- factor(dc_df$source, levels = rev(unique(dc_df$source)))
+      panel_decoupler <- ggplot2::ggplot(dc_df, ggplot2::aes(x = regulator, y = score, fill = source_file)) +
+        ggplot2::geom_col() +
+        ggplot2::coord_flip() +
+        ggplot2::theme_light() +
+        ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none") +
+        ggplot2::xlab(NULL) +
+        ggplot2::ylab("Activity score") +
+        ggplot2::ggtitle("Top decoupleR activities")
+    } else {
+      panel_decoupler <- ggplot2::ggplot() +
+        ggplot2::annotate("text", x = 0.5, y = 0.5, label = "No decoupleR results") +
+        ggplot2::theme_void() +
+        ggplot2::ggtitle("Top decoupleR activities")
+    }
+
+    out_file <- file.path(contrast_dir, paste0(contrast_label, ".combined_summary.pdf"))
+    grDevices::pdf(out_file, width = 14, height = 10)
+    grid::grid.newpage()
+    lay <- grid::grid.layout(
+      nrow = 2,
+      ncol = 2,
+      widths = grid::unit(c(1, 1), "null"),
+      heights = grid::unit(c(1, 1), "null")
+    )
+    grid::pushViewport(grid::viewport(layout = lay))
+    print(panel_volcano, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 1))
+    print(panel_top_genes, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 2))
+    print(panel_top_paths, vp = grid::viewport(layout.pos.row = 2, layout.pos.col = 1))
+    print(panel_decoupler, vp = grid::viewport(layout.pos.row = 2, layout.pos.col = 2))
+    grid::popViewport()
+    grDevices::dev.off()
+  }
+
+  build_contrast_combined_summary()
 }
 
 if (length(contrast_summaries) > 0) {

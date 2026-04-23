@@ -22,6 +22,7 @@ dependencies:
   - bioconductor-clusterprofiler
   - bioconductor-enrichplot
   - bioconductor-fgsea
+  - bioconductor-sva
   - bioconductor-decoupler
   - bioconductor-omnipathr
   - r-msigdbr
