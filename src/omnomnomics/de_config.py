@@ -16,6 +16,8 @@ DEFAULT_DE_CONFIG: dict = {
         "out_dir": "results",
         "write_rendered_r_script": True,
         "rendered_r_script_name": "DE_analysis.rendered.R",
+        "write_customization_guide": True,
+        "customization_guide_script_name": "DE_analysis.customization_guide.R",
         "save_r_session_image": False,
     },
     "design": {
@@ -306,6 +308,12 @@ def _validate_resolved_de_config(config: dict) -> None:
     out_dir = str(config["io"]["out_dir"]).strip()
     if not out_dir:
         raise DEConfigError("DE config io.out_dir must not be empty.")
+    rendered_name = str(config["io"].get("rendered_r_script_name", "")).strip()
+    if not rendered_name:
+        raise DEConfigError("DE config io.rendered_r_script_name must not be empty.")
+    guide_name = str(config["io"].get("customization_guide_script_name", "")).strip()
+    if not guide_name:
+        raise DEConfigError("DE config io.customization_guide_script_name must not be empty.")
 
     top_var = int(config["qc"]["top_variable_genes"])
     if top_var < 10:

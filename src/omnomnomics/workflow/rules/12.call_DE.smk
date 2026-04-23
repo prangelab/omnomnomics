@@ -123,6 +123,76 @@ def _render_de_template(template_path, replacements):
     return rendered
 
 
+def _build_de_customization_guide(
+    counts_table_path,
+    metadata_path,
+    result_root,
+    resolved_formula,
+    de_columns_resolved,
+    de_block_resolved,
+):
+    de_columns_text = ", ".join(str(x) for x in de_columns_resolved) if de_columns_resolved else "<none>"
+    de_block_text = ", ".join(str(x) for x in de_block_resolved) if de_block_resolved else "<none>"
+    return f"""
+
+# -------------------------------------------------------------------------------------------------
+# Customization guide for DE analyses
+# -------------------------------------------------------------------------------------------------
+# This section is intentionally non-executing. It documents common modifications with project paths.
+# Keep the defaults above for exact run reproduction, then adapt options below for custom analyses.
+#
+# Active run inputs
+#   counts table: {counts_table_path}
+#   metadata:     {metadata_path}
+#   output root:  {result_root}
+#   formula:      {resolved_formula}
+#   de columns:   {de_columns_text}
+#   blocks:       {de_block_text}
+#
+# 1) Factor contrasts (main effects / grouped effects)
+# Example structure:
+# contrast_plan <- list(
+#   list(contrast_type = "factor", factor = "treatment", numerator = "L", denominator = "C",
+#        coefficient_name = NA_character_, label = "treatment_L_vs_C"),
+#   list(contrast_type = "factor", factor = "type", numerator = "KD24", denominator = "NT",
+#        coefficient_name = NA_character_, label = "type_KD24_vs_NT"),
+#   list(contrast_type = "factor", factor = "de_group", numerator = "KD24_L", denominator = "KD24_C",
+#        coefficient_name = NA_character_, label = "de_group_KD24_L_vs_KD24_C")
+# )
+#
+# 2) Coefficient contrasts (interaction coefficients)
+# Inspect available coefficients written during this run:
+#   file.path(qc_dir, "deseq2_results_names.tsv")
+#
+# Example structure:
+# contrast_plan <- list(
+#   list(contrast_type = "coefficient", factor = NA_character_, numerator = NA_character_,
+#        denominator = NA_character_, coefficient_name = "typeKD24.treatmentL",
+#        label = "interaction_typeKD24_treatmentL")
+# )
+#
+# 3) Mixed contrast plan (factor + coefficient)
+# contrast_plan <- list(
+#   list(contrast_type = "factor", factor = "treatment", numerator = "L", denominator = "C",
+#        coefficient_name = NA_character_, label = "treatment_L_vs_C"),
+#   list(contrast_type = "coefficient", factor = NA_character_, numerator = NA_character_,
+#        denominator = NA_character_, coefficient_name = "typeKD24.treatmentL",
+#        label = "interaction_typeKD24_treatmentL")
+# )
+#
+# 4) Custom modules from GMT (already supported in this script)
+# custom_modules_enabled <- TRUE
+# custom_modules_gmt <- "/absolute/path/to/modules.gmt"
+# custom_modules_name <- "custom_modules"
+#
+# Notes:
+# - Factor contrast plots are subset to the numerator/denominator samples.
+# - Coefficient contrasts are model-coefficient tests; they do not subset samples by factor levels.
+# - For reproducibility, keep this rendered script together with metadata_derived.tsv and de_run_manifest.tsv.
+# -------------------------------------------------------------------------------------------------
+"""
+
+
 rule call_DE:
     input:
         counts_table=(
@@ -180,6 +250,10 @@ rule call_DE:
             io_cfg = resolved_de_config.get("io", {})
             de_subdir = str(io_cfg.get("out_dir", "results")).strip() or "results"
             rendered_script_name = str(io_cfg.get("rendered_r_script_name", "DE_analysis.rendered.R"))
+            write_customization_guide = bool(io_cfg.get("write_customization_guide", True))
+            customization_guide_script_name = str(
+                io_cfg.get("customization_guide_script_name", "DE_analysis.customization_guide.R")
+            ).strip() or "DE_analysis.customization_guide.R"
             de_result_root = os.path.join(params.outputfolder, de_subdir)
             qc_dir = os.path.join(de_result_root, "qc")
             de_dir = os.path.join(de_result_root, "differential_expression")
@@ -310,6 +384,20 @@ rule call_DE:
             with open(analysis_script, "w") as handle:
                 handle.write(rendered_r_script)
 
+            customization_guide_script = os.path.join(params.outputfolder, customization_guide_script_name)
+            if write_customization_guide:
+                guide_script_text = rendered_r_script + _build_de_customization_guide(
+                    counts_table_path=input.counts_table,
+                    metadata_path=metadata_copy,
+                    result_root=de_result_root,
+                    resolved_formula=str(resolved_de_config.get("design", {}).get("formula", params.resolved_formula)),
+                    de_columns_resolved=params.de_columns_resolved,
+                    de_block_resolved=params.de_block_resolved,
+                )
+                with open(customization_guide_script, "w") as handle:
+                    handle.write(guide_script_text)
+                os.chmod(customization_guide_script, 0o755)
+
             os.chmod(analysis_script, 0o755)
             de_r_command = f"Rscript {analysis_script}"
             record_step_command(master_config['de_rule_num'], "aggregate", de_r_command)
@@ -318,9 +406,16 @@ rule call_DE:
             with zipfile.ZipFile(output[0], "w", compression=zipfile.ZIP_DEFLATED) as archive:
                 archive.write(metadata_copy, arcname=os.path.basename(metadata_copy))
                 archive.write(analysis_script, arcname=os.path.basename(analysis_script))
+                if write_customization_guide and os.path.isfile(customization_guide_script):
+                    archive.write(
+                        customization_guide_script,
+                        arcname=os.path.basename(customization_guide_script),
+                    )
                 _add_tree_to_zip(archive, de_result_root, os.path.basename(de_result_root))
 
             log_it(logfile, f"Step 12 core DE results: {de_result_root}")
+            if write_customization_guide and os.path.isfile(customization_guide_script):
+                log_it(logfile, f"Step 12 customization guide: {customization_guide_script}")
             log_it(logfile, f"Step 12 archive: {output[0]}")
             finish_step_sample(master_config['de_rule_num'], "aggregate", "call_DE", tracking["start_time"], "OK")
         except Exception:

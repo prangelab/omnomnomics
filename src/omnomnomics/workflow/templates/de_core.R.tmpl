@@ -382,6 +382,7 @@ utils::write.table(
   quote = FALSE,
   row.names = FALSE
 )
+validate_contrast_plan(contrast_plan, results_names_tbl$coefficient, col_data)
 
 all_gene_ids <- rownames(dds)
 all_gene_ids_no_version <- strip_ensembl_version(all_gene_ids)
@@ -1402,6 +1403,58 @@ contrast_plan_raw <- if (contrast_mode == "explicit") explicit_contrasts else bu
 contrast_plan <- lapply(seq_along(contrast_plan_raw), function(i) normalize_contrast_item(contrast_plan_raw[[i]], i))
 if (length(contrast_plan) == 0) {
   stop("No DE contrasts were resolved.")
+}
+
+validate_contrast_plan <- function(plan, available_coefficients, metadata_df) {
+  for (i in seq_along(plan)) {
+    item <- plan[[i]]
+    ctype <- as.character(item$contrast_type)
+    if (identical(ctype, "factor")) {
+      factor_name <- as.character(item$factor)
+      numerator <- as.character(item$numerator)
+      denominator <- as.character(item$denominator)
+      if (!(factor_name %in% colnames(metadata_df))) {
+        stop("Factor contrast ", i, " references metadata column '", factor_name, "' which is not present.")
+      }
+      level_values <- unique(as.character(metadata_df[[factor_name]]))
+      level_values <- level_values[!is.na(level_values) & nzchar(level_values)]
+      if (!(numerator %in% level_values)) {
+        stop("Factor contrast ", i, " numerator '", numerator, "' is not a level of metadata column '", factor_name, "'.")
+      }
+      if (!(denominator %in% level_values)) {
+        stop("Factor contrast ", i, " denominator '", denominator, "' is not a level of metadata column '", factor_name, "'.")
+      }
+      next
+    }
+    if (identical(ctype, "coefficient")) {
+      coef_name <- as.character(item$coefficient_name)
+      if (!nzchar(coef_name)) {
+        stop("Coefficient contrast ", i, " has empty coefficient_name.")
+      }
+      if (!(coef_name %in% available_coefficients)) {
+        tokens <- unique(unlist(strsplit(gsub("[^A-Za-z0-9]+", " ", coef_name), "\\s+")))
+        tokens <- tokens[nzchar(tokens)]
+        candidate_idx <- rep(TRUE, length(available_coefficients))
+        if (length(tokens) > 0) {
+          for (tok in tokens) {
+            candidate_idx <- candidate_idx & grepl(tok, available_coefficients, fixed = TRUE)
+          }
+        }
+        candidates <- available_coefficients[candidate_idx]
+        if (length(candidates) == 0) {
+          candidates <- available_coefficients
+        }
+        candidates <- head(candidates, 10)
+        stop(
+          "Coefficient contrast ", i, " requested coefficient_name '", coef_name, "' which is not present in resultsNames(dds). ",
+          "Check results/qc/deseq2_results_names.tsv. ",
+          "Available examples: ", paste(candidates, collapse = ", ")
+        )
+      }
+      next
+    }
+    stop("Contrast ", i, " has unsupported contrast_type '", ctype, "'.")
+  }
 }
 
 safe_pkg_version <- function(pkg_name) {

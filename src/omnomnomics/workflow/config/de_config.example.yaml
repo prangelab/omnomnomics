@@ -3,6 +3,8 @@ io:
   out_dir: "results"
   write_rendered_r_script: true
   rendered_r_script_name: "DE_analysis.rendered.R"
+  write_customization_guide: true
+  customization_guide_script_name: "DE_analysis.customization_guide.R"
   save_r_session_image: false
 
 design:
