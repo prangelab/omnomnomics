@@ -8,8 +8,10 @@
 #=============================================
 import json
 import os
+import re
 import shutil
 import zipfile
+from pathlib import Path
 
 import yaml
 
@@ -123,6 +125,21 @@ def _render_de_template(template_path, replacements):
     return rendered
 
 
+def _suffix_filename(file_name, suffix):
+    path_obj = Path(file_name)
+    if not suffix:
+        return file_name
+    stem = path_obj.stem
+    suffixes = "".join(path_obj.suffixes)
+    return f"{stem}.{suffix}{suffixes}"
+
+
+def _safe_file_component(value, fallback="analysis"):
+    text = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value))
+    text = re.sub(r"_+", "_", text).strip("._-")
+    return text or fallback
+
+
 def _build_de_customization_guide(
     counts_table_path,
     metadata_path,
@@ -213,7 +230,9 @@ rule call_DE:
         resolved_formula=config.get("RESOLVED_DE_FORMULA", "NA"),
         design_mode=config.get("DE_DESIGN_MODE", "NA"),
         resolved_de_config_file=config.get("DE_CONFIG_RESOLVED_FILE", "NA"),
+        resolved_de_config_files=config.get("DE_CONFIG_RESOLVED_FILES", []),
         resolved_de_config_json=config.get("DE_CONFIG_RESOLVED_JSON", "{}"),
+        resolved_de_config_list_json=config.get("DE_CONFIG_RESOLVED_LIST_JSON", "[]"),
         de_columns_resolved=config.get("DE_COLUMNS_RESOLVED", []),
         de_block_resolved=config.get("DE_BLOCK_RESOLVED", []),
     threads:
@@ -240,187 +259,233 @@ rule call_DE:
             if params.metadata_file == "NA" or not os.path.isfile(params.metadata_file):
                 raise FileNotFoundError("Derived metadata file for step 12 was not found.")
 
-            if params.resolved_de_config_file != "NA" and os.path.isfile(params.resolved_de_config_file):
-                with open(params.resolved_de_config_file) as handle:
-                    resolved_de_config = yaml.safe_load(handle) or {}
-            else:
-                resolved_de_config = json.loads(params.resolved_de_config_json or "{}")
-
-            if not resolved_de_config:
+            resolved_de_configs = []
+            resolved_files = params.resolved_de_config_files or []
+            if isinstance(resolved_files, str):
+                resolved_files = [resolved_files]
+            resolved_files = [item for item in resolved_files if item and item != "NA"]
+            for one_file in resolved_files:
+                if os.path.isfile(one_file):
+                    with open(one_file) as handle:
+                        loaded_cfg = yaml.safe_load(handle) or {}
+                    if loaded_cfg:
+                        resolved_de_configs.append(loaded_cfg)
+            if not resolved_de_configs:
+                loaded_list = json.loads(params.resolved_de_config_list_json or "[]")
+                if isinstance(loaded_list, list) and loaded_list:
+                    resolved_de_configs = [item for item in loaded_list if isinstance(item, dict)]
+            if not resolved_de_configs:
+                if params.resolved_de_config_file != "NA" and os.path.isfile(params.resolved_de_config_file):
+                    with open(params.resolved_de_config_file) as handle:
+                        loaded_cfg = yaml.safe_load(handle) or {}
+                    if loaded_cfg:
+                        resolved_de_configs = [loaded_cfg]
+                else:
+                    loaded_cfg = json.loads(params.resolved_de_config_json or "{}")
+                    if isinstance(loaded_cfg, dict) and loaded_cfg:
+                        resolved_de_configs = [loaded_cfg]
+            if not resolved_de_configs:
                 raise ValueError("Resolved DE config is missing.")
 
-            io_cfg = resolved_de_config.get("io", {})
-            de_subdir = str(io_cfg.get("out_dir", "results")).strip() or "results"
-            rendered_script_name = str(io_cfg.get("rendered_r_script_name", "DE_analysis.rendered.R"))
-            write_customization_guide = bool(io_cfg.get("write_customization_guide", True))
-            customization_guide_script_name = str(
-                io_cfg.get("customization_guide_script_name", "DE_analysis.customization_guide.R")
-            ).strip() or "DE_analysis.customization_guide.R"
-            if os.path.normpath(de_subdir).lower() == "qc":
-                raise ValueError("DE output subdirectory cannot be 'qc' because that path is reserved for shared QC outputs.")
-            qc_dir = os.path.join(params.outputfolder, "qc")
-            de_dir = os.path.join(params.outputfolder, de_subdir)
-
             os.makedirs(params.outputfolder, exist_ok=True)
+            qc_dir = os.path.join(params.outputfolder, "qc")
             os.makedirs(qc_dir, exist_ok=True)
-            os.makedirs(de_dir, exist_ok=True)
-
             metadata_copy = os.path.join(params.outputfolder, "metadata_derived.tsv")
             shutil.copy2(params.metadata_file, metadata_copy)
-
-            contrasts_cfg = resolved_de_config.get("contrasts", {})
-            filtering_cfg = resolved_de_config.get("filtering", {})
-            deseq2_cfg = resolved_de_config.get("deseq2", {})
-            latent_cfg = deseq2_cfg.get("latent_factors", {})
-            lfc_cfg = deseq2_cfg.get("lfc_shrink", {})
-            thresholds_cfg = resolved_de_config.get("thresholds", {})
-            qc_cfg = resolved_de_config.get("qc", {})
-            pca_cfg = qc_cfg.get("pca", {})
-            plots_cfg = resolved_de_config.get("plots", {})
-            volcano_cfg = plots_cfg.get("volcano", {})
-            sig_heatmap_cfg = plots_cfg.get("sig_heatmap", {})
-            tables_cfg = resolved_de_config.get("tables", {})
-            enrichment_cfg = resolved_de_config.get("enrichment", {})
-            enrichment_cp_cfg = enrichment_cfg.get("clusterprofiler", {})
-            enrichment_msigdb_sets_cfg = enrichment_cp_cfg.get("msigdb_sets", [])
-            enrichment_dc_cfg = enrichment_cfg.get("decoupler", {})
-            enrichment_cm_cfg = enrichment_cfg.get("custom_modules", {})
-            runtime_cfg = resolved_de_config.get("runtime", {})
-
-            pca_shape_cfg = pca_cfg.get("shape_by", [])
-            if isinstance(pca_shape_cfg, list):
-                pca_shape_values = [str(item) for item in pca_shape_cfg if str(item).strip()]
-            elif pca_shape_cfg:
-                pca_shape_values = [str(pca_shape_cfg).strip()]
-            else:
-                pca_shape_values = []
 
             template_path = os.path.join(workflow_root, "templates", "de_core.R.tmpl")
             if not os.path.isfile(template_path):
                 raise FileNotFoundError(f"DE template file not found: {template_path}")
 
-            template_values = {
-                "__COUNTS_PATH__": _r_string(input.counts_table),
-                "__METADATA_PATH__": _r_string(metadata_copy),
-                "__OUTPUT_ROOT__": _r_string(params.outputfolder),
-                "__QC_DIR__": _r_string(qc_dir),
-                "__DE_DIR__": _r_string(de_dir),
-                "__DESIGN_FORMULA_TEXT__": _r_string(str(resolved_de_config.get("design", {}).get("formula", params.resolved_formula))),
-                "__CONTRAST_MODE__": _r_string(str(contrasts_cfg.get("mode", "auto"))),
-                "__AUTO_PAIRWISE__": _r_bool(contrasts_cfg.get("auto", {}).get("pairwise", True)),
-                "__AUTO_PRIMARY_VARIABLE__": _r_string(str(contrasts_cfg.get("auto", {}).get("primary_variable") or "")),
-                "__EXPLICIT_CONTRASTS__": _r_contrast_list(contrasts_cfg.get("explicit", {}).get("items", [])),
-                "__FILTERING_ENABLED__": _r_bool(filtering_cfg.get("enabled", True)),
-                "__FILTERING_METHOD__": _r_string(str(filtering_cfg.get("method", "min_count_samples"))),
-                "__FILTERING_MIN_COUNT__": str(int(filtering_cfg.get("min_count", 10))),
-                "__FILTERING_MIN_SAMPLES__": str(int(filtering_cfg.get("min_samples", 2))),
-                "__DESEQ_FIT_TYPE__": _r_string(str(deseq2_cfg.get("fit_type", "parametric"))),
-                "__DESEQ_SF_TYPE__": _r_string(str(deseq2_cfg.get("sf_type", "ratio"))),
-                "__DESEQ_PARALLEL__": _r_bool(deseq2_cfg.get("parallel", True)),
-                "__LATENT_ENABLED__": _r_bool(latent_cfg.get("enabled", False)),
-                "__LATENT_METHOD__": _r_string(str(latent_cfg.get("method", "sva"))),
-                "__LATENT_N_SV__": (
-                    str(int(latent_cfg.get("n_sv")))
-                    if latent_cfg.get("n_sv") not in (None, "", "NA")
-                    else "NA_integer_"
-                ),
-                "__SHRINK_ENABLED__": _r_bool(lfc_cfg.get("enabled", True)),
-                "__SHRINK_TYPE__": _r_string(str(lfc_cfg.get("type", "apeglm"))),
-                "__SHRINK_FOR_TABLES__": _r_bool(lfc_cfg.get("use_for_tables", True)),
-                "__ALPHA__": str(float(thresholds_cfg.get("alpha", 0.05))),
-                "__LFC_FOR_SIG__": str(float(thresholds_cfg.get("lfc_for_sig", 1.0))),
-                "__LFC_FOR_HEATMAP__": str(float(thresholds_cfg.get("lfc_for_heatmap", 1.0))),
-                "__MAX_VOLCANO_LABELS__": str(int(thresholds_cfg.get("max_volcano_labels", 50))),
-                "__QC_ENABLED__": _r_bool(qc_cfg.get("enabled", True)),
-                "__VST_BLIND__": _r_bool(qc_cfg.get("vst_blind", True)),
-                "__TOP_VARIABLE_GENES__": str(int(qc_cfg.get("top_variable_genes", 1000))),
-                "__DISTANCE_PLOT_ENABLED__": _r_bool(qc_cfg.get("distance_plot", True)),
-                "__VARIABLE_HEATMAP_ENABLED__": _r_bool(qc_cfg.get("variable_gene_heatmap", True)),
-                "__PCA_ENABLED__": _r_bool(pca_cfg.get("enabled", True)),
-                "__PCA_COLOR_BY__": _r_char_vector(pca_cfg.get("color_by", [])),
-                "__PCA_SHAPE_BY_VALUES__": _r_char_vector(pca_shape_values),
-                "__PCA_EXTRA_PAIRS__": _r_numeric_pair_list(pca_cfg.get("extra_pairs", [[1, 2], [2, 3]])),
-                "__DE_COLUMNS_RESOLVED__": _r_char_vector(params.de_columns_resolved),
-                "__DE_BLOCK_RESOLVED__": _r_char_vector(params.de_block_resolved),
-                "__MA_PLOT_ENABLED__": _r_bool(plots_cfg.get("ma_plot", True)),
-                "__VOLCANO_ENABLED__": _r_bool(volcano_cfg.get("enabled", True)),
-                "__VOLCANO_LABELS_ENABLED__": _r_bool(volcano_cfg.get("labeled", True)),
-                "__VOLCANO_AUTO_AXES__": _r_bool(volcano_cfg.get("auto_scale_axes", True)),
-                "__VOLCANO_MAX_XLIM__": str(float(volcano_cfg.get("max_xlim", 8))),
-                "__VOLCANO_MAX_YLIM__": str(float(volcano_cfg.get("max_ylim", 50))),
-                "__SIG_HEATMAP_ENABLED__": _r_bool(sig_heatmap_cfg.get("enabled", True)),
-                "__SIG_HEATMAP_CLUSTER_ROWS__": _r_bool(sig_heatmap_cfg.get("cluster_rows", True)),
-                "__SIG_HEATMAP_CLUSTER_COLS__": _r_bool(sig_heatmap_cfg.get("cluster_cols", True)),
-                "__WRITE_FULL_RESULTS__": _r_bool(tables_cfg.get("write_full_results", True)),
-                "__WRITE_SIG_ONLY__": _r_bool(tables_cfg.get("write_sig_only_table", True)),
-                "__SIG_SUFFIX__": _r_string(str(tables_cfg.get("sig_only_name_suffix", ".sig_only.tsv"))),
-                "__ENRICHMENT_ENABLED__": _r_bool(enrichment_cfg.get("enabled", True)),
-                "__ENRICHMENT_CP_ENABLED__": _r_bool(enrichment_cp_cfg.get("enabled", True)),
-                "__ENRICHMENT_CP_RUN_ORA__": _r_bool(enrichment_cp_cfg.get("run_ora", True)),
-                "__ENRICHMENT_CP_RUN_GSEA__": _r_bool(enrichment_cp_cfg.get("run_gsea", True)),
-                "__ENRICHMENT_MSIGDB_SETS__": _r_msigdb_set_list(enrichment_msigdb_sets_cfg),
-                "__ENRICHMENT_PVALUE_CUTOFF__": str(float(enrichment_cp_cfg.get("pvalue_cutoff", 0.05))),
-                "__ENRICHMENT_QVALUE_CUTOFF__": str(float(enrichment_cp_cfg.get("qvalue_cutoff", 0.2))),
-                "__ENRICHMENT_MIN_GS_SIZE__": str(int(enrichment_cp_cfg.get("min_gs_size", 10))),
-                "__ENRICHMENT_MAX_GS_SIZE__": str(int(enrichment_cp_cfg.get("max_gs_size", 500))),
-                "__ENRICHMENT_TOP_TERMS__": str(int(enrichment_cp_cfg.get("top_terms", 20))),
-                "__ENRICHMENT_GSEA_PERMUTATIONS__": str(int(enrichment_cp_cfg.get("gsea_permutations", 1000))),
-                "__DECOUPLER_ENABLED__": _r_bool(enrichment_dc_cfg.get("enabled", True)),
-                "__DECOUPLER_RUN_PROGENY__": _r_bool(enrichment_dc_cfg.get("run_progeny", True)),
-                "__DECOUPLER_RUN_TF_NETWORK__": _r_bool(enrichment_dc_cfg.get("run_tf_network", True)),
-                "__DECOUPLER_PROGENY_TOP__": str(int(enrichment_dc_cfg.get("progeny_top", 500))),
-                "__DECOUPLER_TF_SPLIT_COMPLEXES__": _r_bool(enrichment_dc_cfg.get("tf_split_complexes", False)),
-                "__DECOUPLER_MINSIZE__": str(int(enrichment_dc_cfg.get("minsize", 5))),
-                "__DECOUPLER_TOP_FEATURES_HEATMAP__": str(int(enrichment_dc_cfg.get("top_features_heatmap", 25))),
-                "__DECOUPLER_TOP_REGULATORS_BARPLOT__": str(int(enrichment_dc_cfg.get("top_regulators_barplot", 25))),
-                "__DECOUPLER_TOP_REGULATORS_DETAIL_EACH_SIDE__": str(int(enrichment_dc_cfg.get("top_regulators_detail_each_side", 2))),
-                "__CUSTOM_MODULES_ENABLED__": _r_bool(enrichment_cm_cfg.get("enabled", False)),
-                "__CUSTOM_MODULES_GMT__": _r_string(str(enrichment_cm_cfg.get("gmt_file") or "")),
-                "__CUSTOM_MODULES_NAME__": _r_string(str(enrichment_cm_cfg.get("name", "custom_modules"))),
-                "__CUSTOM_MODULES_RUN_ORA__": _r_bool(enrichment_cm_cfg.get("run_ora", True)),
-                "__CUSTOM_MODULES_RUN_GSEA__": _r_bool(enrichment_cm_cfg.get("run_gsea", True)),
-                "__RUNTIME_SEED__": str(int(runtime_cfg.get("seed", 1337))),
-            }
+            analysis_scripts = []
+            customization_scripts = []
+            de_dirs = []
+            seen_de_subdirs = set()
+            multi_analysis = len(resolved_de_configs) > 1
 
-            analysis_script = os.path.join(params.outputfolder, rendered_script_name)
-            rendered_r_script = _render_de_template(template_path, template_values)
-            with open(analysis_script, "w") as handle:
-                handle.write(rendered_r_script)
+            for analysis_index, resolved_de_config in enumerate(resolved_de_configs, start=1):
+                io_cfg = resolved_de_config.get("io", {})
+                de_subdir = str(io_cfg.get("out_dir", "results")).strip() or "results"
+                if os.path.normpath(de_subdir).lower() == "qc":
+                    raise ValueError("DE output subdirectory cannot be 'qc' because that path is reserved for shared QC outputs.")
+                if de_subdir in seen_de_subdirs:
+                    raise ValueError(f"Duplicate DE output subdirectory across analyses: {de_subdir}")
+                seen_de_subdirs.add(de_subdir)
+                de_dir = os.path.join(params.outputfolder, de_subdir)
+                os.makedirs(de_dir, exist_ok=True)
+                de_dirs.append(de_dir)
 
-            customization_guide_script = os.path.join(params.outputfolder, customization_guide_script_name)
-            if write_customization_guide:
-                guide_script_text = rendered_r_script + _build_de_customization_guide(
-                    counts_table_path=input.counts_table,
-                    metadata_path=metadata_copy,
-                    result_root=params.outputfolder,
-                    resolved_formula=str(resolved_de_config.get("design", {}).get("formula", params.resolved_formula)),
-                    de_columns_resolved=params.de_columns_resolved,
-                    de_block_resolved=params.de_block_resolved,
+                rendered_script_name = str(io_cfg.get("rendered_r_script_name", "DE_analysis.rendered.R"))
+                write_customization_guide = bool(io_cfg.get("write_customization_guide", True))
+                customization_guide_script_name = str(
+                    io_cfg.get("customization_guide_script_name", "DE_analysis.customization_guide.R")
+                ).strip() or "DE_analysis.customization_guide.R"
+
+                contrasts_cfg = resolved_de_config.get("contrasts", {})
+                filtering_cfg = resolved_de_config.get("filtering", {})
+                deseq2_cfg = resolved_de_config.get("deseq2", {})
+                latent_cfg = deseq2_cfg.get("latent_factors", {})
+                lfc_cfg = deseq2_cfg.get("lfc_shrink", {})
+                thresholds_cfg = resolved_de_config.get("thresholds", {})
+                qc_cfg = resolved_de_config.get("qc", {})
+                pca_cfg = qc_cfg.get("pca", {})
+                plots_cfg = resolved_de_config.get("plots", {})
+                volcano_cfg = plots_cfg.get("volcano", {})
+                sig_heatmap_cfg = plots_cfg.get("sig_heatmap", {})
+                tables_cfg = resolved_de_config.get("tables", {})
+                enrichment_cfg = resolved_de_config.get("enrichment", {})
+                enrichment_cp_cfg = enrichment_cfg.get("clusterprofiler", {})
+                enrichment_msigdb_sets_cfg = enrichment_cp_cfg.get("msigdb_sets", [])
+                enrichment_dc_cfg = enrichment_cfg.get("decoupler", {})
+                enrichment_cm_cfg = enrichment_cfg.get("custom_modules", {})
+                runtime_cfg = resolved_de_config.get("runtime", {})
+
+                pca_shape_cfg = pca_cfg.get("shape_by", [])
+                if isinstance(pca_shape_cfg, list):
+                    pca_shape_values = [str(item) for item in pca_shape_cfg if str(item).strip()]
+                elif pca_shape_cfg:
+                    pca_shape_values = [str(pca_shape_cfg).strip()]
+                else:
+                    pca_shape_values = []
+
+                template_values = {
+                    "__COUNTS_PATH__": _r_string(input.counts_table),
+                    "__METADATA_PATH__": _r_string(metadata_copy),
+                    "__OUTPUT_ROOT__": _r_string(params.outputfolder),
+                    "__QC_DIR__": _r_string(qc_dir),
+                    "__DE_DIR__": _r_string(de_dir),
+                    "__DESIGN_FORMULA_TEXT__": _r_string(str(resolved_de_config.get("design", {}).get("formula", params.resolved_formula))),
+                    "__CONTRAST_MODE__": _r_string(str(contrasts_cfg.get("mode", "auto"))),
+                    "__AUTO_PAIRWISE__": _r_bool(contrasts_cfg.get("auto", {}).get("pairwise", True)),
+                    "__AUTO_PRIMARY_VARIABLE__": _r_string(str(contrasts_cfg.get("auto", {}).get("primary_variable") or "")),
+                    "__EXPLICIT_CONTRASTS__": _r_contrast_list(contrasts_cfg.get("explicit", {}).get("items", [])),
+                    "__FILTERING_ENABLED__": _r_bool(filtering_cfg.get("enabled", True)),
+                    "__FILTERING_METHOD__": _r_string(str(filtering_cfg.get("method", "min_count_samples"))),
+                    "__FILTERING_MIN_COUNT__": str(int(filtering_cfg.get("min_count", 10))),
+                    "__FILTERING_MIN_SAMPLES__": str(int(filtering_cfg.get("min_samples", 2))),
+                    "__DESEQ_FIT_TYPE__": _r_string(str(deseq2_cfg.get("fit_type", "parametric"))),
+                    "__DESEQ_SF_TYPE__": _r_string(str(deseq2_cfg.get("sf_type", "ratio"))),
+                    "__DESEQ_PARALLEL__": _r_bool(deseq2_cfg.get("parallel", True)),
+                    "__LATENT_ENABLED__": _r_bool(latent_cfg.get("enabled", False)),
+                    "__LATENT_METHOD__": _r_string(str(latent_cfg.get("method", "sva"))),
+                    "__LATENT_N_SV__": (
+                        str(int(latent_cfg.get("n_sv")))
+                        if latent_cfg.get("n_sv") not in (None, "", "NA")
+                        else "NA_integer_"
+                    ),
+                    "__SHRINK_ENABLED__": _r_bool(lfc_cfg.get("enabled", True)),
+                    "__SHRINK_TYPE__": _r_string(str(lfc_cfg.get("type", "apeglm"))),
+                    "__SHRINK_FOR_TABLES__": _r_bool(lfc_cfg.get("use_for_tables", True)),
+                    "__ALPHA__": str(float(thresholds_cfg.get("alpha", 0.05))),
+                    "__LFC_FOR_SIG__": str(float(thresholds_cfg.get("lfc_for_sig", 1.0))),
+                    "__LFC_FOR_HEATMAP__": str(float(thresholds_cfg.get("lfc_for_heatmap", 1.0))),
+                    "__MAX_VOLCANO_LABELS__": str(int(thresholds_cfg.get("max_volcano_labels", 50))),
+                    "__QC_ENABLED__": _r_bool(qc_cfg.get("enabled", True)),
+                    "__VST_BLIND__": _r_bool(qc_cfg.get("vst_blind", True)),
+                    "__TOP_VARIABLE_GENES__": str(int(qc_cfg.get("top_variable_genes", 1000))),
+                    "__DISTANCE_PLOT_ENABLED__": _r_bool(qc_cfg.get("distance_plot", True)),
+                    "__VARIABLE_HEATMAP_ENABLED__": _r_bool(qc_cfg.get("variable_gene_heatmap", True)),
+                    "__PCA_ENABLED__": _r_bool(pca_cfg.get("enabled", True)),
+                    "__PCA_COLOR_BY__": _r_char_vector(pca_cfg.get("color_by", [])),
+                    "__PCA_SHAPE_BY_VALUES__": _r_char_vector(pca_shape_values),
+                    "__PCA_EXTRA_PAIRS__": _r_numeric_pair_list(pca_cfg.get("extra_pairs", [[1, 2], [2, 3]])),
+                    "__DE_COLUMNS_RESOLVED__": _r_char_vector(params.de_columns_resolved),
+                    "__DE_BLOCK_RESOLVED__": _r_char_vector(params.de_block_resolved),
+                    "__MA_PLOT_ENABLED__": _r_bool(plots_cfg.get("ma_plot", True)),
+                    "__VOLCANO_ENABLED__": _r_bool(volcano_cfg.get("enabled", True)),
+                    "__VOLCANO_LABELS_ENABLED__": _r_bool(volcano_cfg.get("labeled", True)),
+                    "__VOLCANO_AUTO_AXES__": _r_bool(volcano_cfg.get("auto_scale_axes", True)),
+                    "__VOLCANO_MAX_XLIM__": str(float(volcano_cfg.get("max_xlim", 8))),
+                    "__VOLCANO_MAX_YLIM__": str(float(volcano_cfg.get("max_ylim", 50))),
+                    "__SIG_HEATMAP_ENABLED__": _r_bool(sig_heatmap_cfg.get("enabled", True)),
+                    "__SIG_HEATMAP_CLUSTER_ROWS__": _r_bool(sig_heatmap_cfg.get("cluster_rows", True)),
+                    "__SIG_HEATMAP_CLUSTER_COLS__": _r_bool(sig_heatmap_cfg.get("cluster_cols", True)),
+                    "__WRITE_FULL_RESULTS__": _r_bool(tables_cfg.get("write_full_results", True)),
+                    "__WRITE_SIG_ONLY__": _r_bool(tables_cfg.get("write_sig_only_table", True)),
+                    "__SIG_SUFFIX__": _r_string(str(tables_cfg.get("sig_only_name_suffix", ".sig_only.tsv"))),
+                    "__ENRICHMENT_ENABLED__": _r_bool(enrichment_cfg.get("enabled", True)),
+                    "__ENRICHMENT_CP_ENABLED__": _r_bool(enrichment_cp_cfg.get("enabled", True)),
+                    "__ENRICHMENT_CP_RUN_ORA__": _r_bool(enrichment_cp_cfg.get("run_ora", True)),
+                    "__ENRICHMENT_CP_RUN_GSEA__": _r_bool(enrichment_cp_cfg.get("run_gsea", True)),
+                    "__ENRICHMENT_MSIGDB_SETS__": _r_msigdb_set_list(enrichment_msigdb_sets_cfg),
+                    "__ENRICHMENT_PVALUE_CUTOFF__": str(float(enrichment_cp_cfg.get("pvalue_cutoff", 0.05))),
+                    "__ENRICHMENT_QVALUE_CUTOFF__": str(float(enrichment_cp_cfg.get("qvalue_cutoff", 0.2))),
+                    "__ENRICHMENT_MIN_GS_SIZE__": str(int(enrichment_cp_cfg.get("min_gs_size", 10))),
+                    "__ENRICHMENT_MAX_GS_SIZE__": str(int(enrichment_cp_cfg.get("max_gs_size", 500))),
+                    "__ENRICHMENT_TOP_TERMS__": str(int(enrichment_cp_cfg.get("top_terms", 20))),
+                    "__ENRICHMENT_GSEA_PERMUTATIONS__": str(int(enrichment_cp_cfg.get("gsea_permutations", 1000))),
+                    "__DECOUPLER_ENABLED__": _r_bool(enrichment_dc_cfg.get("enabled", True)),
+                    "__DECOUPLER_RUN_PROGENY__": _r_bool(enrichment_dc_cfg.get("run_progeny", True)),
+                    "__DECOUPLER_RUN_TF_NETWORK__": _r_bool(enrichment_dc_cfg.get("run_tf_network", True)),
+                    "__DECOUPLER_PROGENY_TOP__": str(int(enrichment_dc_cfg.get("progeny_top", 500))),
+                    "__DECOUPLER_TF_SPLIT_COMPLEXES__": _r_bool(enrichment_dc_cfg.get("tf_split_complexes", False)),
+                    "__DECOUPLER_MINSIZE__": str(int(enrichment_dc_cfg.get("minsize", 5))),
+                    "__DECOUPLER_TOP_FEATURES_HEATMAP__": str(int(enrichment_dc_cfg.get("top_features_heatmap", 25))),
+                    "__DECOUPLER_TOP_REGULATORS_BARPLOT__": str(int(enrichment_dc_cfg.get("top_regulators_barplot", 25))),
+                    "__DECOUPLER_TOP_REGULATORS_DETAIL_EACH_SIDE__": str(int(enrichment_dc_cfg.get("top_regulators_detail_each_side", 2))),
+                    "__CUSTOM_MODULES_ENABLED__": _r_bool(enrichment_cm_cfg.get("enabled", False)),
+                    "__CUSTOM_MODULES_GMT__": _r_string(str(enrichment_cm_cfg.get("gmt_file") or "")),
+                    "__CUSTOM_MODULES_NAME__": _r_string(str(enrichment_cm_cfg.get("name", "custom_modules"))),
+                    "__CUSTOM_MODULES_RUN_ORA__": _r_bool(enrichment_cm_cfg.get("run_ora", True)),
+                    "__CUSTOM_MODULES_RUN_GSEA__": _r_bool(enrichment_cm_cfg.get("run_gsea", True)),
+                    "__RUNTIME_SEED__": str(int(runtime_cfg.get("seed", 1337))),
+                }
+
+                script_suffix = _safe_file_component(de_subdir) if multi_analysis else ""
+                rendered_script_target = _suffix_filename(rendered_script_name, script_suffix)
+                analysis_script = os.path.join(params.outputfolder, rendered_script_target)
+                rendered_r_script = _render_de_template(template_path, template_values)
+                with open(analysis_script, "w") as handle:
+                    handle.write(rendered_r_script)
+                os.chmod(analysis_script, 0o755)
+                analysis_scripts.append(analysis_script)
+
+                customization_guide_script = os.path.join(
+                    params.outputfolder,
+                    _suffix_filename(customization_guide_script_name, script_suffix) if multi_analysis else customization_guide_script_name,
                 )
-                with open(customization_guide_script, "w") as handle:
-                    handle.write(guide_script_text)
-                os.chmod(customization_guide_script, 0o755)
+                if write_customization_guide:
+                    guide_script_text = rendered_r_script + _build_de_customization_guide(
+                        counts_table_path=input.counts_table,
+                        metadata_path=metadata_copy,
+                        result_root=params.outputfolder,
+                        resolved_formula=str(resolved_de_config.get("design", {}).get("formula", params.resolved_formula)),
+                        de_columns_resolved=params.de_columns_resolved,
+                        de_block_resolved=params.de_block_resolved,
+                    )
+                    with open(customization_guide_script, "w") as handle:
+                        handle.write(guide_script_text)
+                    os.chmod(customization_guide_script, 0o755)
+                    customization_scripts.append(customization_guide_script)
 
-            os.chmod(analysis_script, 0o755)
-            de_r_command = f"Rscript {analysis_script}"
-            record_step_command(master_config['de_rule_num'], "aggregate", de_r_command)
-            shell(de_r_command)
+                log_it(
+                    logfile,
+                    f"Step 12 analysis {analysis_index}/{len(resolved_de_configs)}: out_dir={de_subdir}, formula={resolved_de_config.get('design', {}).get('formula', params.resolved_formula)}"
+                )
+                de_r_command = f"Rscript {analysis_script}"
+                record_step_command(master_config['de_rule_num'], f"aggregate_{analysis_index}", de_r_command)
+                shell(de_r_command)
 
             with zipfile.ZipFile(output[0], "w", compression=zipfile.ZIP_DEFLATED) as archive:
                 archive.write(metadata_copy, arcname=os.path.basename(metadata_copy))
-                archive.write(analysis_script, arcname=os.path.basename(analysis_script))
-                if write_customization_guide and os.path.isfile(customization_guide_script):
-                    archive.write(
-                        customization_guide_script,
-                        arcname=os.path.basename(customization_guide_script),
-                    )
+                for analysis_script in analysis_scripts:
+                    archive.write(analysis_script, arcname=os.path.basename(analysis_script))
+                for customization_guide_script in customization_scripts:
+                    if os.path.isfile(customization_guide_script):
+                        archive.write(
+                            customization_guide_script,
+                            arcname=os.path.basename(customization_guide_script),
+                        )
                 _add_tree_to_zip(archive, qc_dir, os.path.basename(qc_dir))
-                _add_tree_to_zip(archive, de_dir, os.path.basename(de_dir))
+                for de_dir in de_dirs:
+                    _add_tree_to_zip(archive, de_dir, os.path.basename(de_dir))
 
-            log_it(logfile, f"Step 12 DE results folder: {de_dir}")
+            for de_dir in de_dirs:
+                log_it(logfile, f"Step 12 DE results folder: {de_dir}")
             log_it(logfile, f"Step 12 shared QC folder: {qc_dir}")
-            if write_customization_guide and os.path.isfile(customization_guide_script):
-                log_it(logfile, f"Step 12 customization guide: {customization_guide_script}")
+            for customization_guide_script in customization_scripts:
+                if os.path.isfile(customization_guide_script):
+                    log_it(logfile, f"Step 12 customization guide: {customization_guide_script}")
             log_it(logfile, f"Step 12 archive: {output[0]}")
             finish_step_sample(master_config['de_rule_num'], "aggregate", "call_DE", tracking["start_time"], "OK")
         except Exception:

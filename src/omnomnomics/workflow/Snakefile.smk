@@ -866,6 +866,10 @@ if not is_worker_job:
     log_it(logfile, f"DE design mode: {config['DE_DESIGN_MODE']}")
     log_it(logfile, f"DE config file: {config.get('DE_CONFIG_FILE', 'NA')}")
     log_it(logfile, f"Resolved DE config file: {config.get('DE_CONFIG_RESOLVED_FILE', 'NA')}")
+    if config.get('DE_CONFIG_FILES'):
+        log_it(logfile, f"DE config files: {', '.join(config.get('DE_CONFIG_FILES', []))}")
+    if config.get('DE_CONFIG_RESOLVED_FILES'):
+        log_it(logfile, f"Resolved DE config files: {', '.join(config.get('DE_CONFIG_RESOLVED_FILES', []))}")
     log_it(logfile, f"Metadata file: {config['MYMETADATA']}")
     log_it(logfile, f"Derived metadata file: {config['DERIVED_METADATA_FILE']}")
     log_it(logfile, f"Sample name columns: {', '.join(config.get('SAMPLE_NAME_COLUMNS', []))}")

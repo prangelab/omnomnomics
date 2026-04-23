@@ -360,6 +360,8 @@ Practical combinations:
 ### Step 12 (DESeq2) quick notes
 - Step 12 requires RNA count-table input from step 11 and a metadata table (`-m`).
 - Use `--de-columns` and `--de-block` for automatic grouped design generation, or `--de-config <yaml>` for explicit control.
+- `--de-config` can be repeated to run multiple DE analyses sequentially in one step-12 run.
+- With repeated `--de-config`, each YAML must set a unique `io.out_dir`. Global `--de-out-dir` is rejected in that mode.
 - Use `--de-out-dir <name>` to separate result trees when testing multiple DE settings.
 - Step-12 QC outputs are shared at `DE_calling/qc/` and are not nested under `--de-out-dir`.
 - Step 12 writes two scripts into `DE_calling/`:

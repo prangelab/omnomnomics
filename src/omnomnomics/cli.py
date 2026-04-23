@@ -428,7 +428,7 @@ def parse_arguments():
    parser.add_argument('-T', '--trim-tool', help='Trimming tool choice. Can be fastp or skewer. \n \t Default: fastp')
    parser.add_argument('-M', '--map-tool', help='Mapping tool choice. Can be HISAT2, STAR, or STAR_TE. STAR(_TE) can only be used for RNA-seq data. \n \t Default: HISAT2')
    parser.add_argument('--de-formula', help='Explicit DESeq2 design formula for step 12. If provided, it overrides --de-columns and --de-block.')
-   parser.add_argument('--de-config', help='Optional YAML file with DE analysis settings for step 12.')
+   parser.add_argument('--de-config', action='append', help='Optional YAML file with DE analysis settings for step 12. Can be passed multiple times to run multiple DE analyses sequentially.')
    parser.add_argument('--de-out-dir', help='Optional DE output subdirectory inside the DE_calling folder. Overrides de_config io.out_dir.')
    parser.add_argument('--de-enable-custom-modules', action='store_true', help='Enable optional custom module enrichment (phase 3) in step 12. Requires a GMT file from --de-custom-modules-gmt or de_config enrichment.custom_modules.gmt_file.')
    parser.add_argument('--de-custom-modules-gmt', help='Path to a custom GMT file for optional custom module enrichment in step 12.')
@@ -497,6 +497,41 @@ def merge_configs(base_config, override_config):
    merged_config = dict(base_config)
    merged_config.update(override_config)
    return merged_config
+
+
+def normalize_de_config_paths(args_de_config, config_de_config):
+    if args_de_config:
+        raw_items = args_de_config
+    else:
+        raw_items = config_de_config
+
+    if raw_items in (None, "", "NA"):
+        return []
+    if isinstance(raw_items, str):
+        raw_items = [raw_items]
+    if not isinstance(raw_items, list):
+        raw_items = [str(raw_items)]
+
+    normalized = []
+    for item in raw_items:
+        if item in (None, "", "NA"):
+            continue
+        normalized.append(str(Path(str(item)).expanduser().resolve()))
+    return normalized
+
+
+def de_config_has_explicit_out_dir(config_path):
+    try:
+        loaded = yaml.safe_load(Path(config_path).read_text()) or {}
+    except Exception:
+        return False
+    if not isinstance(loaded, dict):
+        return False
+    io_cfg = loaded.get("io")
+    if not isinstance(io_cfg, dict):
+        return False
+    out_dir_value = io_cfg.get("out_dir")
+    return out_dir_value is not None and str(out_dir_value).strip() not in ("", "NA")
 
 def resolve_config_path(path_value, workflow_root):
    resolved = str(path_value)
@@ -634,12 +669,17 @@ def validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, c
             print("Metadata file (-m) must be a .txt, .tsv, or .csv file. Aborting...", file=sys.stderr)
             sys.exit(1)
 
-    if de_config and de_config != "NA":
-        if not os.path.isfile(de_config):
-            print("DE config file (--de-config) does not exist! Aborting...", file=sys.stderr)
+    de_config_paths = []
+    if isinstance(de_config, list):
+        de_config_paths = [item for item in de_config if item and item != "NA"]
+    elif de_config and de_config != "NA":
+        de_config_paths = [de_config]
+    for de_cfg in de_config_paths:
+        if not os.path.isfile(de_cfg):
+            print(f"DE config file (--de-config) does not exist: {de_cfg}. Aborting...", file=sys.stderr)
             sys.exit(1)
-        elif not de_config.endswith((".yaml", ".yml")):
-            print("DE config file (--de-config) must be a .yaml or .yml file. Aborting...", file=sys.stderr)
+        if not de_cfg.endswith((".yaml", ".yml")):
+            print(f"DE config file (--de-config) must be a .yaml or .yml file: {de_cfg}. Aborting...", file=sys.stderr)
             sys.exit(1)
 
 
@@ -1174,7 +1214,8 @@ def main():
     map_tool = args.map_tool.lower() if args.map_tool else config.get('map_tool', "hisat2").lower()
     mode = args.mode.lower() if args.mode else config.get('mode', "auto")
     de_formula = args.de_formula if args.de_formula else config.get('de_formula', "NA")
-    de_config = str(Path(args.de_config).expanduser().resolve()) if args.de_config else config.get('de_config', "NA")
+    de_config_list = normalize_de_config_paths(args.de_config, config.get('de_config', "NA"))
+    de_config = de_config_list[0] if de_config_list else "NA"
     de_out_dir = args.de_out_dir if args.de_out_dir else config.get('de_out_dir', "")
     de_enable_custom_modules = args.de_enable_custom_modules or config.get('de_enable_custom_modules', False)
     de_custom_modules_gmt = (
@@ -1245,7 +1286,7 @@ def main():
     selected_routines['selected_routine_de'] = config['selected_routine_de']
 
     # Validate user-defined variables
-    validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, color_data_folder, col_table, overlay, the_type, map_tool, config, de_config)
+    validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, color_data_folder, col_table, overlay, the_type, map_tool, config, de_config_list)
 
     # Setup variables
     run_date = setup_variables(experiment_dir, config)
@@ -1296,6 +1337,9 @@ def main():
     resolved_de_config_path = "NA"
     resolved_de_config = {}
     de_config_file_path = "NA"
+    resolved_de_config_paths = []
+    resolved_de_configs = []
+    de_config_file_paths = []
 
     if metadata_required:
         if metadata == "NA":
@@ -1354,29 +1398,57 @@ def main():
                 de_design_mode = str(de_context["mode"])
                 de_columns_resolved = list(de_context["de_columns"])
                 de_block_resolved = list(de_context["de_block"])
-
-                try:
-                    de_config_file_path, resolved_de_config = resolve_de_config(
-                        None if de_config == "NA" else de_config,
-                        resolved_de_formula,
-                        de_out_dir_override=de_out_dir or None,
-                        custom_modules_gmt=de_custom_modules_gmt or None,
-                        enable_custom_modules=bool(de_enable_custom_modules),
+                if len(de_config_list) > 1 and de_out_dir:
+                    raise MetadataError(
+                        "Global --de-out-dir cannot be combined with multiple --de-config files. "
+                        "Set io.out_dir inside each DE config YAML."
                     )
-                except DEConfigError as exc:
-                    raise MetadataError(str(exc)) from exc
 
+                de_configs_to_resolve = de_config_list if de_config_list else ["NA"]
+                resolved_out_dirs = []
+                for idx, one_de_config in enumerate(de_configs_to_resolve, start=1):
+                    if one_de_config != "NA" and len(de_configs_to_resolve) > 1:
+                        if not de_config_has_explicit_out_dir(one_de_config):
+                            raise MetadataError(
+                                "When multiple --de-config files are provided, each config must explicitly set io.out_dir. "
+                                f"Missing io.out_dir in: {one_de_config}"
+                            )
+                    try:
+                        one_file_path, one_resolved = resolve_de_config(
+                            None if one_de_config == "NA" else one_de_config,
+                            resolved_de_formula,
+                            de_out_dir_override=(de_out_dir or None) if len(de_configs_to_resolve) == 1 else None,
+                            custom_modules_gmt=de_custom_modules_gmt or None,
+                            enable_custom_modules=bool(de_enable_custom_modules),
+                        )
+                    except DEConfigError as exc:
+                        raise MetadataError(str(exc)) from exc
+
+                    one_out_dir = str(one_resolved.get("io", {}).get("out_dir", "")).strip()
+                    if one_out_dir in resolved_out_dirs:
+                        raise MetadataError(
+                            "Multiple DE configs resolved to the same io.out_dir. "
+                            f"Use unique out_dir values per config. Duplicate: {one_out_dir}"
+                        )
+                    resolved_out_dirs.append(one_out_dir)
+                    de_config_file_paths.append(one_file_path)
+                    resolved_de_configs.append(one_resolved)
+
+                    one_resolved_path = os.path.join(
+                        experiment_dir,
+                        "run_configs",
+                        f"omnomnomics.run.{run_date}.de_config.resolved.{idx:02d}.yaml",
+                    )
+                    with open(one_resolved_path, "w") as handle:
+                        yaml.safe_dump(one_resolved, handle, sort_keys=False)
+                    resolved_de_config_paths.append(one_resolved_path)
+
+                resolved_de_config = resolved_de_configs[0]
+                de_config_file_path = de_config_file_paths[0]
+                resolved_de_config_path = resolved_de_config_paths[0]
                 resolved_de_formula = str(resolved_de_config["design"]["formula"])
                 if resolved_de_config["design"].get("formula") and de_config_file_path != "NA":
                     de_design_mode = "config_formula"
-
-                resolved_de_config_path = os.path.join(
-                    experiment_dir,
-                    "run_configs",
-                    f"omnomnomics.run.{run_date}.de_config.resolved.yaml",
-                )
-                with open(resolved_de_config_path, "w") as handle:
-                    yaml.safe_dump(resolved_de_config, handle, sort_keys=False)
 
             derived_metadata_path = os.path.join(
                 experiment_dir,
@@ -1434,6 +1506,9 @@ def main():
         'DE_CONFIG_FILE': de_config_file_path,
         'DE_CONFIG_RESOLVED_FILE': resolved_de_config_path,
         'DE_CONFIG_RESOLVED_JSON': json.dumps(resolved_de_config, sort_keys=True) if resolved_de_config else "{}",
+        'DE_CONFIG_FILES': de_config_file_paths,
+        'DE_CONFIG_RESOLVED_FILES': resolved_de_config_paths,
+        'DE_CONFIG_RESOLVED_LIST_JSON': json.dumps(resolved_de_configs, sort_keys=True) if resolved_de_configs else "[]",
         'MYMETADATA': metadata,
         'DERIVED_METADATA_FILE': derived_metadata_path,
         'METADATA_REQUIRED': metadata_required,
