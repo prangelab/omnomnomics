@@ -16,6 +16,12 @@ contrasts:
     primary_variable: null
   explicit:
     items: []
+    # Examples:
+    # items:
+    #   - [treatment, L, C]
+    #   - contrast_type: coefficient
+    #     coefficient_name: typeKD24.treatmentL
+    #     label: interaction_typeKD24_treatmentL
 
 filtering:
   enabled: true

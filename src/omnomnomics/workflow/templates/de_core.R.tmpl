@@ -371,6 +371,17 @@ dds <- DESeq2::DESeqDataSetFromMatrix(
 )
 dds <- DESeq2::DESeq(dds, fitType = deseq_fit_type, sfType = deseq_sf_type, parallel = deseq_parallel)
 vst_obj <- DESeq2::vst(dds, blind = vst_blind)
+results_names_tbl <- data.frame(
+  coefficient = DESeq2::resultsNames(dds),
+  stringsAsFactors = FALSE
+)
+utils::write.table(
+  results_names_tbl,
+  file = file.path(qc_dir, "deseq2_results_names.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
 
 all_gene_ids <- rownames(dds)
 all_gene_ids_no_version <- strip_ensembl_version(all_gene_ids)
@@ -1316,9 +1327,12 @@ build_auto_contrasts <- function() {
     for (i in seq_len(length(levels_vec) - 1)) {
       for (j in seq((i + 1), length(levels_vec))) {
         contrast_list[[length(contrast_list) + 1]] <- list(
+          contrast_type = "factor",
           factor = candidate,
           numerator = levels_vec[i],
-          denominator = levels_vec[j]
+          denominator = levels_vec[j],
+          coefficient_name = NA_character_,
+          label = paste(levels_vec[i], "vs", levels_vec[j], sep = "_")
         )
       }
     }
@@ -1326,7 +1340,66 @@ build_auto_contrasts <- function() {
   contrast_list
 }
 
-contrast_plan <- if (contrast_mode == "explicit") explicit_contrasts else build_auto_contrasts()
+normalize_contrast_item <- function(item, index = NA_integer_) {
+  if (!is.list(item)) {
+    stop("Each contrast item must be a list.")
+  }
+  contrast_type <- as.character(item$contrast_type)
+  if (!length(contrast_type) || is.na(contrast_type) || !nzchar(contrast_type)) {
+    contrast_type <- as.character(item$type)
+  }
+  if (!length(contrast_type) || is.na(contrast_type) || !nzchar(contrast_type)) {
+    contrast_type <- "factor"
+  }
+  contrast_type <- tolower(trimws(contrast_type))
+  if (!(contrast_type %in% c("factor", "coefficient"))) {
+    stop("Unsupported contrast_type in explicit contrasts: ", contrast_type)
+  }
+  if (contrast_type == "factor") {
+    factor_name <- as.character(item$factor)
+    numerator <- as.character(item$numerator)
+    denominator <- as.character(item$denominator)
+    if (!length(factor_name) || is.na(factor_name) || !nzchar(factor_name) ||
+        !length(numerator) || is.na(numerator) || !nzchar(numerator) ||
+        !length(denominator) || is.na(denominator) || !nzchar(denominator)) {
+      stop("Factor contrast requires non-empty factor, numerator, denominator.")
+    }
+    label <- as.character(item$label)
+    if (!length(label) || is.na(label) || !nzchar(label)) {
+      label <- paste(numerator, "vs", denominator, sep = "_")
+    }
+    return(list(
+      contrast_type = "factor",
+      factor = factor_name,
+      numerator = numerator,
+      denominator = denominator,
+      coefficient_name = NA_character_,
+      label = label
+    ))
+  }
+  coefficient_name <- as.character(item$coefficient_name)
+  if (!length(coefficient_name) || is.na(coefficient_name) || !nzchar(coefficient_name)) {
+    coefficient_name <- as.character(item$name)
+  }
+  if (!length(coefficient_name) || is.na(coefficient_name) || !nzchar(coefficient_name)) {
+    stop("Coefficient contrast requires non-empty coefficient_name (or name).")
+  }
+  label <- as.character(item$label)
+  if (!length(label) || is.na(label) || !nzchar(label)) {
+    label <- coefficient_name
+  }
+  list(
+    contrast_type = "coefficient",
+    factor = NA_character_,
+    numerator = NA_character_,
+    denominator = NA_character_,
+    coefficient_name = coefficient_name,
+    label = label
+  )
+}
+
+contrast_plan_raw <- if (contrast_mode == "explicit") explicit_contrasts else build_auto_contrasts()
+contrast_plan <- lapply(seq_along(contrast_plan_raw), function(i) normalize_contrast_item(contrast_plan_raw[[i]], i))
 if (length(contrast_plan) == 0) {
   stop("No DE contrasts were resolved.")
 }
@@ -1434,10 +1507,12 @@ contrast_manifest <- do.call(
   rbind,
   lapply(contrast_plan, function(x) {
     data.frame(
+      contrast_type = as.character(x$contrast_type),
       factor = as.character(x$factor),
       numerator = as.character(x$numerator),
       denominator = as.character(x$denominator),
-      contrast_label = sanitize_name(paste(x$numerator, "vs", x$denominator, sep = "_")),
+      coefficient_name = as.character(x$coefficient_name),
+      contrast_label = sanitize_name(as.character(x$label)),
       stringsAsFactors = FALSE
     )
   })
@@ -1499,15 +1574,17 @@ utils::write.table(
 
 contrast_summaries <- list()
 for (contrast_cfg in contrast_plan) {
-  factor_name <- contrast_cfg$factor
-  numerator <- contrast_cfg$numerator
-  denominator <- contrast_cfg$denominator
-  contrast_label <- sanitize_name(paste(numerator, "vs", denominator, sep = "_"))
+  contrast_type <- as.character(contrast_cfg$contrast_type)
+  factor_name <- as.character(contrast_cfg$factor)
+  numerator <- as.character(contrast_cfg$numerator)
+  denominator <- as.character(contrast_cfg$denominator)
+  coefficient_name <- as.character(contrast_cfg$coefficient_name)
+  contrast_label <- sanitize_name(as.character(contrast_cfg$label))
   contrast_dir <- file.path(de_dir, contrast_label)
   dir.create(contrast_dir, recursive = TRUE, showWarnings = FALSE)
 
   contrast_sample_ids <- rownames(col_data)
-  if (factor_name %in% colnames(col_data)) {
+  if (contrast_type == "factor" && factor_name %in% colnames(col_data)) {
     contrast_factor_values <- as.character(col_data[[factor_name]])
     keep_contrast_samples <- !is.na(contrast_factor_values) & contrast_factor_values %in% c(numerator, denominator)
     contrast_sample_ids <- rownames(col_data)[keep_contrast_samples]
@@ -1529,12 +1606,20 @@ for (contrast_cfg in contrast_plan) {
     }
   }
 
-  base_res <- DESeq2::results(dds, contrast = c(factor_name, numerator, denominator), alpha = alpha)
+  if (contrast_type == "factor") {
+    base_res <- DESeq2::results(dds, contrast = c(factor_name, numerator, denominator), alpha = alpha)
+  } else {
+    base_res <- DESeq2::results(dds, name = coefficient_name, alpha = alpha)
+  }
   res_for_table <- base_res
 
   if (shrink_enabled) {
     shrunk <- tryCatch(
-      DESeq2::lfcShrink(dds, contrast = c(factor_name, numerator, denominator), type = shrink_type),
+      if (contrast_type == "factor") {
+        DESeq2::lfcShrink(dds, contrast = c(factor_name, numerator, denominator), type = shrink_type)
+      } else {
+        DESeq2::lfcShrink(dds, coef = coefficient_name, type = shrink_type)
+      },
       error = function(e) {
         message("lfcShrink failed for ", contrast_label, ": ", conditionMessage(e), ". Falling back to unshrunk results.")
         base_res
@@ -1752,6 +1837,7 @@ for (contrast_cfg in contrast_plan) {
       pheatmap::pheatmap(
         hm,
         color = hm_colors,
+        scale = "row",
         annotation_col = contrast_annotation_df,
         annotation_colors = contrast_annotation_colors,
         cluster_rows = sig_heatmap_cluster_rows,
@@ -1768,9 +1854,11 @@ for (contrast_cfg in contrast_plan) {
   sig_down <- sum(!is.na(res_df$padj) & res_df$padj < alpha & res_df$log2FoldChange <= -lfc_for_sig)
   contrast_summary <- data.frame(
     contrast = contrast_label,
+    contrast_type = contrast_type,
     factor = factor_name,
     numerator = numerator,
     denominator = denominator,
+    coefficient_name = coefficient_name,
     genes_tested = genes_tested,
     genes_with_pvalue = testing_summary$genes_with_pvalue,
     genes_with_padj = testing_summary$genes_with_padj,
@@ -1796,7 +1884,7 @@ for (contrast_cfg in contrast_plan) {
   top10_df$gene_symbol_plot <- symbols_for_ids(top10_df$gene_id, fallback_to_ids = TRUE)
   top10_df <- top10_df[!is.na(top10_df$gene_symbol_plot) & nzchar(top10_df$gene_symbol_plot), , drop = FALSE]
   top10_df <- head(top10_df, 10)
-  if (nrow(top10_df) > 0 && factor_name %in% colnames(col_data)) {
+  if (nrow(top10_df) > 0 && contrast_type == "factor" && factor_name %in% colnames(col_data)) {
     boxplot_dir <- file.path(contrast_dir, "top10_boxplots")
     dir.create(boxplot_dir, recursive = TRUE, showWarnings = FALSE)
     boxplot_col_data <- col_data[contrast_sample_ids, , drop = FALSE]

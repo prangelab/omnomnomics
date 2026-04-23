@@ -37,8 +37,29 @@ def _r_contrast_list(items):
     for item in items:
         if isinstance(item, list) and len(item) == 3:
             rows.append(
-                f"list(factor={_r_string(item[0])}, numerator={_r_string(item[1])}, denominator={_r_string(item[2])})"
+                f"list(contrast_type={_r_string('factor')}, factor={_r_string(item[0])}, numerator={_r_string(item[1])}, denominator={_r_string(item[2])}, coefficient_name=NA_character_, label={_r_string(str(item[1]) + '_vs_' + str(item[2]))})"
             )
+            continue
+        if isinstance(item, dict):
+            contrast_type = str(item.get("contrast_type", item.get("type", "factor"))).strip().lower()
+            if contrast_type == "factor":
+                factor = str(item.get("factor", "")).strip()
+                numerator = str(item.get("numerator", "")).strip()
+                denominator = str(item.get("denominator", "")).strip()
+                if not factor or not numerator or not denominator:
+                    continue
+                label = str(item.get("label", f"{numerator}_vs_{denominator}")).strip()
+                rows.append(
+                    f"list(contrast_type={_r_string('factor')}, factor={_r_string(factor)}, numerator={_r_string(numerator)}, denominator={_r_string(denominator)}, coefficient_name=NA_character_, label={_r_string(label)})"
+                )
+            elif contrast_type == "coefficient":
+                coefficient_name = str(item.get("coefficient_name", item.get("name", ""))).strip()
+                if not coefficient_name:
+                    continue
+                label = str(item.get("label", coefficient_name)).strip()
+                rows.append(
+                    f"list(contrast_type={_r_string('coefficient')}, factor=NA_character_, numerator=NA_character_, denominator=NA_character_, coefficient_name={_r_string(coefficient_name)}, label={_r_string(label)})"
+                )
     if not rows:
         return "list()"
     return "list(\n  " + ",\n  ".join(rows) + "\n)"

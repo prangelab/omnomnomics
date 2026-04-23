@@ -226,11 +226,82 @@ def _validate_resolved_de_config(config: dict) -> None:
     explicit_items = config["contrasts"]["explicit"]["items"]
     if not isinstance(explicit_items, list):
         raise DEConfigError("DE config contrasts.explicit.items must be a list.")
+    normalized_explicit_items = []
     for item in explicit_items:
-        if not isinstance(item, list) or len(item) != 3:
-            raise DEConfigError(
-                "Each explicit contrast must be a 3-item list: [factor, numerator, denominator]."
+        if isinstance(item, list):
+            if len(item) != 3:
+                raise DEConfigError(
+                    "List-style explicit contrasts must be [factor, numerator, denominator]."
+                )
+            factor = str(item[0]).strip()
+            numerator = str(item[1]).strip()
+            denominator = str(item[2]).strip()
+            if not factor or not numerator or not denominator:
+                raise DEConfigError(
+                    "List-style explicit contrasts must have non-empty factor, numerator, denominator."
+                )
+            normalized_explicit_items.append(
+                {
+                    "contrast_type": "factor",
+                    "factor": factor,
+                    "numerator": numerator,
+                    "denominator": denominator,
+                    "label": f"{numerator}_vs_{denominator}",
+                }
             )
+            continue
+
+        if isinstance(item, dict):
+            contrast_type = str(
+                item.get("contrast_type", item.get("type", "factor"))
+            ).strip().lower()
+            if contrast_type == "factor":
+                factor = str(item.get("factor", "")).strip()
+                numerator = str(item.get("numerator", "")).strip()
+                denominator = str(item.get("denominator", "")).strip()
+                if not factor or not numerator or not denominator:
+                    raise DEConfigError(
+                        "Factor explicit contrast requires non-empty 'factor', 'numerator', and 'denominator'."
+                    )
+                label = str(item.get("label", f"{numerator}_vs_{denominator}")).strip()
+                normalized_explicit_items.append(
+                    {
+                        "contrast_type": "factor",
+                        "factor": factor,
+                        "numerator": numerator,
+                        "denominator": denominator,
+                        "label": label,
+                    }
+                )
+                continue
+
+            if contrast_type == "coefficient":
+                coefficient_name = str(
+                    item.get("coefficient_name", item.get("name", ""))
+                ).strip()
+                if not coefficient_name:
+                    raise DEConfigError(
+                        "Coefficient explicit contrast requires non-empty 'coefficient_name' (or 'name')."
+                    )
+                label = str(item.get("label", coefficient_name)).strip()
+                normalized_explicit_items.append(
+                    {
+                        "contrast_type": "coefficient",
+                        "coefficient_name": coefficient_name,
+                        "label": label,
+                    }
+                )
+                continue
+
+            raise DEConfigError(
+                "Explicit contrast dict contrast_type must be 'factor' or 'coefficient'."
+            )
+
+        raise DEConfigError(
+            "Each explicit contrast must be either a 3-item list [factor, numerator, denominator] "
+            "or a mapping with contrast_type."
+        )
+    config["contrasts"]["explicit"]["items"] = normalized_explicit_items
 
     out_dir = str(config["io"]["out_dir"]).strip()
     if not out_dir:
