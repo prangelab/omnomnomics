@@ -1678,6 +1678,7 @@ utils::write.table(
 )
 
 contrast_summaries <- list()
+contrast_testing_summaries <- list()
 for (contrast_cfg in contrast_plan) {
   contrast_type <- as.character(contrast_cfg$contrast_type)
   factor_name <- as.character(contrast_cfg$factor)
@@ -1774,13 +1775,7 @@ for (contrast_cfg in contrast_plan) {
     lfc_for_sig = lfc_for_sig,
     stringsAsFactors = FALSE
   )
-  utils::write.table(
-    testing_summary,
-    file = file.path(contrast_dir, paste0(contrast_label, ".testing_summary.tsv")),
-    sep = "\t",
-    quote = FALSE,
-    row.names = FALSE
-  )
+  contrast_testing_summaries[[length(contrast_testing_summaries) + 1]] <- testing_summary
 
   if (write_full_results) {
     utils::write.table(
@@ -1974,13 +1969,6 @@ for (contrast_cfg in contrast_plan) {
     alpha = alpha,
     lfc_threshold = lfc_for_sig,
     stringsAsFactors = FALSE
-  )
-  utils::write.table(
-    contrast_summary,
-    file = file.path(contrast_dir, paste0(contrast_label, ".summary.tsv")),
-    sep = "\t",
-    quote = FALSE,
-    row.names = FALSE
   )
   contrast_summaries[[length(contrast_summaries) + 1]] <- contrast_summary
 
@@ -2705,6 +2693,17 @@ if (length(contrast_summaries) > 0) {
     plot = p_summary,
     width = 10,
     height = 6
+  )
+}
+
+if (length(contrast_testing_summaries) > 0) {
+  contrast_testing_table <- do.call(rbind, contrast_testing_summaries)
+  utils::write.table(
+    contrast_testing_table,
+    file = file.path(qc_dir, "contrast_testing_summary.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
   )
 }
 

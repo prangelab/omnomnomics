@@ -190,9 +190,13 @@ EXPERIMENT_DIR
      |- DE_analysis.rendered.R (run-specific reproducible script)
      |- DE_analysis.customization_guide.R (run-specific script with documented customization recipes)
      |- basename.EXPERIMENT_DIR.results.zip (step-12 archive with scripts + results tree)
-     |- results (default; override with --de-out-dir)
-          |- qc
-          |- differential_expression
+     |- qc (shared QC outputs for step-12 runs)
+     |- <de_out_dir> (default: results; override with --de-out-dir)
+          |- <contrast_1>
+          |- <contrast_2>
+          |- contrast_summary.tsv
+          |- enrichment_summary.tsv
+          |- contrast_summary.sig_up_down_barplot.pdf
 
 ```
 Peak QC notes:
@@ -357,6 +361,7 @@ Practical combinations:
 - Step 12 requires RNA count-table input from step 11 and a metadata table (`-m`).
 - Use `--de-columns` and `--de-block` for automatic grouped design generation, or `--de-config <yaml>` for explicit control.
 - Use `--de-out-dir <name>` to separate result trees when testing multiple DE settings.
+- Step-12 QC outputs are shared at `DE_calling/qc/` and are not nested under `--de-out-dir`.
 - Step 12 writes two scripts into `DE_calling/`:
   - `DE_analysis.rendered.R`: exact run reproduction with the resolved settings.
   - `DE_analysis.customization_guide.R`: same runnable script plus documented customization recipes.
@@ -365,6 +370,10 @@ Practical combinations:
   - Coefficient contrasts: `{contrast_type: coefficient, coefficient_name: "...", label: "..."}`
 - Available DESeq2 coefficient names for coefficient contrasts are exported to:
   - `results/qc/deseq2_results_names.tsv`
+- Contrast-level QC tables are consolidated at top level:
+  - `results/qc/contrast_testing_summary.tsv`
+  - `results/differential_expression/contrast_summary.tsv`
+  (Per-contrast folders keep only contrast-specific result files and plots.)
 
 Additional utility command:
 

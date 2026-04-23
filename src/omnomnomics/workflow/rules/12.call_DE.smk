@@ -256,9 +256,10 @@ rule call_DE:
             customization_guide_script_name = str(
                 io_cfg.get("customization_guide_script_name", "DE_analysis.customization_guide.R")
             ).strip() or "DE_analysis.customization_guide.R"
-            de_result_root = os.path.join(params.outputfolder, de_subdir)
-            qc_dir = os.path.join(de_result_root, "qc")
-            de_dir = os.path.join(de_result_root, "differential_expression")
+            if os.path.normpath(de_subdir).lower() == "qc":
+                raise ValueError("DE output subdirectory cannot be 'qc' because that path is reserved for shared QC outputs.")
+            qc_dir = os.path.join(params.outputfolder, "qc")
+            de_dir = os.path.join(params.outputfolder, de_subdir)
 
             os.makedirs(params.outputfolder, exist_ok=True)
             os.makedirs(qc_dir, exist_ok=True)
@@ -301,7 +302,7 @@ rule call_DE:
             template_values = {
                 "__COUNTS_PATH__": _r_string(input.counts_table),
                 "__METADATA_PATH__": _r_string(metadata_copy),
-                "__OUTPUT_ROOT__": _r_string(de_result_root),
+                "__OUTPUT_ROOT__": _r_string(params.outputfolder),
                 "__QC_DIR__": _r_string(qc_dir),
                 "__DE_DIR__": _r_string(de_dir),
                 "__DESIGN_FORMULA_TEXT__": _r_string(str(resolved_de_config.get("design", {}).get("formula", params.resolved_formula))),
@@ -391,7 +392,7 @@ rule call_DE:
                 guide_script_text = rendered_r_script + _build_de_customization_guide(
                     counts_table_path=input.counts_table,
                     metadata_path=metadata_copy,
-                    result_root=de_result_root,
+                    result_root=params.outputfolder,
                     resolved_formula=str(resolved_de_config.get("design", {}).get("formula", params.resolved_formula)),
                     de_columns_resolved=params.de_columns_resolved,
                     de_block_resolved=params.de_block_resolved,
@@ -413,9 +414,11 @@ rule call_DE:
                         customization_guide_script,
                         arcname=os.path.basename(customization_guide_script),
                     )
-                _add_tree_to_zip(archive, de_result_root, os.path.basename(de_result_root))
+                _add_tree_to_zip(archive, qc_dir, os.path.basename(qc_dir))
+                _add_tree_to_zip(archive, de_dir, os.path.basename(de_dir))
 
-            log_it(logfile, f"Step 12 core DE results: {de_result_root}")
+            log_it(logfile, f"Step 12 DE results folder: {de_dir}")
+            log_it(logfile, f"Step 12 shared QC folder: {qc_dir}")
             if write_customization_guide and os.path.isfile(customization_guide_script):
                 log_it(logfile, f"Step 12 customization guide: {customization_guide_script}")
             log_it(logfile, f"Step 12 archive: {output[0]}")
