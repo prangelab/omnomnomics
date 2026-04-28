@@ -8,7 +8,7 @@ dependencies:
   - pip
   - pyyaml
   - pysam
-  - r-base>=4.3
+  - r-base=4.4.*
   - bioconductor-deseq2
   - r-ggplot2
   - r-pheatmap
@@ -22,13 +22,12 @@ dependencies:
   - bioconductor-clusterprofiler
   - bioconductor-enrichplot
   - bioconductor-fgsea
-  - bioconductor-sva
-  - bioconductor-decoupler
-  - bioconductor-omnipathr
   - r-msigdbr
   - r-dplyr
   - r-tidyr
   - r-tibble
+  - r-biocmanager
+  - r-shiny
   - genomepy>=0.16
   - snakemake>=7.25,<8
   - multiqc
@@ -48,6 +47,5 @@ dependencies:
   - subread
   - macs3
   - matplotlib
-  - phantompeakqualtools
   - openjdk
   - perl

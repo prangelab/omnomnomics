@@ -12,7 +12,7 @@ _Omnomnomics is an A-Z processing NGS pipeline of RNA-, ChIP-, or ATAC-seq data.
 ## Quickstart:
 In a rush? Once the environment is installed, you should be able to run:
 ```
-omnomnomics -i path/to/your/experiment_dir -t type_of_your_experiment -g genome_to_use
+omnomnomics rna -i path/to/your/experiment_dir -g genome_to_use
 ```
 For more information about how to use Omnomnomics, see the usage section down below. 
 
@@ -57,7 +57,7 @@ _Omnomnomics_ is a Snakemake pipeline with a Python CLI, packaged workflow confi
 
 To invoke _Omnomnomics_, run:
 ```bash
-omnomnomics -i path/to/your/experiment_dir -t type_of_your_experiment -g genome_to_use
+omnomnomics rna -i path/to/your/experiment_dir -g genome_to_use
 ```
 
 ## Directory Structures
@@ -268,8 +268,8 @@ Some job mode examples:
 
     -i <EXPERIMENT_DIR>:    Main directory containing your experiment.
                                     Required argument
-    -t TYPE:                Type of experiment: RNA, ChIP, ATAC
-                                    Required argument
+    ASSAY VERB:             Select assay via CLI verb: `rna`, `atac`, or `chip`.
+                                    Required for workflow runs.
 	  -g GENOME:				Genome version. Avaliable versions:
 								UCSC/RefSeq/NCBI:	mm10, mm39, hg38.
 								ENSMBL/GenBank:		GRCh38.p14, GRCm39
@@ -330,7 +330,7 @@ Some job mode examples:
     -C <Color_Table_FILE>:  File specifying which colors to use for the tracks
                           	  Default: gray.tint.color.table from the packaged palette directory
                             Can be a *txt list file with one color table per line. Different color tables will 
-							be used per hub as split by -t.
+							be used per hub group where applicable.
                             Can be a full (relative) path to a file or a file basename only in conjuction with 
 	  -P.
                             Use `omnomnomics create-track-color-table` to build a custom palette in a writable folder.
@@ -353,9 +353,19 @@ The optional `--max-project-size` flag adds a soft storage guard for space-heavy
 
 Practical combinations:
 - Full run with reusable outputs and bounded storage:
-  `omnomnomics -i <EXPERIMENT_DIR> -t RNA -g GRCh38 --retention-policy pruned --max-project-size 300G`
+  `omnomnomics rna -i <EXPERIMENT_DIR> -g GRCh38 --retention-policy pruned --max-project-size 300G`
 - Minimal final outputs for tight quota:
-  `omnomnomics -i <EXPERIMENT_DIR> -t RNA -g GRCh38 --retention-policy minimal --max-project-size 200G`
+  `omnomnomics rna -i <EXPERIMENT_DIR> -g GRCh38 --retention-policy minimal --max-project-size 200G`
+
+Utility commands:
+- Monitor the latest run log interactively:
+  `omnomnomics monitor -i <EXPERIMENT_DIR>`
+- Launch the DE Shiny app for a local project copy:
+  `omnomnomics de-app --project-dir /path/to/project_or_DE_calling`
+- Build a custom track color table:
+  `omnomnomics create-track-color-table`
+- Display an existing track color table:
+  `omnomnomics display-track-color-table`
 
 ### Step 12 (DESeq2) quick notes
 - Step 12 requires RNA count-table input from step 11 and a metadata table (`-m`).
@@ -376,6 +386,129 @@ Practical combinations:
   - `results/qc/contrast_testing_summary.tsv`
   - `results/differential_expression/contrast_summary.tsv`
   (Per-contrast folders keep only contrast-specific result files and plots.)
+
+Step 12 DE config run patterns:
+- Single DE config:
+  `omnomnomics rna -i <EXPERIMENT_DIR> -g GRCh38 -j 12 -m <metadata.tsv> --de-config de_grouped.yaml`
+- Multiple DE configs in one sequential run:
+  `omnomnomics rna -i <EXPERIMENT_DIR> -g GRCh38 -j 12 -m <metadata.tsv> --de-config de_grouped.yaml --de-config de_main_effects.yaml --de-config de_interaction.yaml`
+- Multi-config mode requirements:
+  - Every YAML must set `io.out_dir`.
+  - `io.out_dir` values must be unique across the provided YAML files.
+  - Do not use global `--de-out-dir` together with repeated `--de-config`.
+
+Common step-12 config errors:
+- `Global --de-out-dir cannot be combined with multiple --de-config files.`  
+  Fix: remove global `--de-out-dir` and set `io.out_dir` in each YAML.
+- `When multiple --de-config files are provided, each config must explicitly set io.out_dir.`  
+  Fix: add `io.out_dir: <unique_name>` under `io:` in every YAML.
+- `Multiple DE configs resolved to the same io.out_dir.`  
+  Fix: assign unique `io.out_dir` values per YAML.
+- `Explicit contrast dict contrast_type must be 'factor' or 'coefficient'.`  
+  Fix: use `contrast_type: factor` for standard factor-level contrasts or `contrast_type: coefficient` for coefficient tests.
+
+### Run the DE app locally (recommended workflow)
+
+The DE app is intended for interactive local use after step 12 finished on HPC.
+
+Typical workflow:
+1. Run step 12 on HPC.
+2. Copy or sync `DE_calling/` from HPC to your local machine.
+3. Launch the app locally and load that project folder (or `DE_calling/` directly).
+
+Minimum required local data:
+- `DE_calling/metadata_derived.tsv`
+- `DE_calling/qc/`
+- at least one DE analysis output folder (for example `DE_calling/results/` or `DE_calling/<custom_out_dir>/`)
+
+Launch options:
+
+- Preferred (installed CLI):
+  `omnomnomics de-app --project-dir /path/to/project_or_DE_calling`
+
+- Optional flags:
+  - `--port 3838`
+  - `--host 127.0.0.1`
+  - `--no-browser`
+
+- If `omnomnomics` is not on your PATH but the source tree is available:
+  `PYTHONPATH=src python -m omnomnomics.cli de-app --project-dir /path/to/project_or_DE_calling`
+
+- Direct R fallback (advanced/manual):
+  `R -e "shiny::runApp('src/omnomnomics/workflow/R/shiny_app')"`
+
+Notes:
+- Local and HPC environments can be different. You only need the step-12 outputs locally; raw FASTQ/BAM data are not required for app use.
+- Running the app directly on HPC via SSH tunneling can work, but is cluster-specific and not the default supported workflow.
+
+Step 12 YAML mini-templates:
+
+```yaml
+# de_grouped.yaml
+io:
+  out_dir: results_grouped
+
+design:
+  formula: "~ donor + replicate + de_group"
+
+contrasts:
+  mode: explicit
+  explicit:
+    items:
+      - label: KD24_C_vs_KD24_L
+        contrast_type: factor
+        factor: de_group
+        numerator: KD24_C
+        denominator: KD24_L
+      - label: NT_C_vs_NT_L
+        contrast_type: factor
+        factor: de_group
+        numerator: NT_C
+        denominator: NT_L
+```
+
+```yaml
+# de_main_effects.yaml
+io:
+  out_dir: results_main_effects
+
+design:
+  formula: "~ donor + replicate + type + treatment"
+
+contrasts:
+  mode: explicit
+  explicit:
+    items:
+      - label: KD24_vs_NT
+        contrast_type: factor
+        factor: type
+        numerator: KD24
+        denominator: NT
+      - label: L_vs_C
+        contrast_type: factor
+        factor: treatment
+        numerator: L
+        denominator: C
+```
+
+```yaml
+# de_interaction.yaml
+io:
+  out_dir: results_interaction
+
+design:
+  formula: "~ donor + replicate + type * treatment"
+
+contrasts:
+  mode: explicit
+  explicit:
+    items:
+      - label: typeKD24.treatmentL
+        contrast_type: coefficient
+        coefficient_name: typeKD24.treatmentL
+```
+
+Tip: if the exact interaction coefficient name differs in your run, check `DE_calling/qc/deseq2_results_names.tsv` and update `coefficient_name` accordingly.
 
 Additional utility command:
 
@@ -445,7 +578,7 @@ If a run fails with `Disk quota exceeded` or `No space left on device`, first st
 ```bash
 squeue -h -u "$USER" -n snakejob -o "%i" | xargs -r scancel
 snakemake --unlock -s /path/to/Snakefile.smk --directory <EXPERIMENT_DIR> --profile /path/to/slurm_profile --configfile <EXPERIMENT_DIR>/run_configs/<run_config>.yaml
-omnomnomics -i <EXPERIMENT_DIR> -t RNA -g GRCh38 -j 5-11 --retention-policy pruned --max-project-size 300G
+omnomnomics rna -i <EXPERIMENT_DIR> -g GRCh38 -j 5-11 --retention-policy pruned --max-project-size 300G
 ```
 
 Adjust `-j` to match the latest successful stage in your run.

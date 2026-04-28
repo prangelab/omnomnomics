@@ -1085,6 +1085,40 @@ if (!is.null(cooks_mat)) {
     quote = FALSE,
     row.names = FALSE
   )
+
+  cooks_bar <- cooks_sample_summary[order(cooks_sample_summary$genes_cooks_gt_10, decreasing = TRUE), , drop = FALSE]
+  cooks_bar$sample <- factor(cooks_bar$sample, levels = cooks_bar$sample)
+  p_cooks_counts <- ggplot2::ggplot(cooks_bar, ggplot2::aes(x = sample, y = genes_cooks_gt_10)) +
+    ggplot2::geom_col(fill = "steelblue") +
+    ggplot2::coord_flip() +
+    ggplot2::theme_light() +
+    ggplot2::theme(panel.grid = ggplot2::element_blank()) +
+    ggplot2::xlab("Sample") +
+    ggplot2::ylab("Genes with Cook's distance > 10") +
+    ggplot2::ggtitle("Cook's distance outlier count per sample")
+  ggplot2::ggsave(
+    filename = file.path(qc_dir, "cooks_distance.sample_outlier_counts.pdf"),
+    plot = p_cooks_counts,
+    width = 9,
+    height = 6
+  )
+
+  cooks_q99 <- cooks_sample_summary[order(cooks_sample_summary$q99_cooks, decreasing = TRUE), , drop = FALSE]
+  cooks_q99$sample <- factor(cooks_q99$sample, levels = cooks_q99$sample)
+  p_cooks_q99 <- ggplot2::ggplot(cooks_q99, ggplot2::aes(x = sample, y = q99_cooks)) +
+    ggplot2::geom_col(fill = "darkorange3") +
+    ggplot2::coord_flip() +
+    ggplot2::theme_light() +
+    ggplot2::theme(panel.grid = ggplot2::element_blank()) +
+    ggplot2::xlab("Sample") +
+    ggplot2::ylab("99th percentile Cook's distance") +
+    ggplot2::ggtitle("Cook's distance q99 per sample")
+  ggplot2::ggsave(
+    filename = file.path(qc_dir, "cooks_distance.sample_q99.pdf"),
+    plot = p_cooks_q99,
+    width = 9,
+    height = 6
+  )
 }
 
 if (qc_enabled) {
@@ -1688,6 +1722,29 @@ for (contrast_cfg in contrast_plan) {
   contrast_label <- sanitize_name(as.character(contrast_cfg$label))
   contrast_dir <- file.path(de_dir, contrast_label)
   dir.create(contrast_dir, recursive = TRUE, showWarnings = FALSE)
+  positive_direction <- "modeled numerator direction"
+  negative_direction <- "opposite direction"
+  if (contrast_type == "factor" && nzchar(factor_name) && nzchar(numerator) && nzchar(denominator)) {
+    positive_direction <- paste0("higher in ", numerator, " vs ", denominator)
+    negative_direction <- paste0("higher in ", denominator, " vs ", numerator)
+  } else if (contrast_type == "coefficient" && nzchar(coefficient_name)) {
+    positive_direction <- paste0("positive coefficient direction: ", coefficient_name)
+    negative_direction <- "opposite coefficient direction"
+  }
+  direction_caption <- paste0("+: ", positive_direction, " | -: ", negative_direction)
+  utils::write.table(
+    data.frame(
+      contrast = contrast_label,
+      contrast_type = contrast_type,
+      positive_direction = positive_direction,
+      negative_direction = negative_direction,
+      stringsAsFactors = FALSE
+    ),
+    file = file.path(contrast_dir, paste0(contrast_label, ".direction_legend.tsv")),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
 
   contrast_sample_ids <- rownames(col_data)
   if (contrast_type == "factor" && factor_name %in% colnames(col_data)) {
@@ -1760,6 +1817,8 @@ for (contrast_cfg in contrast_plan) {
   }
   testing_summary <- data.frame(
     contrast = contrast_label,
+    positive_direction = positive_direction,
+    negative_direction = negative_direction,
     total_genes = nrow(res_df),
     genes_with_pvalue = sum(!is.na(res_df$pvalue)),
     genes_with_padj = sum(!is.na(res_df$padj)),
@@ -1856,6 +1915,7 @@ for (contrast_cfg in contrast_plan) {
   if (ma_plot_enabled) {
     grDevices::pdf(file.path(contrast_dir, "MA Plot.pdf"), width = 8, height = 6)
     DESeq2::plotMA(res_for_table, ylim = c(-8, 8))
+    graphics::mtext(direction_caption, side = 3, line = 0.3, cex = 0.7)
     grDevices::dev.off()
   }
 
@@ -1883,7 +1943,11 @@ for (contrast_cfg in contrast_plan) {
       ggplot2::theme_light() +
       ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none") +
       ggplot2::xlab("log2 Fold Change") +
-      ggplot2::ylab("-log10 adjusted P-value")
+      ggplot2::ylab("-log10 adjusted P-value") +
+      ggplot2::labs(
+        title = paste0(contrast_label, " volcano"),
+        subtitle = direction_caption
+      )
     ggplot2::ggsave(file.path(contrast_dir, paste0(contrast_label, ".volcano_plot.pdf")), p, width = 8, height = 6)
     if (volcano_labels_enabled && requireNamespace("ggrepel", quietly = TRUE)) {
       label_df <- subset(vdf, is_sig)
@@ -1909,7 +1973,7 @@ for (contrast_cfg in contrast_plan) {
     graphics::hist(
       finite_p,
       breaks = 50,
-      main = paste0("P-value distribution: ", contrast_label),
+      main = paste0("P-value distribution: ", contrast_label, "\n", direction_caption),
       xlab = "p-value",
       col = "grey70",
       border = "white"
@@ -1955,6 +2019,8 @@ for (contrast_cfg in contrast_plan) {
   contrast_summary <- data.frame(
     contrast = contrast_label,
     contrast_type = contrast_type,
+    positive_direction = positive_direction,
+    negative_direction = negative_direction,
     factor = factor_name,
     numerator = numerator,
     denominator = denominator,
@@ -2064,7 +2130,8 @@ for (contrast_cfg in contrast_plan) {
       )
       dot_plot <- tryCatch(
         enrichplot::dotplot(ora_obj, showCategory = enrichment_top_terms) +
-          ggplot2::ggtitle(paste0(contrast_label, " ", set_name, " ORA (", direction_label, ")")),
+          ggplot2::ggtitle(paste0(contrast_label, " ", set_name, " ORA (", direction_label, ")")) +
+          ggplot2::labs(subtitle = direction_caption),
         error = function(e) NULL
       )
       save_enrichment_plot(
@@ -2073,7 +2140,8 @@ for (contrast_cfg in contrast_plan) {
       )
       bar_plot <- tryCatch(
         clusterProfiler::barplot(ora_obj, showCategory = enrichment_top_terms) +
-          ggplot2::ggtitle(paste0(contrast_label, " ", set_name, " ORA (", direction_label, ")")),
+          ggplot2::ggtitle(paste0(contrast_label, " ", set_name, " ORA (", direction_label, ")")) +
+          ggplot2::labs(subtitle = direction_caption),
         error = function(e) NULL
       )
       save_enrichment_plot(
@@ -2082,6 +2150,8 @@ for (contrast_cfg in contrast_plan) {
       )
       enrichment_rows[[length(enrichment_rows) + 1]] <<- data.frame(
         contrast = contrast_label,
+        positive_direction = positive_direction,
+        negative_direction = negative_direction,
         method = "ORA",
         gene_set = set_name,
         direction = direction_label,
@@ -2128,7 +2198,8 @@ for (contrast_cfg in contrast_plan) {
       )
       dot_plot <- tryCatch(
         enrichplot::dotplot(gsea_obj, showCategory = enrichment_top_terms) +
-          ggplot2::ggtitle(paste0(contrast_label, " ", set_name, " GSEA")),
+          ggplot2::ggtitle(paste0(contrast_label, " ", set_name, " GSEA")) +
+          ggplot2::labs(subtitle = direction_caption),
         error = function(e) NULL
       )
       save_enrichment_plot(
@@ -2137,7 +2208,8 @@ for (contrast_cfg in contrast_plan) {
       )
       ridge_plot <- tryCatch(
         enrichplot::ridgeplot(gsea_obj, showCategory = enrichment_top_terms) +
-          ggplot2::ggtitle(paste0(contrast_label, " ", set_name, " GSEA")),
+          ggplot2::ggtitle(paste0(contrast_label, " ", set_name, " GSEA")) +
+          ggplot2::labs(subtitle = direction_caption),
         error = function(e) NULL
       )
       save_enrichment_plot(
@@ -2148,7 +2220,11 @@ for (contrast_cfg in contrast_plan) {
       if (length(top_ids) > 0) {
         for (term_id in top_ids) {
           gp <- tryCatch(
-            enrichplot::gseaplot2(gsea_obj, geneSetID = term_id, title = term_id),
+            enrichplot::gseaplot2(
+              gsea_obj,
+              geneSetID = term_id,
+              title = paste0(term_id, "\n", direction_caption)
+            ),
             error = function(e) NULL
           )
           save_enrichment_plot(
@@ -2164,6 +2240,8 @@ for (contrast_cfg in contrast_plan) {
       }
       enrichment_rows[[length(enrichment_rows) + 1]] <<- data.frame(
         contrast = contrast_label,
+        positive_direction = positive_direction,
+        negative_direction = negative_direction,
         method = "GSEA",
         gene_set = set_name,
         direction = "ranked",
@@ -2363,7 +2441,7 @@ for (contrast_cfg in contrast_plan) {
           plot_decoupler_heatmap(
             prog_all_mat,
             file.path(dc_dir, paste0(contrast_label, ".all_genes.progeny_pathways.pdf")),
-            paste0(contrast_label, " progeny pathway activity"),
+            paste0(contrast_label, " progeny pathway activity\n", direction_caption),
             top_features = decoupler_top_features_heatmap
           )
         }
@@ -2378,7 +2456,7 @@ for (contrast_cfg in contrast_plan) {
           plot_decoupler_bar(
             as.data.frame(prog_deg),
             file.path(dc_dir, paste0(contrast_label, ".DE_genes.progeny_pathways.pdf")),
-            paste0(contrast_label, " progeny pathway activity (DE genes)"),
+            paste0(contrast_label, " progeny pathway activity (DE genes)\n", direction_caption),
             top_n = decoupler_top_regulators_barplot
           )
           plot_decoupler_detail(
@@ -2393,6 +2471,8 @@ for (contrast_cfg in contrast_plan) {
             top_prog <- prog_deg_tbl[order(-abs(prog_deg_tbl$score)), , drop = FALSE]
             enrichment_rows[[length(enrichment_rows) + 1]] <- data.frame(
               contrast = contrast_label,
+              positive_direction = positive_direction,
+              negative_direction = negative_direction,
               method = "decoupleR_MLM",
               gene_set = "progeny",
               direction = "ranked",
@@ -2430,7 +2510,7 @@ for (contrast_cfg in contrast_plan) {
           plot_decoupler_heatmap(
             tf_all_mat,
             file.path(dc_dir, paste0(contrast_label, ".all_genes.TF_network_activity.pdf")),
-            paste0(contrast_label, " TF network activity"),
+            paste0(contrast_label, " TF network activity\n", direction_caption),
             top_features = decoupler_top_features_heatmap
           )
         }
@@ -2445,7 +2525,7 @@ for (contrast_cfg in contrast_plan) {
           plot_decoupler_bar(
             as.data.frame(tf_deg),
             file.path(dc_dir, paste0(contrast_label, ".DE_genes.TF_network_activity.pdf")),
-            paste0(contrast_label, " TF network activity (DE genes)"),
+            paste0(contrast_label, " TF network activity (DE genes)\n", direction_caption),
             top_n = decoupler_top_regulators_barplot
           )
           plot_decoupler_detail(
@@ -2460,6 +2540,8 @@ for (contrast_cfg in contrast_plan) {
             top_tf <- tf_deg_tbl[order(-abs(tf_deg_tbl$score)), , drop = FALSE]
             enrichment_rows[[length(enrichment_rows) + 1]] <- data.frame(
               contrast = contrast_label,
+              positive_direction = positive_direction,
+              negative_direction = negative_direction,
               method = "decoupleR_ULM",
               gene_set = "collectri_tf",
               direction = "ranked",
@@ -2494,7 +2576,8 @@ for (contrast_cfg in contrast_plan) {
       ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none") +
       ggplot2::xlab("log2 fold change") +
       ggplot2::ylab("-log10 adjusted p-value") +
-      ggplot2::ggtitle(paste0(contrast_label, " volcano"))
+      ggplot2::ggtitle(paste0(contrast_label, " volcano")) +
+      ggplot2::labs(subtitle = direction_caption)
 
     tg <- sig_df
     if (nrow(tg) > 0) {

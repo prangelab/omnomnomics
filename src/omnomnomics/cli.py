@@ -87,6 +87,30 @@ def parse_monitor_arguments(argv):
    return args
 
 
+def parse_de_app_arguments(argv):
+   parser = argparse.ArgumentParser(
+       description="Launch the omnomnomics DE Shiny app.",
+       allow_abbrev=False,
+   )
+   parser.add_argument(
+       "-i",
+       "--project-dir",
+       default=".",
+       help="Project directory or DE_calling directory to pre-load in the app. Default: current directory",
+   )
+   parser.add_argument("--host", default="127.0.0.1", help="Host interface for Shiny. Default: 127.0.0.1")
+   parser.add_argument("--port", type=int, default=3838, help="Port for Shiny. Default: 3838")
+   parser.add_argument(
+       "--no-browser",
+       action="store_true",
+       help="Do not auto-open a browser window.",
+   )
+   args, unknown = parser.parse_known_args(argv)
+   if unknown:
+       parser.error(f"Unrecognized arguments: {' '.join(unknown)}")
+   return args
+
+
 def default_user_site_config():
    xdg_config_home = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")).expanduser()
    return xdg_config_home / "omnomnomics" / "site.yaml"
@@ -413,7 +437,37 @@ def monitor_main(argv):
                print("Monitor stopped.")
                return
 
-def parse_arguments():
+
+def de_app_main(argv):
+   args = parse_de_app_arguments(argv)
+   app_dir = WORKFLOW_ROOT / "R" / "shiny_app"
+   app_entry = app_dir / "app.R"
+   if not app_entry.is_file():
+       print(f"Shiny app entry file '{app_entry}' does not exist. Aborting...", file=sys.stderr)
+       sys.exit(1)
+
+   project_dir = str(Path(args.project_dir).expanduser().resolve())
+   env = os.environ.copy()
+   env["OMNOMNOMICS_DE_APP_PROJECT"] = project_dir
+
+   launch_browser = "FALSE" if args.no_browser else "TRUE"
+   app_dir_r = json.dumps(str(app_dir))
+   host_r = json.dumps(str(args.host))
+   r_expr = (
+       f"shiny::runApp({app_dir_r}, "
+       f"host={host_r}, "
+       f"port={int(args.port)}, "
+       f"launch.browser={launch_browser})"
+   )
+   cmd = ["Rscript", "-e", r_expr]
+   try:
+       completed = subprocess.run(cmd, env=env)
+   except FileNotFoundError:
+       print("Rscript was not found in PATH. Activate an environment with R installed and retry.", file=sys.stderr)
+       sys.exit(1)
+   sys.exit(completed.returncode)
+
+def parse_arguments(argv=None):
    #Parse command-line arguments
    parser = argparse.ArgumentParser(
        description="Modular HPC pipeline for RNA-seq, ATAC-seq, and ChIP-seq processing.",
@@ -422,7 +476,6 @@ def parse_arguments():
 
    # Define command-line options
    parser.add_argument('-i', '--experiment-dir', help='Path to the experiment directory')
-   parser.add_argument('-t', '--type', help='Type of experiment: RNA, ChIP, ATAC')
    parser.add_argument('-g', '--genome', help='Genome assembly name. Must match an available directory under the configured genome assembly root')
    parser.add_argument('-j', '--mode', help='Job mode. Can be auto, all or a range of jobs. See readme for some examples. \n \t Default: auto')
    parser.add_argument('-T', '--trim-tool', help='Trimming tool choice. Can be fastp or skewer. \n \t Default: fastp')
@@ -457,13 +510,14 @@ def parse_arguments():
    parser.add_argument('--retention-policy', choices=['all', 'pruned', 'minimal'], help='Post-run output retention policy. all keeps everything, pruned keeps FASTQ plus reusable downstream outputs, minimal keeps FASTQ plus only the requested terminal outputs. Default: all')
    parser.add_argument('--max-project-size', help='Soft project-size cap such as 200G or 800GB. Omnomnomics may delete safe intermediates and skip BigWig or trackhub creation when the cap would be exceeded.')
 
-   args, unknown = parser.parse_known_args()
+   args, unknown = parser.parse_known_args(argv)
    # Check if any unknown arguments are provided
    if unknown:
        parser.error(f"Unrecognized arguments: {' '.join(unknown)}")
 
    # Check if at least one argument is provided besides the script name
-   if len(sys.argv) < 2: 
+   argv_to_check = argv if argv is not None else sys.argv[1:]
+   if len(argv_to_check) < 1:
        print("Not enough input arguments...")
        parser.print_help()
        sys.exit(1)
@@ -1150,11 +1204,21 @@ def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
 # Main function
 ##--------------------------------------------------------------------------------------------------------------
 def main():
+    forwarded_argv = None
+    assay = None
+    assay_verbs = {"rna", "atac", "chip"}
+    if len(sys.argv) > 1 and sys.argv[1].lower() in assay_verbs:
+        assay = sys.argv[1].lower()
+        forwarded_argv = list(sys.argv[2:])
+
     if len(sys.argv) > 1 and sys.argv[1] == "genomes":
         genomes_main(sys.argv[2:], WORKFLOW_ROOT, DEFAULT_WORKFLOW_CONFIG, DEFAULT_SITE_CONFIG)
         return
     if len(sys.argv) > 1 and sys.argv[1] == "monitor":
         monitor_main(sys.argv[2:])
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "de-app":
+        de_app_main(sys.argv[2:])
         return
     if len(sys.argv) > 1 and sys.argv[1] == "create-track-color-table":
         original_argv = sys.argv[:]
@@ -1172,6 +1236,13 @@ def main():
         finally:
             sys.argv = original_argv
         return
+
+    if assay is None:
+        print(
+            "Please select an assay verb: 'omnomnomics rna ...', 'omnomnomics atac ...', or 'omnomnomics chip ...'. Aborting...",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     # Define variables for packaged workflow paths
     workflow_root = WORKFLOW_ROOT
@@ -1191,7 +1262,7 @@ def main():
     the_command = ' '.join(sys.argv)
         
     # Parse command-line arguments
-    args = parse_arguments()
+    args = parse_arguments(forwarded_argv)
 
     site_config_file = resolve_site_config_path(args.site_config)
     if not site_config_file.is_file():
@@ -1208,7 +1279,7 @@ def main():
 
     # Access parsed arguments
     experiment_dir = str(Path(args.experiment_dir).expanduser().resolve()) if args.experiment_dir else args.experiment_dir
-    the_type = args.type.upper()
+    the_type = assay.upper()
     genome = args.genome
     trim_tool = args.trim_tool.lower() if args.trim_tool else config.get("trim_tool","fastp").lower()
     map_tool = args.map_tool.lower() if args.map_tool else config.get('map_tool', "hisat2").lower()
