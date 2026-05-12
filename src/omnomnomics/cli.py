@@ -1462,6 +1462,8 @@ def main():
             sys.exit(1)
 
         try:
+            run_configs_dir = os.path.join(experiment_dir, "run_configs")
+            os.makedirs(run_configs_dir, exist_ok=True)
             metadata_fieldnames, metadata_rows = read_metadata_table(metadata)
             derived_fieldnames, derived_rows, selector_map = derive_metadata_rows(
                 metadata_fieldnames,
@@ -1541,8 +1543,7 @@ def main():
                     resolved_de_configs.append(one_resolved)
 
                     one_resolved_path = os.path.join(
-                        experiment_dir,
-                        "run_configs",
+                        run_configs_dir,
                         f"omnomnomics.run.{run_date}.de_config.resolved.{idx:02d}.yaml",
                     )
                     with open(one_resolved_path, "w") as handle:
@@ -1557,8 +1558,7 @@ def main():
                     de_design_mode = "config_formula"
 
             derived_metadata_path = os.path.join(
-                experiment_dir,
-                "run_configs",
+                run_configs_dir,
                 f"omnomnomics.run.{run_date}.metadata_derived.tsv",
             )
             write_metadata_table(derived_metadata_path, derived_fieldnames, derived_rows)
