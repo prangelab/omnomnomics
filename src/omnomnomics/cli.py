@@ -111,6 +111,36 @@ def parse_de_app_arguments(argv):
    return args
 
 
+def print_top_level_help(exit_code=0):
+   help_text = """
+usage: omnomnomics <command> [options]
+
+Assay workflow commands:
+  omnomnomics rna   ...   Run RNA-seq workflow
+  omnomnomics atac  ...   Run ATAC-seq workflow
+  omnomnomics chip  ...   Run ChIP-seq workflow
+
+Utility commands:
+  omnomnomics monitor                   Monitor latest run log
+  omnomnomics de-app                    Launch DE Shiny app
+  omnomnomics genomes ...               Genome helper subcommands
+  omnomnomics create-track-color-table  Build custom track color table
+  omnomnomics display-track-color-table Preview an existing track color table
+
+Examples:
+  omnomnomics rna -i /path/to/experiment -g GRCh38
+  omnomnomics monitor -i /path/to/experiment
+  omnomnomics de-app --project-dir /path/to/experiment/DE_calling
+
+Use assay-specific help:
+  omnomnomics rna --help
+  omnomnomics atac --help
+  omnomnomics chip --help
+"""
+   print(help_text.strip())
+   sys.exit(exit_code)
+
+
 def default_user_site_config():
    xdg_config_home = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")).expanduser()
    return xdg_config_home / "omnomnomics" / "site.yaml"
@@ -1204,6 +1234,11 @@ def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
 # Main function
 ##--------------------------------------------------------------------------------------------------------------
 def main():
+    if len(sys.argv) == 1:
+        print_top_level_help(exit_code=1)
+    if len(sys.argv) > 1 and sys.argv[1] in {"-h", "--help"}:
+        print_top_level_help(exit_code=0)
+
     forwarded_argv = None
     assay = None
     assay_verbs = {"rna", "atac", "chip"}
