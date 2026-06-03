@@ -1101,7 +1101,7 @@ def merged_sample_roots_for_mode(experiment_dir, input_folder, input_file_type):
     else:
         files = []
         for extension in FASTQ_EXTENSIONS if input_file_type in FASTQ_EXTENSIONS else (input_file_type,):
-            files.extend(glob.glob(f"{experiment_dir}/{input_folder}/*_R1*{extension}"))
+            files.extend(glob.glob(f"{experiment_dir}/{input_folder}/*{extension}"))
 
     normalized_files = sorted(
         set(normalize_field_selection_name(file_path, input_file_type) for file_path in files)

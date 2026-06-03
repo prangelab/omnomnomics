@@ -23,6 +23,7 @@ For more information about how to use Omnomnomics, see the usage section down be
 
 Packaged helper verbs are also available:
 ```bash
+omnomnomics genomes --help
 omnomnomics create-track-color-table -h
 omnomnomics display-track-color-table -h
 ```
@@ -45,6 +46,21 @@ Reference genomes are managed separately from the code checkout. Install them un
 - `star/`
 - `hisat2/`
 - `aux/`
+
+Useful genome helper commands:
+
+```bash
+# Search remote assemblies from the configured provider
+omnomnomics genomes list --species human
+omnomnomics genomes ls --species mouse
+
+# Show locally installed normalized assemblies
+omnomnomics genomes installed
+omnomnomics genomes local --species mouse
+
+# Install the latest matching assembly for a species
+omnomnomics genomes install --species mouse
+```
 
 ## Overview of Omnomnomics
 OMNOM_HOME, is the directory containing _Omnomnomics_. This is where you installed _Omnomnomics_ and where the wrapper script, main snakefile, bin folder, genomes and slurm_profile are. The default directory structure generated and used by the pipeline is the EXPERIMENT_DIR. This is the main input directory containing your experiment and all your files folders for the in- and output. 
@@ -415,6 +431,13 @@ Utility commands:
   `omnomnomics monitor -i <EXPERIMENT_DIR>`
 - Launch the DE Shiny app for a local project copy:
   `omnomnomics de-app --project-dir /path/to/project_or_DE_calling`
+- Search remote genome assemblies:
+  `omnomnomics genomes list --species human`
+- Show locally installed normalized assemblies:
+  `omnomnomics genomes installed`
+- Short aliases for the same genome helper actions:
+  `omnomnomics genomes ls --species mouse`
+  `omnomnomics genomes local --species mouse`
 - Build a custom track color table:
   `omnomnomics create-track-color-table`
 - Display an existing track color table:
