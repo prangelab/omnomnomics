@@ -53,7 +53,7 @@ rule analyze_peaks_de:
         de_outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num'] - 1]}",
         prede_outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num'] - 1]}",
         bam_inputfolder=f"{experiment_dir}/{master_config['input_folders'][master_config['analyzepeaksde_rule_num'] - 1][0]}",
-        genome_version=config["THEGENOMEVERSION"],
+        genome_version=config["THEGENOME"],
         gtf_file=os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "annotation", "genes.gtf"),
     threads:
         Threads_Per_Rule[str(master_config["analyzepeaksde_rule_num"])]
