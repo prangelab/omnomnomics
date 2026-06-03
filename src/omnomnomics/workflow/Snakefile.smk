@@ -954,6 +954,14 @@ def normalize_sample_name(file_path, file_type):
 
 
 def fastq_candidate_names(sample, read_label):
+    if read_label == "SE":
+        for extension in FASTQ_EXTENSIONS:
+            yield f"{sample}{extension}"
+            yield f"{sample}_R1{extension}"
+            yield f"{sample}_R1_001{extension}"
+            yield f"{sample}_1_001{extension}"
+        return
+
     read_number = read_label.replace("R", "")
     suffixes = (
         f"_{read_label}_001",

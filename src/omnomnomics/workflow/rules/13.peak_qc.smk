@@ -39,7 +39,8 @@ rule peak_qc:
     input:
         peak_qc_input
     output:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num'] - 1]}/extra_{master_config['peakqc_rule_num']}.tmp"
+        extra=f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num'] - 1]}/extra_{master_config['peakqc_rule_num']}.tmp",
+        union_annotation=f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num'] - 1]}/peak_qc/peak_annotations/{config['THETYPE'].lower()}.all_groups.merged_peaks.annotated.bed"
     params:
         thetype=config["THETYPE"],
         spp_gate_mode=str(config.get("SPP_GATE", "warn")).strip().lower(),

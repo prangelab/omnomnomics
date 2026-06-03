@@ -19,7 +19,7 @@ rule run_fastp:
     input:
         fastq1=lambda wildcards: resolve_fastq_input(
             wildcards.sample,
-            "R1",
+            "R1" if config["PAIRED"] else "SE",
             master_config['input_folders'][master_config['trim_rule_num'] - 1],
         ),
         fastq2=(
