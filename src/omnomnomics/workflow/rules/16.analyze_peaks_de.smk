@@ -28,9 +28,10 @@ def analyze_peaks_de_input(_wildcards):
         input_files.append(
             f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num'] - 1]}/extra_{master_config['analyzepeaks_rule_num']}.tmp"
         )
+        bam_inputfolder = master_config["output_folders"][master_config["touchup_rule_num"] - 1]
         bam_suffix = ".sorted.dups_marked.filtered.bam" if config["THETYPE"] == "ATAC" else ".filtered.bam"
         input_files.extend(
-            f"{experiment_dir}/{master_config['input_folders'][master_config['analyzepeaksde_rule_num'] - 1][0]}/{sample}{bam_suffix}"
+            f"{experiment_dir}/{bam_inputfolder}/{sample}{bam_suffix}"
             for sample in samples2
         )
         if config["THETYPE"] == "CHIP" and str(config.get("BROAD_MODE", "off")).strip().lower() == "genebody":
@@ -52,7 +53,7 @@ rule analyze_peaks_de:
         outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaksde_rule_num'] - 1]}",
         de_outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num'] - 1]}",
         prede_outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num'] - 1]}",
-        bam_inputfolder=f"{experiment_dir}/{master_config['input_folders'][master_config['analyzepeaksde_rule_num'] - 1][0]}",
+        bam_inputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['touchup_rule_num'] - 1]}",
         genome_version=config["THEGENOME"],
         gtf_file=os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "annotation", "genes.gtf"),
     threads:

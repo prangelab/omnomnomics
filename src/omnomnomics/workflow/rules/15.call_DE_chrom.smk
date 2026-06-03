@@ -220,7 +220,8 @@ rule call_DE_chrom:
             else []
         )
     output:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num']-1]}/{os.path.basename(config['EXPERIMENT_DIR'])}.chrom.results.zip"
+        results_zip=f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num']-1]}/{os.path.basename(config['EXPERIMENT_DIR'])}.chrom.results.zip",
+        peak_metadata=f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num']-1]}/peak_metadata.tsv"
     params:
         thetype=config['THETYPE'],
         broad_mode=str(config.get("BROAD_MODE", "off")).strip().lower(),
@@ -539,7 +540,7 @@ rule call_DE_chrom:
                 record_step_command(master_config['dechrom_rule_num'], f"aggregate_{analysis_index}", de_r_command)
                 shell(de_r_command)
 
-            with zipfile.ZipFile(output[0], "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            with zipfile.ZipFile(output.results_zip, "w", compression=zipfile.ZIP_DEFLATED) as archive:
                 archive.write(metadata_copy, arcname=os.path.basename(metadata_copy))
                 archive.write(peak_metadata_copy, arcname=os.path.basename(peak_metadata_copy))
                 if params.thetype == "CHIP" and params.broad_mode in {"genebody", "diffuse"}:
@@ -565,7 +566,7 @@ rule call_DE_chrom:
             for customization_guide_script in customization_scripts:
                 if os.path.isfile(customization_guide_script):
                     log_it(logfile, f"Step 15 customization guide: {customization_guide_script}")
-            log_it(logfile, f"Step 15 archive: {output[0]}")
+            log_it(logfile, f"Step 15 archive: {output.results_zip}")
             finish_step_sample(master_config['dechrom_rule_num'], "aggregate", "call_DE_chrom", tracking["start_time"], "OK")
         except Exception:
             finish_step_sample(master_config['dechrom_rule_num'], "aggregate", "call_DE_chrom", tracking["start_time"], "FAIL")
