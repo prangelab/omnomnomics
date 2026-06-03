@@ -23,7 +23,7 @@ FASTQ_EXTENSIONS = (
 )
 BIGWIG_EXTENSIONS = (".plus.bw", ".minus.bw", ".bw")
 OTHER_EXTENSIONS = (".bam", ".bai")
-FASTQ_READ_SUFFIX_RE = re.compile(r"_(?:R)?[12](?:_[0-9]{3})?$")
+FASTQ_READ_SUFFIX_RE = re.compile(r"(?:_R[12]|_[12]_[0-9]{3})$")
 LANE_SUFFIX_RE = re.compile(r"_L00[0-9]$")
 
 

@@ -937,7 +937,7 @@ if technical_replicate_mode and input_file_type == ".bam":
     ]
 
 FASTQ_EXTENSIONS = (".fastq.gz", ".fq.gz", ".fastq", ".fq")
-FASTQ_READ_SUFFIX_RE = re.compile(r'_(?:R)?[12](?:_[0-9]{3})?$')
+FASTQ_READ_SUFFIX_RE = re.compile(r'(?:_R[12]|_[12]_[0-9]{3})$')
 
 
 def strip_fastq_read_suffix(sample_name):
