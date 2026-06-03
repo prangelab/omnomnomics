@@ -147,6 +147,9 @@ def derive_metadata_rows(
     seen_filenames: set[str] = set()
     seen_filename_keys: set[str] = set()
     seen_sample_ids: set[str] = set()
+    has_technical_replicate_column = "technical_replicate" in fieldnames
+    sample_id_technical_replicates: dict[str, set[str]] = {}
+    sample_ids_missing_technical_replicate: set[str] = set()
 
     for row in rows:
         filename = row["filename"].strip()
@@ -169,11 +172,30 @@ def derive_metadata_rows(
             raise MetadataError(
                 f"Derived sample_id is empty for metadata row '{filename}'. Check --sample-name columns."
             )
+        technical_replicate_value = row.get("technical_replicate", "").strip()
         if sample_id in seen_sample_ids:
-            raise MetadataError(
-                f"Derived sample_id values are not unique. Duplicate sample_id: {sample_id}"
-            )
-        seen_sample_ids.add(sample_id)
+            if not has_technical_replicate_column:
+                raise MetadataError(
+                    f"Derived sample_id values are not unique. Duplicate sample_id: {sample_id}"
+                )
+            if sample_id in sample_ids_missing_technical_replicate or not technical_replicate_value:
+                raise MetadataError(
+                    "Duplicate sample_id values require a non-empty technical_replicate column. "
+                    f"Metadata row '{filename}' is missing technical_replicate for sample_id '{sample_id}'."
+                )
+            technical_replicates = sample_id_technical_replicates.setdefault(sample_id, set())
+            if technical_replicate_value in technical_replicates:
+                raise MetadataError(
+                    "Technical replicate identifiers must be unique within each derived sample_id. "
+                    f"Duplicate technical_replicate '{technical_replicate_value}' for sample_id '{sample_id}'."
+                )
+            technical_replicates.add(technical_replicate_value)
+        else:
+            seen_sample_ids.add(sample_id)
+            if technical_replicate_value:
+                sample_id_technical_replicates[sample_id] = {technical_replicate_value}
+            elif has_technical_replicate_column:
+                sample_ids_missing_technical_replicate.add(sample_id)
 
         sample_type = sanitize_identifier(join_metadata_values(row, sample_type_columns)) if sample_type_columns else ""
         if not sample_type:

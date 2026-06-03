@@ -1,0 +1,3159 @@
+#!/usr/bin/env Rscript
+
+# Rendered by omnomnomics step 12. Running this script should reproduce the DE result tree.
+
+suppressPackageStartupMessages({
+  required_packages <- c("DESeq2", "ggplot2", "pheatmap", "matrixStats", "RColorBrewer")
+  missing_required <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
+  if (length(missing_required) > 0) {
+    stop("Missing required R packages: ", paste(missing_required, collapse = ", "))
+  }
+})
+
+set.seed(__RUNTIME_SEED__)
+
+counts_path <- __COUNTS_PATH__
+metadata_path <- __METADATA_PATH__
+output_root <- __OUTPUT_ROOT__
+qc_dir <- __QC_DIR__
+de_dir <- __DE_DIR__
+peak_metadata_path <- __PEAK_METADATA_PATH__
+peak_id_column <- __PEAK_ID_COLUMN__
+assay_lower <- __ASSAY_LOWER__
+feature_label_singular <- __FEATURE_LABEL_SINGULAR__
+feature_label_plural <- __FEATURE_LABEL_PLURAL__
+feature_file_stem <- __FEATURE_FILE_STEM__
+all_feature_file_stem <- __ALL_FEATURE_FILE_STEM__
+de_feature_file_stem <- __DE_FEATURE_FILE_STEM__
+
+design_formula_text <- __DESIGN_FORMULA_TEXT__
+contrast_mode <- __CONTRAST_MODE__
+auto_pairwise <- __AUTO_PAIRWISE__
+auto_primary_variable <- __AUTO_PRIMARY_VARIABLE__
+explicit_contrasts <- __EXPLICIT_CONTRASTS__
+
+filtering_enabled <- __FILTERING_ENABLED__
+filtering_method <- __FILTERING_METHOD__
+filtering_min_count <- __FILTERING_MIN_COUNT__
+filtering_min_samples <- __FILTERING_MIN_SAMPLES__
+atac_filter_min_total_count <- __ATAC_FILTER_MIN_TOTAL_COUNT__
+atac_filter_min_samples_mode <- __ATAC_FILTER_MIN_SAMPLES_MODE__
+
+deseq_fit_type <- __DESEQ_FIT_TYPE__
+deseq_sf_type <- __DESEQ_SF_TYPE__
+deseq_parallel <- __DESEQ_PARALLEL__
+latent_enabled <- __LATENT_ENABLED__
+latent_method <- __LATENT_METHOD__
+latent_n_sv <- __LATENT_N_SV__
+shrink_enabled <- __SHRINK_ENABLED__
+shrink_type <- __SHRINK_TYPE__
+shrink_for_tables <- __SHRINK_FOR_TABLES__
+
+alpha <- __ALPHA__
+lfc_for_sig <- __LFC_FOR_SIG__
+lfc_for_heatmap <- __LFC_FOR_HEATMAP__
+max_volcano_labels <- __MAX_VOLCANO_LABELS__
+
+qc_enabled <- __QC_ENABLED__
+vst_blind <- __VST_BLIND__
+top_variable_genes <- __TOP_VARIABLE_GENES__
+distance_plot_enabled <- __DISTANCE_PLOT_ENABLED__
+variable_heatmap_enabled <- __VARIABLE_HEATMAP_ENABLED__
+pca_enabled <- __PCA_ENABLED__
+pca_color_by <- __PCA_COLOR_BY__
+pca_shape_by_values <- __PCA_SHAPE_BY_VALUES__
+pca_extra_pairs <- __PCA_EXTRA_PAIRS__
+de_columns_resolved <- __DE_COLUMNS_RESOLVED__
+de_block_resolved <- __DE_BLOCK_RESOLVED__
+
+ma_plot_enabled <- __MA_PLOT_ENABLED__
+volcano_enabled <- __VOLCANO_ENABLED__
+volcano_labels_enabled <- __VOLCANO_LABELS_ENABLED__
+volcano_auto_axes <- __VOLCANO_AUTO_AXES__
+volcano_max_xlim <- __VOLCANO_MAX_XLIM__
+volcano_max_ylim <- __VOLCANO_MAX_YLIM__
+sig_heatmap_enabled <- __SIG_HEATMAP_ENABLED__
+sig_heatmap_cluster_rows <- __SIG_HEATMAP_CLUSTER_ROWS__
+sig_heatmap_cluster_cols <- __SIG_HEATMAP_CLUSTER_COLS__
+
+write_full_results <- __WRITE_FULL_RESULTS__
+write_sig_only <- __WRITE_SIG_ONLY__
+sig_suffix <- __SIG_SUFFIX__
+
+enrichment_enabled <- __ENRICHMENT_ENABLED__
+enrichment_cp_enabled <- __ENRICHMENT_CP_ENABLED__
+enrichment_cp_run_ora <- __ENRICHMENT_CP_RUN_ORA__
+enrichment_cp_run_gsea <- __ENRICHMENT_CP_RUN_GSEA__
+enrichment_msigdb_sets <- __ENRICHMENT_MSIGDB_SETS__
+enrichment_pvalue_cutoff <- __ENRICHMENT_PVALUE_CUTOFF__
+enrichment_qvalue_cutoff <- __ENRICHMENT_QVALUE_CUTOFF__
+enrichment_min_gs_size <- __ENRICHMENT_MIN_GS_SIZE__
+enrichment_max_gs_size <- __ENRICHMENT_MAX_GS_SIZE__
+enrichment_top_terms <- __ENRICHMENT_TOP_TERMS__
+enrichment_gsea_permutations <- __ENRICHMENT_GSEA_PERMUTATIONS__
+
+decoupler_enabled <- __DECOUPLER_ENABLED__
+decoupler_run_progeny <- __DECOUPLER_RUN_PROGENY__
+decoupler_run_tf_network <- __DECOUPLER_RUN_TF_NETWORK__
+decoupler_progeny_top <- __DECOUPLER_PROGENY_TOP__
+decoupler_tf_split_complexes <- __DECOUPLER_TF_SPLIT_COMPLEXES__
+decoupler_minsize <- __DECOUPLER_MINSIZE__
+decoupler_top_features_heatmap <- __DECOUPLER_TOP_FEATURES_HEATMAP__
+decoupler_top_regulators_barplot <- __DECOUPLER_TOP_REGULATORS_BARPLOT__
+decoupler_top_regulators_detail_each_side <- __DECOUPLER_TOP_REGULATORS_DETAIL_EACH_SIDE__
+
+custom_modules_enabled <- __CUSTOM_MODULES_ENABLED__
+custom_modules_gmt <- __CUSTOM_MODULES_GMT__
+custom_modules_name <- __CUSTOM_MODULES_NAME__
+custom_modules_run_ora <- __CUSTOM_MODULES_RUN_ORA__
+custom_modules_run_gsea <- __CUSTOM_MODULES_RUN_GSEA__
+
+if (!nzchar(custom_modules_gmt)) {
+  custom_modules_gmt <- NA_character_
+}
+if (!nzchar(peak_metadata_path) || identical(peak_metadata_path, "NA")) {
+  peak_metadata_path <- NA_character_
+}
+
+feature_label_singular_title <- tools::toTitleCase(feature_label_singular)
+feature_label_plural_title <- tools::toTitleCase(feature_label_plural)
+feature_metadata_label <- paste(feature_label_singular, "metadata")
+feature_metadata_label_title <- tools::toTitleCase(feature_metadata_label)
+
+# Optional custom module enrichment block:
+# - Default is off for pipeline runs.
+# - For interactive reruns in RStudio, set:
+#   custom_modules_enabled <- TRUE
+#   custom_modules_gmt <- "/absolute/path/to/modules.gmt"
+# - Then run this script to create per-contrast custom module outputs.
+
+sanitize_name <- function(x) {
+  x <- gsub("[^A-Za-z0-9._-]+", "_", x)
+  x <- gsub("_+", "_", x)
+  x <- gsub("^[_\\.\\-]+|[_\\.\\-]+$", "", x)
+  if (!nzchar(x)) "contrast" else x
+}
+
+sanitize_file_component <- function(x, fallback = "item") {
+  x <- gsub("[^A-Za-z0-9._-]+", "_", x)
+  x <- gsub("_+", "_", x)
+  x <- gsub("^[_\\.\\-]+|[_\\.\\-]+$", "", x)
+  if (!nzchar(x)) fallback else x
+}
+
+is_informative_column <- function(df, column_name) {
+  if (!(column_name %in% colnames(df))) {
+    return(FALSE)
+  }
+  values <- as.character(df[[column_name]])
+  values <- values[!is.na(values) & nzchar(values)]
+  n_unique <- length(unique(values))
+  n_unique >= 2 && n_unique < nrow(df)
+}
+
+is_categorical_grouping_column <- function(df, column_name) {
+  if (!(column_name %in% colnames(df))) {
+    return(FALSE)
+  }
+  values_raw <- df[[column_name]]
+  if (is.numeric(values_raw) || is.integer(values_raw)) {
+    return(FALSE)
+  }
+  is_informative_column(df, column_name)
+}
+
+qualitative_palette_names <- c("Set1", "Dark2", "Paired", "Set2", "Accent", "Pastel1", "Pastel2", "Set3")
+palette_cache <- new.env(parent = emptyenv())
+palette_assignment_rows <- list()
+
+palette_name_for_column <- function(column_name) {
+  column_name <- as.character(column_name)
+  if (!nzchar(column_name)) {
+    return(qualitative_palette_names[[1]])
+  }
+  if (exists(column_name, envir = palette_cache, inherits = FALSE)) {
+    return(get(column_name, envir = palette_cache, inherits = FALSE))
+  }
+  used <- unlist(as.list(palette_cache), use.names = FALSE)
+  available <- setdiff(qualitative_palette_names, used)
+  if (length(available) == 0) {
+    available <- qualitative_palette_names
+  }
+  idx <- (sum(utf8ToInt(column_name)) %% length(available)) + 1
+  selected <- available[[idx]]
+  assign(column_name, selected, envir = palette_cache)
+  palette_assignment_rows[[length(palette_assignment_rows) + 1]] <<- data.frame(
+    column = column_name,
+    palette = selected,
+    stringsAsFactors = FALSE
+  )
+  selected
+}
+
+categorical_palette <- function(levels_vec, palette_name = NULL) {
+  levels_vec <- unique(as.character(levels_vec))
+  levels_vec <- levels_vec[nzchar(levels_vec)]
+  if (length(levels_vec) == 0) {
+    return(c())
+  }
+  brewer_info <- RColorBrewer::brewer.pal.info
+  if (is.null(palette_name) || !(palette_name %in% rownames(brewer_info))) {
+    qualitative <- rownames(brewer_info[brewer_info$category == "qual", , drop = FALSE])
+    palette_name <- qualitative[which.max(brewer_info[qualitative, "maxcolors"])]
+  }
+  base_n <- brewer_info[palette_name, "maxcolors"]
+  base_palette <- RColorBrewer::brewer.pal(max(3, min(base_n, length(levels_vec))), palette_name)
+  if (length(levels_vec) > length(base_palette)) {
+    base_palette <- grDevices::colorRampPalette(base_palette)(length(levels_vec))
+  } else {
+    base_palette <- base_palette[seq_len(length(levels_vec))]
+  }
+  stats::setNames(base_palette, levels_vec)
+}
+
+gradient_palette <- function(n) {
+  n <- max(3, as.integer(n))
+  base_steps <- max(9, min(11, n))
+  base_palette <- RColorBrewer::brewer.pal(base_steps, "RdBu")
+  base_palette <- rev(base_palette)
+  if (n > length(base_palette)) {
+    return(grDevices::colorRampPalette(base_palette)(n))
+  }
+  stats::setNames(base_palette[seq_len(n)], NULL)
+}
+
+row_zscore <- function(mat) {
+  scaled <- t(scale(t(mat)))
+  scaled[is.na(scaled)] <- 0
+  scaled
+}
+
+strip_ensembl_version <- function(ids) {
+  sub("\\..*$", "", as.character(ids))
+}
+
+map_gene_symbols <- function(gene_ids, fallback_to_ids = TRUE) {
+  gene_ids <- as.character(gene_ids)
+  ids_no_version <- strip_ensembl_version(gene_ids)
+  symbols <- rep(NA_character_, length(ids_no_version))
+
+  has_annotationdbi <- requireNamespace("AnnotationDbi", quietly = TRUE)
+  if (has_annotationdbi) {
+    is_human <- grepl("^ENSG", ids_no_version)
+    is_mouse <- grepl("^ENSMUSG", ids_no_version)
+
+    if (any(is_human) && requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
+      mapped <- tryCatch(
+        AnnotationDbi::mapIds(
+          org.Hs.eg.db::org.Hs.eg.db,
+          keys = unique(ids_no_version[is_human]),
+          column = "SYMBOL",
+          keytype = "ENSEMBL",
+          multiVals = "first"
+        ),
+        error = function(e) {
+          message("Symbol mapping warning (human): ", conditionMessage(e))
+          stats::setNames(rep(NA_character_, length(unique(ids_no_version[is_human]))), unique(ids_no_version[is_human]))
+        }
+      )
+      symbols[is_human] <- unname(mapped[ids_no_version[is_human]])
+    }
+
+    if (any(is_mouse) && requireNamespace("org.Mm.eg.db", quietly = TRUE)) {
+      mapped <- tryCatch(
+        AnnotationDbi::mapIds(
+          org.Mm.eg.db::org.Mm.eg.db,
+          keys = unique(ids_no_version[is_mouse]),
+          column = "SYMBOL",
+          keytype = "ENSEMBL",
+          multiVals = "first"
+        ),
+        error = function(e) {
+          message("Symbol mapping warning (mouse): ", conditionMessage(e))
+          stats::setNames(rep(NA_character_, length(unique(ids_no_version[is_mouse]))), unique(ids_no_version[is_mouse]))
+        }
+      )
+      symbols[is_mouse] <- unname(mapped[ids_no_version[is_mouse]])
+    }
+  }
+
+  missing <- is.na(symbols) | !nzchar(symbols)
+  if (fallback_to_ids) {
+    symbols[missing] <- ids_no_version[missing]
+  } else {
+    symbols[missing] <- NA_character_
+  }
+  symbols
+}
+
+counts_df <- utils::read.delim(counts_path, check.names = FALSE, stringsAsFactors = FALSE)
+metadata_df <- utils::read.delim(metadata_path, check.names = FALSE, stringsAsFactors = FALSE)
+
+if (ncol(counts_df) < 2) {
+  stop("Count table must contain a feature-id column and at least one sample column.")
+}
+
+if (!("sample_id" %in% colnames(metadata_df))) {
+  stop("Derived metadata must contain sample_id.")
+}
+
+sample_columns <- colnames(counts_df)[-1]
+if (all(metadata_df$sample_id %in% sample_columns)) {
+  match_key <- "sample_id"
+} else if ("filename_key" %in% colnames(metadata_df) && all(metadata_df$filename_key %in% sample_columns)) {
+  match_key <- "filename_key"
+} else {
+  stop("Could not match count table sample columns to metadata sample_id or filename_key.")
+}
+
+metadata_df <- metadata_df[match(sample_columns, metadata_df[[match_key]]), , drop = FALSE]
+if (any(is.na(metadata_df[[match_key]]))) {
+  stop("Metadata matching produced missing rows.")
+}
+
+count_matrix <- as.matrix(counts_df[, sample_columns, drop = FALSE])
+rownames(count_matrix) <- counts_df[[1]]
+mode(count_matrix) <- "numeric"
+raw_count_matrix <- count_matrix
+non_integer <- abs(count_matrix - round(count_matrix)) > 1e-8
+if (any(non_integer, na.rm = TRUE)) {
+  stop("Count table contains non-integer values. DESeq2 requires raw integer counts.")
+}
+storage.mode(count_matrix) <- "integer"
+genes_before_filter <- nrow(count_matrix)
+
+col_data <- metadata_df
+rownames(col_data) <- sample_columns
+
+peak_data <- NULL
+if (!is.na(peak_metadata_path) && file.exists(peak_metadata_path)) {
+  peak_df <- utils::read.delim(peak_metadata_path, check.names = FALSE, stringsAsFactors = FALSE)
+  if (!(peak_id_column %in% colnames(peak_df))) {
+    stop(
+      feature_metadata_label_title,
+      " file is missing required key column '",
+      peak_id_column,
+      "': ",
+      peak_metadata_path
+    )
+  }
+  peak_key <- as.character(peak_df[[peak_id_column]])
+  row_ids <- rownames(count_matrix)
+  if (!all(row_ids %in% peak_key)) {
+    missing_peak_rows <- setdiff(row_ids, peak_key)
+    stop(
+      feature_metadata_label_title,
+      " is missing rows for count-table feature IDs. Missing example(s): ",
+      paste(utils::head(missing_peak_rows, 10), collapse = ", ")
+    )
+  }
+  peak_df <- peak_df[match(row_ids, peak_key), , drop = FALSE]
+  rownames(peak_df) <- row_ids
+  peak_data <- peak_df
+  utils::write.table(
+    peak_data,
+    file = file.path(qc_dir, "peak_metadata_matched.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+  message("Loaded and matched ", feature_metadata_label, ": ", peak_metadata_path)
+} else {
+  message("No ", feature_metadata_label, " file provided; proceeding without peakData table.")
+}
+
+if (filtering_enabled && filtering_method == "min_count_samples") {
+  keep <- rep(TRUE, nrow(count_matrix))
+
+  min_samples_use <- filtering_min_samples
+  if (identical(tolower(atac_filter_min_samples_mode), "per_group")) {
+    if ("de_group" %in% colnames(col_data)) {
+      group_sizes <- table(as.character(col_data$de_group))
+      min_samples_use <- min(min_samples_use, as.integer(min(group_sizes)))
+      min_samples_use <- max(1L, as.integer(min_samples_use))
+    } else {
+      warning("min_samples_mode='per_group' requested but de_group is missing; falling back to fixed min_samples.")
+    }
+  }
+  keep <- keep & (rowSums(count_matrix >= filtering_min_count) >= min_samples_use)
+  keep <- keep & (rowSums(count_matrix) >= atac_filter_min_total_count)
+
+  count_matrix <- count_matrix[keep, , drop = FALSE]
+  if (!is.null(peak_data)) {
+    peak_data <- peak_data[rownames(count_matrix), , drop = FALSE]
+  }
+}
+genes_after_filter <- nrow(count_matrix)
+
+design_formula_base <- stats::as.formula(design_formula_text)
+design_formula <- design_formula_base
+design_formula_effective_text <- design_formula_text
+latent_sv_columns <- character(0)
+latent_message <- "Latent-factor correction disabled."
+if (isTRUE(latent_enabled)) {
+  latent_method <- tolower(trimws(as.character(latent_method)))
+  if (!nzchar(latent_method) || latent_method != "sva") {
+    stop("Unsupported latent factor method: ", latent_method, ". Currently supported: sva.")
+  }
+  if (!requireNamespace("sva", quietly = TRUE)) {
+    stop("Latent factors requested but missing required R package: sva")
+  }
+  full_mod <- stats::model.matrix(design_formula_base, data = col_data)
+  null_mod <- stats::model.matrix(~ 1, data = col_data)
+  n_sv_use <- if (is.na(latent_n_sv)) NULL else as.integer(latent_n_sv)
+  sv_obj <- tryCatch(
+    sva::svaseq(counts = as.matrix(count_matrix), mod = full_mod, mod0 = null_mod, n.sv = n_sv_use),
+    error = function(e) {
+      stop("Failed to estimate latent factors with sva::svaseq: ", conditionMessage(e))
+    }
+  )
+  sv_matrix <- sv_obj$sv
+  if (is.null(sv_matrix) || ncol(sv_matrix) == 0) {
+    latent_message <- "Latent-factor correction enabled, but sva returned zero surrogate variables."
+  } else {
+    sv_df <- as.data.frame(sv_matrix, stringsAsFactors = FALSE)
+    latent_sv_columns <- paste0("sv", seq_len(ncol(sv_df)))
+    colnames(sv_df) <- latent_sv_columns
+    for (sv_col in latent_sv_columns) {
+      col_data[[sv_col]] <- as.numeric(sv_df[[sv_col]])
+    }
+    design_formula_effective_text <- paste(design_formula_text, paste(latent_sv_columns, collapse = " + "), sep = " + ")
+    design_formula <- stats::as.formula(design_formula_effective_text)
+    latent_message <- paste0("Latent-factor correction enabled with ", length(latent_sv_columns), " surrogate variables.")
+    latent_factors_tbl <- data.frame(
+      sample_id = rownames(col_data),
+      col_data[, latent_sv_columns, drop = FALSE],
+      check.names = FALSE,
+      stringsAsFactors = FALSE
+    )
+    utils::write.table(
+      latent_factors_tbl,
+      file = file.path(qc_dir, "latent_factors.tsv"),
+      sep = "\t",
+      quote = FALSE,
+      row.names = FALSE
+    )
+  }
+}
+message(latent_message)
+dds <- DESeq2::DESeqDataSetFromMatrix(
+  countData = count_matrix,
+  colData = col_data,
+  design = design_formula
+)
+dds <- DESeq2::DESeq(dds, fitType = deseq_fit_type, sfType = deseq_sf_type, parallel = deseq_parallel)
+vst_obj <- DESeq2::vst(dds, blind = vst_blind)
+results_names_tbl <- data.frame(
+  coefficient = DESeq2::resultsNames(dds),
+  stringsAsFactors = FALSE
+)
+utils::write.table(
+  results_names_tbl,
+  file = file.path(qc_dir, "deseq2_results_names.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+all_gene_ids <- rownames(dds)
+all_gene_ids_no_version <- strip_ensembl_version(all_gene_ids)
+all_gene_symbols <- map_gene_symbols(all_gene_ids, fallback_to_ids = FALSE)
+symbol_lookup <- stats::setNames(all_gene_symbols, all_gene_ids)
+symbol_lookup_no_version <- stats::setNames(all_gene_symbols, all_gene_ids_no_version)
+
+ensembl_like <- grepl("^ENS(?:MUSG|G)[0-9]+$", all_gene_ids_no_version)
+ensembl_like_fraction <- mean(ensembl_like)
+mapped_symbol_fraction <- mean(!is.na(all_gene_symbols) & nzchar(all_gene_symbols))
+unmapped_gene_ids <- all_gene_ids[is.na(all_gene_symbols) | !nzchar(all_gene_symbols)]
+mapping_status <- "ok"
+mapping_message <- "Gene symbol mapping succeeded for most genes."
+if (length(unmapped_gene_ids) > 0) {
+  mapping_status <- "fallback_to_ensembl"
+  mapping_message <- paste0(
+    "Falling back to Ensembl IDs for ", length(unmapped_gene_ids),
+    " genes without mapped symbols."
+  )
+}
+if (is.finite(ensembl_like_fraction) && is.finite(mapped_symbol_fraction) &&
+    ensembl_like_fraction >= 0.5 && mapped_symbol_fraction < 0.05) {
+  mapping_status <- "fallback_likely_missing_annotation_packages"
+  mapping_message <- paste0(
+    "Symbol mapping is very low for Ensembl-like IDs (mapped fraction=",
+    round(mapped_symbol_fraction, 4),
+    "). Falling back to Ensembl IDs. ",
+    "Likely cause: missing org.Hs.eg.db/org.Mm.eg.db and/or AnnotationDbi packages."
+  )
+}
+message(mapping_message)
+
+symbols_for_ids <- function(gene_ids, fallback_to_ids = FALSE) {
+  gid <- as.character(gene_ids)
+  gid_no_version <- strip_ensembl_version(gid)
+  symbols <- unname(symbol_lookup[gid])
+  missing <- is.na(symbols) | !nzchar(symbols)
+  if (any(missing)) {
+    symbols[missing] <- unname(symbol_lookup_no_version[gid_no_version[missing]])
+  }
+  missing <- is.na(symbols) | !nzchar(symbols)
+  if (any(missing)) {
+    symbols_missing <- tryCatch(
+      map_gene_symbols(gid[missing], fallback_to_ids = fallback_to_ids),
+      error = function(e) {
+        message("Symbol remap fallback warning: ", conditionMessage(e))
+        rep(NA_character_, sum(missing))
+      }
+    )
+    symbols[missing] <- symbols_missing
+  }
+  if (fallback_to_ids) {
+    missing <- is.na(symbols) | !nzchar(symbols)
+    symbols[missing] <- strip_ensembl_version(gid[missing])
+  }
+  symbols
+}
+
+detect_species_from_gene_ids <- function(gene_ids) {
+  ids_no_version <- strip_ensembl_version(gene_ids)
+  frac_human <- mean(grepl("^ENSG[0-9]+$", ids_no_version))
+  frac_mouse <- mean(grepl("^ENSMUSG[0-9]+$", ids_no_version))
+  if (is.finite(frac_human) && frac_human >= 0.5) {
+    return(list(
+      species_label = "human",
+      msig_species = "Homo sapiens",
+      orgdb = if (requireNamespace("org.Hs.eg.db", quietly = TRUE)) org.Hs.eg.db::org.Hs.eg.db else NULL
+    ))
+  }
+  if (is.finite(frac_mouse) && frac_mouse >= 0.5) {
+    return(list(
+      species_label = "mouse",
+      msig_species = "Mus musculus",
+      orgdb = if (requireNamespace("org.Mm.eg.db", quietly = TRUE)) org.Mm.eg.db::org.Mm.eg.db else NULL
+    ))
+  }
+  list(species_label = "unknown", msig_species = NULL, orgdb = NULL)
+}
+
+is_valid_symbol <- function(x) {
+  x <- as.character(x)
+  !is.na(x) & nzchar(x) & !grepl("^ENS(?:MUSG|G)[0-9]+$", strip_ensembl_version(x))
+}
+
+deduplicate_ranked_vector <- function(gene_stats) {
+  gene_stats <- gene_stats[is.finite(gene_stats)]
+  if (length(gene_stats) == 0) {
+    return(gene_stats)
+  }
+  split_vals <- split(as.numeric(gene_stats), names(gene_stats))
+  collapsed <- vapply(
+    split_vals,
+    function(vals) vals[which.max(abs(vals))],
+    numeric(1)
+  )
+  sort(collapsed, decreasing = TRUE)
+}
+
+save_enrichment_plot <- function(plot_obj, out_path, width = 11, height = 8) {
+  if (is.null(plot_obj)) {
+    return(FALSE)
+  }
+  tryCatch({
+    ggplot2::ggsave(filename = out_path, plot = plot_obj, width = width, height = height)
+    TRUE
+  }, error = function(e) {
+    message("Could not save plot ", out_path, ": ", conditionMessage(e))
+    FALSE
+  })
+}
+
+safe_cp_result_table <- function(cp_obj) {
+  if (is.null(cp_obj)) {
+    return(NULL)
+  }
+  df <- tryCatch(as.data.frame(cp_obj), error = function(e) NULL)
+  if (is.null(df) || nrow(df) == 0) {
+    return(NULL)
+  }
+  df
+}
+
+build_rank_table <- function(df, score_col, id_col = "gene_symbol", fallback_id_col = "gene_id") {
+  if (!(score_col %in% colnames(df))) {
+    return(NULL)
+  }
+  scores <- suppressWarnings(as.numeric(df[[score_col]]))
+  ids <- as.character(df[[id_col]])
+  if (!(fallback_id_col %in% colnames(df))) {
+    fallback_ids <- rep(NA_character_, nrow(df))
+  } else {
+    fallback_ids <- strip_ensembl_version(as.character(df[[fallback_id_col]]))
+  }
+  use_ids <- ids
+  bad <- is.na(use_ids) | !nzchar(use_ids)
+  use_ids[bad] <- fallback_ids[bad]
+  keep <- !is.na(use_ids) & nzchar(use_ids) & is.finite(scores)
+  if (!any(keep)) {
+    return(NULL)
+  }
+  rank_df <- data.frame(
+    feature = use_ids[keep],
+    score = scores[keep],
+    stringsAsFactors = FALSE
+  )
+  rank_df <- rank_df[order(abs(rank_df$score), decreasing = TRUE), , drop = FALSE]
+  rank_df <- rank_df[!duplicated(rank_df$feature), , drop = FALSE]
+  rank_df <- rank_df[order(rank_df$score, decreasing = TRUE), , drop = FALSE]
+  rank_df
+}
+
+read_gmt_term2gene <- function(gmt_path) {
+  lines <- readLines(gmt_path, warn = FALSE)
+  lines <- lines[nzchar(lines)]
+  if (length(lines) == 0) {
+    return(data.frame(term = character(0), gene = character(0), stringsAsFactors = FALSE))
+  }
+  rows <- vector("list", length(lines))
+  out_idx <- 0L
+  for (line in lines) {
+    parts <- strsplit(line, "\t", fixed = TRUE)[[1]]
+    if (length(parts) < 3) {
+      next
+    }
+    term <- as.character(parts[[1]])
+    genes <- unique(as.character(parts[-c(1, 2)]))
+    genes <- genes[nzchar(genes)]
+    if (!nzchar(term) || length(genes) == 0) {
+      next
+    }
+    out_idx <- out_idx + 1L
+    rows[[out_idx]] <- data.frame(
+      term = rep(term, length(genes)),
+      gene = genes,
+      stringsAsFactors = FALSE
+    )
+  }
+  if (out_idx == 0L) {
+    return(data.frame(term = character(0), gene = character(0), stringsAsFactors = FALSE))
+  }
+  do.call(rbind, rows[seq_len(out_idx)])
+}
+
+normalize_term_tokens <- function(x) {
+  x <- tolower(as.character(x))
+  x <- gsub("[^a-z0-9 ]+", " ", x)
+  x <- gsub("\\s+", " ", x)
+  x <- trimws(x)
+  if (!nzchar(x)) {
+    return(character(0))
+  }
+  toks <- unique(strsplit(x, " ", fixed = TRUE)[[1]])
+  toks <- toks[nzchar(toks)]
+  # Remove low-information tokens commonly repeated across pathway names.
+  toks <- toks[!(toks %in% c("pathway", "signaling", "process", "response", "regulation"))]
+  toks
+}
+
+reduce_redundant_terms <- function(df, term_col = "term", score_col = "score", max_terms = 12, jaccard_cutoff = 0.6) {
+  if (nrow(df) == 0) {
+    return(df)
+  }
+  df <- df[order(df[[score_col]], decreasing = TRUE), , drop = FALSE]
+  keep_idx <- integer(0)
+  kept_tokens <- list()
+  for (i in seq_len(nrow(df))) {
+    term_tokens <- normalize_term_tokens(df[[term_col]][i])
+    is_redundant <- FALSE
+    if (length(term_tokens) > 0 && length(kept_tokens) > 0) {
+      for (tok in kept_tokens) {
+        inter <- length(intersect(term_tokens, tok))
+        union <- length(union(term_tokens, tok))
+        jaccard <- if (union > 0) inter / union else 0
+        if (jaccard >= jaccard_cutoff) {
+          is_redundant <- TRUE
+          break
+        }
+      }
+    }
+    if (!is_redundant) {
+      keep_idx <- c(keep_idx, i)
+      kept_tokens[[length(kept_tokens) + 1]] <- term_tokens
+    }
+    if (length(keep_idx) >= max_terms) {
+      break
+    }
+  }
+  if (length(keep_idx) == 0) {
+    return(head(df, min(max_terms, nrow(df))))
+  }
+  df[keep_idx, , drop = FALSE]
+}
+
+resolve_featurecounts_summary_path <- function(counts_table_path) {
+  candidate <- sub("\\.raw_read_quant\\.table\\.txt$", ".featureCounts.summary.txt", counts_table_path)
+  if (!identical(candidate, counts_table_path) && file.exists(candidate)) {
+    return(candidate)
+  }
+  search_dir <- dirname(counts_table_path)
+  candidates <- list.files(
+    search_dir,
+    pattern = "\\.featureCounts\\.summary\\.txt$",
+    full.names = TRUE
+  )
+  if (length(candidates) == 1) {
+    return(candidates[[1]])
+  }
+  if (length(candidates) > 1) {
+    ordered <- candidates[order(file.info(candidates)$mtime, decreasing = TRUE)]
+    return(ordered[[1]])
+  }
+  NA_character_
+}
+
+resolve_peak_qc_metrics_path <- function(output_root_path) {
+  project_root <- dirname(output_root_path)
+  qc_basename <- paste0(assay_lower, ".peak_qc_metrics.tsv")
+  candidates <- c(
+    file.path(project_root, "filtered_BAM", "peak_qc", qc_basename),
+    file.path(project_root, "peak_qc", qc_basename)
+  )
+  for (candidate in candidates) {
+    if (file.exists(candidate)) {
+      return(candidate)
+    }
+  }
+  discovered <- Sys.glob(file.path(project_root, "**", "peak_qc", qc_basename))
+  if (length(discovered) > 0) {
+    return(discovered[[1]])
+  }
+  NA_character_
+}
+
+aggregate_symbol_matrix <- function(mat, symbols) {
+  keep <- !is.na(symbols) & nzchar(symbols)
+  mat <- mat[keep, , drop = FALSE]
+  symbols <- symbols[keep]
+  keep2 <- !duplicated(cbind(symbols, rownames(mat)))
+  mat <- mat[keep2, , drop = FALSE]
+  symbols <- symbols[keep2]
+  if (nrow(mat) == 0) {
+    return(mat)
+  }
+  summed <- rowsum(mat, group = symbols, reorder = FALSE)
+  symbol_counts <- table(symbols)
+  denom <- as.numeric(symbol_counts[rownames(summed)])
+  denom[!is.finite(denom) | denom <= 0] <- 1
+  swept <- sweep(summed, 1, denom, "/")
+  swept
+}
+
+decoupler_to_matrix <- function(activity_df) {
+  needed <- c("condition", "source", "score")
+  if (!all(needed %in% colnames(activity_df))) {
+    return(NULL)
+  }
+  xtabs(score ~ condition + source, data = activity_df)
+}
+
+plot_decoupler_bar <- function(activity_df, out_file, title, top_n = 25) {
+  needed <- c("source", "score")
+  if (!all(needed %in% colnames(activity_df))) {
+    return(NULL)
+  }
+  plot_df <- activity_df[, needed, drop = FALSE]
+  plot_df <- plot_df[is.finite(plot_df$score), , drop = FALSE]
+  if (nrow(plot_df) == 0) {
+    return(NULL)
+  }
+  plot_df <- plot_df[order(-abs(plot_df$score)), , drop = FALSE]
+  plot_df <- head(plot_df, top_n)
+  cols <- rev(RColorBrewer::brewer.pal(n = 11, name = "RdBu")[c(2, 10)])
+  p <- ggplot2::ggplot(
+    plot_df,
+    ggplot2::aes(x = stats::reorder(source, score), y = score, fill = score)
+  ) +
+    ggplot2::geom_col(color = "black") +
+    ggplot2::coord_flip() +
+    ggplot2::scale_fill_gradient2(low = cols[1], mid = "whitesmoke", high = cols[2], midpoint = 0) +
+    ggplot2::theme_light() +
+    ggplot2::theme(panel.grid = ggplot2::element_blank()) +
+    ggplot2::xlab(NULL) +
+    ggplot2::ylab("Activity score") +
+    ggplot2::ggtitle(title)
+  save_enrichment_plot(p, out_file, width = 10, height = 8)
+}
+
+plot_decoupler_heatmap <- function(activity_mat, out_file, title, top_features = 25) {
+  if (is.null(activity_mat) || nrow(activity_mat) < 2 || ncol(activity_mat) < 2) {
+    return(NULL)
+  }
+  feature_sd <- apply(activity_mat, 2, stats::sd, na.rm = TRUE)
+  feature_sd[!is.finite(feature_sd)] <- 0
+  keep_cols <- names(sort(feature_sd, decreasing = TRUE))[seq_len(min(top_features, ncol(activity_mat)))]
+  mat <- activity_mat[, keep_cols, drop = FALSE]
+  mat <- scale(mat)
+  mat[is.na(mat)] <- 0
+  cols <- rev(RColorBrewer::brewer.pal(n = 11, name = "RdBu"))
+  cols <- grDevices::colorRampPalette(cols)(100)
+  breaks <- c(seq(-2, 0, length.out = 51), seq(0.05, 2, length.out = 49))
+  grDevices::pdf(out_file, width = 12, height = 8)
+  pheatmap::pheatmap(
+    mat = mat,
+    color = cols,
+    breaks = breaks,
+    border_color = "white",
+    main = title
+  )
+  grDevices::dev.off()
+}
+
+enrichment_rows <- list()
+cp_available <- enrichment_enabled && enrichment_cp_enabled &&
+  requireNamespace("clusterProfiler", quietly = TRUE) &&
+  requireNamespace("enrichplot", quietly = TRUE)
+if (enrichment_enabled && enrichment_cp_enabled && !cp_available) {
+  message("Enrichment requested but clusterProfiler/enrichplot are not available. Skipping enrichment.")
+}
+
+decoupler_available <- enrichment_enabled && decoupler_enabled &&
+  requireNamespace("decoupleR", quietly = TRUE)
+if (enrichment_enabled && decoupler_enabled && !decoupler_available) {
+  message("Decoupler enrichment requested but decoupleR is not available. Skipping decoupler outputs.")
+}
+
+species_info <- detect_species_from_gene_ids(rownames(dds))
+msig_term2gene <- list()
+if (cp_available && enrichment_enabled && enrichment_cp_enabled) {
+  if (!requireNamespace("msigdbr", quietly = TRUE) || is.null(species_info$msig_species)) {
+    message("MSigDB enrichment requested but msigdbr and/or species detection is unavailable. MSigDB enrichment will be skipped.")
+  } else if (!is.list(enrichment_msigdb_sets) || length(enrichment_msigdb_sets) == 0) {
+    message("No MSigDB sets configured for clusterProfiler enrichment. Skipping clusterProfiler enrichment.")
+  } else {
+    for (set_cfg in enrichment_msigdb_sets) {
+      set_name <- as.character(set_cfg$name)
+      set_category <- toupper(as.character(set_cfg$category))
+      set_subcategory <- set_cfg$subcategory
+      if (length(set_name) == 0 || !nzchar(set_name) || length(set_category) == 0 || !nzchar(set_category)) {
+        next
+      }
+      msig_tbl <- tryCatch(
+        {
+          if (is.null(set_subcategory) || is.na(set_subcategory) || !nzchar(as.character(set_subcategory))) {
+            msigdbr::msigdbr(species = species_info$msig_species, category = set_category)
+          } else {
+            msigdbr::msigdbr(
+              species = species_info$msig_species,
+              category = set_category,
+              subcategory = as.character(set_subcategory)
+            )
+          }
+        },
+        error = function(e) {
+          message(
+            "msigdbr loading failed for set '", set_name, "' (", set_category,
+            if (!is.null(set_subcategory) && !is.na(set_subcategory) && nzchar(as.character(set_subcategory))) {
+              paste0(":", as.character(set_subcategory))
+            } else {
+              ""
+            },
+            "): ", conditionMessage(e)
+          )
+          NULL
+        }
+      )
+      if (is.null(msig_tbl) || nrow(msig_tbl) == 0) {
+        next
+      }
+      term2gene <- unique(msig_tbl[, c("gs_name", "gene_symbol"), drop = FALSE])
+      colnames(term2gene) <- c("term", "gene")
+      msig_term2gene[[set_name]] <- term2gene
+    }
+    if (length(msig_term2gene) == 0) {
+      message("None of the configured MSigDB sets could be loaded. Skipping clusterProfiler enrichment.")
+    }
+  }
+}
+
+custom_modules_term2gene <- NULL
+if (enrichment_enabled && custom_modules_enabled) {
+  if (is.na(custom_modules_gmt) || !nzchar(custom_modules_gmt)) {
+    stop("custom_modules_enabled is TRUE but no custom_modules_gmt path was provided.")
+  }
+  if (!file.exists(custom_modules_gmt)) {
+    stop("Custom modules GMT file does not exist: ", custom_modules_gmt)
+  }
+  custom_modules_term2gene <- tryCatch(
+    read_gmt_term2gene(custom_modules_gmt),
+    error = function(e) {
+      stop("Could not parse custom modules GMT file: ", conditionMessage(e))
+    }
+  )
+  if (is.null(custom_modules_term2gene) || nrow(custom_modules_term2gene) == 0) {
+    stop("Custom modules GMT file has no usable term-to-gene entries: ", custom_modules_gmt)
+  }
+  message(
+    "Loaded custom modules GMT: ", custom_modules_gmt,
+    " (", length(unique(custom_modules_term2gene$term)), " terms)"
+  )
+}
+
+design_terms <- attr(stats::terms(design_formula_base), "term.labels")
+annotation_columns <- unique(unlist(strsplit(design_terms, ":", fixed = TRUE)))
+annotation_columns <- annotation_columns[nzchar(annotation_columns)]
+auto_categorical_columns <- colnames(col_data)[
+  vapply(colnames(col_data), function(x) is_categorical_grouping_column(col_data, x), logical(1))
+]
+annotation_columns <- unique(c(
+  annotation_columns,
+  pca_color_by,
+  pca_shape_by_values,
+  de_columns_resolved,
+  de_block_resolved,
+  auto_categorical_columns
+))
+annotation_columns <- annotation_columns[annotation_columns %in% colnames(col_data)]
+
+annotation_df <- NULL
+annotation_colors <- list()
+informative_annotation_columns <- character(0)
+annotation_df_informative <- NULL
+annotation_colors_informative <- list()
+  if (length(annotation_columns) > 0) {
+  annotation_df <- as.data.frame(col_data[, annotation_columns, drop = FALSE], stringsAsFactors = FALSE)
+  for (column_name in colnames(annotation_df)) {
+    annotation_df[[column_name]] <- as.factor(as.character(annotation_df[[column_name]]))
+    annotation_colors[[column_name]] <- categorical_palette(
+      levels(annotation_df[[column_name]]),
+      palette_name = palette_name_for_column(column_name)
+    )
+  }
+  informative_annotation_columns <- colnames(annotation_df)[
+    vapply(colnames(annotation_df), function(x) is_informative_column(annotation_df, x), logical(1))
+  ]
+  if (length(informative_annotation_columns) > 0) {
+    annotation_df_informative <- annotation_df[, informative_annotation_columns, drop = FALSE]
+    annotation_colors_informative <- annotation_colors[informative_annotation_columns]
+  }
+}
+
+dir.create(output_root, recursive = TRUE, showWarnings = FALSE)
+dir.create(qc_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(de_dir, recursive = TRUE, showWarnings = FALSE)
+
+palette_rows <- list()
+add_palette_rows <- function(column_name) {
+  if (!(column_name %in% colnames(col_data))) {
+    return()
+  }
+  column_values <- as.character(col_data[[column_name]])
+  levels_vec <- unique(column_values)
+  levels_vec <- levels_vec[!is.na(levels_vec) & nzchar(levels_vec)]
+  if (length(levels_vec) < 2) {
+    return()
+  }
+  pal <- categorical_palette(
+    levels_vec,
+    palette_name = palette_name_for_column(column_name)
+  )
+  if (length(pal) == 0) {
+    return()
+  }
+  palette_rows[[length(palette_rows) + 1]] <<- data.frame(
+    column = column_name,
+    level = names(pal),
+    color = as.vector(pal),
+    stringsAsFactors = FALSE
+  )
+}
+
+add_palette_rows("sample_type")
+add_palette_rows("sample_color")
+for (column_name in pca_color_by) {
+  add_palette_rows(column_name)
+}
+for (column_name in pca_shape_by_values) {
+  add_palette_rows(column_name)
+}
+if (length(palette_rows) > 0) {
+  palette_table <- do.call(rbind, palette_rows)
+  utils::write.table(
+    palette_table,
+    file = file.path(qc_dir, "color_mappings.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+}
+
+filter_summary <- data.frame(
+  filtering_enabled = filtering_enabled,
+  filtering_method = filtering_method,
+  min_count = filtering_min_count,
+  min_samples = filtering_min_samples,
+  genes_before = genes_before_filter,
+  genes_after = genes_after_filter,
+  genes_removed = genes_before_filter - genes_after_filter,
+  percent_kept = round(100 * genes_after_filter / max(genes_before_filter, 1), 3),
+  stringsAsFactors = FALSE
+)
+utils::write.table(
+  filter_summary,
+  file = file.path(qc_dir, "filtering_summary.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+symbol_mapping_summary <- data.frame(
+  total_genes = length(all_gene_ids),
+  ensembl_like_fraction = round(ensembl_like_fraction, 6),
+  mapped_symbol_fraction = round(mapped_symbol_fraction, 6),
+  mapped_symbols = sum(!is.na(all_gene_symbols) & nzchar(all_gene_symbols)),
+  fallback_to_ensembl_genes = length(unmapped_gene_ids),
+  mapping_status = mapping_status,
+  mapping_message = mapping_message,
+  stringsAsFactors = FALSE
+)
+utils::write.table(
+  symbol_mapping_summary,
+  file = file.path(qc_dir, "gene_symbol_mapping_summary.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+writeLines(
+  paste0("[gene_symbol_mapping] ", mapping_status, " - ", mapping_message),
+  con = file.path(qc_dir, "gene_symbol_mapping_status.log")
+)
+if (length(unmapped_gene_ids) > 0) {
+  utils::write.table(
+    data.frame(gene_id = unmapped_gene_ids, stringsAsFactors = FALSE),
+    file = file.path(qc_dir, "gene_symbol_mapping_unmapped_gene_ids.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+}
+if (length(palette_assignment_rows) > 0) {
+  palette_assignment_table <- do.call(rbind, palette_assignment_rows)
+  utils::write.table(
+    palette_assignment_table,
+    file = file.path(qc_dir, "palette_assignments.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+}
+
+norm_counts <- DESeq2::counts(dds, normalized = TRUE)
+utils::write.table(
+  data.frame(gene_id = rownames(norm_counts), norm_counts, check.names = FALSE),
+  file = file.path(qc_dir, "normalized_counts.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+vst_mat <- SummarizedExperiment::assay(vst_obj)
+utils::write.table(
+  data.frame(gene_id = rownames(vst_mat), vst_mat, check.names = FALSE),
+  file = file.path(qc_dir, "vst_matrix.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+sample_qc <- data.frame(
+  sample = sample_columns,
+  library_size_raw = as.numeric(colSums(raw_count_matrix, na.rm = TRUE)),
+  genes_detected_raw = as.numeric(colSums(raw_count_matrix > 0, na.rm = TRUE)),
+  library_size_filtered = as.numeric(colSums(count_matrix, na.rm = TRUE)),
+  genes_detected_filtered = as.numeric(colSums(count_matrix > 0, na.rm = TRUE)),
+  size_factor = as.numeric(DESeq2::sizeFactors(dds)[sample_columns]),
+  stringsAsFactors = FALSE
+)
+
+fc_summary_path <- resolve_featurecounts_summary_path(counts_path)
+if (!is.na(fc_summary_path) && file.exists(fc_summary_path)) {
+  message("Using featureCounts summary for sample QC: ", fc_summary_path)
+  fc_summary <- tryCatch(
+    utils::read.delim(fc_summary_path, check.names = FALSE, stringsAsFactors = FALSE, row.names = 1),
+    error = function(e) NULL
+  )
+  if (!is.null(fc_summary) && ncol(fc_summary) > 0) {
+    fc_cols <- colnames(fc_summary)
+    fc_totals <- colSums(fc_summary, na.rm = TRUE)
+    assigned_row_name <- c("Assigned", "assigned")
+    assigned_row_name <- assigned_row_name[assigned_row_name %in% rownames(fc_summary)]
+    if (length(assigned_row_name) > 0) {
+      fc_assigned <- as.numeric(fc_summary[assigned_row_name[[1]], , drop = TRUE])
+    } else {
+      fc_assigned <- rep(NA_real_, length(fc_cols))
+    }
+    fc_assigned_pct <- 100 * fc_assigned / pmax(fc_totals, 1)
+    sample_qc$featurecounts_total <- as.numeric(fc_totals[match(sample_qc$sample, fc_cols)])
+    sample_qc$featurecounts_assigned <- as.numeric(fc_assigned[match(sample_qc$sample, fc_cols)])
+    sample_qc$featurecounts_assigned_pct <- as.numeric(fc_assigned_pct[match(sample_qc$sample, fc_cols)])
+  } else {
+    sample_qc$featurecounts_total <- NA_real_
+    sample_qc$featurecounts_assigned <- NA_real_
+    sample_qc$featurecounts_assigned_pct <- NA_real_
+  }
+} else {
+  message("No featureCounts summary file detected for sample QC. Assignment metrics will be NA.")
+  sample_qc$featurecounts_total <- NA_real_
+  sample_qc$featurecounts_assigned <- NA_real_
+  sample_qc$featurecounts_assigned_pct <- NA_real_
+}
+
+utils::write.table(
+  sample_qc,
+  file = file.path(qc_dir, "sample_qc_summary.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+project_qc <- data.frame(
+  metric = c(
+    "n_samples",
+    "median_library_size_raw",
+    "median_genes_detected_raw",
+    "median_size_factor",
+    "mean_featurecounts_assigned_pct"
+  ),
+  value = c(
+    nrow(sample_qc),
+    stats::median(sample_qc$library_size_raw, na.rm = TRUE),
+    stats::median(sample_qc$genes_detected_raw, na.rm = TRUE),
+    stats::median(sample_qc$size_factor, na.rm = TRUE),
+    mean(sample_qc$featurecounts_assigned_pct, na.rm = TRUE)
+  ),
+  stringsAsFactors = FALSE
+)
+utils::write.table(
+  project_qc,
+  file = file.path(qc_dir, "project_qc_summary.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+peak_qc_metrics_path <- resolve_peak_qc_metrics_path(output_root)
+if (!is.na(peak_qc_metrics_path) && file.exists(peak_qc_metrics_path)) {
+  peak_qc_tbl <- tryCatch(
+    utils::read.delim(peak_qc_metrics_path, check.names = FALSE, stringsAsFactors = FALSE),
+    error = function(e) NULL
+  )
+  if (!is.null(peak_qc_tbl) && nrow(peak_qc_tbl) > 0) {
+    utils::write.table(
+      peak_qc_tbl,
+      file = file.path(qc_dir, paste0(feature_file_stem, "_qc_metrics.imported.tsv")),
+      sep = "\t",
+      quote = FALSE,
+      row.names = FALSE
+    )
+    required_cols <- c("group", "frip", "peak_count")
+    if (all(required_cols %in% colnames(peak_qc_tbl))) {
+      frip_df <- peak_qc_tbl
+      frip_df$group <- as.factor(as.character(frip_df$group))
+      frip_df$frip <- suppressWarnings(as.numeric(frip_df$frip))
+      frip_df$peak_count <- suppressWarnings(as.numeric(frip_df$peak_count))
+      frip_df <- frip_df[is.finite(frip_df$frip) & is.finite(frip_df$peak_count), , drop = FALSE]
+      if (nrow(frip_df) > 0) {
+        p_frip <- ggplot2::ggplot(
+          frip_df,
+          ggplot2::aes(x = peak_count, y = frip, color = group, label = group)
+        ) +
+          ggplot2::geom_point(size = 3) +
+          ggplot2::theme_light() +
+          ggplot2::theme(panel.grid = ggplot2::element_blank()) +
+          ggplot2::xlab(paste(feature_label_singular_title, "count")) +
+          ggplot2::ylab("FRiP") +
+          ggplot2::ggtitle(paste(feature_label_plural_title, "QC: FRiP vs", tolower(feature_label_singular), "count"))
+        if (requireNamespace("ggrepel", quietly = TRUE)) {
+          p_frip <- p_frip + ggrepel::geom_text_repel(size = 3, max.overlaps = 100)
+        } else {
+          p_frip <- p_frip + ggplot2::geom_text(vjust = -0.6, size = 3, check_overlap = TRUE)
+        }
+        ggplot2::ggsave(
+          filename = file.path(qc_dir, paste0(feature_file_stem, "_qc.frip_vs_", feature_file_stem, "_count.pdf")),
+          plot = p_frip,
+          width = 8,
+          height = 6
+        )
+      }
+    }
+  }
+}
+
+if (!is.null(peak_data) && "genomic_region" %in% colnames(peak_data)) {
+  peak_region_counts <- as.data.frame(table(as.character(peak_data$genomic_region)), stringsAsFactors = FALSE)
+  colnames(peak_region_counts) <- c("genomic_region", "feature_count")
+  peak_region_counts$feature_fraction <- peak_region_counts$feature_count / sum(peak_region_counts$feature_count)
+  utils::write.table(
+    peak_region_counts,
+    file = file.path(qc_dir, paste0(feature_file_stem, "_region_distribution.tsv")),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+  peak_region_counts$genomic_region <- stats::reorder(
+    peak_region_counts$genomic_region,
+    peak_region_counts$feature_count,
+    FUN = identity
+  )
+  p_region <- ggplot2::ggplot(peak_region_counts, ggplot2::aes(x = genomic_region, y = feature_count)) +
+    ggplot2::geom_col(fill = "#3A86B2") +
+    ggplot2::theme_light() +
+    ggplot2::theme(panel.grid = ggplot2::element_blank()) +
+    ggplot2::xlab("Genomic region class") +
+    ggplot2::ylab(paste("Number of", feature_label_plural)) +
+    ggplot2::ggtitle(paste(feature_label_plural_title, "by genomic region class"))
+  ggplot2::ggsave(
+    filename = file.path(qc_dir, paste0(feature_file_stem, "_qc.genomic_region_distribution.pdf")),
+    plot = p_region,
+    width = 8,
+    height = 6
+  )
+}
+
+grDevices::pdf(file.path(qc_dir, "dispersion_plot.pdf"), width = 8, height = 6)
+DESeq2::plotDispEsts(dds)
+grDevices::dev.off()
+
+cooks_mat <- tryCatch(SummarizedExperiment::assay(dds, "cooks"), error = function(e) NULL)
+if (!is.null(cooks_mat)) {
+  cooks_sample_summary <- data.frame(
+    sample = colnames(cooks_mat),
+    genes_cooks_gt_10 = colSums(cooks_mat > 10, na.rm = TRUE),
+    max_cooks = apply(cooks_mat, 2, max, na.rm = TRUE),
+    q99_cooks = apply(cooks_mat, 2, stats::quantile, probs = 0.99, na.rm = TRUE),
+    stringsAsFactors = FALSE
+  )
+  utils::write.table(
+    cooks_sample_summary,
+    file = file.path(qc_dir, "cooks_distance_sample_summary.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+
+  cooks_global <- data.frame(
+    metric = c("num_values", "num_gt_1", "num_gt_5", "num_gt_10", "global_max", "global_q99"),
+    value = c(
+      sum(is.finite(cooks_mat)),
+      sum(cooks_mat > 1, na.rm = TRUE),
+      sum(cooks_mat > 5, na.rm = TRUE),
+      sum(cooks_mat > 10, na.rm = TRUE),
+      max(cooks_mat, na.rm = TRUE),
+      stats::quantile(cooks_mat, probs = 0.99, na.rm = TRUE)
+    ),
+    stringsAsFactors = FALSE
+  )
+  utils::write.table(
+    cooks_global,
+    file = file.path(qc_dir, "cooks_distance_global_summary.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+
+  cooks_bar <- cooks_sample_summary[order(cooks_sample_summary$genes_cooks_gt_10, decreasing = TRUE), , drop = FALSE]
+  cooks_bar$sample <- factor(cooks_bar$sample, levels = cooks_bar$sample)
+  p_cooks_counts <- ggplot2::ggplot(cooks_bar, ggplot2::aes(x = sample, y = genes_cooks_gt_10)) +
+    ggplot2::geom_col(fill = "steelblue") +
+    ggplot2::coord_flip() +
+    ggplot2::theme_light() +
+    ggplot2::theme(panel.grid = ggplot2::element_blank()) +
+    ggplot2::xlab("Sample") +
+    ggplot2::ylab(paste(feature_label_plural_title, "with Cook's distance > 10")) +
+    ggplot2::ggtitle(paste("Cook's distance outlier count per sample (", feature_label_plural, ")", sep = ""))
+  ggplot2::ggsave(
+    filename = file.path(qc_dir, "cooks_distance.sample_outlier_counts.pdf"),
+    plot = p_cooks_counts,
+    width = 9,
+    height = 6
+  )
+
+  cooks_q99 <- cooks_sample_summary[order(cooks_sample_summary$q99_cooks, decreasing = TRUE), , drop = FALSE]
+  cooks_q99$sample <- factor(cooks_q99$sample, levels = cooks_q99$sample)
+  p_cooks_q99 <- ggplot2::ggplot(cooks_q99, ggplot2::aes(x = sample, y = q99_cooks)) +
+    ggplot2::geom_col(fill = "darkorange3") +
+    ggplot2::coord_flip() +
+    ggplot2::theme_light() +
+    ggplot2::theme(panel.grid = ggplot2::element_blank()) +
+    ggplot2::xlab("Sample") +
+    ggplot2::ylab("99th percentile Cook's distance") +
+    ggplot2::ggtitle("Cook's distance q99 per sample")
+  ggplot2::ggsave(
+    filename = file.path(qc_dir, "cooks_distance.sample_q99.pdf"),
+    plot = p_cooks_q99,
+    width = 9,
+    height = 6
+  )
+}
+
+if (qc_enabled) {
+  pca_color_by_use <- pca_color_by[
+    pca_color_by %in% colnames(col_data) &
+      vapply(pca_color_by, function(x) is_informative_column(col_data, x), logical(1))
+  ]
+  pca_shape_by_values_use <- pca_shape_by_values[
+    pca_shape_by_values %in% colnames(col_data) &
+      vapply(pca_shape_by_values, function(x) is_informative_column(col_data, x), logical(1))
+  ]
+  pca_color_by_use <- unique(c(pca_color_by_use, auto_categorical_columns))
+  pca_color_by_use <- unique(c(de_columns_resolved, pca_color_by_use))
+
+  if (distance_plot_enabled) {
+    dist_mat <- as.matrix(stats::dist(t(SummarizedExperiment::assay(vst_obj))))
+    label_columns <- informative_annotation_columns
+    label_columns <- label_columns[seq_len(min(3, length(label_columns)))]
+    if (length(label_columns) > 0) {
+      sample_labels <- apply(
+        cbind(sample = rownames(col_data), col_data[, label_columns, drop = FALSE]),
+        1,
+        function(x) paste(x, collapse = " : ")
+      )
+      rownames(dist_mat) <- sample_labels
+      colnames(dist_mat) <- sample_labels
+    }
+    grDevices::pdf(file.path(qc_dir, "top_variable_genes.distance_plot.pdf"), width = 10, height = 10)
+    pheatmap::pheatmap(dist_mat, main = paste("Sample distance (", feature_label_plural, ")", sep = ""))
+    grDevices::dev.off()
+  }
+
+  if (variable_heatmap_enabled) {
+    top_idx <- head(order(-matrixStats::rowVars(SummarizedExperiment::assay(vst_obj))), top_variable_genes)
+    top_mat <- SummarizedExperiment::assay(vst_obj)[top_idx, , drop = FALSE]
+    top_mat <- row_zscore(top_mat)
+    keep_rows <- is.finite(rowMeans(top_mat))
+    top_mat <- top_mat[keep_rows, , drop = FALSE]
+    if (nrow(top_mat) > 1) {
+      k <- min(5, nrow(top_mat))
+      km <- stats::kmeans(top_mat, centers = k, iter.max = 20, nstart = 20)
+      top_mat <- top_mat[names(sort(km$cluster)), , drop = FALSE]
+    }
+    hm_colors <- gradient_palette(255)
+    max_abs <- max(abs(top_mat), na.rm = TRUE)
+    if (!is.finite(max_abs) || max_abs <= 0) {
+      max_abs <- 1
+    }
+    hm_breaks <- seq(-max_abs, max_abs, length.out = 256)
+    grDevices::pdf(file.path(qc_dir, "top_variable_genes.kmeans_heatmap.pdf"), width = 12, height = 10)
+    pheatmap::pheatmap(
+      top_mat,
+      cluster_rows = FALSE,
+      cluster_cols = TRUE,
+      breaks = hm_breaks,
+      color = hm_colors,
+      annotation_col = annotation_df_informative,
+      annotation_colors = annotation_colors_informative,
+      show_rownames = FALSE,
+      show_colnames = TRUE,
+      main = paste("Top variable", feature_label_plural)
+    )
+    grDevices::dev.off()
+  }
+
+  if (pca_enabled) {
+    pca <- stats::prcomp(t(SummarizedExperiment::assay(vst_obj)))
+    pca_df <- as.data.frame(pca$x)
+    pca_df$sample <- rownames(pca_df)
+    for (column_name in colnames(col_data)) {
+      pca_df[[column_name]] <- col_data[[column_name]]
+    }
+    pct <- round(100 * (pca$sdev^2 / sum(pca$sdev^2)), 2)
+    pca_var_df <- data.frame(
+      pc = paste0("PC", seq_along(pca$sdev)),
+      variance_explained_pct = as.numeric(100 * (pca$sdev^2 / sum(pca$sdev^2))),
+      cumulative_variance_explained_pct = as.numeric(cumsum(100 * (pca$sdev^2 / sum(pca$sdev^2)))),
+      stringsAsFactors = FALSE
+    )
+    utils::write.table(
+      pca_var_df,
+      file = file.path(qc_dir, "pca_variance_explained.tsv"),
+      sep = "\t",
+      quote = FALSE,
+      row.names = FALSE
+    )
+
+    assoc_columns <- unique(c(
+      de_columns_resolved,
+      de_block_resolved,
+      pca_color_by_use,
+      pca_shape_by_values_use,
+      auto_categorical_columns
+    ))
+    assoc_columns <- assoc_columns[assoc_columns %in% colnames(col_data)]
+    assoc_columns <- assoc_columns[
+      vapply(assoc_columns, function(x) is_informative_column(col_data, x), logical(1))
+    ]
+    n_pcs_assoc <- min(5, ncol(pca$x))
+    pca_assoc_rows <- list()
+    if (n_pcs_assoc >= 1 && length(assoc_columns) > 0) {
+      for (pc_idx in seq_len(n_pcs_assoc)) {
+        pc_name <- paste0("PC", pc_idx)
+        pc_vals <- as.numeric(pca_df[[pc_name]])
+        for (column_name in assoc_columns) {
+          var_vals <- col_data[[column_name]]
+          keep <- !is.na(pc_vals) & !is.na(var_vals)
+          if (sum(keep) < 4) {
+            next
+          }
+          df_model <- data.frame(
+            pc_value = pc_vals[keep],
+            variable = var_vals[keep],
+            stringsAsFactors = FALSE
+          )
+          n_unique <- length(unique(df_model$variable))
+          if (n_unique < 2) {
+            next
+          }
+          is_numeric_predictor <- is.numeric(df_model$variable) || is.integer(df_model$variable)
+          if (!is_numeric_predictor) {
+            df_model$variable <- as.factor(as.character(df_model$variable))
+          }
+          fit <- tryCatch(
+            stats::lm(pc_value ~ variable, data = df_model),
+            error = function(e) NULL
+          )
+          if (is.null(fit)) {
+            next
+          }
+          fit_anova <- tryCatch(stats::anova(fit), error = function(e) NULL)
+          if (is.null(fit_anova) || nrow(fit_anova) < 1) {
+            next
+          }
+          p_value <- suppressWarnings(as.numeric(fit_anova[1, "Pr(>F)"]))
+          r2 <- suppressWarnings(as.numeric(summary(fit)$r.squared))
+          pca_assoc_rows[[length(pca_assoc_rows) + 1]] <- data.frame(
+            factor = column_name,
+            pc = pc_name,
+            p_value = p_value,
+            r_squared = r2,
+            n_samples = nrow(df_model),
+            n_levels = if (is_numeric_predictor) NA_integer_ else n_unique,
+            predictor_type = if (is_numeric_predictor) "numeric" else "categorical",
+            stringsAsFactors = FALSE
+          )
+        }
+      }
+    }
+    if (length(pca_assoc_rows) > 0) {
+      pca_assoc_df <- do.call(rbind, pca_assoc_rows)
+      pca_assoc_df$fdr_bh <- NA_real_
+      for (pc_name in unique(pca_assoc_df$pc)) {
+        idx <- which(pca_assoc_df$pc == pc_name & is.finite(pca_assoc_df$p_value))
+        if (length(idx) > 0) {
+          pca_assoc_df$fdr_bh[idx] <- stats::p.adjust(pca_assoc_df$p_value[idx], method = "BH")
+        }
+      }
+      pca_assoc_df <- pca_assoc_df[order(pca_assoc_df$pc, pca_assoc_df$p_value), , drop = FALSE]
+      utils::write.table(
+        pca_assoc_df,
+        file = file.path(qc_dir, "pca_factor_association.tsv"),
+        sep = "\t",
+        quote = FALSE,
+        row.names = FALSE
+      )
+    }
+
+    plot_pca_pair <- function(pc_x, pc_y, color_col, shape_col = "") {
+      xcol <- paste0("PC", pc_x)
+      ycol <- paste0("PC", pc_y)
+      if (!(xcol %in% colnames(pca_df)) || !(ycol %in% colnames(pca_df))) {
+        return()
+      }
+      if (!(color_col %in% colnames(pca_df))) {
+        return()
+      }
+      plot_df <- pca_df
+      plot_df[[color_col]] <- as.factor(as.character(plot_df[[color_col]]))
+      color_map <- categorical_palette(
+        levels(plot_df[[color_col]]),
+        palette_name = palette_name_for_column(color_col)
+      )
+      if (length(color_map) == 0) {
+        return()
+      }
+      p <- ggplot2::ggplot(plot_df, ggplot2::aes_string(x = xcol, y = ycol, color = color_col))
+      if (nzchar(shape_col) && shape_col %in% colnames(plot_df)) {
+        plot_df[[shape_col]] <- as.factor(as.character(plot_df[[shape_col]]))
+        p <- p + ggplot2::geom_point(ggplot2::aes_string(shape = shape_col), size = 3)
+      } else {
+        p <- p + ggplot2::geom_point(size = 3)
+      }
+      p <- p +
+        ggplot2::scale_color_manual(values = color_map, drop = FALSE) +
+        ggplot2::xlab(paste0(xcol, ": ", pct[pc_x], "% variance")) +
+        ggplot2::ylab(paste0(ycol, ": ", pct[pc_y], "% variance")) +
+        ggplot2::theme_light() +
+        ggplot2::theme(panel.grid = ggplot2::element_blank(), aspect.ratio = 1)
+      shape_suffix <- if (nzchar(shape_col)) paste0("_shape_", sanitize_file_component(shape_col, "shape")) else ""
+      out_name <- paste0("top_variable_genes.PCA_plot_", color_col, shape_suffix, "_PC", pc_x, "_PC", pc_y, ".pdf")
+      ggplot2::ggsave(filename = file.path(qc_dir, out_name), plot = p, width = 8, height = 8)
+    }
+
+    for (color_col in pca_color_by_use) {
+      shape_options <- c("", pca_shape_by_values_use)
+      for (shape_col in shape_options) {
+        plot_pca_pair(1, 2, color_col, shape_col)
+        if (length(pca_extra_pairs) > 0) {
+          for (pair in pca_extra_pairs) {
+            plot_pca_pair(pair[1], pair[2], color_col, shape_col)
+          }
+        }
+      }
+    }
+  }
+}
+
+build_auto_contrasts <- function() {
+  candidate <- auto_primary_variable
+  if (!nzchar(candidate)) {
+    terms_vec <- attr(stats::terms(design_formula_base), "term.labels")
+    terms_vec <- terms_vec[!grepl(":", terms_vec, fixed = TRUE)]
+    if (length(terms_vec) == 0) {
+      stop("Could not infer an auto contrast variable from the design formula.")
+    }
+    candidate <- terms_vec[length(terms_vec)]
+  }
+  if (!(candidate %in% colnames(col_data))) {
+    stop("Auto contrast variable '", candidate, "' is not present in metadata.")
+  }
+  values <- as.factor(col_data[[candidate]])
+  levels_vec <- levels(values)
+  if (length(levels_vec) < 2) {
+    stop("Auto contrast variable '", candidate, "' has fewer than two levels.")
+  }
+  contrast_list <- list()
+  if (auto_pairwise) {
+    for (i in seq_len(length(levels_vec) - 1)) {
+      for (j in seq((i + 1), length(levels_vec))) {
+        contrast_list[[length(contrast_list) + 1]] <- list(
+          contrast_type = "factor",
+          factor = candidate,
+          numerator = levels_vec[i],
+          denominator = levels_vec[j],
+          coefficient_name = NA_character_,
+          label = paste(levels_vec[i], "vs", levels_vec[j], sep = "_")
+        )
+      }
+    }
+  }
+  contrast_list
+}
+
+normalize_contrast_item <- function(item, index = NA_integer_) {
+  if (!is.list(item)) {
+    stop("Each contrast item must be a list.")
+  }
+  contrast_type <- as.character(item$contrast_type)
+  if (!length(contrast_type) || is.na(contrast_type) || !nzchar(contrast_type)) {
+    contrast_type <- as.character(item$type)
+  }
+  if (!length(contrast_type) || is.na(contrast_type) || !nzchar(contrast_type)) {
+    contrast_type <- "factor"
+  }
+  contrast_type <- tolower(trimws(contrast_type))
+  if (!(contrast_type %in% c("factor", "coefficient"))) {
+    stop("Unsupported contrast_type in explicit contrasts: ", contrast_type)
+  }
+  if (contrast_type == "factor") {
+    factor_name <- as.character(item$factor)
+    numerator <- as.character(item$numerator)
+    denominator <- as.character(item$denominator)
+    if (!length(factor_name) || is.na(factor_name) || !nzchar(factor_name) ||
+        !length(numerator) || is.na(numerator) || !nzchar(numerator) ||
+        !length(denominator) || is.na(denominator) || !nzchar(denominator)) {
+      stop("Factor contrast requires non-empty factor, numerator, denominator.")
+    }
+    label <- as.character(item$label)
+    if (!length(label) || is.na(label) || !nzchar(label)) {
+      label <- paste(numerator, "vs", denominator, sep = "_")
+    }
+    return(list(
+      contrast_type = "factor",
+      factor = factor_name,
+      numerator = numerator,
+      denominator = denominator,
+      coefficient_name = NA_character_,
+      label = label
+    ))
+  }
+  coefficient_name <- as.character(item$coefficient_name)
+  if (!length(coefficient_name) || is.na(coefficient_name) || !nzchar(coefficient_name)) {
+    coefficient_name <- as.character(item$name)
+  }
+  if (!length(coefficient_name) || is.na(coefficient_name) || !nzchar(coefficient_name)) {
+    stop("Coefficient contrast requires non-empty coefficient_name (or name).")
+  }
+  label <- as.character(item$label)
+  if (!length(label) || is.na(label) || !nzchar(label)) {
+    label <- coefficient_name
+  }
+  list(
+    contrast_type = "coefficient",
+    factor = NA_character_,
+    numerator = NA_character_,
+    denominator = NA_character_,
+    coefficient_name = coefficient_name,
+    label = label
+  )
+}
+
+contrast_plan_raw <- if (contrast_mode == "explicit") explicit_contrasts else build_auto_contrasts()
+contrast_plan <- lapply(seq_along(contrast_plan_raw), function(i) normalize_contrast_item(contrast_plan_raw[[i]], i))
+if (length(contrast_plan) == 0) {
+  stop("No DE contrasts were resolved.")
+}
+
+resolve_coefficient_shorthand <- function(raw_name, available_coefficients) {
+  name <- trimws(as.character(raw_name))
+  if (!nzchar(name)) {
+    return(NULL)
+  }
+  if (name %in% available_coefficients) {
+    return(name)
+  }
+  if (!grepl(":", name, fixed = TRUE)) {
+    return(NULL)
+  }
+  term_tokens <- unlist(strsplit(name, ":", fixed = TRUE))
+  term_tokens <- trimws(term_tokens)
+  term_tokens <- term_tokens[nzchar(term_tokens)]
+  if (length(term_tokens) < 2) {
+    return(NULL)
+  }
+  idx <- rep(TRUE, length(available_coefficients))
+  for (tok in term_tokens) {
+    idx <- idx & grepl(tok, available_coefficients, fixed = TRUE)
+  }
+  candidates <- available_coefficients[idx]
+  if (length(candidates) == 1) {
+    return(candidates[[1]])
+  }
+  if (length(candidates) > 1) {
+    forward_pattern <- paste(term_tokens, collapse = ".*")
+    reverse_pattern <- paste(rev(term_tokens), collapse = ".*")
+    forward <- candidates[grepl(forward_pattern, candidates)]
+    reverse <- candidates[grepl(reverse_pattern, candidates)]
+    narrowed <- unique(c(forward, reverse))
+    if (length(narrowed) == 1) {
+      return(narrowed[[1]])
+    }
+  }
+  NULL
+}
+
+validate_contrast_plan <- function(plan, available_coefficients, metadata_df) {
+  available_coefficients <- unique(as.character(available_coefficients))
+  available_coefficients <- available_coefficients[!is.na(available_coefficients) & nzchar(available_coefficients)]
+  for (i in seq_along(plan)) {
+    item <- plan[[i]]
+    ctype <- as.character(item$contrast_type)
+    if (identical(ctype, "factor")) {
+      factor_name <- as.character(item$factor)
+      numerator <- as.character(item$numerator)
+      denominator <- as.character(item$denominator)
+      if (!(factor_name %in% colnames(metadata_df))) {
+        stop("Factor contrast ", i, " references metadata column '", factor_name, "' which is not present.")
+      }
+      level_values <- unique(as.character(metadata_df[[factor_name]]))
+      level_values <- level_values[!is.na(level_values) & nzchar(level_values)]
+      if (!(numerator %in% level_values)) {
+        stop("Factor contrast ", i, " numerator '", numerator, "' is not a level of metadata column '", factor_name, "'.")
+      }
+      if (!(denominator %in% level_values)) {
+        stop("Factor contrast ", i, " denominator '", denominator, "' is not a level of metadata column '", factor_name, "'.")
+      }
+      next
+    }
+    if (identical(ctype, "coefficient")) {
+      coef_name <- as.character(item$coefficient_name)
+      if (!nzchar(coef_name)) {
+        stop("Coefficient contrast ", i, " has empty coefficient_name.")
+      }
+      resolved_coef <- resolve_coefficient_shorthand(coef_name, available_coefficients)
+      if (!is.null(resolved_coef) && nzchar(resolved_coef)) {
+        if (!identical(resolved_coef, coef_name)) {
+          message(
+            "Resolved coefficient shorthand for contrast ", i, ": '", coef_name,
+            "' -> '", resolved_coef, "'."
+          )
+        }
+        plan[[i]]$coefficient_name <- resolved_coef
+        coef_name <- resolved_coef
+      }
+      if (!(coef_name %in% available_coefficients)) {
+        tokens <- unique(unlist(strsplit(gsub("[^A-Za-z0-9]+", " ", coef_name), "\\s+")))
+        tokens <- tokens[nzchar(tokens)]
+        candidate_idx <- rep(TRUE, length(available_coefficients))
+        if (length(tokens) > 0) {
+          for (tok in tokens) {
+            candidate_idx <- candidate_idx & grepl(tok, available_coefficients, fixed = TRUE)
+          }
+        }
+        candidates <- available_coefficients[candidate_idx]
+        if (length(candidates) == 0) {
+          candidates <- available_coefficients
+        }
+        candidates <- head(candidates, 10)
+        stop(
+          "Coefficient contrast ", i, " requested coefficient_name '", coef_name, "' which is not present in resultsNames(dds). ",
+          "Check results/qc/deseq2_results_names.tsv. ",
+          "Available examples: ", paste(candidates, collapse = ", ")
+        )
+      }
+      next
+    }
+    stop("Contrast ", i, " has unsupported contrast_type '", ctype, "'.")
+  }
+  plan
+}
+
+contrast_plan <- validate_contrast_plan(contrast_plan, results_names_tbl$coefficient, col_data)
+
+safe_pkg_version <- function(pkg_name) {
+  if (!requireNamespace(pkg_name, quietly = TRUE)) {
+    return(NA_character_)
+  }
+  as.character(utils::packageVersion(pkg_name))
+}
+
+de_run_manifest <- data.frame(
+  key = c(
+    "counts_path",
+    "metadata_path",
+    "output_root",
+    "qc_dir",
+    "de_dir",
+    "design_formula",
+    "contrast_mode",
+    "auto_pairwise",
+    "auto_primary_variable",
+    "filtering_enabled",
+    "filtering_method",
+    "filtering_min_count",
+    "filtering_min_samples",
+    "deseq_fit_type",
+    "deseq_sf_type",
+    "deseq_parallel",
+    "latent_enabled",
+    "latent_method",
+    "latent_n_sv_requested",
+    "latent_n_sv_used",
+    "design_formula_effective",
+    "shrink_enabled",
+    "shrink_type",
+    "shrink_for_tables",
+    "alpha",
+    "lfc_for_sig",
+    "lfc_for_heatmap",
+    "runtime_seed",
+    "n_samples",
+    "n_genes_after_filtering"
+  ),
+  value = c(
+    counts_path,
+    metadata_path,
+    output_root,
+    qc_dir,
+    de_dir,
+    design_formula_text,
+    contrast_mode,
+    as.character(auto_pairwise),
+    auto_primary_variable,
+    as.character(filtering_enabled),
+    filtering_method,
+    as.character(filtering_min_count),
+    as.character(filtering_min_samples),
+    deseq_fit_type,
+    deseq_sf_type,
+    as.character(deseq_parallel),
+    as.character(latent_enabled),
+    latent_method,
+    ifelse(is.na(latent_n_sv), "auto", as.character(latent_n_sv)),
+    as.character(length(latent_sv_columns)),
+    design_formula_effective_text,
+    as.character(shrink_enabled),
+    shrink_type,
+    as.character(shrink_for_tables),
+    as.character(alpha),
+    as.character(lfc_for_sig),
+    as.character(lfc_for_heatmap),
+    as.character(__RUNTIME_SEED__),
+    as.character(ncol(count_matrix)),
+    as.character(nrow(count_matrix))
+  ),
+  stringsAsFactors = FALSE
+)
+utils::write.table(
+  de_run_manifest,
+  file = file.path(qc_dir, "de_run_manifest.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+latent_factor_summary <- data.frame(
+  enabled = latent_enabled,
+  method = latent_method,
+  n_sv_requested = ifelse(is.na(latent_n_sv), NA_integer_, as.integer(latent_n_sv)),
+  n_sv_used = as.integer(length(latent_sv_columns)),
+  design_formula_base = design_formula_text,
+  design_formula_effective = design_formula_effective_text,
+  stringsAsFactors = FALSE
+)
+utils::write.table(
+  latent_factor_summary,
+  file = file.path(qc_dir, "latent_factor_summary.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+contrast_manifest <- do.call(
+  rbind,
+  lapply(contrast_plan, function(x) {
+    data.frame(
+      contrast_type = as.character(x$contrast_type),
+      factor = as.character(x$factor),
+      numerator = as.character(x$numerator),
+      denominator = as.character(x$denominator),
+      coefficient_name = as.character(x$coefficient_name),
+      contrast_label = sanitize_name(as.character(x$label)),
+      stringsAsFactors = FALSE
+    )
+  })
+)
+utils::write.table(
+  contrast_manifest,
+  file = file.path(de_dir, "contrast_plan.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+pkg_versions <- data.frame(
+  package = c(
+    "DESeq2",
+    "ggplot2",
+    "pheatmap",
+    "matrixStats",
+    "RColorBrewer",
+    "ggrepel",
+    "AnnotationDbi",
+    "org.Hs.eg.db",
+    "org.Mm.eg.db",
+    "clusterProfiler",
+    "enrichplot",
+    "fgsea",
+    "sva",
+    "msigdbr",
+    "decoupleR",
+    "OmnipathR"
+  ),
+  version = c(
+    safe_pkg_version("DESeq2"),
+    safe_pkg_version("ggplot2"),
+    safe_pkg_version("pheatmap"),
+    safe_pkg_version("matrixStats"),
+    safe_pkg_version("RColorBrewer"),
+    safe_pkg_version("ggrepel"),
+    safe_pkg_version("AnnotationDbi"),
+    safe_pkg_version("org.Hs.eg.db"),
+    safe_pkg_version("org.Mm.eg.db"),
+    safe_pkg_version("clusterProfiler"),
+    safe_pkg_version("enrichplot"),
+    safe_pkg_version("fgsea"),
+    safe_pkg_version("sva"),
+    safe_pkg_version("msigdbr"),
+    safe_pkg_version("decoupleR"),
+    safe_pkg_version("OmnipathR")
+  ),
+  stringsAsFactors = FALSE
+)
+utils::write.table(
+  pkg_versions,
+  file = file.path(qc_dir, "package_versions.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+contrast_summaries <- list()
+contrast_testing_summaries <- list()
+for (contrast_cfg in contrast_plan) {
+  contrast_type <- as.character(contrast_cfg$contrast_type)
+  factor_name <- as.character(contrast_cfg$factor)
+  numerator <- as.character(contrast_cfg$numerator)
+  denominator <- as.character(contrast_cfg$denominator)
+  coefficient_name <- as.character(contrast_cfg$coefficient_name)
+  contrast_label <- sanitize_name(as.character(contrast_cfg$label))
+  contrast_dir <- file.path(de_dir, contrast_label)
+  dir.create(contrast_dir, recursive = TRUE, showWarnings = FALSE)
+  positive_direction <- "modeled numerator direction"
+  negative_direction <- "opposite direction"
+  if (contrast_type == "factor" && nzchar(factor_name) && nzchar(numerator) && nzchar(denominator)) {
+    positive_direction <- paste0("higher in ", numerator, " vs ", denominator)
+    negative_direction <- paste0("higher in ", denominator, " vs ", numerator)
+  } else if (contrast_type == "coefficient" && nzchar(coefficient_name)) {
+    positive_direction <- paste0("positive coefficient direction: ", coefficient_name)
+    negative_direction <- "opposite coefficient direction"
+  }
+  direction_caption <- paste0("+: ", positive_direction, " | -: ", negative_direction)
+  utils::write.table(
+    data.frame(
+      contrast = contrast_label,
+      contrast_type = contrast_type,
+      positive_direction = positive_direction,
+      negative_direction = negative_direction,
+      stringsAsFactors = FALSE
+    ),
+    file = file.path(contrast_dir, paste0(contrast_label, ".direction_legend.tsv")),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+
+  contrast_sample_ids <- rownames(col_data)
+  if (contrast_type == "factor" && factor_name %in% colnames(col_data)) {
+    contrast_factor_values <- as.character(col_data[[factor_name]])
+    keep_contrast_samples <- !is.na(contrast_factor_values) & contrast_factor_values %in% c(numerator, denominator)
+    contrast_sample_ids <- rownames(col_data)[keep_contrast_samples]
+    if (length(contrast_sample_ids) < 2) {
+      message(
+        "Contrast sample subsetting yielded <2 samples for ", contrast_label,
+        ". Falling back to all samples for plotting."
+      )
+      contrast_sample_ids <- rownames(col_data)
+    }
+  }
+  contrast_annotation_df <- NULL
+  contrast_annotation_colors <- NULL
+  if (!is.null(annotation_df_informative) && nrow(annotation_df_informative) > 0) {
+    ann_keep <- intersect(contrast_sample_ids, rownames(annotation_df_informative))
+    if (length(ann_keep) > 0) {
+      contrast_annotation_df <- annotation_df_informative[ann_keep, , drop = FALSE]
+      contrast_annotation_colors <- annotation_colors_informative
+    }
+  }
+
+  if (contrast_type == "factor") {
+    base_res <- DESeq2::results(dds, contrast = c(factor_name, numerator, denominator), alpha = alpha)
+  } else {
+    base_res <- DESeq2::results(dds, name = coefficient_name, alpha = alpha)
+  }
+  res_for_table <- base_res
+
+  if (shrink_enabled) {
+    shrunk <- tryCatch(
+      if (contrast_type == "factor") {
+        DESeq2::lfcShrink(dds, contrast = c(factor_name, numerator, denominator), type = shrink_type)
+      } else {
+        DESeq2::lfcShrink(dds, coef = coefficient_name, type = shrink_type)
+      },
+      error = function(e) {
+        message("lfcShrink failed for ", contrast_label, ": ", conditionMessage(e), ". Falling back to unshrunk results.")
+        base_res
+      }
+    )
+    if (shrink_for_tables) {
+      res_for_table <- shrunk
+    }
+  }
+
+  res_df <- as.data.frame(res_for_table)
+  res_df$gene_id <- rownames(res_df)
+  res_df$gene_symbol <- symbols_for_ids(res_df$gene_id, fallback_to_ids = TRUE)
+  res_df <- res_df[, c("gene_id", "gene_symbol", setdiff(colnames(res_df), c("gene_id", "gene_symbol")))]
+  res_df <- res_df[order(res_df$padj, na.last = TRUE), , drop = FALSE]
+
+  res_meta <- tryCatch(S4Vectors::metadata(res_for_table), error = function(e) list())
+  independent_filtering_enabled <- if (!is.null(res_meta$independentFiltering)) {
+    as.logical(res_meta$independentFiltering)
+  } else {
+    NA
+  }
+  filter_threshold <- if (!is.null(res_meta$filterThreshold)) {
+    as.numeric(res_meta$filterThreshold)
+  } else {
+    NA_real_
+  }
+  cooks_cutoff <- if (!is.null(res_meta$cooksCutoff)) {
+    as.numeric(res_meta$cooksCutoff)
+  } else {
+    NA_real_
+  }
+  testing_summary <- data.frame(
+    contrast = contrast_label,
+    positive_direction = positive_direction,
+    negative_direction = negative_direction,
+    total_genes = nrow(res_df),
+    genes_with_pvalue = sum(!is.na(res_df$pvalue)),
+    genes_with_padj = sum(!is.na(res_df$padj)),
+    genes_pvalue_na = sum(is.na(res_df$pvalue)),
+    genes_padj_na = sum(is.na(res_df$padj)),
+    genes_padj_na_with_pvalue = sum(is.na(res_df$padj) & !is.na(res_df$pvalue)),
+    genes_lfc_na = sum(is.na(res_df$log2FoldChange)),
+    genes_lfcse_na = if ("lfcSE" %in% colnames(res_df)) sum(is.na(res_df$lfcSE)) else NA_integer_,
+    independent_filtering_enabled = independent_filtering_enabled,
+    filter_threshold = filter_threshold,
+    cooks_cutoff = cooks_cutoff,
+    alpha = alpha,
+    lfc_for_sig = lfc_for_sig,
+    stringsAsFactors = FALSE
+  )
+  contrast_testing_summaries[[length(contrast_testing_summaries) + 1]] <- testing_summary
+
+  if (write_full_results) {
+    utils::write.table(
+      res_df,
+      file = file.path(contrast_dir, paste0(contrast_label, ".diff_", feature_file_stem, ".DESeq2.txt")),
+      sep = "\t",
+      quote = FALSE,
+      row.names = FALSE
+    )
+  }
+
+  ranked_exports <- list()
+  rank_lfc <- build_rank_table(res_df, "log2FoldChange")
+  if (!is.null(rank_lfc) && nrow(rank_lfc) > 1) {
+    out_rnk <- file.path(contrast_dir, paste0(contrast_label, ".ranked.log2FoldChange.rnk"))
+    utils::write.table(rank_lfc, file = out_rnk, sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+    ranked_exports[[length(ranked_exports) + 1]] <- data.frame(
+      file = basename(out_rnk),
+      score = "log2FoldChange",
+      n_features = nrow(rank_lfc),
+      stringsAsFactors = FALSE
+    )
+  }
+  rank_stat <- build_rank_table(res_df, "stat")
+  if (!is.null(rank_stat) && nrow(rank_stat) > 1) {
+    out_rnk <- file.path(contrast_dir, paste0(contrast_label, ".ranked.stat.rnk"))
+    utils::write.table(rank_stat, file = out_rnk, sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+    ranked_exports[[length(ranked_exports) + 1]] <- data.frame(
+      file = basename(out_rnk),
+      score = "stat",
+      n_features = nrow(rank_stat),
+      stringsAsFactors = FALSE
+    )
+  }
+  if ("pvalue" %in% colnames(res_df)) {
+    pval <- as.numeric(res_df$pvalue)
+    lfc <- as.numeric(res_df$log2FoldChange)
+    signed_log10p <- sign(lfc) * (-log10(pmax(pval, 1e-300)))
+    rank_slp_df <- res_df
+    rank_slp_df$signed_log10_pvalue <- signed_log10p
+    rank_slp <- build_rank_table(rank_slp_df, "signed_log10_pvalue")
+    if (!is.null(rank_slp) && nrow(rank_slp) > 1) {
+      out_rnk <- file.path(contrast_dir, paste0(contrast_label, ".ranked.signed_log10_pvalue.rnk"))
+      utils::write.table(rank_slp, file = out_rnk, sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+      ranked_exports[[length(ranked_exports) + 1]] <- data.frame(
+        file = basename(out_rnk),
+        score = "signed_log10_pvalue",
+        n_features = nrow(rank_slp),
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+  if (length(ranked_exports) > 0) {
+    rank_manifest <- do.call(rbind, ranked_exports)
+    utils::write.table(
+      rank_manifest,
+      file = file.path(contrast_dir, paste0(contrast_label, ".ranked_exports.tsv")),
+      sep = "\t",
+      quote = FALSE,
+      row.names = FALSE
+    )
+  }
+
+  sig_df <- subset(res_df, !is.na(padj) & padj < alpha & abs(log2FoldChange) >= lfc_for_sig)
+  enrich_df <- res_df
+  enrich_df$peak_region <- NA_character_
+  enrich_df$assigned_genes <- NA_character_
+  enrich_df$nearest_gene <- NA_character_
+  enrich_df$linked_gene_symbol <- NA_character_
+  enrich_df$link_mode <- "none"
+  if (!is.null(peak_data) && nrow(peak_data) > 0) {
+    peak_map <- peak_data
+    peak_map$feature_id <- rownames(peak_map)
+    enrich_df <- merge(
+      enrich_df,
+      peak_map[, c("feature_id", "genomic_region", "assigned_genes", "nearest_gene"), drop = FALSE],
+      by.x = "gene_id",
+      by.y = "feature_id",
+      all.x = TRUE,
+      sort = FALSE
+    )
+    enrich_df$peak_region <- as.character(enrich_df$genomic_region)
+    enrich_df$assigned_genes <- as.character(enrich_df$assigned_genes)
+    enrich_df$nearest_gene <- as.character(enrich_df$nearest_gene)
+    enrich_df$genomic_region <- NULL
+
+    first_assigned_gene <- function(x) {
+      x <- as.character(x)
+      if (is.na(x) || !nzchar(x) || identical(x, "NA")) {
+        return(NA_character_)
+      }
+      primary <- strsplit(x, ",", fixed = TRUE)[[1]][1]
+      primary <- trimws(primary)
+      if (!nzchar(primary)) {
+        return(NA_character_)
+      }
+      if (grepl("\\|", primary, fixed = FALSE)) {
+        primary <- strsplit(primary, "\\|", perl = TRUE)[[1]][1]
+      }
+      primary <- trimws(primary)
+      if (!nzchar(primary) || identical(primary, "NA")) {
+        return(NA_character_)
+      }
+      primary
+    }
+
+    first_nearest_gene <- function(x) {
+      x <- as.character(x)
+      if (is.na(x) || !nzchar(x) || identical(x, "NA")) {
+        return(NA_character_)
+      }
+      primary <- trimws(x)
+      if (grepl("\\|", primary, fixed = FALSE)) {
+        primary <- strsplit(primary, "\\|", perl = TRUE)[[1]][1]
+      }
+      primary <- trimws(primary)
+      if (!nzchar(primary) || identical(primary, "NA")) {
+        return(NA_character_)
+      }
+      primary
+    }
+
+    assigned_symbol <- vapply(enrich_df$assigned_genes, first_assigned_gene, character(1))
+    nearest_symbol <- vapply(enrich_df$nearest_gene, first_nearest_gene, character(1))
+    enrich_df$linked_gene_symbol <- nearest_symbol
+    enrich_df$link_mode <- "nearest"
+    promoter_like <- enrich_df$peak_region %in% c("promoter")
+    gene_body_like <- enrich_df$peak_region %in% c("exon", "intron")
+    enrich_df$linked_gene_symbol[promoter_like] <- assigned_symbol[promoter_like]
+    enrich_df$link_mode[promoter_like] <- "promoter_assigned"
+    enrich_df$linked_gene_symbol[gene_body_like & !is.na(assigned_symbol)] <- assigned_symbol[gene_body_like & !is.na(assigned_symbol)]
+    enrich_df$link_mode[gene_body_like & !is.na(assigned_symbol)] <- "gene_body_assigned"
+    enrich_df$linked_gene_symbol[!is_valid_symbol(enrich_df$linked_gene_symbol)] <- NA_character_
+  } else {
+    enrich_df$linked_gene_symbol <- enrich_df$gene_symbol
+    enrich_df$linked_gene_symbol[!is_valid_symbol(enrich_df$linked_gene_symbol)] <- NA_character_
+  }
+  enrich_df$gene_symbol_clean <- enrich_df$linked_gene_symbol
+
+  region_short_from_peak_region <- function(region_value) {
+    rv <- tolower(trimws(as.character(region_value)))
+    if (!nzchar(rv) || is.na(rv) || identical(rv, "na")) {
+      return("unk")
+    }
+    if (rv == "promoter") {
+      return("prom")
+    }
+    if (rv == "intergenic") {
+      return("distal")
+    }
+    if (rv %in% c("exon", "intron")) {
+      return("body")
+    }
+    rv
+  }
+
+  enrich_df$feature_label <- vapply(
+    seq_len(nrow(enrich_df)),
+    function(i) {
+      coord <- as.character(enrich_df$gene_id[[i]])
+      region_short <- region_short_from_peak_region(enrich_df$peak_region[[i]])
+      linked <- as.character(enrich_df$linked_gene_symbol[[i]])
+      if (is.na(linked) || !nzchar(linked) || identical(linked, "NA")) {
+        linked <- as.character(enrich_df$gene_symbol[[i]])
+      }
+      if (is.na(linked) || !nzchar(linked) || identical(linked, "NA")) {
+        linked <- "NA"
+      }
+      paste(coord, region_short, linked, sep = "-")
+    },
+    character(1)
+  )
+
+  res_df$feature_label <- enrich_df$feature_label[match(res_df$gene_id, enrich_df$gene_id)]
+  res_df$peak_region <- enrich_df$peak_region[match(res_df$gene_id, enrich_df$gene_id)]
+  res_df$assigned_genes <- enrich_df$assigned_genes[match(res_df$gene_id, enrich_df$gene_id)]
+  res_df$nearest_gene <- enrich_df$nearest_gene[match(res_df$gene_id, enrich_df$gene_id)]
+  res_df$linked_gene_symbol <- enrich_df$linked_gene_symbol[match(res_df$gene_id, enrich_df$gene_id)]
+  res_df$link_mode <- enrich_df$link_mode[match(res_df$gene_id, enrich_df$gene_id)]
+  missing_feature_labels <- is.na(res_df$feature_label) | !nzchar(res_df$feature_label)
+  res_df$feature_label[missing_feature_labels] <- res_df$gene_id[missing_feature_labels]
+  missing_peak_region <- is.na(res_df$peak_region) | !nzchar(res_df$peak_region)
+  res_df$peak_region[missing_peak_region] <- "NA"
+  missing_link_mode <- is.na(res_df$link_mode) | !nzchar(res_df$link_mode)
+  res_df$link_mode[missing_link_mode] <- "none"
+
+  table_front_cols <- c(
+    "gene_id",
+    "feature_label",
+    "peak_region",
+    "assigned_genes",
+    "nearest_gene",
+    "linked_gene_symbol",
+    "link_mode",
+    "gene_symbol"
+  )
+  table_front_cols <- table_front_cols[table_front_cols %in% colnames(res_df)]
+  res_df <- res_df[, c(table_front_cols, setdiff(colnames(res_df), table_front_cols)), drop = FALSE]
+  sig_df <- subset(res_df, !is.na(padj) & padj < alpha & abs(log2FoldChange) >= lfc_for_sig)
+
+  if (write_sig_only) {
+    utils::write.table(
+      sig_df,
+      file = file.path(contrast_dir, paste0(contrast_label, sig_suffix)),
+      sep = "\t",
+      quote = FALSE,
+      row.names = FALSE
+    )
+  }
+
+  if (ma_plot_enabled) {
+    grDevices::pdf(file.path(contrast_dir, "MA Plot.pdf"), width = 8, height = 6)
+    DESeq2::plotMA(res_for_table, ylim = c(-8, 8))
+    graphics::mtext(direction_caption, side = 3, line = 0.3, cex = 0.7)
+    grDevices::dev.off()
+  }
+
+  if (volcano_enabled) {
+    vdf <- res_df
+    vdf$padj[is.na(vdf$padj)] <- 1
+    vdf$log2FoldChange[is.na(vdf$log2FoldChange)] <- 0
+    vdf$neglog10padj <- -log10(vdf$padj)
+    vdf$is_sig <- vdf$padj < alpha & abs(vdf$log2FoldChange) >= lfc_for_sig
+    if (volcano_auto_axes) {
+      x_lim <- max(abs(vdf$log2FoldChange), na.rm = TRUE) * 1.05
+      y_lim <- max(vdf$neglog10padj[is.finite(vdf$neglog10padj)], na.rm = TRUE) * 1.05
+    } else {
+      x_lim <- volcano_max_xlim
+      y_lim <- volcano_max_ylim
+    }
+    x_lim <- max(x_lim, 1)
+    y_lim <- max(y_lim, 1)
+    p <- ggplot2::ggplot(vdf, ggplot2::aes(x = log2FoldChange, y = neglog10padj, color = is_sig)) +
+      ggplot2::geom_point(alpha = 0.7, size = 1.2) +
+      ggplot2::scale_color_manual(values = c("FALSE" = "grey60", "TRUE" = "firebrick")) +
+      ggplot2::geom_vline(xintercept = c(-lfc_for_sig, 0, lfc_for_sig), linetype = c("dashed", "solid", "dashed")) +
+      ggplot2::geom_hline(yintercept = -log10(alpha), linetype = "dashed") +
+      ggplot2::coord_cartesian(xlim = c(-x_lim, x_lim), ylim = c(0, y_lim)) +
+      ggplot2::theme_light() +
+      ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none") +
+      ggplot2::xlab("log2 Fold Change") +
+      ggplot2::ylab("-log10 adjusted P-value") +
+      ggplot2::labs(
+        title = paste0(contrast_label, " volcano"),
+        subtitle = direction_caption
+      )
+    ggplot2::ggsave(file.path(contrast_dir, paste0(contrast_label, ".volcano_plot.pdf")), p, width = 8, height = 6)
+    if (volcano_labels_enabled && requireNamespace("ggrepel", quietly = TRUE)) {
+      label_df <- subset(vdf, is_sig)
+      label_df <- label_df[order(label_df$padj, -abs(label_df$log2FoldChange)), , drop = FALSE]
+      label_df$feature_label <- res_df$feature_label[match(label_df$gene_id, res_df$gene_id)]
+      label_df <- label_df[!is.na(label_df$feature_label) & nzchar(label_df$feature_label), , drop = FALSE]
+      label_df <- head(label_df, max_volcano_labels)
+      if (nrow(label_df) > 0) {
+        p_labels <- p + ggrepel::geom_text_repel(
+          data = label_df,
+          ggplot2::aes(label = feature_label),
+          size = 3,
+          max.overlaps = max_volcano_labels
+        )
+        ggplot2::ggsave(file.path(contrast_dir, paste0(contrast_label, ".volcano_plot_labels.pdf")), p_labels, width = 10, height = 7)
+      }
+    }
+  }
+
+  finite_p <- res_df$pvalue[is.finite(res_df$pvalue)]
+  if (length(finite_p) > 0) {
+    grDevices::pdf(file.path(contrast_dir, paste0(contrast_label, ".pvalue_histogram.pdf")), width = 8, height = 6)
+    graphics::hist(
+      finite_p,
+      breaks = 50,
+      main = paste0("P-value distribution: ", contrast_label, "\n", direction_caption),
+      xlab = "p-value",
+      col = "grey70",
+      border = "white"
+    )
+    grDevices::dev.off()
+  }
+
+  if (sig_heatmap_enabled) {
+    sig_for_heatmap <- subset(res_df, !is.na(padj) & padj < alpha & abs(log2FoldChange) >= lfc_for_heatmap)
+    sig_for_heatmap$gene_symbol_plot <- sig_for_heatmap$feature_label
+    sig_for_heatmap <- sig_for_heatmap[
+      !is.na(sig_for_heatmap$gene_symbol_plot) & nzchar(sig_for_heatmap$gene_symbol_plot),
+      ,
+      drop = FALSE
+    ]
+    sig_for_heatmap <- sig_for_heatmap[order(sig_for_heatmap$padj, -abs(sig_for_heatmap$log2FoldChange)), , drop = FALSE]
+    sig_for_heatmap <- head(sig_for_heatmap, 50)
+    sig_genes <- unique(sig_for_heatmap$gene_id)
+    if (length(sig_genes) >= 2) {
+      hm <- SummarizedExperiment::assay(vst_obj)[sig_genes, contrast_sample_ids, drop = FALSE]
+      gene_labels <- sig_for_heatmap$gene_symbol_plot[match(sig_genes, sig_for_heatmap$gene_id)]
+      rownames(hm) <- make.unique(gene_labels)
+      hm_colors <- gradient_palette(255)
+      grDevices::pdf(file.path(contrast_dir, paste0(contrast_label, ".sig_diff_", feature_file_stem, ".heatmap.pdf")), width = 10, height = 10)
+      pheatmap::pheatmap(
+        hm,
+        color = hm_colors,
+        scale = "row",
+        annotation_col = contrast_annotation_df,
+        annotation_colors = contrast_annotation_colors,
+        cluster_rows = sig_heatmap_cluster_rows,
+        cluster_cols = sig_heatmap_cluster_cols,
+        show_rownames = TRUE,
+        show_colnames = FALSE
+      )
+      grDevices::dev.off()
+    }
+  }
+
+  genes_tested <- sum(!is.na(res_df$padj))
+  sig_up <- sum(!is.na(res_df$padj) & res_df$padj < alpha & res_df$log2FoldChange >= lfc_for_sig)
+  sig_down <- sum(!is.na(res_df$padj) & res_df$padj < alpha & res_df$log2FoldChange <= -lfc_for_sig)
+  contrast_summary <- data.frame(
+    contrast = contrast_label,
+    contrast_type = contrast_type,
+    positive_direction = positive_direction,
+    negative_direction = negative_direction,
+    factor = factor_name,
+    numerator = numerator,
+    denominator = denominator,
+    coefficient_name = coefficient_name,
+    genes_tested = genes_tested,
+    genes_with_pvalue = testing_summary$genes_with_pvalue,
+    genes_with_padj = testing_summary$genes_with_padj,
+    genes_padj_na_with_pvalue = testing_summary$genes_padj_na_with_pvalue,
+    sig_total = nrow(sig_df),
+    sig_up = sig_up,
+    sig_down = sig_down,
+    alpha = alpha,
+    lfc_threshold = lfc_for_sig,
+    stringsAsFactors = FALSE
+  )
+  contrast_summaries[[length(contrast_summaries) + 1]] <- contrast_summary
+
+  top10_df <- subset(res_df, !is.na(padj) & abs(log2FoldChange) >= lfc_for_sig)
+  top10_df <- top10_df[order(top10_df$padj, -abs(top10_df$log2FoldChange)), , drop = FALSE]
+  top10_df$gene_symbol_plot <- top10_df$feature_label
+  top10_df <- top10_df[!is.na(top10_df$gene_symbol_plot) & nzchar(top10_df$gene_symbol_plot), , drop = FALSE]
+  top10_df <- head(top10_df, 10)
+  if (nrow(top10_df) > 0 && contrast_type == "factor" && factor_name %in% colnames(col_data)) {
+    boxplot_dir <- file.path(contrast_dir, "top10_boxplots")
+    dir.create(boxplot_dir, recursive = TRUE, showWarnings = FALSE)
+    boxplot_col_data <- col_data[contrast_sample_ids, , drop = FALSE]
+    group_values <- factor(as.character(boxplot_col_data[[factor_name]]), levels = c(numerator, denominator))
+    group_palette <- categorical_palette(
+      c(numerator, denominator),
+      palette_name = palette_name_for_column(factor_name)
+    )
+    for (idx in seq_len(nrow(top10_df))) {
+      gene_id <- top10_df$gene_id[idx]
+      if (!(gene_id %in% rownames(SummarizedExperiment::assay(vst_obj)))) {
+        next
+      }
+      feature_label_plot <- top10_df$gene_symbol_plot[idx]
+      if (is.na(feature_label_plot) || !nzchar(feature_label_plot)) {
+        next
+      }
+      plot_df <- data.frame(
+        sample = rownames(boxplot_col_data),
+        expression = as.numeric(SummarizedExperiment::assay(vst_obj)[gene_id, contrast_sample_ids]),
+        group = group_values,
+        stringsAsFactors = FALSE
+      )
+      p_box <- ggplot2::ggplot(plot_df, ggplot2::aes(x = group, y = expression, color = group)) +
+        ggplot2::geom_boxplot(outlier.shape = NA) +
+        ggplot2::geom_jitter(width = 0.15, size = 2, alpha = 0.8) +
+        ggplot2::scale_color_manual(values = group_palette, drop = FALSE) +
+        ggplot2::xlab(factor_name) +
+        ggplot2::ylab("VST expression") +
+        ggplot2::ggtitle(feature_label_plot) +
+        ggplot2::theme_light() +
+        ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none")
+      plot_file <- file.path(
+        boxplot_dir,
+        paste0(sanitize_file_component(feature_label_plot, fallback = sanitize_file_component(gene_id)), ".boxplot.pdf")
+      )
+      ggplot2::ggsave(plot_file, p_box, width = 7, height = 5)
+    }
+  }
+
+  if (enrichment_enabled && enrichment_cp_enabled && cp_available) {
+    cp_dir <- file.path(contrast_dir, "clusterProfiler")
+    dir.create(cp_dir, recursive = TRUE, showWarnings = FALSE)
+    split_sets <- list(
+      promoter = subset(enrich_df, peak_region %in% c("promoter")),
+      distal = subset(enrich_df, peak_region %in% c("intergenic")),
+      gene_body = subset(enrich_df, peak_region %in% c("exon", "intron"))
+    )
+
+    run_ora_term2gene <- function(gene_symbols, term2gene_tbl, set_name, direction_label, universe_symbols, output_dir = cp_dir, split_name = "all") {
+      if (length(gene_symbols) < 2 || is.null(term2gene_tbl) || nrow(term2gene_tbl) == 0) {
+        return(NULL)
+      }
+      ora_obj <- tryCatch(
+        clusterProfiler::enricher(
+          gene = gene_symbols,
+          universe = universe_symbols,
+          TERM2GENE = term2gene_tbl,
+          pvalueCutoff = enrichment_pvalue_cutoff,
+          qvalueCutoff = enrichment_qvalue_cutoff,
+          minGSSize = enrichment_min_gs_size,
+          maxGSSize = enrichment_max_gs_size
+        ),
+        error = function(e) {
+          message("ORA failed for ", contrast_label, " [", set_name, ", ", direction_label, "]: ", conditionMessage(e))
+          NULL
+        }
+      )
+      ora_tbl <- safe_cp_result_table(ora_obj)
+      if (is.null(ora_tbl)) {
+        return(NULL)
+      }
+      utils::write.table(
+        ora_tbl,
+        file = file.path(output_dir, paste0(contrast_label, ".", set_name, ".", direction_label, ".ORA.tsv")),
+        sep = "\t",
+        quote = FALSE,
+        row.names = FALSE
+      )
+      dot_plot <- tryCatch(
+        enrichplot::dotplot(ora_obj, showCategory = enrichment_top_terms) +
+          ggplot2::ggtitle(paste0(contrast_label, " ", set_name, " ORA (", direction_label, ")")) +
+          ggplot2::labs(subtitle = direction_caption),
+        error = function(e) NULL
+      )
+      save_enrichment_plot(
+        dot_plot,
+        file.path(output_dir, paste0(contrast_label, ".", set_name, ".", direction_label, ".dotplot.ORA.pdf"))
+      )
+      bar_plot <- tryCatch(
+        clusterProfiler::barplot(ora_obj, showCategory = enrichment_top_terms) +
+          ggplot2::ggtitle(paste0(contrast_label, " ", set_name, " ORA (", direction_label, ")")) +
+          ggplot2::labs(subtitle = direction_caption),
+        error = function(e) NULL
+      )
+      save_enrichment_plot(
+        bar_plot,
+        file.path(output_dir, paste0(contrast_label, ".", set_name, ".", direction_label, ".barplot.ORA.pdf"))
+      )
+      enrichment_rows[[length(enrichment_rows) + 1]] <<- data.frame(
+        contrast = contrast_label,
+        positive_direction = positive_direction,
+        negative_direction = negative_direction,
+        method = "ORA",
+        gene_set = paste0(split_name, "::", set_name),
+        direction = direction_label,
+        terms = nrow(ora_tbl),
+        top_term = as.character(ora_tbl$Description[[1]]),
+        top_padj = as.numeric(ora_tbl$p.adjust[[1]]),
+        stringsAsFactors = FALSE
+      )
+      ora_tbl
+    }
+
+    run_gsea_term2gene <- function(ranked_vec, term2gene_tbl, set_name, output_dir = cp_dir, split_name = "all") {
+      if (length(ranked_vec) < 10 || is.null(term2gene_tbl) || nrow(term2gene_tbl) == 0) {
+        return(NULL)
+      }
+      gsea_args <- list(
+        geneList = ranked_vec,
+        TERM2GENE = term2gene_tbl,
+        pvalueCutoff = enrichment_pvalue_cutoff,
+        minGSSize = enrichment_min_gs_size,
+        maxGSSize = enrichment_max_gs_size,
+        verbose = FALSE
+      )
+      if ("nPermSimple" %in% names(formals(clusterProfiler::GSEA))) {
+        gsea_args$nPermSimple <- enrichment_gsea_permutations
+      }
+      gsea_obj <- tryCatch(
+        do.call(clusterProfiler::GSEA, gsea_args),
+        error = function(e) {
+          message("GSEA failed for ", contrast_label, " [", set_name, "]: ", conditionMessage(e))
+          NULL
+        }
+      )
+      gsea_tbl <- safe_cp_result_table(gsea_obj)
+      if (is.null(gsea_tbl)) {
+        return(NULL)
+      }
+      utils::write.table(
+        gsea_tbl,
+        file = file.path(output_dir, paste0(contrast_label, ".", set_name, ".GSEA.tsv")),
+        sep = "\t",
+        quote = FALSE,
+        row.names = FALSE
+      )
+      dot_plot <- tryCatch(
+        enrichplot::dotplot(gsea_obj, showCategory = enrichment_top_terms) +
+          ggplot2::ggtitle(paste0(contrast_label, " ", set_name, " GSEA")) +
+          ggplot2::labs(subtitle = direction_caption),
+        error = function(e) NULL
+      )
+      save_enrichment_plot(
+        dot_plot,
+        file.path(output_dir, paste0(contrast_label, ".", set_name, ".dotplot.GSEA.pdf"))
+      )
+      ridge_plot <- tryCatch(
+        enrichplot::ridgeplot(gsea_obj, showCategory = enrichment_top_terms) +
+          ggplot2::ggtitle(paste0(contrast_label, " ", set_name, " GSEA")) +
+          ggplot2::labs(subtitle = direction_caption),
+        error = function(e) NULL
+      )
+      save_enrichment_plot(
+        ridge_plot,
+        file.path(output_dir, paste0(contrast_label, ".", set_name, ".ridgeplot.GSEA.pdf"))
+      )
+      top_ids <- head(as.character(gsea_tbl$ID), min(10, nrow(gsea_tbl)))
+      if (length(top_ids) > 0) {
+        for (term_id in top_ids) {
+          gp <- tryCatch(
+            enrichplot::gseaplot2(
+              gsea_obj,
+              geneSetID = term_id,
+              title = paste0(term_id, "\n", direction_caption)
+            ),
+            error = function(e) NULL
+          )
+          save_enrichment_plot(
+            gp,
+            file.path(
+              output_dir,
+              paste0(contrast_label, ".", set_name, ".nesplot.", sanitize_file_component(term_id, "term"), ".GSEA.pdf")
+            ),
+            width = 10,
+            height = 6
+          )
+        }
+      }
+      enrichment_rows[[length(enrichment_rows) + 1]] <<- data.frame(
+        contrast = contrast_label,
+        positive_direction = positive_direction,
+        negative_direction = negative_direction,
+        method = "GSEA",
+        gene_set = paste0(split_name, "::", set_name),
+        direction = "ranked",
+        terms = nrow(gsea_tbl),
+        top_term = as.character(gsea_tbl$Description[[1]]),
+        top_padj = as.numeric(gsea_tbl$p.adjust[[1]]),
+        stringsAsFactors = FALSE
+      )
+      gsea_tbl
+    }
+
+    for (split_name in names(split_sets)) {
+      split_df <- split_sets[[split_name]]
+      if (is.null(split_df) || nrow(split_df) < 10) {
+        next
+      }
+      split_symbols <- split_df$gene_symbol_clean
+      split_symbols <- split_symbols[!is.na(split_symbols) & nzchar(split_symbols)]
+      universe_symbols <- unique(split_symbols)
+      if (length(universe_symbols) < 10) {
+        next
+      }
+      split_dir <- file.path(cp_dir, split_name)
+      dir.create(split_dir, recursive = TRUE, showWarnings = FALSE)
+
+      sig_for_enrich <- subset(split_df, !is.na(padj) & padj < enrichment_pvalue_cutoff)
+      pos_symbols <- unique(sig_for_enrich$gene_symbol_clean[sig_for_enrich$log2FoldChange > 0 & !is.na(sig_for_enrich$gene_symbol_clean)])
+      neg_symbols <- unique(sig_for_enrich$gene_symbol_clean[sig_for_enrich$log2FoldChange < 0 & !is.na(sig_for_enrich$gene_symbol_clean)])
+
+      ranked_stats <- split_df$log2FoldChange
+      names(ranked_stats) <- split_df$gene_symbol_clean
+      ranked_stats <- ranked_stats[!is.na(names(ranked_stats)) & is.finite(ranked_stats)]
+      ranked_stats <- deduplicate_ranked_vector(ranked_stats)
+
+      if (enrichment_cp_run_ora) {
+        for (set_name in names(msig_term2gene)) {
+          run_ora_term2gene(pos_symbols, msig_term2gene[[set_name]], set_name, "up", universe_symbols, output_dir = split_dir, split_name = split_name)
+          run_ora_term2gene(neg_symbols, msig_term2gene[[set_name]], set_name, "down", universe_symbols, output_dir = split_dir, split_name = split_name)
+        }
+      }
+      if (enrichment_cp_run_gsea) {
+        for (set_name in names(msig_term2gene)) {
+          run_gsea_term2gene(ranked_stats, msig_term2gene[[set_name]], set_name, output_dir = split_dir, split_name = split_name)
+        }
+      }
+    }
+  }
+
+  if (enrichment_enabled && custom_modules_enabled && !is.null(custom_modules_term2gene)) {
+    cm_dir <- file.path(contrast_dir, "custom_modules")
+    dir.create(cm_dir, recursive = TRUE, showWarnings = FALSE)
+    cm_set_name <- sanitize_file_component(custom_modules_name, "custom_modules")
+    split_sets_cm <- list(
+      promoter = subset(enrich_df, peak_region %in% c("promoter")),
+      distal = subset(enrich_df, peak_region %in% c("intergenic")),
+      gene_body = subset(enrich_df, peak_region %in% c("exon", "intron"))
+    )
+    for (split_name in names(split_sets_cm)) {
+      split_df <- split_sets_cm[[split_name]]
+      if (is.null(split_df) || nrow(split_df) < 10) {
+        next
+      }
+      split_symbols <- split_df$gene_symbol_clean
+      split_symbols <- split_symbols[!is.na(split_symbols) & nzchar(split_symbols)]
+      universe_symbols <- unique(split_symbols)
+      if (length(universe_symbols) < 10) {
+        next
+      }
+      split_dir <- file.path(cm_dir, split_name)
+      dir.create(split_dir, recursive = TRUE, showWarnings = FALSE)
+
+      sig_for_enrich <- subset(split_df, !is.na(padj) & padj < enrichment_pvalue_cutoff)
+      pos_symbols <- unique(sig_for_enrich$gene_symbol_clean[sig_for_enrich$log2FoldChange > 0 & !is.na(sig_for_enrich$gene_symbol_clean)])
+      neg_symbols <- unique(sig_for_enrich$gene_symbol_clean[sig_for_enrich$log2FoldChange < 0 & !is.na(sig_for_enrich$gene_symbol_clean)])
+
+      ranked_stats <- split_df$log2FoldChange
+      names(ranked_stats) <- split_df$gene_symbol_clean
+      ranked_stats <- ranked_stats[!is.na(names(ranked_stats)) & is.finite(ranked_stats)]
+      ranked_stats <- deduplicate_ranked_vector(ranked_stats)
+
+      if (custom_modules_run_ora) {
+        run_ora_term2gene(
+          pos_symbols,
+          custom_modules_term2gene,
+          cm_set_name,
+          "up",
+          universe_symbols = universe_symbols,
+          output_dir = split_dir,
+          split_name = split_name
+        )
+        run_ora_term2gene(
+          neg_symbols,
+          custom_modules_term2gene,
+          cm_set_name,
+          "down",
+          universe_symbols = universe_symbols,
+          output_dir = split_dir,
+          split_name = split_name
+        )
+      }
+
+      if (custom_modules_run_gsea) {
+        run_gsea_term2gene(
+          ranked_stats,
+          custom_modules_term2gene,
+          cm_set_name,
+          output_dir = split_dir,
+          split_name = split_name
+        )
+      }
+    }
+  }
+
+  if (enrichment_enabled && decoupler_enabled && decoupler_available &&
+      (decoupler_run_progeny || decoupler_run_tf_network)) {
+    dc_dir <- file.path(contrast_dir, "decoupler")
+    dir.create(dc_dir, recursive = TRUE, showWarnings = FALSE)
+
+    contrast_vst <- SummarizedExperiment::assay(vst_obj)[, contrast_sample_ids, drop = FALSE]
+    sample_symbol_ids <- symbols_for_ids(rownames(contrast_vst), fallback_to_ids = FALSE)
+    sample_symbol_ids[!is_valid_symbol(sample_symbol_ids)] <- NA_character_
+    dc_sample_mat <- aggregate_symbol_matrix(contrast_vst, sample_symbol_ids)
+
+    deg_symbol_ids <- enrich_df$gene_symbol_clean
+    dc_deg_mat_raw <- matrix(
+      enrich_df$log2FoldChange,
+      ncol = 1,
+      dimnames = list(deg_symbol_ids, contrast_label)
+    )
+    dc_deg_mat <- aggregate_symbol_matrix(dc_deg_mat_raw, rownames(dc_deg_mat_raw))
+
+    dc_deg_stats <- enrich_df[, c("gene_symbol_clean", "log2FoldChange", "pvalue"), drop = FALSE]
+    dc_deg_stats <- dc_deg_stats[!is.na(dc_deg_stats$gene_symbol_clean), , drop = FALSE]
+    dc_deg_stats <- dc_deg_stats[order(abs(dc_deg_stats$log2FoldChange), decreasing = TRUE), , drop = FALSE]
+    dc_deg_stats <- dc_deg_stats[!duplicated(dc_deg_stats$gene_symbol_clean), , drop = FALSE]
+    rownames(dc_deg_stats) <- dc_deg_stats$gene_symbol_clean
+
+    species_dc <- if (species_info$species_label %in% c("human", "mouse")) species_info$species_label else "human"
+
+    safe_decouple_run <- function(fun_name, mat, net, mor_col) {
+      if (!(fun_name %in% getNamespaceExports("decoupleR"))) {
+        return(NULL)
+      }
+      fun <- get(fun_name, envir = asNamespace("decoupleR"))
+      tryCatch(
+        fun(
+          mat = mat,
+          net = net,
+          .source = "source",
+          .target = "target",
+          .mor = mor_col,
+          minsize = decoupler_minsize
+        ),
+        error = function(e) {
+          message("decoupleR ", fun_name, " failed in ", contrast_label, ": ", conditionMessage(e))
+          NULL
+        }
+      )
+    }
+
+    plot_decoupler_detail <- function(net_tbl, activity_tbl, mor_col, out_prefix, label_suffix) {
+      if (is.null(activity_tbl) || nrow(activity_tbl) == 0) {
+        return()
+      }
+      activity_tbl <- activity_tbl[is.finite(activity_tbl$score), , drop = FALSE]
+      if (nrow(activity_tbl) == 0) {
+        return()
+      }
+      activity_tbl <- activity_tbl[order(activity_tbl$score), , drop = FALSE]
+      n_each <- min(decoupler_top_regulators_detail_each_side, floor(nrow(activity_tbl) / 2))
+      if (n_each < 1) {
+        return()
+      }
+      top_regs <- c(
+        head(activity_tbl$source, n_each),
+        tail(activity_tbl$source, n_each)
+      )
+      top_regs <- unique(as.character(top_regs))
+      cols <- rev(RColorBrewer::brewer.pal(n = 11, name = "RdBu")[c(2, 10)])
+      for (reg in top_regs) {
+        reg_net <- net_tbl[net_tbl$source == reg, c("target", mor_col), drop = FALSE]
+        colnames(reg_net) <- c("target", "mor_value")
+        reg_net <- reg_net[!is.na(reg_net$target), , drop = FALSE]
+        if (nrow(reg_net) == 0) {
+          next
+        }
+        inter <- intersect(reg_net$target, rownames(dc_deg_stats))
+        if (length(inter) < 3) {
+          next
+        }
+        plot_df <- data.frame(
+          target = inter,
+          mor = reg_net$mor_value[match(inter, reg_net$target)],
+          logfc = dc_deg_stats[inter, "log2FoldChange"],
+          pvalue = dc_deg_stats[inter, "pvalue"],
+          stringsAsFactors = FALSE
+        )
+        plot_df$color_class <- "neutral"
+        plot_df$color_class[plot_df$mor > 0 & plot_df$logfc > 0] <- "concordant"
+        plot_df$color_class[plot_df$mor < 0 & plot_df$logfc < 0] <- "concordant"
+        plot_df$color_class[plot_df$mor > 0 & plot_df$logfc < 0] <- "discordant"
+        plot_df$color_class[plot_df$mor < 0 & plot_df$logfc > 0] <- "discordant"
+        p <- ggplot2::ggplot(
+          plot_df,
+          ggplot2::aes(x = mor, y = logfc, color = color_class)
+        ) +
+          ggplot2::geom_point(size = 2) +
+          ggplot2::scale_color_manual(values = c("concordant" = cols[2], "discordant" = cols[1], "neutral" = "grey60")) +
+          ggplot2::geom_vline(xintercept = 0, linetype = "dotted") +
+          ggplot2::geom_hline(yintercept = 0, linetype = "dotted") +
+          ggplot2::theme_light() +
+          ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none") +
+          ggplot2::xlab("Network weight") +
+          ggplot2::ylab("log2 fold change") +
+          ggplot2::ggtitle(reg)
+        if (requireNamespace("ggrepel", quietly = TRUE)) {
+          p <- p + ggrepel::geom_text_repel(
+            data = head(plot_df[order(abs(plot_df$logfc), decreasing = TRUE), , drop = FALSE], 20),
+            ggplot2::aes(label = target),
+            size = 3
+          )
+        }
+        save_enrichment_plot(
+          p,
+          file.path(dc_dir, paste0(out_prefix, ".DE_", feature_file_stem, ".in.", sanitize_file_component(reg, "regulator"), ".", label_suffix, ".pdf")),
+          width = 9,
+          height = 7
+        )
+      }
+    }
+
+    if (decoupler_run_progeny && nrow(dc_sample_mat) >= 20 && nrow(dc_deg_mat) >= 20 &&
+        "get_progeny" %in% getNamespaceExports("decoupleR")) {
+      prog_net <- tryCatch(
+        decoupleR::get_progeny(organism = species_dc, top = decoupler_progeny_top),
+        error = function(e) {
+          message("get_progeny failed in ", contrast_label, ": ", conditionMessage(e))
+          NULL
+        }
+      )
+      if (!is.null(prog_net) && nrow(prog_net) > 0) {
+        prog_all <- safe_decouple_run("run_mlm", dc_sample_mat, prog_net, "weight")
+        prog_deg <- safe_decouple_run("run_mlm", dc_deg_mat, prog_net, "weight")
+        if (!is.null(prog_all)) {
+          utils::write.table(
+            prog_all,
+            file = file.path(dc_dir, paste0(contrast_label, ".", all_feature_file_stem, ".progeny_pathways.tsv")),
+            sep = "\t",
+            quote = FALSE,
+            row.names = FALSE
+          )
+          prog_all_mat <- decoupler_to_matrix(as.data.frame(prog_all))
+          plot_decoupler_heatmap(
+            prog_all_mat,
+            file.path(dc_dir, paste0(contrast_label, ".", all_feature_file_stem, ".progeny_pathways.pdf")),
+            paste0(contrast_label, " progeny pathway activity\n", direction_caption),
+            top_features = decoupler_top_features_heatmap
+          )
+        }
+        if (!is.null(prog_deg)) {
+          utils::write.table(
+            prog_deg,
+            file = file.path(dc_dir, paste0(contrast_label, ".", de_feature_file_stem, ".progeny_pathways.tsv")),
+            sep = "\t",
+            quote = FALSE,
+            row.names = FALSE
+          )
+          plot_decoupler_bar(
+            as.data.frame(prog_deg),
+            file.path(dc_dir, paste0(contrast_label, ".", de_feature_file_stem, ".progeny_pathways.pdf")),
+            paste0(contrast_label, " progeny pathway activity (DE ", feature_label_plural, ")\n", direction_caption),
+            top_n = decoupler_top_regulators_barplot
+          )
+          plot_decoupler_detail(
+            net_tbl = prog_net,
+            activity_tbl = as.data.frame(prog_deg),
+            mor_col = "weight",
+            out_prefix = contrast_label,
+            label_suffix = "progeny_pathway"
+          )
+          prog_deg_tbl <- as.data.frame(prog_deg)
+          if (all(c("source", "score") %in% colnames(prog_deg_tbl))) {
+            top_prog <- prog_deg_tbl[order(-abs(prog_deg_tbl$score)), , drop = FALSE]
+            enrichment_rows[[length(enrichment_rows) + 1]] <- data.frame(
+              contrast = contrast_label,
+              positive_direction = positive_direction,
+              negative_direction = negative_direction,
+              method = "decoupleR_MLM",
+              gene_set = "progeny",
+              direction = "ranked",
+              terms = nrow(prog_deg_tbl),
+              top_term = as.character(top_prog$source[[1]]),
+              top_padj = NA_real_,
+              stringsAsFactors = FALSE
+            )
+          }
+        }
+      }
+    }
+
+    if (decoupler_run_tf_network && nrow(dc_sample_mat) >= 20 && nrow(dc_deg_mat) >= 20 &&
+        "get_collectri" %in% getNamespaceExports("decoupleR")) {
+      tf_net <- tryCatch(
+        decoupleR::get_collectri(organism = species_dc, split_complexes = decoupler_tf_split_complexes),
+        error = function(e) {
+          message("get_collectri failed in ", contrast_label, ": ", conditionMessage(e))
+          NULL
+        }
+      )
+      if (!is.null(tf_net) && nrow(tf_net) > 0) {
+        tf_all <- safe_decouple_run("run_ulm", dc_sample_mat, tf_net, "mor")
+        tf_deg <- safe_decouple_run("run_ulm", dc_deg_mat, tf_net, "mor")
+        if (!is.null(tf_all)) {
+          utils::write.table(
+            tf_all,
+            file = file.path(dc_dir, paste0(contrast_label, ".", all_feature_file_stem, ".TF_network_activity.tsv")),
+            sep = "\t",
+            quote = FALSE,
+            row.names = FALSE
+          )
+          tf_all_mat <- decoupler_to_matrix(as.data.frame(tf_all))
+          plot_decoupler_heatmap(
+            tf_all_mat,
+            file.path(dc_dir, paste0(contrast_label, ".", all_feature_file_stem, ".TF_network_activity.pdf")),
+            paste0(contrast_label, " TF network activity\n", direction_caption),
+            top_features = decoupler_top_features_heatmap
+          )
+        }
+        if (!is.null(tf_deg)) {
+          utils::write.table(
+            tf_deg,
+            file = file.path(dc_dir, paste0(contrast_label, ".", de_feature_file_stem, ".TF_network_activity.tsv")),
+            sep = "\t",
+            quote = FALSE,
+            row.names = FALSE
+          )
+          plot_decoupler_bar(
+            as.data.frame(tf_deg),
+            file.path(dc_dir, paste0(contrast_label, ".", de_feature_file_stem, ".TF_network_activity.pdf")),
+            paste0(contrast_label, " TF network activity (DE ", feature_label_plural, ")\n", direction_caption),
+            top_n = decoupler_top_regulators_barplot
+          )
+          plot_decoupler_detail(
+            net_tbl = tf_net,
+            activity_tbl = as.data.frame(tf_deg),
+            mor_col = "mor",
+            out_prefix = contrast_label,
+            label_suffix = "TF_network_activity"
+          )
+          tf_deg_tbl <- as.data.frame(tf_deg)
+          if (all(c("source", "score") %in% colnames(tf_deg_tbl))) {
+            top_tf <- tf_deg_tbl[order(-abs(tf_deg_tbl$score)), , drop = FALSE]
+            enrichment_rows[[length(enrichment_rows) + 1]] <- data.frame(
+              contrast = contrast_label,
+              positive_direction = positive_direction,
+              negative_direction = negative_direction,
+              method = "decoupleR_ULM",
+              gene_set = "collectri_tf",
+              direction = "ranked",
+              terms = nrow(tf_deg_tbl),
+              top_term = as.character(top_tf$source[[1]]),
+              top_padj = NA_real_,
+              stringsAsFactors = FALSE
+            )
+          }
+        }
+      }
+    }
+  }
+
+  build_contrast_combined_summary <- function() {
+    panel_volcano <- NULL
+    panel_top_genes <- NULL
+    panel_top_paths <- NULL
+    panel_decoupler <- NULL
+
+    vdf <- res_df
+    vdf$padj[is.na(vdf$padj)] <- 1
+    vdf$log2FoldChange[is.na(vdf$log2FoldChange)] <- 0
+    vdf$neglog10padj <- -log10(pmax(vdf$padj, 1e-300))
+    vdf$is_sig <- vdf$padj < alpha & abs(vdf$log2FoldChange) >= lfc_for_sig
+    panel_volcano <- ggplot2::ggplot(vdf, ggplot2::aes(x = log2FoldChange, y = neglog10padj, color = is_sig)) +
+      ggplot2::geom_point(alpha = 0.6, size = 1.0) +
+      ggplot2::scale_color_manual(values = c("FALSE" = "grey70", "TRUE" = "firebrick")) +
+      ggplot2::geom_vline(xintercept = c(-lfc_for_sig, 0, lfc_for_sig), linetype = c("dashed", "solid", "dashed")) +
+      ggplot2::geom_hline(yintercept = -log10(alpha), linetype = "dashed") +
+      ggplot2::theme_light() +
+      ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none") +
+      ggplot2::xlab("log2 fold change") +
+      ggplot2::ylab("-log10 adjusted p-value") +
+      ggplot2::ggtitle(paste0(contrast_label, " volcano")) +
+      ggplot2::labs(subtitle = direction_caption)
+
+    tg <- sig_df
+    if (nrow(tg) > 0) {
+      tg <- tg[order(tg$padj, -abs(tg$log2FoldChange)), , drop = FALSE]
+      tg <- head(tg, 12)
+      tg$gene_plot <- tg$feature_label
+      tg$direction <- ifelse(tg$log2FoldChange >= 0, "up", "down")
+      tg$gene_plot <- factor(tg$gene_plot, levels = rev(tg$gene_plot))
+      panel_top_genes <- ggplot2::ggplot(
+        tg,
+        ggplot2::aes(x = gene_plot, y = log2FoldChange, fill = direction)
+      ) +
+        ggplot2::geom_col() +
+        ggplot2::coord_flip() +
+        ggplot2::scale_fill_manual(values = c("up" = "firebrick", "down" = "steelblue")) +
+        ggplot2::theme_light() +
+        ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none") +
+        ggplot2::xlab(NULL) +
+        ggplot2::ylab("log2 fold change") +
+        ggplot2::ggtitle(paste("Top DE", feature_label_plural))
+    } else {
+      panel_top_genes <- ggplot2::ggplot() +
+        ggplot2::annotate("text", x = 0.5, y = 0.5, label = paste("No significant", feature_label_plural)) +
+        ggplot2::theme_void() +
+        ggplot2::ggtitle(paste("Top DE", feature_label_plural))
+    }
+
+    path_rows <- list()
+    cp_dir <- file.path(contrast_dir, "clusterProfiler")
+    if (dir.exists(cp_dir)) {
+      cp_tables <- list.files(cp_dir, pattern = "\\.(ORA|GSEA)\\.tsv$", full.names = TRUE)
+      for (tab in cp_tables) {
+        tab_df <- tryCatch(utils::read.delim(tab, stringsAsFactors = FALSE, check.names = FALSE), error = function(e) NULL)
+        if (is.null(tab_df) || nrow(tab_df) == 0) {
+          next
+        }
+        p_col <- if ("p.adjust" %in% colnames(tab_df)) "p.adjust" else if ("qvalue" %in% colnames(tab_df)) "qvalue" else NA_character_
+        d_col <- if ("Description" %in% colnames(tab_df)) "Description" else if ("ID" %in% colnames(tab_df)) "ID" else NA_character_
+        if (is.na(p_col) || is.na(d_col)) {
+          next
+        }
+        score <- -log10(pmax(as.numeric(tab_df[[p_col]]), 1e-300))
+        keep <- is.finite(score)
+        if (!any(keep)) {
+          next
+        }
+        top_idx <- order(score[keep], decreasing = TRUE)
+        top_labels <- as.character(tab_df[[d_col]][keep])[top_idx]
+        top_scores <- score[keep][top_idx]
+        n_take <- min(5, length(top_scores))
+        if (n_take < 1) {
+          next
+        }
+        path_rows[[length(path_rows) + 1]] <- data.frame(
+          term = top_labels[seq_len(n_take)],
+          score = top_scores[seq_len(n_take)],
+          source = sub(paste0("^", contrast_label, "\\."), "", basename(tab)),
+          stringsAsFactors = FALSE
+        )
+      }
+    }
+    if (length(path_rows) > 0) {
+      path_df <- do.call(rbind, path_rows)
+      path_df <- path_df[order(path_df$score, decreasing = TRUE), , drop = FALSE]
+      path_df <- reduce_redundant_terms(
+        path_df,
+        term_col = "term",
+        score_col = "score",
+        max_terms = 12,
+        jaccard_cutoff = 0.6
+      )
+      path_df$term <- factor(path_df$term, levels = rev(unique(path_df$term)))
+      panel_top_paths <- ggplot2::ggplot(path_df, ggplot2::aes(x = term, y = score, fill = source)) +
+        ggplot2::geom_col() +
+        ggplot2::coord_flip() +
+        ggplot2::theme_light() +
+        ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none") +
+        ggplot2::xlab(NULL) +
+        ggplot2::ylab("-log10 adjusted p-value") +
+        ggplot2::ggtitle("Top enriched pathways")
+    } else {
+      panel_top_paths <- ggplot2::ggplot() +
+        ggplot2::annotate("text", x = 0.5, y = 0.5, label = "No enrichment results") +
+        ggplot2::theme_void() +
+        ggplot2::ggtitle("Top enriched pathways")
+    }
+
+    dc_rows <- list()
+    dc_dir <- file.path(contrast_dir, "decoupler")
+    if (dir.exists(dc_dir)) {
+      dc_tables <- list.files(dc_dir, pattern = "\\.tsv$", full.names = TRUE)
+      for (tab in dc_tables) {
+        tab_df <- tryCatch(utils::read.delim(tab, stringsAsFactors = FALSE, check.names = FALSE), error = function(e) NULL)
+        if (is.null(tab_df) || nrow(tab_df) == 0) {
+          next
+        }
+        if (!all(c("source", "score") %in% colnames(tab_df))) {
+          next
+        }
+        keep <- is.finite(as.numeric(tab_df$score))
+        if (!any(keep)) {
+          next
+        }
+        tmp <- tab_df[keep, c("source", "score"), drop = FALSE]
+        tmp$score <- as.numeric(tmp$score)
+        tmp <- tmp[order(abs(tmp$score), decreasing = TRUE), , drop = FALSE]
+        tmp <- head(tmp, 5)
+        tmp$source_file <- sub(paste0("^", contrast_label, "\\."), "", basename(tab))
+        dc_rows[[length(dc_rows) + 1]] <- tmp
+      }
+    }
+    if (length(dc_rows) > 0) {
+      dc_df <- do.call(rbind, dc_rows)
+      dc_df <- dc_df[order(abs(dc_df$score), decreasing = TRUE), , drop = FALSE]
+      dc_df <- head(dc_df, 12)
+      dc_df$regulator <- factor(dc_df$source, levels = rev(unique(dc_df$source)))
+      panel_decoupler <- ggplot2::ggplot(dc_df, ggplot2::aes(x = regulator, y = score, fill = source_file)) +
+        ggplot2::geom_col() +
+        ggplot2::coord_flip() +
+        ggplot2::theme_light() +
+        ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none") +
+        ggplot2::xlab(NULL) +
+        ggplot2::ylab("Activity score") +
+        ggplot2::ggtitle("Top decoupleR activities")
+    } else {
+      panel_decoupler <- ggplot2::ggplot() +
+        ggplot2::annotate("text", x = 0.5, y = 0.5, label = "No decoupleR results") +
+        ggplot2::theme_void() +
+        ggplot2::ggtitle("Top decoupleR activities")
+    }
+
+    out_file <- file.path(contrast_dir, paste0(contrast_label, ".combined_summary.pdf"))
+    grDevices::pdf(out_file, width = 14, height = 10)
+    grid::grid.newpage()
+    lay <- grid::grid.layout(
+      nrow = 2,
+      ncol = 2,
+      widths = grid::unit(c(1, 1), "null"),
+      heights = grid::unit(c(1, 1), "null")
+    )
+    grid::pushViewport(grid::viewport(layout = lay))
+    print(panel_volcano, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 1))
+    print(panel_top_genes, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 2))
+    print(panel_top_paths, vp = grid::viewport(layout.pos.row = 2, layout.pos.col = 1))
+    print(panel_decoupler, vp = grid::viewport(layout.pos.row = 2, layout.pos.col = 2))
+    grid::popViewport()
+    grDevices::dev.off()
+  }
+
+  build_contrast_combined_summary()
+}
+
+if (length(contrast_summaries) > 0) {
+  contrast_summary_table <- do.call(rbind, contrast_summaries)
+  utils::write.table(
+    contrast_summary_table,
+    file = file.path(de_dir, "contrast_summary.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+
+  summary_plot_df <- rbind(
+    data.frame(
+      contrast = contrast_summary_table$contrast,
+      direction = "up",
+      count = contrast_summary_table$sig_up,
+      stringsAsFactors = FALSE
+    ),
+    data.frame(
+      contrast = contrast_summary_table$contrast,
+      direction = "down",
+      count = contrast_summary_table$sig_down,
+      stringsAsFactors = FALSE
+    )
+  )
+  summary_plot_df$contrast <- factor(
+    summary_plot_df$contrast,
+    levels = contrast_summary_table$contrast[order(contrast_summary_table$sig_total, decreasing = TRUE)]
+  )
+  summary_plot_df$direction <- factor(summary_plot_df$direction, levels = c("up", "down"))
+
+  p_summary <- ggplot2::ggplot(summary_plot_df, ggplot2::aes(x = contrast, y = count, fill = direction)) +
+    ggplot2::geom_col(position = "dodge") +
+    ggplot2::scale_fill_manual(values = c("up" = "firebrick", "down" = "steelblue")) +
+    ggplot2::xlab("Contrast") +
+    ggplot2::ylab(paste("Significant", feature_label_plural)) +
+    ggplot2::theme_light() +
+    ggplot2::theme(
+      panel.grid = ggplot2::element_blank(),
+      axis.text.x = ggplot2::element_text(angle = 30, hjust = 1),
+      legend.title = ggplot2::element_blank()
+    )
+  ggplot2::ggsave(
+    filename = file.path(de_dir, "contrast_summary.sig_up_down_barplot.pdf"),
+    plot = p_summary,
+    width = 10,
+    height = 6
+  )
+}
+
+if (length(contrast_testing_summaries) > 0) {
+  contrast_testing_table <- do.call(rbind, contrast_testing_summaries)
+  utils::write.table(
+    contrast_testing_table,
+    file = file.path(qc_dir, "contrast_testing_summary.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+}
+
+if (length(enrichment_rows) > 0) {
+  enrichment_summary <- do.call(rbind, enrichment_rows)
+  enrichment_summary <- enrichment_summary[order(enrichment_summary$contrast, enrichment_summary$method, enrichment_summary$gene_set), , drop = FALSE]
+  utils::write.table(
+    enrichment_summary,
+    file = file.path(de_dir, "enrichment_summary.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+}
+
+writeLines(capture.output(sessionInfo()), con = file.path(qc_dir, "sessionInfo.txt"))

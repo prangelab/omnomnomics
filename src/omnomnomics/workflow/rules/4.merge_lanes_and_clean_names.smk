@@ -34,7 +34,7 @@ rule merge_bam:
         partition = master_config['partition'],
         runtime = Runtime_Per_Rule['4']
     run:
-        log_once(logfile, "step4.header", "Merging lanes...", f"EXECUTING STEP {master_config['merge_rule_num']}")
+        log_once(logfile, "step4.header", "Merging BAM inputs...", f"EXECUTING STEP {master_config['merge_rule_num']}")
         log_once(logfile, "step4.inputfolder", f"Input folder: {params.inputfolder}")
         log_once(logfile, "step4.outputfolder", f"Output folder: {params.outputfolder}")
             
@@ -52,76 +52,66 @@ rule merge_bam:
             def quote(path):
                 return shlex.quote(path)
 
-            # Check if we have lane info
-            input_bamfiles = glob.glob(f"{inputfolder}/{sample4}_L*.bam")
+            grouped_input_units = input_units_for_merged_sample(sample4)
+            input_bamfiles = [
+                os.path.join(inputfolder, f"{input_unit}.bam")
+                for input_unit in grouped_input_units
+                if os.path.exists(os.path.join(inputfolder, f"{input_unit}.bam"))
+            ]
+            output_bam = os.path.join(inputfolder, f"{sample4}.bam")
+            technical_replicates = sorted(
+                {
+                    technical_replicate
+                    for technical_replicate in (
+                        metadata_value_for_sample(input_unit, "technical_replicate", "")
+                        for input_unit in grouped_input_units
+                    )
+                    if technical_replicate
+                }
+            )
             try:
                 if input_bamfiles:
-                    # Initialize a dictionary to store sample4 names and their associated lane numbers with aligner extensions
-                    sample_lane_dict = {}
-
-                    # Iterate through each BAM file in the list of bam_files
-                    for bam_file in input_bamfiles:
-                        # Extract the base name of the BAM file (i.e., the file name without the directory path)
-                        basename = os.path.basename(bam_file)
-                        
-                        # Extract sample4 name, lane information, and aligner extension
-                        parts = basename.split('_L00')
-                        sample2 = parts[0]
-                        lane_and_extension = parts[1].split('.', 1)
-                        lane_number = 'L00' + lane_and_extension[0]  # Get the full lane number (e.g., L001, L002)
-                        ext = '.' + lane_and_extension[1]  # Get the aligner extension or empty string
-
-                        # Create a unique key for the sample4 and aligner extension
-                        sample_key = f"{sample2}{ext}"
-
-                        # If the sample_key is not already in the dictionary, add it with an empty set as its value
-                        if sample_key not in sample_lane_dict:
-                            sample_lane_dict[sample_key] = set()
-                        
-                        # Add the lane number to the set of lane numbers for this sample_key
-                        sample_lane_dict[sample_key].add(lane_number)
-
-                    # Iterate over the samples with multiple lanes
-                    for sample_key, lanes in sample_lane_dict.items():
-                        # Get number of lanes (L00n)
-                        num_lanes = len(lanes)
-                        # Merge only if more than one lane was run
-                        if num_lanes > 1:
-                            # Collect the set of files per sample
-                            parts = sample_key.split('.', 1)
-                            sample3 = parts[0]
-                            ext = '.'+parts[1]
-                            #All files for this samples with different lane numbers but same aligners extension
-                            bam_list = glob.glob(f"{inputfolder}/{sample3}_L0*{ext}")
-
-                            # Set clean names
-                            myname = parts[0]   # the sample name without lane info or aligner extension
-
-                            # Run samtools merge
-                            record_step_note(master_config['merge_rule_num'], myname, "merging_lanes")
-                            local_bam_list = []
-                            for bamfile in bam_list:
-                                local_bam = os.path.join(local_workdir, os.path.basename(bamfile))
-                                shell(f'cp {quote(bamfile)} {quote(local_bam)}')
-                                local_bam_list.append(local_bam)
-                            local_output = os.path.join(local_workdir, f"{myname}{ext}")
-                            merge_command = f"samtools merge -@ {threads} -o {quote(local_output)} {' '.join(quote(bam) for bam in local_bam_list)}"
-                            record_step_command(master_config['merge_rule_num'], myname, merge_command)
-                            shell(merge_command)
-                            shell(f'cp {quote(local_output)} {quote(os.path.join(inputfolder, f"{myname}{ext}"))}')
-                            shell(f"""echo "necessity file for merge bams. can delete this." > {inputfolder}/{wildcards.sample4}.extra_4.tmp""")
+                    record_step_note(
+                        master_config['merge_rule_num'],
+                        sample4,
+                        "merge_inputs=" + ",".join(os.path.basename(path) for path in input_bamfiles),
+                    )
+                    if technical_replicates:
+                        record_step_note(
+                            master_config['merge_rule_num'],
+                            sample4,
+                            "technical_replicates=" + ",".join(technical_replicates),
+                        )
+                    if len(input_bamfiles) > 1:
+                        local_bam_list = []
+                        for bamfile in input_bamfiles:
+                            local_bam = os.path.join(local_workdir, os.path.basename(bamfile))
+                            shell(f"cp {quote(bamfile)} {quote(local_bam)}")
+                            local_bam_list.append(local_bam)
+                        local_output = os.path.join(local_workdir, f"{sample4}.bam")
+                        merge_command = (
+                            f"samtools merge -@ {threads} -o {quote(local_output)} "
+                            + " ".join(quote(bam) for bam in local_bam_list)
+                        )
+                        record_step_note(master_config['merge_rule_num'], sample4, "merging_input_units")
+                        record_step_command(master_config['merge_rule_num'], sample4, merge_command)
+                        shell(merge_command)
+                        shell(f"cp {quote(local_output)} {quote(output_bam)}")
+                    else:
+                        source_bam = input_bamfiles[0]
+                        if os.path.abspath(source_bam) != os.path.abspath(output_bam):
+                            record_step_note(master_config['merge_rule_num'], sample4, "renaming_single_input_bam")
+                            shell(f"cp {quote(source_bam)} {quote(output_bam)}")
                         else:
-                            # If there is only one lane we don't need to bother with merging and can simply clean the name
-                            parts = sample_key.split('.', 1)
-                            from_file = glob.glob(f"{inputfolder}/{parts[0]}_L00*.{parts[1]}")[0]
-                            to_file = os.path.join(inputfolder, parts[0] + ('.'+parts[1]))
-                            record_step_note(master_config['merge_rule_num'], parts[0], "renaming_single_lane_bam")
-                            shell(f"cp {quote(from_file)} {quote(to_file)}")
-                            shell(f"""echo "necessity file for merge bams. can delete this." > {inputfolder}/{wildcards.sample4}.extra_4.tmp""")
-
-                else:
-                    record_step_note(master_config['merge_rule_num'], sample4, "no_lane_info_found")
+                            record_step_note(master_config['merge_rule_num'], sample4, "single_input_bam_already_canonical")
                     shell(f"""echo "necessity file for merge bams. can delete this." > {inputfolder}/{wildcards.sample4}.extra_4.tmp""")
+                elif os.path.exists(output_bam):
+                    record_step_note(master_config['merge_rule_num'], sample4, "canonical_bam_already_present")
+                    shell(f"""echo "necessity file for merge bams. can delete this." > {inputfolder}/{wildcards.sample4}.extra_4.tmp""")
+                else:
+                    raise FileNotFoundError(
+                        f"No input BAMs resolved for merged sample '{sample4}' in {inputfolder}."
+                    )
                 finish_step_sample(master_config['merge_rule_num'], sample4, "merge_bam", tracking["start_time"], "OK")
             except Exception:
                 finish_step_sample(master_config['merge_rule_num'], sample4, "merge_bam", tracking["start_time"], "FAIL")

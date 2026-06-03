@@ -9,8 +9,8 @@ import yaml
 
 def check_config_file_header(config_file_path, expected_header):
     with open(config_file_path, "r") as config_file:
-        lines = config_file.readlines()
-        if len(lines) < 3 or expected_header not in lines[2]:
+        header_lines = [line.strip() for line in config_file if line.strip()]
+        if len(header_lines) < 1 or expected_header not in header_lines[0]:
             print("Config file does not contain right header. Aborting...", file=sys.stderr)
             sys.exit(1)
 
@@ -42,6 +42,10 @@ SPECIES_ALIASES = {
     "human": "homo sapiens",
     "mouse": "mus musculus",
 }
+INSTALLED_SPECIES_HINTS = {
+    "homo sapiens": ("grch", "hg", "human", "homo_sapiens", "homo sapiens"),
+    "mus musculus": ("grcm", "mm", "mouse", "mus_musculus", "mus musculus"),
+}
 
 
 def load_site_settings(workflow_root, workflow_config_file, site_config_file):
@@ -66,10 +70,17 @@ def parse_genomes_arguments(argv):
 
     subparsers = parser.add_subparsers(dest="genomes_command", required=True)
 
-    list_parser = subparsers.add_parser("list", help="List available assemblies for a species")
+    list_parser = subparsers.add_parser("list", aliases=["ls"], help="List available assemblies for a species")
     list_parser.add_argument("--species", default="homo sapiens", help="Species search term")
     list_parser.add_argument("--provider", default="GENCODE", help="Provider name for genomepy search")
     list_parser.add_argument("--limit", type=int, default=25, help="Maximum number of rows to show")
+
+    installed_parser = subparsers.add_parser("installed", aliases=["local"], help="List locally installed assemblies")
+    installed_parser.add_argument(
+        "--species",
+        help="Optional species hint to filter installed assemblies by assembly name, e.g. human or mouse",
+    )
+    installed_parser.add_argument("--limit", type=int, default=100, help="Maximum number of rows to show")
 
     install_parser = subparsers.add_parser("install", help="Download and normalize one or more assemblies")
     install_parser.add_argument("--species", default="homo sapiens", help="Species search term if no assemblies are given")
@@ -155,6 +166,59 @@ def resolve_default_assembly(genomepy, species, provider):
 
 def print_rows(rows, limit):
     header = ["name", "provider", "accession", "tax_id", "annotation", "species", "other_info"]
+    print("\t".join(header))
+    for row in rows[:limit]:
+        print("\t".join(str(field) for field in row))
+
+
+def filter_installed_rows_by_species(rows, species):
+    if not species:
+        return rows
+
+    species_norm = normalize_species_name(species).strip().lower()
+    hint_tokens = INSTALLED_SPECIES_HINTS.get(species_norm)
+    if not hint_tokens:
+        compact_species = species_norm.replace(" ", "_")
+        hint_tokens = (species_norm, compact_species)
+
+    filtered_rows = [
+        row
+        for row in rows
+        if any(token in str(row[0]).lower() for token in hint_tokens)
+    ]
+    return filtered_rows
+
+
+def list_installed_rows(assembly_root, species=None):
+    assembly_root = Path(assembly_root)
+    if not assembly_root.is_dir():
+        print(f"Genome assembly root '{assembly_root}' does not exist.", file=sys.stderr)
+        sys.exit(1)
+
+    rows = []
+    for path in sorted(assembly_root.iterdir()):
+        if not path.is_dir() or path.name.startswith("."):
+            continue
+        fasta_ok = (path / "fasta" / "genome.fa").is_file()
+        gtf_ok = (path / "annotation" / "genes.gtf").is_file()
+        star_ok = has_complete_star_index(path / "star")
+        hisat2_ok = has_complete_hisat2_index(path / "hisat2", path.name)
+        rows.append(
+            (
+                path.name,
+                "yes" if fasta_ok else "no",
+                "yes" if gtf_ok else "no",
+                "yes" if star_ok else "no",
+                "yes" if hisat2_ok else "no",
+                str(path),
+            )
+        )
+
+    return filter_installed_rows_by_species(rows, species)
+
+
+def print_installed_rows(rows, limit):
+    header = ["name", "fasta", "gtf", "star", "hisat2", "path"]
     print("\t".join(header))
     for row in rows[:limit]:
         print("\t".join(str(field) for field in row))
@@ -392,6 +456,12 @@ def genomes_main(argv, workflow_root, workflow_config_file, default_site_config)
     args = parse_genomes_arguments(argv)
     site_config_file = Path(args.site_config).expanduser().resolve() if args.site_config else default_site_config
     config = load_site_settings(workflow_root, workflow_config_file, site_config_file)
+
+    if args.genomes_command == "installed":
+        rows = list_installed_rows(config["genome_assembly_dir"], getattr(args, "species", None))
+        print_installed_rows(rows, args.limit)
+        return
+
     genomepy = import_genomepy()
     args.species = normalize_species_name(args.species)
 

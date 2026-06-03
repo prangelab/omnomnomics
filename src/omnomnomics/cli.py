@@ -70,7 +70,44 @@ ANSI_WARNING = "\033[38;5;214m"
 FASTQ_EXTENSIONS = (".fastq.gz", ".fq.gz", ".fastq", ".fq")
 FASTQ_READ_SUFFIX_RE = re.compile(r'_(?:R)?[12](?:_[0-9]{3})?$')
 MERGED_LANE_SUFFIX_RE = re.compile(r'_L00.')
-METADATA_REQUIRED_STEPS = {9, 10, 11, 12}
+METADATA_REQUIRED_STEPS = {9, 10, 11, 12, 13, 14, 15, 16}
+ASSAY_PUBLIC_INTERNAL_STEP_MAP = {
+   "RNA": {i: i for i in range(1, 13)},
+   "ATAC": {
+      1: 1,
+      2: 2,
+      3: 3,
+      4: 4,
+      5: 5,
+      6: 6,
+      7: 7,
+      8: 8,
+      9: 9,
+      10: 10,
+      11: 13,
+      12: 14,
+      13: 11,
+      14: 15,
+      15: 16,
+   },
+   "CHIP": {
+      1: 1,
+      2: 2,
+      3: 3,
+      4: 4,
+      5: 5,
+      6: 6,
+      7: 7,
+      8: 8,
+      9: 9,
+      10: 10,
+      11: 13,
+      12: 14,
+      13: 11,
+      14: 15,
+      15: 16,
+   },
+}
 
 
 def parse_monitor_arguments(argv):
@@ -517,7 +554,17 @@ def parse_arguments(argv=None):
    parser.add_argument('--de-custom-modules-gmt', help='Path to a custom GMT file for optional custom module enrichment in step 12.')
    parser.add_argument('-I', '--input', help='Input BAM file used for ChIP peak calling with MACS3. \n \t Default: do not use input')
    parser.add_argument('-m', '--metadata', help='Tabular metadata file. The first column must be named filename. Metadata drives sample naming, peak grouping, trackhub grouping, and DE design.')
-   parser.add_argument('-b', '--broad', action='store_true', help='ChIP: Call broad histone marks with MACS3 --broad mode. Default is TF / narrow peaks.')
+   parser.add_argument('--broad-mode', choices=['off', 'domain', 'genebody', 'diffuse'], help='ChIP broad-mark handling mode. off keeps the narrow/TF-like path, domain uses MACS3 broad domains, genebody will use gene-body features, and diffuse will use tiled windows. Default: off')
+   parser.add_argument('--chip-broad-qvalue', type=float, help='Relaxed MACS3 q-value used for ChIP broad domain mode pooled/replicate/pseudoreplicate calls. Default: 0.05')
+   parser.add_argument('--chip-broad-cutoff', type=float, help='MACS3 --broad-cutoff value for ChIP broad domain mode. Default: 0.1')
+   parser.add_argument('--chip-broad-min-length', type=int, help='Optional MACS3 --min-length for ChIP broad domain mode. Default: unset')
+   parser.add_argument('--chip-broad-max-gap', type=int, help='Optional MACS3 --max-gap for ChIP broad domain mode. Default: unset')
+   parser.add_argument('--chip-broad-replicate-fraction', type=float, help='Minimum fraction of true replicates that must support a pooled broad domain in ChIP domain mode. Value in [0,1]. Default: 1.0')
+   parser.add_argument('--chip-broad-overlap-fraction', type=float, help='Minimum reciprocal overlap fraction used when evaluating support for pooled broad domains in ChIP domain mode. Value in (0,1]. Default: 0.5')
+   parser.add_argument('--chip-diffuse-bin-size', type=int, help='Fixed genomic bin size in bp for ChIP diffuse mode. Default: 10000')
+   parser.add_argument('--chip-diffuse-merge-gap', type=int, help='Maximum gap in bp used to merge adjacent significant diffuse bins into domains. Default: one bin width')
+   parser.add_argument('--chip-diffuse-keep-nonstandard-chroms', action='store_true', help='Keep nonstandard chromosomes in ChIP diffuse mode. Default filters to chr1-22,X,Y style chromosomes only.')
+   parser.add_argument('--chip-diffuse-keep-chrm', action='store_true', help='Keep chrM/MT bins in ChIP diffuse mode. Default excludes chrM/MT bins.')
    parser.add_argument('-C', '--col-table', help='File specifying which colors to use for the tracks. \n \t Default: gray.tint.color.table from the packaged palette directory. Can be a *txt list file with one color table per line. Different color tables will be used per hub when multiple sample_type groups are present. Can be a full path or a file basename in combination with -P. Use `omnomnomics create-track-color-table` to build custom palettes and `omnomnomics display-track-color-table` to preview them.')
    parser.add_argument('-P', '--color-data-folder', help='Path to a folder with color tables. \n \t Default: packaged color_data_for_hubs directory. Use this to point the workflow at custom palettes.') ##################change this default??
    parser.add_argument('-o', '--overlay', help='Overlay type (transparentOverlay|stacked|solidOverlay|none) \n \t Default: transparentOverlay')
@@ -533,6 +580,13 @@ def parse_arguments(argv=None):
    parser.add_argument('--de-columns', help='Metadata columns of interest for auto-building the DESeq2 design when --de-formula is not given.')
    parser.add_argument('--de-block', help='Metadata columns to include as blocking terms when auto-building the DESeq2 design.')
    parser.add_argument('--de-interactions', action='store_true', help='Include interaction terms when auto-building the DESeq2 design from exactly two --de-columns values.')
+   parser.add_argument('--atac-peak-opt-mode', choices=['none', 'fast', 'full'], help='ATAC step-10 peak optimization mode. none runs one fixed MACS3 call per group, fast runs a reduced candidate grid, full runs the full candidate grid.')
+   parser.add_argument('--chip-peak-opt-mode', choices=['none', 'fast', 'full'], help='ChIP narrow (TF-like) step-10 peak optimization mode. none runs one fixed MACS3 call per group, fast runs a reduced candidate grid, full runs the full candidate grid.')
+   parser.add_argument('--narrow-peak-strategy', choices=['idr', 'macs3'], help='Narrow-peak strategy for ATAC and narrow ChIP in step 10. idr uses replicate-consensus IDR (default), macs3 uses MACS3-only optimization.')
+   parser.add_argument('--idr-mode', choices=['basic', 'encode'], help='IDR mode when --narrow-peak-strategy idr is active. basic runs true-replicate pairwise IDR consensus; encode additionally runs pseudo-replicate IDR diagnostics.')
+   parser.add_argument('--idr-pair-fraction', type=float, help='Minimum fraction of replicate pairs that must support a peak in IDR basic/encode consensus. Value in [0,1]. Default: 0.5')
+   parser.add_argument('--idr-pairing-policy', choices=['all_pairs', 'anchor_vs_all'], help='Replicate pairing policy for IDR when groups have >2 replicates. all_pairs uses all pairwise combinations; anchor_vs_all pairs the first replicate with every other replicate.')
+   parser.add_argument('--spp-gate', choices=['none', 'warn', 'drop', 'strict'], help='SPP QC gate mode for ATAC/ChIP step 13. none disables SPP gating, warn reports flags only, drop excludes flagged samples from downstream count/DE, strict aborts if any sample fails thresholds.')
    parser.add_argument('-a', '--appendix', help='Appendix to add to track name \n \t Default: hub')
    parser.add_argument('-k', '--keepunpaired', action='store_true', help='Keep unpaired or not in HISAT2')
    parser.add_argument('--dry-run', action='store_true', help='Validate the workflow and build the Snakemake DAG without executing jobs')
@@ -941,6 +995,49 @@ def set_job_mode(args, config, experiment_dir, mode):
     mode_steps = sorted(mode_steps)
     return mode_steps, config
 
+
+def resolve_public_mode_steps(mode, public_max_step):
+    if mode == "auto":
+        mode = "all"
+    if mode == "all":
+        return list(range(1, public_max_step + 1))
+
+    if re.match(r'^[0-9]+$', mode):
+        steps = [int(mode)]
+    elif re.match(r'^[0-9]+-[0-9]+$', mode):
+        start, end = map(int, mode.split('-'))
+        if start > end:
+            print("Job mode range has to increase from start to end! Aborting...")
+            sys.exit(1)
+        steps = list(range(start, end + 1))
+    else:
+        steps = expand_range(mode)
+        if not all(isinstance(step, int) for step in steps):
+            print("Job mode should be 'all', 'auto', a single step number, a numeric range of steps separated by a dash (e.g., 1-12), or a number of ranges and steps separated by commas (e.g., 1-3,6,8,10-12).")
+            print("Aborting...")
+            sys.exit(1)
+        if any(steps[i] >= steps[i + 1] for i in range(len(steps) - 1)):
+            print("Job mode range has to increase from start to end! Aborting...")
+            sys.exit(1)
+
+    if any(step < 1 or step > public_max_step for step in steps):
+        print(f"Job mode range should lie between 1 and {public_max_step} for this assay. Aborting...")
+        sys.exit(1)
+    return sorted(steps)
+
+
+def map_public_to_internal_steps(assay_type, public_steps):
+    mapping = ASSAY_PUBLIC_INTERNAL_STEP_MAP.get(assay_type, {})
+    internal = []
+    for step in public_steps:
+        if step not in mapping:
+            print(f"Public step {step} is not defined for assay {assay_type}. Aborting...", file=sys.stderr)
+            sys.exit(1)
+        mapped = mapping[step]
+        if mapped not in internal:
+            internal.append(mapped)
+    return sorted(internal)
+
 ##---------------------------------------------------------------------------------------------------------------
 ## Set some parameters
 ##---------------------------------------------------------------------------------------------------------------
@@ -966,9 +1063,10 @@ def validate_input_files(the_type, config, mode_range_min, experiment_dir):
     input_folder_mod_range_min = input_folders[mode_range_min - 1]
     input_file_type_mod_range_min = input_file_types[mode_range_min - 1]
 
-    #For rules with multiple input filetypes, set it to the right one
-    if mode_range_min == 11:
+    # For rules with multiple input filetypes, use the first entry as primary sanity input
+    if isinstance(input_file_type_mod_range_min, list):
         input_file_type_mod_range_min = input_file_type_mod_range_min[0]
+    if isinstance(input_folder_mod_range_min, list):
         input_folder_mod_range_min = input_folder_mod_range_min[0]
 
 
@@ -978,20 +1076,14 @@ def validate_input_files(the_type, config, mode_range_min, experiment_dir):
 
     # Sanity check file number
     if num_files == 0:
-        if mode_range_min == 12 and the_type == "CHIP":
-                pass
-        else: 
-            print("No input files detected! Aborting...", file=sys.stderr)
-            sys.exit(1)
-   
-    if mode_range_min == 12 and the_type == "CHIP":
-        pass
-    else:
-        # Check if input files are readable
-        input_files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}")
-        if not os.access(input_files[0], os.R_OK):
-            print(f"Permission error! {input_file_type_mod_range_min} files in {experiment_dir}/{input_folder_mod_range_min} are not readable! Aborting...", file=sys.stderr)
-            sys.exit(1)
+        print("No input files detected! Aborting...", file=sys.stderr)
+        sys.exit(1)
+
+    # Check if input files are readable
+    input_files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}")
+    if not os.access(input_files[0], os.R_OK):
+        print(f"Permission error! {input_file_type_mod_range_min} files in {experiment_dir}/{input_folder_mod_range_min} are not readable! Aborting...", file=sys.stderr)
+        sys.exit(1)
 
 
     # Set the number of pairs (if dealing with FASTQs, else just keep it equal to file number)
@@ -1333,7 +1425,21 @@ def main():
         de_custom_modules_gmt = str(Path(de_custom_modules_gmt).expanduser().resolve())
     else:
         de_custom_modules_gmt = ""
-    broad = args.broad if args.broad else config.get('broad', "NA")
+    broad_mode = (args.broad_mode if args.broad_mode else config.get('broad_mode', 'off')).strip().lower()
+    chip_broad_qvalue = args.chip_broad_qvalue if args.chip_broad_qvalue is not None else config.get('chip_broad_qvalue', 0.05)
+    chip_broad_cutoff = args.chip_broad_cutoff if args.chip_broad_cutoff is not None else config.get('chip_broad_cutoff', 0.1)
+    chip_broad_min_length = args.chip_broad_min_length if args.chip_broad_min_length is not None else config.get('chip_broad_min_length', None)
+    chip_broad_max_gap = args.chip_broad_max_gap if args.chip_broad_max_gap is not None else config.get('chip_broad_max_gap', None)
+    chip_broad_replicate_fraction = args.chip_broad_replicate_fraction if args.chip_broad_replicate_fraction is not None else config.get('chip_broad_replicate_fraction', 1.0)
+    chip_broad_overlap_fraction = args.chip_broad_overlap_fraction if args.chip_broad_overlap_fraction is not None else config.get('chip_broad_overlap_fraction', 0.5)
+    chip_diffuse_bin_size = args.chip_diffuse_bin_size if args.chip_diffuse_bin_size is not None else config.get('chip_diffuse_bin_size', 10000)
+    chip_diffuse_merge_gap = args.chip_diffuse_merge_gap if args.chip_diffuse_merge_gap is not None else config.get('chip_diffuse_merge_gap', "auto")
+    chip_diffuse_standard_chroms_only = not args.chip_diffuse_keep_nonstandard_chroms
+    if 'chip_diffuse_standard_chroms_only' in config and not args.chip_diffuse_keep_nonstandard_chroms:
+        chip_diffuse_standard_chroms_only = bool(config.get('chip_diffuse_standard_chroms_only', True))
+    chip_diffuse_exclude_chrm = not args.chip_diffuse_keep_chrm
+    if 'chip_diffuse_exclude_chrm' in config and not args.chip_diffuse_keep_chrm:
+        chip_diffuse_exclude_chrm = bool(config.get('chip_diffuse_exclude_chrm', True))
     INPUT = args.input if args.input else config.get('input',"NA")
     metadata = args.metadata if args.metadata else config.get('metadata', "NA")
     col_table = resolve_config_path(args.col_table, workflow_root) if args.col_table else resolve_config_path(config.get('color_table', f"{workflow_root}/bin/color_data_for_hubs/gray.tint.color.table"), workflow_root)
@@ -1359,6 +1465,81 @@ def main():
     de_columns = args.de_columns if args.de_columns else config.get('de_columns', "")
     de_block = args.de_block if args.de_block else config.get('de_block', "")
     de_interactions = args.de_interactions or config.get('de_interactions', False)
+    atac_peak_opt_mode = (args.atac_peak_opt_mode if args.atac_peak_opt_mode else config.get('atac_peak_opt_mode', 'fast')).strip().lower()
+    chip_peak_opt_mode = (args.chip_peak_opt_mode if args.chip_peak_opt_mode else config.get('chip_peak_opt_mode', 'fast')).strip().lower()
+    narrow_peak_strategy = (args.narrow_peak_strategy if args.narrow_peak_strategy else config.get('narrow_peak_strategy', 'idr')).strip().lower()
+    idr_mode = (args.idr_mode if args.idr_mode else config.get('idr_mode', 'encode')).strip().lower()
+    idr_pair_fraction = args.idr_pair_fraction if args.idr_pair_fraction is not None else config.get('idr_pair_fraction', 0.5)
+    idr_pairing_policy = (args.idr_pairing_policy if args.idr_pairing_policy else config.get('idr_pairing_policy', 'all_pairs')).strip().lower()
+    try:
+        idr_pair_fraction = float(idr_pair_fraction)
+    except (TypeError, ValueError):
+        print("--idr-pair-fraction must be a numeric value in [0,1]. Aborting...", file=sys.stderr)
+        sys.exit(1)
+    if not (0.0 <= idr_pair_fraction <= 1.0):
+        print("--idr-pair-fraction must be within [0,1]. Aborting...", file=sys.stderr)
+        sys.exit(1)
+    try:
+        chip_broad_qvalue = float(chip_broad_qvalue)
+        chip_broad_cutoff = float(chip_broad_cutoff)
+        chip_broad_replicate_fraction = float(chip_broad_replicate_fraction)
+        chip_broad_overlap_fraction = float(chip_broad_overlap_fraction)
+    except (TypeError, ValueError):
+        print("ChIP broad-domain numeric parameters must be valid numbers. Aborting...", file=sys.stderr)
+        sys.exit(1)
+    if not (0.0 < chip_broad_qvalue <= 1.0):
+        print("--chip-broad-qvalue must be within (0,1]. Aborting...", file=sys.stderr)
+        sys.exit(1)
+    if not (0.0 < chip_broad_cutoff <= 1.0):
+        print("--chip-broad-cutoff must be within (0,1]. Aborting...", file=sys.stderr)
+        sys.exit(1)
+    if not (0.0 <= chip_broad_replicate_fraction <= 1.0):
+        print("--chip-broad-replicate-fraction must be within [0,1]. Aborting...", file=sys.stderr)
+        sys.exit(1)
+    if not (0.0 < chip_broad_overlap_fraction <= 1.0):
+        print("--chip-broad-overlap-fraction must be within (0,1]. Aborting...", file=sys.stderr)
+        sys.exit(1)
+    try:
+        chip_diffuse_bin_size = int(chip_diffuse_bin_size)
+    except (TypeError, ValueError):
+        print("--chip-diffuse-bin-size must be an integer. Aborting...", file=sys.stderr)
+        sys.exit(1)
+    if chip_diffuse_bin_size <= 0:
+        print("--chip-diffuse-bin-size must be > 0. Aborting...", file=sys.stderr)
+        sys.exit(1)
+    if chip_diffuse_merge_gap in ("", "NA", None, "auto"):
+        chip_diffuse_merge_gap = chip_diffuse_bin_size
+    try:
+        chip_diffuse_merge_gap = int(chip_diffuse_merge_gap)
+    except (TypeError, ValueError):
+        print("--chip-diffuse-merge-gap must be an integer or omitted. Aborting...", file=sys.stderr)
+        sys.exit(1)
+    if chip_diffuse_merge_gap < 0:
+        print("--chip-diffuse-merge-gap must be >= 0. Aborting...", file=sys.stderr)
+        sys.exit(1)
+    if chip_broad_min_length in ("", "NA"):
+        chip_broad_min_length = None
+    if chip_broad_max_gap in ("", "NA"):
+        chip_broad_max_gap = None
+    if chip_broad_min_length is not None:
+        try:
+            chip_broad_min_length = int(chip_broad_min_length)
+        except (TypeError, ValueError):
+            print("--chip-broad-min-length must be an integer. Aborting...", file=sys.stderr)
+            sys.exit(1)
+        if chip_broad_min_length <= 0:
+            print("--chip-broad-min-length must be > 0. Aborting...", file=sys.stderr)
+            sys.exit(1)
+    if chip_broad_max_gap is not None:
+        try:
+            chip_broad_max_gap = int(chip_broad_max_gap)
+        except (TypeError, ValueError):
+            print("--chip-broad-max-gap must be an integer. Aborting...", file=sys.stderr)
+            sys.exit(1)
+        if chip_broad_max_gap < 0:
+            print("--chip-broad-max-gap must be >= 0. Aborting...", file=sys.stderr)
+            sys.exit(1)
+    spp_gate = (args.spp_gate if args.spp_gate else config.get('spp_gate', 'warn')).strip().lower()
     appendix = args.appendix if args.appendix else config.get('appendix', "hub")
     keep_unpaired = args.keepunpaired if args.keepunpaired else config.get('keep_unpaired', False)
     dry_run = args.dry_run
@@ -1390,6 +1571,10 @@ def main():
     selected_routines['selected_routine_callpeaks'] = config['selected_routine_callpeaks']
     selected_routines['selected_routine_countreads'] = config['selected_routine_countreads']
     selected_routines['selected_routine_de'] = config['selected_routine_de']
+    selected_routines['selected_routine_peakqc'] = config['selected_routine_peakqc']
+    selected_routines['selected_routine_analyzepeaks'] = config['selected_routine_analyzepeaks']
+    selected_routines['selected_routine_dechrom'] = config['selected_routine_dechrom']
+    selected_routines['selected_routine_analyzepeaksde'] = config['selected_routine_analyzepeaksde']
 
     # Validate user-defined variables
     validate_user_defined_vars(workflow_root, metadata, experiment_dir, INPUT, color_data_folder, col_table, overlay, the_type, map_tool, config, de_config_list)
@@ -1397,14 +1582,18 @@ def main():
     # Setup variables
     run_date = setup_variables(experiment_dir, config)
 
-    #getting job mode (which steps)
-    mode_steps, config = set_job_mode(args, config, experiment_dir, mode)
-    print(f"MODE STEPS = {mode_steps}")
+    # Resolve assay-specific public job mode and map it to internal workflow steps
+    public_step_map = ASSAY_PUBLIC_INTERNAL_STEP_MAP.get(the_type)
+    if not public_step_map:
+        print(f"No public step map is defined for assay type {the_type}. Aborting...", file=sys.stderr)
+        sys.exit(1)
+    public_max_step = max(public_step_map)
+    public_mode_steps = resolve_public_mode_steps(mode, public_max_step)
+    mode_steps = map_public_to_internal_steps(the_type, public_mode_steps)
+    print(f"PUBLIC MODE STEPS = {public_mode_steps}")
+    print(f"INTERNAL MODE STEPS = {mode_steps}")
 
     # Check if pipeline needed or user first has to run separate scripts
-    if min(mode_steps) == 11 and the_type == "CHIP":
-        print("For ChIP experiments, first determine optimal peak caller settings and quantify peaks with your chosen downstream workflow before continuing.")
-        return
     if 10 in mode_steps and the_type == "RNA":
         print("Not a ChIP- or ATAC-seq experiment, skipping step 10 Call Peaks step...")
         mode_steps = [step for step in mode_steps if step != 10]
@@ -1417,7 +1606,7 @@ def main():
         if not mode_steps:
             print("For the rest no steps to run. Done!")
             return
-    print(f"MODE STEPS NEW = {mode_steps}")
+    print(f"INTERNAL MODE STEPS NEW = {mode_steps}")
 
     # Reset selected step bookkeeping for the new run
     reset_step_tracking(mode_steps, experiment_dir)
@@ -1472,7 +1661,12 @@ def main():
                 sample_type_selector=sample_type,
                 sample_color_selector=sample_color,
             )
-            if min(mode_steps) == 12:
+            de_steps = {
+                config.get('de_rule_num'),
+                config.get('dechrom_rule_num'),
+            }
+            de_steps = {step for step in de_steps if isinstance(step, int)}
+            if de_steps and min(mode_steps) in de_steps:
                 count_table_path = os.path.join(
                     experiment_dir,
                     config['input_folders'][config['de_rule_num'] - 1],
@@ -1493,7 +1687,7 @@ def main():
             sample_type_columns = selector_map["sample_type_columns"]
             sample_color_columns = selector_map["sample_color_columns"]
 
-            if 12 in mode_steps:
+            if (config.get('de_rule_num') in mode_steps) or (config.get('dechrom_rule_num') in mode_steps):
                 derived_fieldnames, derived_rows, resolved_de_formula, de_context = resolve_de_metadata(
                     metadata_fieldnames,
                     derived_fieldnames,
@@ -1593,8 +1787,19 @@ def main():
         'INPUT_FOLDER': input_folder_mod_range_min,
         'INPUT_FILE_TYPE': input_file_type_mod_range_min,
         'INPUT': INPUT,
-        'BROAD': broad,
+        'BROAD_MODE': broad_mode,
+        'CHIP_BROAD_QVALUE': chip_broad_qvalue,
+        'CHIP_BROAD_CUTOFF': chip_broad_cutoff,
+        'CHIP_BROAD_MIN_LENGTH': chip_broad_min_length if chip_broad_min_length is not None else "NA",
+        'CHIP_BROAD_MAX_GAP': chip_broad_max_gap if chip_broad_max_gap is not None else "NA",
+        'CHIP_BROAD_REPLICATE_FRACTION': chip_broad_replicate_fraction,
+        'CHIP_BROAD_OVERLAP_FRACTION': chip_broad_overlap_fraction,
+        'CHIP_DIFFUSE_BIN_SIZE': chip_diffuse_bin_size,
+        'CHIP_DIFFUSE_MERGE_GAP': chip_diffuse_merge_gap,
+        'CHIP_DIFFUSE_STANDARD_CHROMS_ONLY': bool(chip_diffuse_standard_chroms_only),
+        'CHIP_DIFFUSE_EXCLUDE_CHRM': bool(chip_diffuse_exclude_chrm),
         'THEMODE': mode_steps,
+        'PUBLIC_MODE_STEPS': public_mode_steps,
         'THETYPE': the_type,
         'NUMFILES': num_files,
         'NUMPAIRS': num_pairs,
@@ -1608,6 +1813,13 @@ def main():
         'DE_COLUMNS': de_columns,
         'DE_BLOCK': de_block,
         'DE_INTERACTIONS': bool(de_interactions),
+        'ATAC_PEAK_OPT_MODE': atac_peak_opt_mode,
+        'CHIP_PEAK_OPT_MODE': chip_peak_opt_mode,
+        'NARROW_PEAK_STRATEGY': narrow_peak_strategy,
+        'IDR_MODE': idr_mode,
+        'IDR_PAIR_FRACTION': idr_pair_fraction,
+        'IDR_PAIRING_POLICY': idr_pairing_policy,
+        'SPP_GATE': spp_gate,
         'DE_DESIGN_MODE': de_design_mode,
         'DE_CONFIG_FILE': de_config_file_path,
         'DE_CONFIG_RESOLVED_FILE': resolved_de_config_path,

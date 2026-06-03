@@ -456,14 +456,35 @@ derived_metadata_by_filename = {
     for row in derived_metadata_rows
     if row.get("filename_key") or row.get("filename")
 }
+metadata_filename_keys = set(derived_metadata_by_filename)
+metadata_rows_by_sample_id = {}
+for row in derived_metadata_rows:
+    sample_id = str(row.get("sample_id", "")).strip()
+    if sample_id and sample_id not in metadata_rows_by_sample_id:
+        metadata_rows_by_sample_id[sample_id] = row
+technical_replicate_mode = any(
+    str(row.get("technical_replicate", "")).strip()
+    for row in derived_metadata_rows
+)
 
 
 def merged_sample_name(sample_name):
-    return normalize_metadata_sample_key(sample_name)
+    normalized_name = normalize_metadata_sample_key(sample_name)
+    if not technical_replicate_mode:
+        return normalized_name
+    row = derived_metadata_by_filename.get(normalized_name)
+    if row is None:
+        return normalized_name
+    sample_id = str(row.get("sample_id", "")).strip()
+    return sample_id or normalized_name
 
 
 def metadata_row_for_sample(sample_name):
-    return derived_metadata_by_filename.get(merged_sample_name(sample_name))
+    normalized_name = normalize_metadata_sample_key(sample_name)
+    row = derived_metadata_by_filename.get(normalized_name)
+    if row is not None:
+        return row
+    return metadata_rows_by_sample_id.get(normalized_name)
 
 
 def metadata_value_for_sample(sample_name, column_name, default_value=None):
@@ -877,7 +898,7 @@ if not is_worker_job:
     log_it(logfile, f"Sample color columns: {', '.join(config.get('SAMPLE_COLOR_COLUMNS', [])) or 'default(sample_type)'}")
 
     log_it(logfile, f"Input file (MACS3): {config['INPUT']}", "PEAK CALLING SETTINGS")
-    log_it(logfile, f"Broad peaks: {config['BROAD']}")
+    log_it(logfile, f"Broad mode: {config.get('BROAD_MODE', 'off')}")
 
     log_it(logfile, f"{config['THEHEAPINIT']} HEAP init", "JAVA MEMORY SETTINGS")
     log_it(logfile, f"{config['THEMEM']} memory per sample")
@@ -908,6 +929,12 @@ if THEMODERANGEMIN == 11:
 
 input_pattern = os.path.join(input_folder, f"*{input_file_type}")
 input_files = glob.glob(input_pattern)
+if technical_replicate_mode and input_file_type == ".bam":
+    input_files = [
+        file_path
+        for file_path in input_files
+        if normalize_metadata_sample_key(file_path) in metadata_filename_keys
+    ]
 
 FASTQ_EXTENSIONS = (".fastq.gz", ".fq.gz", ".fastq", ".fq")
 FASTQ_READ_SUFFIX_RE = re.compile(r'_(?:R)?[12](?:_[0-9]{3})?$')
@@ -978,7 +1005,14 @@ for folder_name, extensions in lane_sample_sources:
     for extension in extensions:
         candidate_files.extend(glob.glob(os.path.join(experiment_dir, folder_name, f"*{extension}")))
     if folder_name == master_config['output_folders'][master_config['map_rule_num'] - 1]:
-        candidate_files = [path for path in candidate_files if re.search(r'_L0\d+\.bam$', os.path.basename(path))]
+        if technical_replicate_mode:
+            candidate_files = [
+                path
+                for path in candidate_files
+                if normalize_sample_name(path, ".bam") in metadata_filename_keys
+            ]
+        else:
+            candidate_files = [path for path in candidate_files if re.search(r'_L0\d+\.bam$', os.path.basename(path))]
     if candidate_files:
         lane_sample_files = candidate_files
         break
@@ -1011,6 +1045,14 @@ def lane_samples_for_merged_sample(sample_name):
         if merged_sample_name(lane_sample) == sample_name
     )
 
+
+def input_units_for_merged_sample(sample_name):
+    return sorted(
+        sample_root
+        for sample_root in samples
+        if merged_sample_name(sample_root) == sample_name
+    )
+
 if config['PAIRED'] == 1 and THEMODERANGEMIN < 4: 
     num_samples = len(samples) / 2
 else: 
@@ -1028,8 +1070,32 @@ def get_rule_core_limits(rule_num):
         max_cores = master_config['maxcores_single_sample_step1_9'][rule_num - 1]
     else:
         offset = rule_num - 10
-        min_cores = master_config['mincores_per_rule_run_step10_13'][offset]
-        max_cores = master_config['maxcores_per_rule_run_step10_13'][offset]
+        min_table = master_config.get('mincores_per_rule_run_step10_15', master_config.get('mincores_per_rule_run_step10_13', []))
+        max_table = master_config.get('maxcores_per_rule_run_step10_15', master_config.get('maxcores_per_rule_run_step10_13', []))
+        min_cores = min_table[offset]
+        max_cores = max_table[offset]
+
+    # Peak-calling optimization with MACS3 candidate grids benefits from wide parallel batches.
+    # For rule 10, scale to node-wide cores only when narrow peak strategy is MACS3.
+    narrow_peak_strategy = str(config.get('NARROW_PEAK_STRATEGY', 'idr')).lower()
+    if (
+        rule_num == master_config.get('callpeaks_rule_num', 10)
+        and (
+            (
+                config.get('THETYPE') == "ATAC"
+                and narrow_peak_strategy == "macs3"
+                and str(config.get('ATAC_PEAK_OPT_MODE', 'fast')).lower() != "none"
+            )
+            or (
+                config.get('THETYPE') == "CHIP"
+                and str(config.get('BROAD_MODE', 'off')).lower() == "off"
+                and narrow_peak_strategy == "macs3"
+                and str(config.get('CHIP_PEAK_OPT_MODE', 'fast')).lower() != "none"
+            )
+        )
+    ):
+        min_cores = master_config.get('min_slice_cores', 16)
+        max_cores = master_config.get('cores_per_node', 128)
 
     min_cores = (
         min_cores
@@ -1207,16 +1273,24 @@ for rule_num in themode:
             all_outputs.append(f"{experiment_dir}/{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.featureCounts.summary.txt")
         all_outputs.append(f"{experiment_dir}/{output_folder}/extra_11.tmp")
     if rule_num == 12:
-        all_outputs.append( f"{experiment_dir}/{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.results.zip")
+        all_outputs.append(f"{experiment_dir}/{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.results.zip")
+    if rule_num == 13:
+        all_outputs.append(f"{experiment_dir}/{output_folder}/extra_{master_config['peakqc_rule_num']}.tmp")
+    if rule_num == 14:
+        all_outputs.append(f"{experiment_dir}/{output_folder}/extra_{master_config['analyzepeaks_rule_num']}.tmp")
+    if rule_num == 15:
+        all_outputs.append(f"{experiment_dir}/{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.chrom.results.zip")
+    if rule_num == 16:
+        all_outputs.append(f"{experiment_dir}/{output_folder}/extra_{master_config['analyzepeaksde_rule_num']}.tmp")
 
 if create_homer_tagdirs:
     homer_output_folder = master_config['output_folders'][master_config['homer_tagdir_rule_num'] - 1]
     if config['THETYPE'] != "CHIP":
         all_outputs += expand(f"{experiment_dir}/{homer_output_folder}/{{sample}}.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz", sample=samples2)
-        all_outputs += expand(f"{experiment_dir}/{homer_output_folder}/{{sample}}.extra_13.tmp", sample=samples2)
+        all_outputs += expand(f"{experiment_dir}/{homer_output_folder}/{{sample}}.extra_{master_config['homer_tagdir_rule_num']}.tmp", sample=samples2)
     else:
         all_outputs += expand(f"{experiment_dir}/{homer_output_folder}/{{sample}}.filtered.HOMER_tagDir.tar.gz", sample=samples2)
-        all_outputs += expand(f"{experiment_dir}/{homer_output_folder}/{{sample}}.extra_13.tmp", sample=samples2)
+        all_outputs += expand(f"{experiment_dir}/{homer_output_folder}/{{sample}}.extra_{master_config['homer_tagdir_rule_num']}.tmp", sample=samples2)
 
 if not is_worker_job:
     target_manifest = os.path.join(experiment_dir, "run_logs", f"omnomnomics.run.{run_date}.targets.txt")
@@ -1339,6 +1413,10 @@ onsuccess:
                     return primary_path
                 return f"{flow_qc_mapper_cache_dir}/{sample_name}.STAR_stats.txt"
 
+            def atac_stats_path(sample_name):
+                touchup_output_folder = master_config['output_folders'][master_config['touchup_rule_num'] - 1]
+                return f"{experiment_dir}/{touchup_output_folder}/{sample_name}.ATAC_stats.txt"
+
             sample2_to_lane_samples = {}
             for sample_name in samples:
                 aggregated_sample = merged_sample_name(sample_name)
@@ -1414,6 +1492,30 @@ onsuccess:
                             metrics[row["metric"]] = None
                         else:
                             metrics[row["metric"]] = int(float(value))
+                return metrics
+
+            def parse_atac_stats(stats_path):
+                metrics = {
+                    "atac_prefilter_total_aligned_reads": None,
+                    "atac_prefilter_chrM_aligned_reads": None,
+                    "atac_prefilter_chrM_pct": None,
+                }
+                if not os.path.exists(stats_path):
+                    return metrics
+                with open(stats_path) as handle:
+                    for raw_line in handle:
+                        line = raw_line.strip()
+                        if not line:
+                            continue
+                        total_match = re.search(r"Total aligned reads before filtering:\s*([0-9,]+)", line)
+                        if total_match:
+                            metrics["atac_prefilter_total_aligned_reads"] = int(normalize_numeric_string(total_match.group(1)))
+                        chrm_match = re.search(r"chrM aligned reads before filtering:\s*([0-9,]+)", line)
+                        if chrm_match:
+                            metrics["atac_prefilter_chrM_aligned_reads"] = int(normalize_numeric_string(chrm_match.group(1)))
+                        pct_match = re.search(r"\(([0-9]+(?:\.[0-9]+)?)%\)", line)
+                        if pct_match:
+                            metrics["atac_prefilter_chrM_pct"] = float(pct_match.group(1))
                 return metrics
 
             def build_flow_qc_rows():
@@ -1506,6 +1608,33 @@ onsuccess:
                             "unit": "percent",
                             "value": round((mapper_totals["mapper_reported_aligned_reads"] / mapper_totals["mapper_input_reads"]) * 100, 4),
                         })
+
+                    if config["THETYPE"] == "ATAC":
+                        atac_metrics = parse_atac_stats(atac_stats_path(sample_name))
+                        if atac_metrics["atac_prefilter_total_aligned_reads"] is not None:
+                            rows.append({
+                                "sample": sample_name,
+                                "stage": "atac_prefilter",
+                                "metric": "atac_prefilter_total_aligned_reads",
+                                "unit": "reads",
+                                "value": atac_metrics["atac_prefilter_total_aligned_reads"],
+                            })
+                        if atac_metrics["atac_prefilter_chrM_aligned_reads"] is not None:
+                            rows.append({
+                                "sample": sample_name,
+                                "stage": "atac_prefilter",
+                                "metric": "atac_prefilter_chrM_aligned_reads",
+                                "unit": "reads",
+                                "value": atac_metrics["atac_prefilter_chrM_aligned_reads"],
+                            })
+                        if atac_metrics["atac_prefilter_chrM_pct"] is not None:
+                            rows.append({
+                                "sample": sample_name,
+                                "stage": "atac_prefilter",
+                                "metric": "atac_prefilter_chrM_pct",
+                                "unit": "percent",
+                                "value": atac_metrics["atac_prefilter_chrM_pct"],
+                            })
 
                 return rows
 
@@ -1729,6 +1858,16 @@ onsuccess:
                     },
                     "data": sample_metric_map,
                 }
+                if config["THETYPE"] == "ATAC":
+                    generalstats_yaml["headers"]["atac_prefilter__atac_prefilter_chrM_pct"] = {
+                        "title": "chrM %",
+                        "description": "ATAC chrM-aligned reads before filtering as a percentage of total aligned reads.",
+                        "min": 0,
+                        "max": 100,
+                        "suffix": "%",
+                        "scale": "RdYlGn-rev",
+                        "format": "{:,.2f}",
+                    }
 
                 table_headers = {
                     "raw_fastq__raw_reads": {"title": "Raw Reads", "format": "{:,.0f}"},
@@ -1746,6 +1885,12 @@ onsuccess:
                     "post_filter__duplicate_flagged_primary_reads": {"title": "Post Duplicate-flagged Reads", "format": "{:,.0f}"},
                     "post_filter__duplicate_flagged_primary_reads_pct": {"title": "Post Duplicate-flagged %", "suffix": "%", "format": "{:,.1f}"},
                 }
+                if config["THETYPE"] == "ATAC":
+                    table_headers.update({
+                        "atac_prefilter__atac_prefilter_total_aligned_reads": {"title": "ATAC Pre-filter Total Aligned", "format": "{:,.0f}"},
+                        "atac_prefilter__atac_prefilter_chrM_aligned_reads": {"title": "ATAC Pre-filter chrM Aligned", "format": "{:,.0f}"},
+                        "atac_prefilter__atac_prefilter_chrM_pct": {"title": "ATAC Pre-filter chrM %", "suffix": "%", "format": "{:,.2f}"},
+                    })
                 if config["PAIRED"]:
                     table_headers.update({
                         "pre_filter__properly_paired_templates": {"title": "Pre Proper Pairs", "format": "{:,.0f}"},
@@ -1830,8 +1975,20 @@ onsuccess:
             list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['countreads_rule_num']-1]}/extra_11.tmp")
             for file in list_of_extra_files:
                 os.remove(file)
+        if 13 in themode:
+            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['peakqc_rule_num']-1]}/extra_{master_config['peakqc_rule_num']}.tmp")
+            for file in list_of_extra_files:
+                os.remove(file)
+        if 14 in themode:
+            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['analyzepeaks_rule_num']-1]}/extra_{master_config['analyzepeaks_rule_num']}.tmp")
+            for file in list_of_extra_files:
+                os.remove(file)
+        if 16 in themode:
+            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['analyzepeaksde_rule_num']-1]}/extra_{master_config['analyzepeaksde_rule_num']}.tmp")
+            for file in list_of_extra_files:
+                os.remove(file)
         if create_homer_tagdirs:
-            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['homer_tagdir_rule_num']-1]}/*.extra_13.tmp")
+            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['homer_tagdir_rule_num']-1]}/*.extra_{master_config['homer_tagdir_rule_num']}.tmp")
             for file in list_of_extra_files:
                 os.remove(file)
 

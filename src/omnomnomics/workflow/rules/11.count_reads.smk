@@ -19,13 +19,22 @@ def count_reads_input(_wildcards):
             f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num'] - 1][0]}/{sample}.sorted.dups_marked.filtered.bam"
             for sample in samples2
         )
-    elif config["THETYPE"] == "ATAC":
-        if master_config["callpeaks_rule_num"] in themode:
+    elif config["THETYPE"] in {"ATAC", "CHIP"}:
+        if master_config.get("analyzepeaks_rule_num") in themode:
+            input_files.append(
+                f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num'] - 1][1]}/extra_{master_config['analyzepeaks_rule_num']}.tmp"
+            )
+        elif master_config.get("peakqc_rule_num") in themode:
+            input_files.append(
+                f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num'] - 1][1]}/extra_{master_config['peakqc_rule_num']}.tmp"
+            )
+        elif master_config["callpeaks_rule_num"] in themode:
             input_files.append(
                 f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num'] - 1][1]}/extra_{master_config['callpeaks_rule_num']}.tmp"
             )
+        bam_suffix = ".sorted.dups_marked.filtered.bam" if config["THETYPE"] == "ATAC" else ".filtered.bam"
         input_files.extend(
-            f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num'] - 1][0]}/{sample}.sorted.dups_marked.filtered.bam"
+            f"{experiment_dir}/{master_config['input_folders'][master_config['countreads_rule_num'] - 1][0]}/{sample}{bam_suffix}"
             for sample in samples2
         )
         input_files.append(
@@ -50,6 +59,7 @@ rule count_reads:
         )
     params:
         thetype=config["THETYPE"],
+        broad_mode=str(config.get("BROAD_MODE", "off")).strip().lower(),
         genome=config["THEGENOME"],
         experiment_dir=config["EXPERIMENT_DIR"],
         paired=config["PAIRED"],
@@ -71,6 +81,37 @@ rule count_reads:
 
         def quote(path):
             return shlex.quote(path)
+
+        def samples_after_spp_drop():
+            if params.thetype not in {"ATAC", "CHIP"}:
+                return list(samples2)
+            drop_file = os.path.join(
+                experiment_dir,
+                master_config["output_folders"][master_config["peakqc_rule_num"] - 1],
+                "peak_qc",
+                "spp_qc",
+                "dropped_samples.tsv",
+            )
+            if not os.path.exists(drop_file):
+                return list(samples2)
+            dropped_ids = set()
+            with open(drop_file, newline="") as handle:
+                reader = csv.DictReader(handle, delimiter="\t")
+                for row in reader:
+                    sample_id = str(row.get("sample_id", "")).strip()
+                    if sample_id:
+                        dropped_ids.add(sample_id)
+            if not dropped_ids:
+                return list(samples2)
+            filtered = [sample for sample in samples2 if sample_id_for_sample(sample) not in dropped_ids]
+            log_it(
+                logfile,
+                "SPP drop list detected. Excluding samples from count matrix: "
+                + ", ".join(sorted(dropped_ids)),
+            )
+            if not filtered:
+                raise RuntimeError("All samples were dropped by SPP gate. Cannot continue with count matrix generation.")
+            return filtered
 
         def write_tmp_file(outputfolder):
             shell(f"""echo "necessity file for count reads. can delete this." > {outputfolder}/extra_11.tmp""")
@@ -129,8 +170,17 @@ rule count_reads:
             bedtools_version = subprocess.check_output(["bedtools", "--version"], stderr=subprocess.STDOUT)
             log_once(logfile, "step11.bedtools_version", "\n" + bedtools_version.decode("utf-8"), "BEDTOOLS VERSION")
 
-            peak_bed = os.path.join(peak_folder, "all_groups.merged_peaks.bed")
-            bam_files = [os.path.join(input_folder, f"{sample}.sorted.dups_marked.filtered.bam") for sample in samples2]
+            filtered_peak_bed = os.path.join(
+                experiment_dir,
+                master_config["output_folders"][master_config["peakqc_rule_num"] - 1],
+                "peak_qc",
+                "filtered_peaks",
+                "all_groups.merged_peaks.bed",
+            )
+            peak_bed = filtered_peak_bed if os.path.exists(filtered_peak_bed) else os.path.join(peak_folder, "all_groups.merged_peaks.bed")
+            log_it(logfile, f"ATAC peak BED used for counting: {peak_bed}")
+            selected_samples = samples_after_spp_drop()
+            bam_files = [os.path.join(input_folder, f"{sample}.sorted.dups_marked.filtered.bam") for sample in selected_samples]
             multicov_output = os.path.join(output_folder, f"{os.path.basename(params.experiment_dir)}.multicov.tmp.txt")
             multicov_command = (
                 f"bedtools multicov -bed {quote(peak_bed)} -bams {' '.join(quote(path) for path in bam_files)} "
@@ -143,10 +193,57 @@ rule count_reads:
             with open(multicov_output, newline="") as source, open(final_output, "w", newline="") as destination:
                 reader = csv.reader(source, delimiter="\t")
                 writer = csv.writer(destination, delimiter="\t", lineterminator="\n")
-                writer.writerow(["Peak", *[sample_id_for_sample(sample) for sample in samples2]])
+                writer.writerow(["Peak", *[sample_id_for_sample(sample) for sample in selected_samples]])
                 for row in reader:
                     peak_name = f"{row[0]}_{row[1]}_{row[2]}"
                     writer.writerow([peak_name, *row[3:]])
+
+            os.remove(multicov_output)
+
+        def count_reads_chip(input_folder, peak_folder, output_folder, broad_mode):
+            if broad_mode == "genebody":
+                log_once(logfile, "step11.chip_mode", "Counting ChIP reads over gene-body features with bedtools multicov...")
+            elif broad_mode == "diffuse":
+                log_once(logfile, "step11.chip_mode", "Counting ChIP reads over fixed genomic bins with bedtools multicov...")
+            else:
+                log_once(logfile, "step11.chip_mode", "Counting ChIP reads from BAMs with bedtools multicov...")
+            sanity_check_dir(logfile, input_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][0], "step11.chip_bam_sanity")
+            sanity_check_dir(logfile, peak_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][1], "step11.chip_peak_sanity")
+
+            bedtools_version = subprocess.check_output(["bedtools", "--version"], stderr=subprocess.STDOUT)
+            log_once(logfile, "step11.bedtools_version", "\n" + bedtools_version.decode("utf-8"), "BEDTOOLS VERSION")
+
+            peak_bed = os.path.join(peak_folder, "all_groups.merged_peaks.bed")
+            if broad_mode == "genebody":
+                log_it(logfile, f"ChIP gene-body BED used for counting: {peak_bed}")
+            elif broad_mode == "diffuse":
+                log_it(logfile, f"ChIP diffuse bin BED used for counting: {peak_bed}")
+            else:
+                log_it(logfile, f"ChIP peak BED used for counting: {peak_bed}")
+            selected_samples = samples_after_spp_drop()
+            bam_files = [os.path.join(input_folder, f"{sample}.filtered.bam") for sample in selected_samples]
+            multicov_output = os.path.join(output_folder, f"{os.path.basename(params.experiment_dir)}.multicov.tmp.txt")
+            multicov_command = (
+                f"bedtools multicov -bed {quote(peak_bed)} -bams {' '.join(quote(path) for path in bam_files)} "
+                f"> {quote(multicov_output)}"
+            )
+            log_it(logfile, multicov_command, "BEDTOOLS MULTICOV COMMAND")
+            shell(multicov_command)
+
+            final_output = rna_output_path(output_folder)
+            with open(multicov_output, newline="") as source, open(final_output, "w", newline="") as destination:
+                reader = csv.reader(source, delimiter="\t")
+                writer = csv.writer(destination, delimiter="\t", lineterminator="\n")
+                if broad_mode == "genebody":
+                    feature_label = "Feature"
+                elif broad_mode == "diffuse":
+                    feature_label = "Bin"
+                else:
+                    feature_label = "Peak"
+                writer.writerow([feature_label, *[sample_id_for_sample(sample) for sample in selected_samples]])
+                for row in reader:
+                    feature_name = f"{row[0]}_{row[1]}_{row[2]}"
+                    writer.writerow([feature_name, *row[3:]])
 
             os.remove(multicov_output)
 
@@ -155,6 +252,8 @@ rule count_reads:
                 count_reads_rna(params.bam_input_folder, params.outputfolder, params.gtf_file, params.paired)
             elif params.thetype == "ATAC":
                 count_reads_atac(params.bam_input_folder, params.peak_input_folder, params.outputfolder)
+            elif params.thetype == "CHIP":
+                count_reads_chip(params.bam_input_folder, params.peak_input_folder, params.outputfolder, params.broad_mode)
             else:
                 log_once(logfile, "step11.chip_note", "For ChIP experiments, first determine optimal peak caller settings and quantify peaks with your chosen downstream workflow before continuing.")
 

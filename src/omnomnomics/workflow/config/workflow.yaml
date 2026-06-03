@@ -14,12 +14,34 @@ mergewig_rule_num: 9
 callpeaks_rule_num: 10
 countreads_rule_num: 11
 de_rule_num: 12
-homer_tagdir_rule_num: 13
+peakqc_rule_num: 13
+analyzepeaks_rule_num: 14
+dechrom_rule_num: 15
+analyzepeaksde_rule_num: 16
+homer_tagdir_rule_num: 17
 
 #Define the maximum public step index
-max_step: 12
+max_step: 16
 retention_policy: "all"
 max_project_size: "NA"
+broad_mode: "off"
+chip_broad_qvalue: 0.05
+chip_broad_cutoff: 0.1
+chip_broad_min_length: null
+chip_broad_max_gap: null
+chip_broad_replicate_fraction: 1.0
+chip_broad_overlap_fraction: 0.5
+chip_diffuse_bin_size: 10000
+chip_diffuse_merge_gap: 10000
+chip_diffuse_standard_chroms_only: true
+chip_diffuse_exclude_chrm: true
+atac_peak_opt_mode: "fast"
+chip_peak_opt_mode: "fast"
+narrow_peak_strategy: "idr"
+idr_mode: "encode"
+idr_pair_fraction: 0.5
+idr_pairing_policy: "all_pairs"
+spp_gate: "warn"
 
 
 trim:
@@ -49,6 +71,14 @@ countreads:
   - "count_reads"
 de:
   - "call_DE"
+peakqc:
+  - "peak_qc"
+analyzepeaks:
+  - "analyze_peaks"
+dechrom:
+  - "call_DE_chrom"
+analyzepeaksde:
+  - "analyze_peaks_de"
 
 
 selected_routine_trim: 0
@@ -63,6 +93,10 @@ selected_routine_mergewig: 0
 selected_routine_callpeaks: 0
 selected_routine_countreads: 0
 selected_routine_de: 0
+selected_routine_peakqc: 0
+selected_routine_analyzepeaks: 0
+selected_routine_dechrom: 0
+selected_routine_analyzepeaksde: 0
 
 routines:
   - trim
@@ -77,6 +111,10 @@ routines:
   - callpeaks
   - countreads
   - de
+  - peakqc
+  - analyzepeaks
+  - dechrom
+  - analyzepeaksde
 
 
 input_folders:
@@ -92,6 +130,10 @@ input_folders:
   - "filtered_BAM"
   - ["filtered_BAM", "peak_calling"]
   - "DE_calling"
+  - ["filtered_BAM", "peak_calling"]
+  - ["filtered_BAM", "peak_calling"]
+  - "DE_calling"
+  - "DE_calling"
   - "filtered_BAM"
 
 output_folders:
@@ -104,6 +146,10 @@ output_folders:
   - "filtered_BAM"
   - "BigWigs"
   - "merged_hubs"
+  - "peak_calling"
+  - "DE_calling"
+  - "DE_calling"
+  - "peak_calling"
   - "peak_calling"
   - "DE_calling"
   - "DE_calling"
@@ -122,6 +168,10 @@ input_file_types:
   - ".bam"
   - [".bam", ".bed"]
   - ".raw_read_quant.table.txt"
+  - [".bam", ".bed"]
+  - [".bam", ".bed"]
+  - ".raw_read_quant.table.txt"
+  - ".chrom.results.zip"
   - ".filtered.bam"
 
 output_file_types:
@@ -137,6 +187,10 @@ output_file_types:
   - ".bed"
   - ".raw_read_quant.table.txt"
   - ".results.zip"
+  - ".peak_qc.tsv"
+  - ".analyze_peaks.tsv"
+  - ".chrom.results.zip"
+  - ".analyze_peaks_de.tsv"
   - ".HOMER_tagDir.tar.gz"
 
 mincores_single_sample_step1_9:
@@ -161,13 +215,21 @@ maxcores_single_sample_step1_9:
   - 16
   - 16
 
-mincores_per_rule_run_step10_13:
+mincores_per_rule_run_step10_15:
+  - 16
+  - 16
+  - 16
+  - 16
   - 16
   - 16
   - 16
   - 16
 
-maxcores_per_rule_run_step10_13:
+maxcores_per_rule_run_step10_15:
+  - 16
+  - 16
+  - 16
+  - 16
   - 16
   - 16
   - 16
@@ -199,6 +261,10 @@ rule_runtime:
   - 120
   - 120
   - 240
+  - 120
+  - 120
+  - 120
+  - 120
   - 120
   - 120
   - 120

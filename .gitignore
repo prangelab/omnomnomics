@@ -24,6 +24,7 @@ __pycache__/
 # Local planning and agent notes
 /AGENTS.md
 /DESIGNGOALS.md
+/MANUSCRIPT/
 
 # macOS cruft
 .DS_Store

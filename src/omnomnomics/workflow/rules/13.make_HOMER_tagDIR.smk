@@ -28,30 +28,31 @@ rule create_homer_tagDir:
         bai_BAM = f"{experiment_dir}/{master_config['input_folders'][master_config['homer_tagdir_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.bam.bai" if config['THETYPE'] != "CHIP" else f"{experiment_dir}/{master_config['input_folders'][master_config['homer_tagdir_rule_num']-1]}/{{sample}}.filtered.bam.bai"
     output:
         f"{experiment_dir}/{master_config['output_folders'][master_config['homer_tagdir_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.HOMER_tagDir.tar.gz" if config['THETYPE'] != "CHIP" else f"{experiment_dir}/{master_config['output_folders'][master_config['homer_tagdir_rule_num']-1]}/{{sample}}.filtered.HOMER_tagDir.tar.gz",
-        f"{experiment_dir}/{master_config['output_folders'][master_config['homer_tagdir_rule_num']-1]}/{{sample}}.extra_13.tmp"
+        f"{experiment_dir}/{master_config['output_folders'][master_config['homer_tagdir_rule_num']-1]}/{{sample}}.extra_{master_config['homer_tagdir_rule_num']}.tmp"
     params:
         genome = config['THEGENOME'],
         thetype = config['THETYPE'],
         inputfolder = f"{experiment_dir}/{master_config['input_folders'][master_config['homer_tagdir_rule_num']-1]}",
         outputfolder = f"{experiment_dir}/{master_config['output_folders'][master_config['homer_tagdir_rule_num']-1]}"
     threads:
-        Threads_Per_Rule['13']
+        Threads_Per_Rule[str(master_config['homer_tagdir_rule_num'])]
     resources:
-        mem_mb = Memory_Per_Rule['13'],
+        mem_mb = Memory_Per_Rule[str(master_config['homer_tagdir_rule_num'])],
         partition = master_config['partition'],
-        runtime = Runtime_Per_Rule['13']
+        runtime = Runtime_Per_Rule[str(master_config['homer_tagdir_rule_num'])]
     run:
-        log_once(logfile, "step13.header", "Creating optional HOMER tag directory exports...", f"EXECUTING STEP {master_config['homer_tagdir_rule_num']}")
-        log_once(logfile, "step13.inputfolder", f"Input folder: {params.inputfolder}")
-        log_once(logfile, "step13.outputfolder", f"Output folder: {params.outputfolder}")
+        homer_step = master_config['homer_tagdir_rule_num']
+        log_once(logfile, f"step{homer_step}.header", "Creating optional HOMER tag directory exports...", f"EXECUTING STEP {homer_step}")
+        log_once(logfile, f"step{homer_step}.inputfolder", f"Input folder: {params.inputfolder}")
+        log_once(logfile, f"step{homer_step}.outputfolder", f"Output folder: {params.outputfolder}")
 
         samtools_version = subprocess.check_output("samtools --version | head -n2", shell=True, executable='/bin/bash')
-        log_once(logfile, "step13.samtools_version", "\n"+samtools_version.decode("utf-8"), "SAMTOOLS VERSION")
+        log_once(logfile, f"step{homer_step}.samtools_version", "\n"+samtools_version.decode("utf-8"), "SAMTOOLS VERSION")
 
         homer_genome = resolve_homer_genome(params.genome)
-        log_once(logfile, "step13.homer_genome", f"HOMER genome alias: {params.genome} -> {homer_genome}")
+        log_once(logfile, f"step{homer_step}.homer_genome", f"HOMER genome alias: {params.genome} -> {homer_genome}")
 
-        sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['homer_tagdir_rule_num']-1], "step13.homer_sanity")
+        sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['homer_tagdir_rule_num']-1], f"step{homer_step}.homer_sanity")
 
         # Function to create HOMER tag directories
         def create_homer_tagDir(filepath, outputfolder, genome, thetype):
@@ -127,7 +128,7 @@ rule create_homer_tagDir:
                 shell(f"cd {quote(local_workdir)} && tar czf {quote(os.path.basename(tar_gz_path))} {quote(os.path.basename(tag_dir))}")
 
                 shell(f'cp {quote(tar_gz_path)} {quote(os.path.join(outputfolder, os.path.basename(tar_gz_path)))}')
-                shell(f"""echo "necessity file for homer_tagdir export. can delete this." > {quote(os.path.join(outputfolder, f"{wildcards.sample}.extra_13.tmp"))}""")
+                shell(f"""echo "necessity file for homer_tagdir export. can delete this." > {quote(os.path.join(outputfolder, f"{wildcards.sample}.extra_{master_config['homer_tagdir_rule_num']}.tmp"))}""")
                 finish_step_sample(master_config['homer_tagdir_rule_num'], wildcards.sample, "create_homer_tagDir", tracking["start_time"], "OK")
             except Exception:
                 finish_step_sample(master_config['homer_tagdir_rule_num'], wildcards.sample, "create_homer_tagDir", tracking["start_time"], "FAIL")
