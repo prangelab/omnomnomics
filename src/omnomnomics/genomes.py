@@ -457,7 +457,9 @@ def genomes_main(argv, workflow_root, workflow_config_file, default_site_config)
     site_config_file = Path(args.site_config).expanduser().resolve() if args.site_config else default_site_config
     config = load_site_settings(workflow_root, workflow_config_file, site_config_file)
 
-    if args.genomes_command == "installed":
+    genomes_command = {"ls": "list", "local": "installed"}.get(args.genomes_command, args.genomes_command)
+
+    if genomes_command == "installed":
         rows = list_installed_rows(config["genome_assembly_dir"], getattr(args, "species", None))
         print_installed_rows(rows, args.limit)
         return
@@ -465,7 +467,7 @@ def genomes_main(argv, workflow_root, workflow_config_file, default_site_config)
     genomepy = import_genomepy()
     args.species = normalize_species_name(args.species)
 
-    if args.genomes_command == "list":
+    if genomes_command == "list":
         rows = search_rows(genomepy, args.species, args.provider)
         print_rows(rows, args.limit)
         return
