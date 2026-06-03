@@ -38,7 +38,8 @@ rule call_peaks:
     input:
         input_function
     output:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/extra_10.tmp"
+        extra=f"{experiment_dir}/{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/extra_10.tmp",
+        merged_features=f"{experiment_dir}/{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/all_groups.merged_peaks.bed"
     params:
         thetype= lambda wildcards: config['THETYPE'],  
         broad_mode= lambda wildcards: str(config.get('BROAD_MODE', 'off')).lower(),
