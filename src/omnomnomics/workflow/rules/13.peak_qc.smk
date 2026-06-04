@@ -102,13 +102,13 @@ rule peak_qc:
                 if keep_standard:
                     std_bed = os.path.join(tmpdir, "std.bed")
                     shell(
-                        f"awk 'BEGIN{{OFS=\"\\t\"}} $1 ~ /^chr([0-9]+|X|Y)$/ {{print $0}}' {quote(work)} > {quote(std_bed)}"
+                        f"awk 'BEGIN{{{{OFS=\"\\t\"}}}} $1 ~ /^chr([0-9]+|X|Y)$/ {{{{print $0}}}}' {quote(work)} > {quote(std_bed)}"
                     )
                     work = std_bed
                 if drop_chrm:
                     chrm_bed = os.path.join(tmpdir, "nochrm.bed")
                     shell(
-                        f"awk 'BEGIN{{OFS=\"\\t\"}} $1 != \"chrM\" && $1 != \"MT\" && $1 != \"chrMT\" {{print $0}}' {quote(work)} > {quote(chrm_bed)}"
+                        f"awk 'BEGIN{{{{OFS=\"\\t\"}}}} $1 != \"chrM\" && $1 != \"MT\" && $1 != \"chrMT\" {{{{print $0}}}}' {quote(work)} > {quote(chrm_bed)}"
                     )
                     work = chrm_bed
                 if blacklist_bed and os.path.exists(blacklist_bed):
@@ -387,15 +387,15 @@ rule peak_qc:
                 if config["PAIRED"]:
                     complexity_command = (
                         f"bedtools bamtobed -bedpe -i {quote(bam_path)} | "
-                        "awk 'BEGIN{OFS=\"\\t\"} $1==$4 && $1!=\".\" {"
+                        "awk 'BEGIN{{OFS=\"\\t\"}} $1==$4 && $1!=\".\" {{"
                         "start=($2<$5?$2:$5); end=($3>$6?$3:$6); print $1,start,end"
-                        "}' | "
+                        "}}' | "
                         f"sort -T {quote(tmpdir)} -k1,1 -k2,2n -k3,3n | uniq -c > {quote(counts_path)}"
                     )
                 else:
                     complexity_command = (
                         f"bedtools bamtobed -i {quote(bam_path)} | "
-                        "awk 'BEGIN{OFS=\"\\t\"} {print $1,$2,$3,$6}' | "
+                        "awk 'BEGIN{{OFS=\"\\t\"}} {{print $1,$2,$3,$6}}' | "
                         f"sort -T {quote(tmpdir)} -k1,1 -k2,2n -k3,3n -k4,4 | uniq -c > {quote(counts_path)}"
                     )
                 shell(complexity_command)
