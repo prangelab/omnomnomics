@@ -1012,7 +1012,7 @@ else print >> "{sam2}";
                 log_it(logfile, "Calling peaks with MACS3...")
                 
                 # Sanity check the working dir
-                sanity_check_dir(logfile, inputfolder1,  master_config['input_file_types'][master_config['callpeaks_rule_num']-1][0]) 
+                sanity_check_dir(logfile, inputfolder1, ".filtered.bam")
 
                 grouped_bams = grouped_bams_by_sample_type(inputfolder1, ".filtered.bam")
                 chip_groups = sorted(grouped_bams)
@@ -1295,7 +1295,7 @@ else print >> "{sam2}";
                 log_it(logfile, "Calling ATAC open chromatin peaks...")
 
                 # Sanity check the working dir
-                sanity_check_dir(logfile, inputfolder1,  master_config['input_file_types'][master_config['callpeaks_rule_num']-1][0]) 
+                sanity_check_dir(logfile, inputfolder1, ".sorted.dups_marked.filtered.bam")
 
                 grouped_bams = grouped_bams_by_sample_type(inputfolder1, ".sorted.dups_marked.filtered.bam")
                 atac_groups = sorted(grouped_bams)
