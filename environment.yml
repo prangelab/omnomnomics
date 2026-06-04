@@ -49,7 +49,6 @@ dependencies:
   - gimmemotifs
   - subread
   - macs3
-  - idr
   - matplotlib
   - phantompeakqualtools
   - homer

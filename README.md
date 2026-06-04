@@ -40,6 +40,14 @@ micromamba activate omnomnomics
 pip install -e .
 ```
 
+Default narrow ATAC/ChIP peak calling uses IDR. Bioconda IDR currently requires an older Python than the main `omnomnomics` environment, so install it once as a small companion environment and wrapper:
+
+```bash
+bash scripts/install_idr_helper.sh
+```
+
+After that, users do not need to activate the companion environment manually. The main `omnomnomics` environment contains an `idr` wrapper that dispatches to `omnomnomics-idr`. If you only use `--narrow-peak-strategy macs3`, the IDR helper is not required.
+
 Reference genomes are managed separately from the code checkout. Install them under the configured genome assembly root, or use the packaged genome helper commands. A normalized assembly layout contains at least:
 - `fasta/genome.fa`
 - `annotation/genes.gtf`
@@ -670,18 +678,19 @@ After completion of a run of _Omnomnomics_, MultiQC is used to parse and combine
 ## Requirements:
 - A working `omnomnomics` environment should be installed from `environment.yml`.
 - The environment should provide the current workflow tools, including:
-		- fastp
-		- skewer
-	 	- fastqc
-	  	- hisat2
-	  	- star
-	  	- samtools
-	  	- bedtools
-	  	- deeptools
-	  	- subread
-	  	- macs3
-	  	- homer
-	  	- multiqc
+  - fastp
+  - skewer
+  - fastqc
+  - hisat2
+  - star
+  - samtools
+  - bedtools
+  - deeptools
+  - subread
+  - macs3
+  - idr, via `scripts/install_idr_helper.sh`, for default narrow ATAC/ChIP peak calling
+  - homer
+  - multiqc
 - On HPC systems, `sbatch` must be available because the Snakemake controller is submitted as a SLURM job.
 - A valid sequence of steps should be included on the command line, if any. This should be 'valid' in the sense that the input/output of the included steps should 'fit' together. For every specified step, the input must already be present at the start OR it must be created by another specified steps. If intermediate steps are left out, Snakemake will attempt to run extra rules to create the necesarry inputs, but due to the complex naming schemes of input/output files, success is not guaranteed.
 - Only one type of data should be present at the same time. This type must be specified on the command line. **Important**: Ensure that if intermediate inputs are given, that those are also not given on mixed type data. Example: ATAC & RNA data will yield filtered BAM files of name filtered_BAM/"sample_name".sorted.dups_marked.filtered.bam while CHIP data will yield filtered BAM files of name filtered_BAM/"sample_name".filtered.bam. If starting the pipeline from here, make sure to not give mixed time filtered BAM files.
