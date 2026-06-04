@@ -30,23 +30,38 @@ omnomnomics display-track-color-table -h
 
 The packaged `color_data_for_hubs` directory is intended as a read-only source of default palettes. When creating a custom palette, provide a writable target directory with `-P`.
 
-## Installation 
-Clone the repository and create the packaged environment:
+## Installation
+
+Clone the repository:
+
 ```bash
 git clone https://github.com/prangelab/omnomnomics.git path/to/install/omnomnomics
 cd path/to/install/omnomnomics
+```
+
+Create the main `omnomnomics` environment and install the package:
+
+```bash
 micromamba env create -f environment.yml
 micromamba activate omnomnomics
 pip install -e .
 ```
 
-Default narrow ATAC/ChIP peak calling uses IDR. Bioconda IDR currently requires an older Python than the main `omnomnomics` environment, so install it once as a small companion environment and wrapper:
+### IDR Companion Environment
+
+Default narrow ATAC/ChIP peak calling uses IDR. Bioconda IDR currently requires an older Python than the main `omnomnomics` environment, so IDR is installed in a small companion environment. If you want to use the default `--narrow-peak-strategy idr` mode for ATAC or narrow ChIP, run this once after creating the main environment:
 
 ```bash
 bash scripts/install_idr_helper.sh
 ```
 
-After that, users do not need to activate the companion environment manually. The main `omnomnomics` environment contains an `idr` wrapper that dispatches to `omnomnomics-idr`. If you only use `--narrow-peak-strategy macs3`, the IDR helper is not required.
+The helper creates or updates `omnomnomics-idr` from `environment.idr.yml`, then installs an `idr` wrapper into the main `omnomnomics` environment. After this, users should continue activating only the main environment:
+
+```bash
+micromamba activate omnomnomics
+```
+
+You do not need to activate `omnomnomics-idr` manually during normal pipeline runs. If you only use `--narrow-peak-strategy macs3`, the IDR companion environment is not required.
 
 Reference genomes are managed separately from the code checkout. Install them under the configured genome assembly root, or use the packaged genome helper commands. A normalized assembly layout contains at least:
 - `fasta/genome.fa`
