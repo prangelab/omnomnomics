@@ -1305,9 +1305,11 @@ if (qc_enabled) {
       if (length(color_map) == 0) {
         return()
       }
-      p <- ggplot2::ggplot(plot_df, ggplot2::aes_string(x = xcol, y = ycol, color = color_col))
       if (nzchar(shape_col) && shape_col %in% colnames(plot_df)) {
         plot_df[[shape_col]] <- as.factor(as.character(plot_df[[shape_col]]))
+      }
+      p <- ggplot2::ggplot(plot_df, ggplot2::aes_string(x = xcol, y = ycol, color = color_col))
+      if (nzchar(shape_col) && shape_col %in% colnames(plot_df)) {
         p <- p + ggplot2::geom_point(ggplot2::aes_string(shape = shape_col), size = 3)
       } else {
         p <- p + ggplot2::geom_point(size = 3)
