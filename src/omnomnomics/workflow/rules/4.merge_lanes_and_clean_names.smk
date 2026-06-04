@@ -20,10 +20,14 @@ rule merge_bam:
         extra_files=lambda wildcards: [
             f"{experiment_dir}/{master_config['input_folders'][master_config['merge_rule_num']-1]}/{lane_sample}.extra_3.tmp"
             for lane_sample in lane_samples_for_merged_sample(wildcards.sample4)
-        ] if 3 in themode else []
+        ] if 3 in themode else [],
+        bam_files=lambda wildcards: [
+            f"{experiment_dir}/{master_config['input_folders'][master_config['merge_rule_num']-1]}/{input_unit}.bam"
+            for input_unit in input_units_for_merged_sample(wildcards.sample4)
+        ]
     output:
-        f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/{{sample4}}.bam",
-        f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/{{sample4}}.extra_4.tmp"
+        bam=f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/{{sample4}}.bam",
+        extra=f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/{{sample4}}.extra_4.tmp"
     params:
         inputfolder = f"{experiment_dir}/{master_config['input_folders'][master_config['merge_rule_num']-1]}",
         outputfolder = f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}"
@@ -41,9 +45,7 @@ rule merge_bam:
         merging_version = subprocess.check_output("samtools --version | head -n2", shell=True, executable='/bin/bash')
         log_once(logfile, "step4.samtools_version", "\n"+merging_version.decode("utf-8"), "SAMTOOLS VERSION")
 
-        sanity_check_dir(logfile, params.inputfolder,  master_config['input_file_types'][master_config['merge_rule_num']-1])
-
-        def merge_bam_files(threads, inputfolder, sample4):
+        def merge_bam_files(threads, inputfolder, outputfolder, sample4, expected_bamfiles, output_bam, output_extra):
             tracking = begin_step_sample(master_config['merge_rule_num'], sample4, "merge_bam")
             tmpdir_root = os.environ.get("TMPDIR")
             local_workdir = tempfile.mkdtemp(prefix=f"{sample4}.", dir=tmpdir_root if tmpdir_root else None)
@@ -54,11 +56,10 @@ rule merge_bam:
 
             grouped_input_units = input_units_for_merged_sample(sample4)
             input_bamfiles = [
-                os.path.join(inputfolder, f"{input_unit}.bam")
-                for input_unit in grouped_input_units
-                if os.path.exists(os.path.join(inputfolder, f"{input_unit}.bam"))
+                bamfile
+                for bamfile in expected_bamfiles
+                if os.path.exists(bamfile)
             ]
-            output_bam = os.path.join(inputfolder, f"{sample4}.bam")
             technical_replicates = sorted(
                 {
                     technical_replicate
@@ -70,6 +71,16 @@ rule merge_bam:
                 }
             )
             try:
+                missing_bamfiles = [
+                    bamfile for bamfile in expected_bamfiles
+                    if not os.path.exists(bamfile)
+                ]
+                if missing_bamfiles:
+                    raise FileNotFoundError(
+                        "Missing mapped BAM input(s) for merged sample "
+                        f"'{sample4}': " + ", ".join(missing_bamfiles)
+                    )
+                os.makedirs(outputfolder, exist_ok=True)
                 if input_bamfiles:
                     record_step_note(
                         master_config['merge_rule_num'],
@@ -104,10 +115,10 @@ rule merge_bam:
                             shell(f"cp {quote(source_bam)} {quote(output_bam)}")
                         else:
                             record_step_note(master_config['merge_rule_num'], sample4, "single_input_bam_already_canonical")
-                    shell(f"""echo "necessity file for merge bams. can delete this." > {inputfolder}/{wildcards.sample4}.extra_4.tmp""")
+                    shell(f"""echo "necessity file for merge bams. can delete this." > {quote(output_extra)}""")
                 elif os.path.exists(output_bam):
                     record_step_note(master_config['merge_rule_num'], sample4, "canonical_bam_already_present")
-                    shell(f"""echo "necessity file for merge bams. can delete this." > {inputfolder}/{wildcards.sample4}.extra_4.tmp""")
+                    shell(f"""echo "necessity file for merge bams. can delete this." > {quote(output_extra)}""")
                 else:
                     raise FileNotFoundError(
                         f"No input BAMs resolved for merged sample '{sample4}' in {inputfolder}."
@@ -119,4 +130,12 @@ rule merge_bam:
             finally:
                 shutil.rmtree(local_workdir, ignore_errors=True)
 
-        merge_bam_files(threads, params.inputfolder, wildcards.sample4)
+        merge_bam_files(
+            threads,
+            params.inputfolder,
+            params.outputfolder,
+            wildcards.sample4,
+            list(input.bam_files),
+            output.bam,
+            output.extra,
+        )
