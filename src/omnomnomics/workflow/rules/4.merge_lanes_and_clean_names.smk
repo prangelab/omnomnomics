@@ -15,7 +15,7 @@ import tempfile
 
 rule merge_bam:
     wildcard_constraints:
-        sample4=merged_sample_wildcard_pattern
+        sample4=merge_bam_output_wildcard_pattern
     input:
         extra_files=lambda wildcards: [
             f"{experiment_dir}/{master_config['input_folders'][master_config['merge_rule_num']-1]}/{lane_sample}.extra_3.tmp"
@@ -139,3 +139,34 @@ rule merge_bam:
             output.bam,
             output.extra,
         )
+
+
+rule mark_bam_merged:
+    wildcard_constraints:
+        sample4=merge_bam_passthrough_wildcard_pattern
+    input:
+        extra_files=lambda wildcards: [
+            f"{experiment_dir}/{master_config['input_folders'][master_config['merge_rule_num']-1]}/{lane_sample}.extra_3.tmp"
+            for lane_sample in lane_samples_for_merged_sample(wildcards.sample4)
+        ] if 3 in themode else [],
+        bam_file=f"{experiment_dir}/{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample4}}.bam"
+    output:
+        extra=f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/{{sample4}}.extra_4.tmp"
+    params:
+        outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}"
+    threads:
+        1
+    resources:
+        mem_mb=1024,
+        partition=master_config['partition'],
+        runtime=Runtime_Per_Rule['4']
+    run:
+        tracking = begin_step_sample(master_config['merge_rule_num'], wildcards.sample4, "mark_bam_merged")
+        try:
+            os.makedirs(params.outputfolder, exist_ok=True)
+            record_step_note(master_config['merge_rule_num'], wildcards.sample4, "single_input_bam_already_canonical")
+            shell(f"""echo "necessity file for merge bams. can delete this." > {shlex.quote(output.extra)}""")
+            finish_step_sample(master_config['merge_rule_num'], wildcards.sample4, "mark_bam_merged", tracking["start_time"], "OK")
+        except Exception:
+            finish_step_sample(master_config['merge_rule_num'], wildcards.sample4, "mark_bam_merged", tracking["start_time"], "FAIL")
+            raise

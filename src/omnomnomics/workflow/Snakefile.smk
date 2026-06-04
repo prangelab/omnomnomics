@@ -1061,6 +1061,32 @@ def input_units_for_merged_sample(sample_name):
         if merged_sample_name(sample_root) == sample_name
     )
 
+
+def merged_sample_requires_bam_output(sample_name):
+    input_units = input_units_for_merged_sample(sample_name)
+    return len(input_units) != 1 or input_units[0] != sample_name
+
+
+merge_bam_output_samples = sorted(
+    sample_name for sample_name in samples2
+    if merged_sample_requires_bam_output(sample_name)
+)
+merge_bam_passthrough_samples = sorted(
+    sample_name for sample_name in samples2
+    if not merged_sample_requires_bam_output(sample_name)
+)
+merge_bam_output_wildcard_pattern = (
+    "|".join(re.escape(sample_name) for sample_name in merge_bam_output_samples)
+    if merge_bam_output_samples
+    else r"$.^"
+)
+merge_bam_passthrough_wildcard_pattern = (
+    "|".join(re.escape(sample_name) for sample_name in merge_bam_passthrough_samples)
+    if merge_bam_passthrough_samples
+    else r"$.^"
+)
+
+
 if config['PAIRED'] == 1 and THEMODERANGEMIN < 4: 
     num_samples = len(samples) / 2
 else: 
@@ -1246,7 +1272,7 @@ for rule_num in themode:
                 all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.extra_3.tmp", sample = samples)
                 all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.STAR_TE_stats.txt", sample = samples)
     if rule_num == 4:
-        all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.bam", sample = samples2)
+        all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.bam", sample = merge_bam_output_samples)
         all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.extra_4.tmp",  sample = samples2)
     if rule_num == 5:
         if config['THETYPE'] != "CHIP":
