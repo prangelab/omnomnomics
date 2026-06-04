@@ -146,14 +146,14 @@ rule call_peaks:
             summary_path = os.path.join(diffuse_root, "diffuse_feature_summary.tsv")
 
             shell(
-                f"""samtools view -H {quote(reference_bam)} | awk 'BEGIN{{FS="\\t"; OFS="\\t"}} /^@SQ/ {{
+                f"""samtools view -H {quote(reference_bam)} | awk 'BEGIN{{{{FS="\\t"; OFS="\\t"}}}} /^@SQ/ {{{{
 chrom=""; len="";
-for (i=1; i<=NF; i++) {{
+for (i=1; i<=NF; i++) {{{{
   if ($i ~ /^SN:/) chrom=substr($i,4);
   else if ($i ~ /^LN:/) len=substr($i,4);
-}}
+}}}}
 if (chrom != "" && len != "") print chrom, len;
-}}' > {quote(genome_sizes)}"""
+}}}}' > {quote(genome_sizes)}"""
             )
             shell(f"bedtools makewindows -g {quote(genome_sizes)} -w {int(bin_size)} > {quote(raw_bins)}")
 
@@ -162,13 +162,13 @@ if (chrom != "" && len != "") print chrom, len;
                 if keep_standard:
                     std_bins = os.path.join(tmpdir, "std_bins.bed")
                     shell(
-                        f"awk 'BEGIN{{OFS=\"\\t\"}} $1 ~ /^chr([0-9]+|X|Y)$/ {{print $0}}' {quote(work)} > {quote(std_bins)}"
+                        f"awk 'BEGIN{{{{OFS=\"\\t\"}}}} $1 ~ /^chr([0-9]+|X|Y)$/ {{{{print $0}}}}' {quote(work)} > {quote(std_bins)}"
                     )
                     work = std_bins
                 if drop_chrm:
                     no_chrm_bins = os.path.join(tmpdir, "no_chrm_bins.bed")
                     shell(
-                        f"awk 'BEGIN{{OFS=\"\\t\"}} $1 != \"chrM\" && $1 != \"MT\" && $1 != \"chrMT\" {{print $0}}' {quote(work)} > {quote(no_chrm_bins)}"
+                        f"awk 'BEGIN{{{{OFS=\"\\t\"}}}} $1 != \"chrM\" && $1 != \"MT\" && $1 != \"chrMT\" {{{{print $0}}}}' {quote(work)} > {quote(no_chrm_bins)}"
                     )
                     work = no_chrm_bins
                 if blacklist_bed and os.path.exists(blacklist_bed):
@@ -405,16 +405,16 @@ if (chrom != "" && len != "") print chrom, len;
             bam2 = os.path.join(work_dir, f"{out_prefix}.ps2.bam")
             shell(f"samtools view -H {quote(input_bam)} > {quote(header)}")
             shell(
-                f"""samtools view {quote(input_bam)} | awk 'BEGIN{{FS=OFS="\\t"; seed={int(split_seed)}}} {{
+                f"""samtools view {quote(input_bam)} | awk 'BEGIN{{{{FS=OFS="\\t"; seed={int(split_seed)}}}}} {{{{
 key=$1;
 if (length(key)==0) next;
 h=seed;
-for (i=1; i<=length(key); i++) {{
+for (i=1; i<=length(key); i++) {{{{
   h = (h * 33 + int(sprintf("%d", substr(key,i,1)))) % 2147483647;
-}}
+}}}}
 if (h % 2 == 0) print >> "{sam1}";
 else print >> "{sam2}";
-}}'"""
+}}}}'"""
             )
             shell(f"cat {quote(header)} {quote(sam1)} | samtools view -bS - > {quote(bam1)}")
             shell(f"cat {quote(header)} {quote(sam2)} | samtools view -bS - > {quote(bam2)}")
@@ -751,16 +751,16 @@ else print >> "{sam2}";
                 bam2 = os.path.join(group_tmp, f"{out_prefix}.ps2.bam")
                 shell(f"samtools view -H {quote(input_bam)} > {quote(header)}")
                 shell(
-                    f"""samtools view {quote(input_bam)} | awk 'BEGIN{{FS=OFS="\\t"; seed={int(split_seed)}}} {{
+                    f"""samtools view {quote(input_bam)} | awk 'BEGIN{{{{FS=OFS="\\t"; seed={int(split_seed)}}}}} {{{{
 key=$1;
 if (length(key)==0) next;
 h=seed;
-for (i=1; i<=length(key); i++) {{
+for (i=1; i<=length(key); i++) {{{{
   h = (h * 33 + int(sprintf("%d", substr(key,i,1)))) % 2147483647;
-}}
+}}}}
 if (h % 2 == 0) print >> "{sam1}";
 else print >> "{sam2}";
-}}'"""
+}}}}'"""
                 )
                 shell(f"cat {quote(header)} {quote(sam1)} | samtools view -bS - > {quote(bam1)}")
                 shell(f"cat {quote(header)} {quote(sam2)} | samtools view -bS - > {quote(bam2)}")
@@ -920,7 +920,7 @@ else print >> "{sam2}";
                         pair_join = " ".join(quote(p) for p in pair_pass_beds)
                         shell(
                             f"bedtools multiinter -i {pair_join} | "
-                            f"awk 'BEGIN{{OFS=\"\\t\"}} $4>={min_pairs} {{print $1,$2,$3}}' | "
+                            f"awk 'BEGIN{{{{OFS=\"\\t\"}}}} $4>={min_pairs} {{{{print $1,$2,$3}}}}' | "
                             f"sort -k1,1 -k2,2n -k3,3n > {quote(final_bed)}"
                         )
                     retained_count = int(
