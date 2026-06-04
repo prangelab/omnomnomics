@@ -2089,9 +2089,27 @@ for (contrast_cfg in contrast_plan) {
       sort = FALSE
     )
     enrich_df$peak_region <- as.character(enrich_df$genomic_region)
-    enrich_df$assigned_genes <- as.character(enrich_df$assigned_genes)
-    enrich_df$nearest_gene <- as.character(enrich_df$nearest_gene)
+    assigned_col <- if ("assigned_genes.y" %in% colnames(enrich_df)) {
+      "assigned_genes.y"
+    } else if ("assigned_genes" %in% colnames(enrich_df)) {
+      "assigned_genes"
+    } else {
+      NA_character_
+    }
+    nearest_col <- if ("nearest_gene.y" %in% colnames(enrich_df)) {
+      "nearest_gene.y"
+    } else if ("nearest_gene" %in% colnames(enrich_df)) {
+      "nearest_gene"
+    } else {
+      NA_character_
+    }
+    enrich_df$assigned_genes <- if (!is.na(assigned_col)) as.character(enrich_df[[assigned_col]]) else rep(NA_character_, nrow(enrich_df))
+    enrich_df$nearest_gene <- if (!is.na(nearest_col)) as.character(enrich_df[[nearest_col]]) else rep(NA_character_, nrow(enrich_df))
     enrich_df$genomic_region <- NULL
+    suffix_cols <- intersect(c("assigned_genes.x", "assigned_genes.y", "nearest_gene.x", "nearest_gene.y"), colnames(enrich_df))
+    if (length(suffix_cols) > 0) {
+      enrich_df[, suffix_cols] <- NULL
+    }
 
     first_assigned_gene <- function(x) {
       x <- as.character(x)
