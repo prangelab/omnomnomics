@@ -1,0 +1,8 @@
+name: omnomnomics-spp
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - r-base=4.4
+  - phantompeakqualtools=1.2.2

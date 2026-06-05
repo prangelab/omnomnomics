@@ -50,7 +50,6 @@ dependencies:
   - subread
   - macs3
   - matplotlib
-  - phantompeakqualtools
   - homer
   - openjdk
   - perl

@@ -47,7 +47,7 @@ micromamba activate omnomnomics
 pip install -e .
 ```
 
-The main environment includes the motif-analysis tools used by post-DE peak analysis, including GimmeMotifs. IDR is the only default narrow-peak dependency that uses the companion environment described below.
+The main environment includes the motif-analysis tools used by post-DE peak analysis, including GimmeMotifs. IDR and SPP use small companion environments because their dependency stacks conflict with the main Python/R analysis environment.
 
 ### IDR Companion Environment
 
@@ -64,6 +64,22 @@ micromamba activate omnomnomics
 ```
 
 You do not need to activate `omnomnomics-idr` manually during normal pipeline runs. If you only use `--narrow-peak-strategy macs3`, the IDR companion environment is not required.
+
+### SPP Companion Environment
+
+ATAC/ChIP peak QC can report strand cross-correlation metrics (`NSC` and `RSC`) through `phantompeakqualtools` / SPP. Current Bioconda SPP packages require an older R stack than the main `omnomnomics` environment, so install it through the helper after creating the main environment:
+
+```bash
+bash scripts/install_spp_helper.sh
+```
+
+The helper creates or updates `omnomnomics-spp` from `environment.spp.yml`, then installs a `run_spp.R` wrapper into the main `omnomnomics` environment. Users should still activate only the main environment during normal runs:
+
+```bash
+micromamba activate omnomnomics
+```
+
+If the SPP helper is not installed, peak QC still runs and records the SPP fields as unavailable. Install the helper when you want `NSC`/`RSC` metrics or `--spp-gate` decisions.
 
 Reference genomes are managed separately from the code checkout. Install them under the configured genome assembly root, or use the packaged genome helper commands. A normalized assembly layout contains at least:
 - `fasta/genome.fa`
@@ -248,7 +264,7 @@ EXPERIMENT_DIR
 Peak QC notes:
 - `FRiP` and `peak_count` are reported per MACS3 peak set.
 - `NRF`, `PBC1`, and `PBC2` are reported per BAM as library complexity metrics.
-- `NSC` and `RSC` are reported from strand cross-correlation analysis via `phantompeakqualtools`.
+- `NSC` and `RSC` are reported from strand cross-correlation analysis via `phantompeakqualtools` / SPP when `scripts/install_spp_helper.sh` has installed the `run_spp.R` wrapper.
 - `NSC` and `RSC` are most informative for `TF / narrow peaks` and should be interpreted more cautiously for broad histone marks.
 
 ## Workflow:
@@ -706,6 +722,7 @@ After completion of a run of _Omnomnomics_, MultiQC is used to parse and combine
   - subread
   - macs3
   - idr, via `scripts/install_idr_helper.sh`, for default narrow ATAC/ChIP peak calling
+  - run_spp.R, via `scripts/install_spp_helper.sh`, for ATAC/ChIP SPP cross-correlation QC
   - homer
   - multiqc
 - On HPC systems, `sbatch` must be available because the Snakemake controller is submitted as a SLURM job.
