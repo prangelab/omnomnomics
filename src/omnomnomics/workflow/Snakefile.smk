@@ -1981,6 +1981,20 @@ onsuccess:
 
                 return generalstats_path, table_path
 
+            def write_multiqc_runtime_config():
+                multiqc_dir = f"{experiment_dir}/MultiQC"
+                os.makedirs(multiqc_dir, exist_ok=True)
+                config_path = os.path.join(multiqc_dir, "omnomnomics_multiqc_config.yaml")
+                runtime_config = {
+                    "custom_plot_config": {
+                        "general_stats_table": {"color": "#377eb8"},
+                        "omnomnomics_alignment_flow_table_plot": {"color": "#377eb8"},
+                    }
+                }
+                with open(config_path, "w") as handle:
+                    yaml.safe_dump(runtime_config, handle, sort_keys=False)
+                return config_path
+
             stats_tsv_paths = [sample_qc_stats_path(sample_name) for sample_name in samples2]
             existing_stats_tsvs = [path for path in stats_tsv_paths if os.path.exists(path)]
             if existing_stats_tsvs:
@@ -1998,8 +2012,10 @@ onsuccess:
             log_it(logfile, "Running multiQC...", "STATS")
             multiqc_version = subprocess.check_output(["multiqc", "--version"])
             log_it(logfile, "\n" + multiqc_version.decode("utf-8"), "MULTIQC VERSION")
+            multiqc_config = write_multiqc_runtime_config()
+            log_it(logfile, f"MultiQC runtime config file: {multiqc_config}")
             multiqc_command = (
-                f"multiqc --filename MultiQC/omnomnomics.run.{run_date}.multiqc_report.html --dirs --export ."
+                f"multiqc --config {multiqc_config} --filename MultiQC/omnomnomics.run.{run_date}.multiqc_report.html --dirs --export ."
             )
             log_it(logfile, multiqc_command, "MULTIQC COMMAND")
             shell(multiqc_command)
