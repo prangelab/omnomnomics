@@ -923,8 +923,9 @@ THEMODERANGEMIN = config['THEMODERANGEMIN']
 
 input_folder = master_config['input_folders'][THEMODERANGEMIN-1]
 input_file_type =  master_config['input_file_types'][THEMODERANGEMIN-1]
-if THEMODERANGEMIN == 11:
+if isinstance(input_file_type, list):
     input_file_type = input_file_type[0]
+if isinstance(input_folder, list):
     input_folder = input_folder[0]
 
 input_pattern = os.path.join(input_folder, f"*{input_file_type}")
