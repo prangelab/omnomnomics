@@ -212,13 +212,38 @@ def _build_de_customization_guide(
 """
 
 
+def _chrom_de_peak_metadata_file():
+    if config['THETYPE'] == "ATAC":
+        return f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num']-1]}/analyze_peaks/summary/peak_metadata_for_r.tsv"
+    if config['THETYPE'] == "CHIP":
+        if str(config.get("BROAD_MODE", "off")).strip().lower() in {"genebody", "diffuse"}:
+            return f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num']-1]}/analyze_peaks/summary/feature_metadata_for_r.tsv"
+        return f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num']-1]}/peak_qc/peak_annotations/chip.all_groups.merged_peaks.annotated.bed"
+    return "NA"
+
+
+def _chrom_de_peak_metadata_dependency():
+    if config['THETYPE'] == "ATAC":
+        return f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num']-1]}/extra_{master_config['analyzepeaks_rule_num']}.tmp"
+    if config['THETYPE'] == "CHIP":
+        if str(config.get("BROAD_MODE", "off")).strip().lower() in {"genebody", "diffuse"}:
+            return f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num']-1]}/extra_{master_config['analyzepeaks_rule_num']}.tmp"
+        return _chrom_de_peak_metadata_file()
+    return []
+
+
+chrom_de_peak_metadata_file = _chrom_de_peak_metadata_file()
+chrom_de_peak_metadata_dependency = _chrom_de_peak_metadata_dependency()
+
+
 rule call_DE_chrom:
     input:
         counts_table=(
             f"{experiment_dir}/{master_config['input_folders'][master_config['dechrom_rule_num']-1]}/{os.path.basename(config['EXPERIMENT_DIR'])}.raw_read_quant.table.txt"
             if config['THETYPE'] in {"ATAC", "CHIP"}
             else []
-        )
+        ),
+        peak_metadata_dependency=chrom_de_peak_metadata_dependency
     output:
         results_zip=f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num']-1]}/{os.path.basename(config['EXPERIMENT_DIR'])}.chrom.results.zip",
         peak_metadata=f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num']-1]}/peak_metadata.tsv"
@@ -227,15 +252,7 @@ rule call_DE_chrom:
         broad_mode=str(config.get("BROAD_MODE", "off")).strip().lower(),
         inputfolder=f"{experiment_dir}/{master_config['input_folders'][master_config['dechrom_rule_num']-1]}",
         outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num']-1]}",
-        peak_metadata_file=(
-            f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num']-1]}/analyze_peaks/summary/peak_metadata_for_r.tsv"
-            if config['THETYPE'] == "ATAC"
-            else (
-                f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num']-1]}/analyze_peaks/summary/feature_metadata_for_r.tsv"
-                if str(config.get("BROAD_MODE", "off")).strip().lower() in {"genebody", "diffuse"}
-                else f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num']-1]}/peak_qc/peak_annotations/chip.all_groups.merged_peaks.annotated.bed"
-            )
-        ),
+        peak_metadata_file=chrom_de_peak_metadata_file,
         metadata_file=config.get("DERIVED_METADATA_FILE", "NA"),
         metadata_source=config.get("MYMETADATA", "NA"),
         resolved_formula=config.get("RESOLVED_DE_FORMULA", "NA"),
