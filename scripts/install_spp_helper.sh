@@ -26,7 +26,7 @@ fi
 if "${micromamba_bin}" env list | awk '{print $1}' | grep -qx "${SPP_ENV}"; then
     "${micromamba_bin}" install -y -n "${SPP_ENV}" -c conda-forge -c bioconda r-base=4.4 phantompeakqualtools=1.2.2
 else
-    "${micromamba_bin}" env create -f "${SPP_ENV_YAML}"
+    "${micromamba_bin}" env create -y -f "${SPP_ENV_YAML}"
 fi
 
 main_prefix="$("${micromamba_bin}" run -n "${MAIN_ENV}" python -c "import sys; print(sys.prefix)")"
