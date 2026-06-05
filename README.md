@@ -47,6 +47,8 @@ micromamba activate omnomnomics
 pip install -e .
 ```
 
+The main environment includes the motif-analysis tools used by post-DE peak analysis, including GimmeMotifs. IDR is the only default narrow-peak dependency that uses the companion environment described below.
+
 ### IDR Companion Environment
 
 Default narrow ATAC/ChIP peak calling uses IDR. Bioconda IDR currently requires an older Python than the main `omnomnomics` environment, so IDR is installed in a small companion environment. If you want to use the default `--narrow-peak-strategy idr` mode for ATAC or narrow ChIP, run this once after creating the main environment:

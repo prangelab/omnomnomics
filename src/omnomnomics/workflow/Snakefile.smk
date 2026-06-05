@@ -1002,6 +1002,30 @@ samples2 = [merged_sample_name(string) for string in samples]
 samples = list(set(samples))
 samples2 = list(set(samples2))
 
+metadata_sample_entry_steps = {
+    master_config.get("de_rule_num"),
+    master_config.get("dechrom_rule_num"),
+    master_config.get("analyzepeaksde_rule_num"),
+}
+if THEMODERANGEMIN in metadata_sample_entry_steps and derived_metadata_rows:
+    metadata_samples = sorted(
+        {
+            str(row.get("filename_key") or row.get("filename") or row.get("sample_id") or "").strip()
+            for row in derived_metadata_rows
+            if str(row.get("filename_key") or row.get("filename") or row.get("sample_id") or "").strip()
+        }
+    )
+    metadata_merged_samples = sorted(
+        {
+            str(row.get("sample_id") or row.get("filename_key") or row.get("filename") or "").strip()
+            for row in derived_metadata_rows
+            if str(row.get("sample_id") or row.get("filename_key") or row.get("filename") or "").strip()
+        }
+    )
+    if metadata_merged_samples:
+        samples = metadata_samples or metadata_merged_samples
+        samples2 = metadata_merged_samples
+
 lane_sample_files = []
 lane_sample_sources = [
     (master_config['input_folders'][master_config['trim_rule_num'] - 1], FASTQ_EXTENSIONS),
