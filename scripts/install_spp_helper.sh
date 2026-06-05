@@ -38,4 +38,5 @@ exec "${micromamba_bin}" run -n "${SPP_ENV}" run_spp.R "\$@"
 EOF
 chmod +x "${wrapper_path}"
 
-"${micromamba_bin}" run -n "${MAIN_ENV}" run_spp.R -h >/dev/null
+"${micromamba_bin}" run -n "${SPP_ENV}" bash -lc "command -v run_spp.R >/dev/null"
+"${micromamba_bin}" run -n "${MAIN_ENV}" bash -lc "command -v run_spp.R >/dev/null"
