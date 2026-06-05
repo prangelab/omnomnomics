@@ -446,7 +446,7 @@ rule peak_qc:
 
             run_spp_command = (
                 f"run_spp.R -c={quote(bam_path)} -savp={quote(crosscorr_pdf)} "
-                f"-out={quote(crosscorr_table)} -p={threads}"
+                f"-out={quote(crosscorr_table)} -p={threads} -rf"
             )
             log_it(logfile, run_spp_command, "PHANTOMPEAKQUALTOOLS COMMAND")
             shell(run_spp_command)
