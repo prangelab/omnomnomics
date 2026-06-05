@@ -434,12 +434,14 @@ rule peak_qc:
             crosscorr_table = f"{crosscorr_prefix}.cross_correlation.tsv"
             crosscorr_pdf = f"{crosscorr_prefix}.cross_correlation.pdf"
             if not shutil.which("run_spp.R"):
+                log_once(logfile, "step13.run_spp_missing", "run_spp.R not found on PATH. NSC/RSC metrics will be reported as missing.", "PHANTOMPEAKQUALTOOLS")
                 return {
                     "est_frag_len": "",
                     "nsc": "",
                     "rsc": "",
                     "crosscorr_table": "",
                     "crosscorr_pdf": "",
+                    "spp_status": "run_spp.R_not_found",
                 }
 
             run_spp_command = (
@@ -461,12 +463,16 @@ rule peak_qc:
             est_frag_len = parts[2] if len(parts) > 2 else ""
             nsc = parts[8] if len(parts) > 8 else ""
             rsc = parts[9] if len(parts) > 9 else ""
+            spp_status = "parsed" if nsc and rsc else "unparseable_output"
+            if spp_status != "parsed":
+                log_it(logfile, f"Could not parse NSC/RSC from run_spp.R output for {sample_name}: {crosscorr_table}")
             return {
                 "est_frag_len": est_frag_len,
                 "nsc": nsc,
                 "rsc": rsc,
                 "crosscorr_table": crosscorr_table,
                 "crosscorr_pdf": crosscorr_pdf,
+                "spp_status": spp_status,
             }
 
         def calculate_peak_qc_metrics(peak_bed, bam_files):
@@ -532,6 +538,7 @@ rule peak_qc:
                     "est_frag_len",
                     "nsc",
                     "rsc",
+                    "spp_status",
                     "crosscorr_table",
                     "crosscorr_pdf",
                 ])
@@ -550,6 +557,7 @@ rule peak_qc:
                         row["est_frag_len"],
                         row["nsc"],
                         row["rsc"],
+                        row.get("spp_status", ""),
                         row["crosscorr_table"],
                         row["crosscorr_pdf"],
                     ])

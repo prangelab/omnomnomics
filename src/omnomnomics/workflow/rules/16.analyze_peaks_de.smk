@@ -532,9 +532,24 @@ rule analyze_peaks_de:
                     )
 
         def run_gimme_motifs(set_manifest_rows, motifs_dir):
+            motif_summary_path = os.path.join(motifs_dir, "motif_runs.tsv")
+            eligible_set_types = {
+                "de_significant_promoter",
+                "de_significant_distal",
+                "unique_from_prede",
+                "de_significant_promoter_regions",
+                "de_up_promoter_regions",
+                "de_down_promoter_regions",
+            }
+            motif_summary = []
             if not tool_available("gimme"):
                 log_it(logfile, "gimme executable not found. Skipping motif analysis in analyze_peaks_de.")
-                return
+                motif_summary.append(["ALL", "SKIP", "", "", "", "gimme executable not found"])
+                with open(motif_summary_path, "w", newline="") as handle:
+                    writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+                    writer.writerow(["set_name", "status", "peak_bed", "output_dir", "genome", "reason"])
+                    writer.writerows(motif_summary)
+                return motif_summary_path
 
             genome_map = {
                 "GRCh38": "hg38",
@@ -542,37 +557,32 @@ rule analyze_peaks_de:
                 "GRCm39": "mm39",
             }
             motif_genome = genome_map.get(str(params.genome_version), str(params.genome_version))
-            motif_summary = []
             for item in set_manifest_rows:
-                if item["set_type"] not in {
-                    "de_significant_promoter",
-                    "de_significant_distal",
-                    "unique_from_prede",
-                    "de_significant_promoter_regions",
-                    "de_up_promoter_regions",
-                    "de_down_promoter_regions",
-                }:
+                if item["set_type"] not in eligible_set_types:
+                    motif_summary.append([item["set_name"], "SKIP", item["peak_bed"], "", motif_genome, "set type is not configured for motif analysis"])
                     continue
                 if int(item["peak_count"]) < 50:
+                    motif_summary.append([item["set_name"], "SKIP", item["peak_bed"], "", motif_genome, "fewer than 50 peaks"])
                     continue
                 safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", item["set_name"])
                 out_dir = ensure_dir(os.path.join(motifs_dir, safe_name))
                 cmd = (
-                    f"gimme motifs {quote(item['peak_bed'])} {quote(motif_genome)} {quote(out_dir)} "
-                    f"--known --denovo --nthreads {threads}"
+                    f"gimme motifs {quote(item['peak_bed'])} {quote(out_dir)} "
+                    f"--known --denovo --nthreads {threads} -g {quote(motif_genome)}"
                 )
                 try:
                     shell(cmd)
-                    motif_summary.append([item["set_name"], "OK", item["peak_bed"], out_dir, motif_genome])
+                    motif_summary.append([item["set_name"], "OK", item["peak_bed"], out_dir, motif_genome, ""])
                 except Exception as motif_error:
                     log_it(logfile, f"Motif run failed for {item['set_name']}: {motif_error}")
-                    motif_summary.append([item["set_name"], "FAIL", item["peak_bed"], out_dir, motif_genome])
+                    motif_summary.append([item["set_name"], "FAIL", item["peak_bed"], out_dir, motif_genome, str(motif_error)])
 
-            if motif_summary:
-                with open(os.path.join(motifs_dir, "motif_runs.tsv"), "w", newline="") as handle:
-                    writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-                    writer.writerow(["set_name", "status", "peak_bed", "output_dir", "genome"])
-                    writer.writerows(motif_summary)
+            with open(motif_summary_path, "w", newline="") as handle:
+                writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+                writer.writerow(["set_name", "status", "peak_bed", "output_dir", "genome", "reason"])
+                writer.writerows(motif_summary)
+            log_it(logfile, f"Motif run summary: {motif_summary_path}")
+            return motif_summary_path
 
         try:
             if params.thetype not in {"ATAC", "CHIP"}:
@@ -686,7 +696,7 @@ rule analyze_peaks_de:
                     )
 
             run_deeptools(set_manifest_rows, signal_dir)
-            run_gimme_motifs(set_manifest_rows, motifs_dir)
+            motif_summary_path = run_gimme_motifs(set_manifest_rows, motifs_dir)
 
             report_path = os.path.join(summary_dir, "analyze_peaks_de_report.tsv")
             with open(report_path, "w", newline="") as handle:
@@ -703,6 +713,7 @@ rule analyze_peaks_de:
                 writer.writerow(["set_manifest", set_manifest_path])
                 writer.writerow(["signal_dir", signal_dir])
                 writer.writerow(["motifs_dir", motifs_dir])
+                writer.writerow(["motif_runs", motif_summary_path or "NA"])
                 writer.writerow(["peak_metadata_path", peak_metadata_path])
 
             write_tmp_file()
