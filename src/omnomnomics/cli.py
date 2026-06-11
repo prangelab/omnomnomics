@@ -637,6 +637,44 @@ def merge_configs(base_config, override_config):
    return merged_config
 
 
+def positive_int_or_none(value):
+   try:
+       parsed = int(value)
+   except (TypeError, ValueError):
+       return None
+   return parsed if parsed > 0 else None
+
+
+def apply_assay_runtime_defaults(config, assay_type):
+   if assay_type not in {"ATAC", "CHIP"}:
+       return
+
+   chromatin_default_runtime = positive_int_or_none(config.get("chromatin_default_runtime"))
+   if chromatin_default_runtime is not None:
+       current_default_runtime = positive_int_or_none(config.get("default_runtime")) or 0
+       config["default_runtime"] = max(current_default_runtime, chromatin_default_runtime)
+
+   chromatin_controller_runtime = positive_int_or_none(config.get("chromatin_controller_runtime"))
+   if chromatin_controller_runtime is not None:
+       current_controller_runtime = positive_int_or_none(config.get("controller_runtime")) or 0
+       config["controller_runtime"] = max(current_controller_runtime, chromatin_controller_runtime)
+
+   chromatin_rule_runtime = config.get("chromatin_rule_runtime")
+   if not isinstance(chromatin_rule_runtime, list):
+       return
+
+   rule_runtime = list(config.get("rule_runtime", []))
+   for index, chromatin_runtime in enumerate(chromatin_rule_runtime):
+       parsed_chromatin_runtime = positive_int_or_none(chromatin_runtime)
+       if parsed_chromatin_runtime is None:
+           continue
+       while len(rule_runtime) <= index:
+           rule_runtime.append(None)
+       current_rule_runtime = positive_int_or_none(rule_runtime[index]) or 0
+       rule_runtime[index] = max(current_rule_runtime, parsed_chromatin_runtime)
+   config["rule_runtime"] = rule_runtime
+
+
 def normalize_de_config_paths(args_de_config, config_de_config):
     if args_de_config:
         raw_items = args_de_config
@@ -1407,6 +1445,7 @@ def main():
     # Access parsed arguments
     experiment_dir = str(Path(args.experiment_dir).expanduser().resolve()) if args.experiment_dir else args.experiment_dir
     the_type = assay.upper()
+    apply_assay_runtime_defaults(config, the_type)
     genome = args.genome
     trim_tool = args.trim_tool.lower() if args.trim_tool else config.get("trim_tool","fastp").lower()
     map_tool = args.map_tool.lower() if args.map_tool else config.get('map_tool', "hisat2").lower()
@@ -1779,6 +1818,9 @@ def main():
         'COLOR_DATA_FOLDER_DEFAULT': str(workflow_root / "bin" / "color_data_for_hubs"),
         'GENOME_ASSEMBLY_DIR': config['genome_assembly_dir'],
         'CELLRANGER_REFERENCE_DIR': config['cellranger_reference_dir'],
+        'default_runtime': config.get('default_runtime'),
+        'controller_runtime': config.get('controller_runtime'),
+        'rule_runtime': config.get('rule_runtime'),
         'HISAT2_GENOME_DIR': genome_subdir(config['genome_assembly_dir'], genome, "hisat2"),
         'STAR_GENOME_DIR': genome_subdir(config['genome_assembly_dir'], genome, "star"),
         'GENOME_AUX_DIR': genome_subdir(config['genome_assembly_dir'], genome, "aux"),

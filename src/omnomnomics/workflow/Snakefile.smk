@@ -398,6 +398,9 @@ if not os.path.isfile(site_config_file):
 workflow_config = load_and_validate_yaml(logfile, workflow_config_file, "## Omnomnomics pipeline config ##")
 site_config = load_and_validate_yaml(logfile, site_config_file, "## Omnomnomics pipeline config ##")
 master_config = merge_configs(workflow_config, site_config)
+for runtime_key in ("default_runtime", "controller_runtime", "rule_runtime"):
+    if runtime_key in config and config[runtime_key] is not None:
+        master_config[runtime_key] = config[runtime_key]
 
 themode = config['THEMODE']
 retention_policy = str(config.get("RETENTION_POLICY", "all")).lower()
