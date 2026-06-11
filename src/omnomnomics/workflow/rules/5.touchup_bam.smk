@@ -99,7 +99,24 @@ rule touchup_bam:
                 if thetype == "ATAC":
                     record_step_note(master_config['touchup_rule_num'], sample, "writing_atac_mitochondrial_summary")
                     atac_stats_path = os.path.join(outputfolder, f"{sample}.ATAC_stats.txt")
-                    shell(f"""samtools view {quote(local_input)} | awk '{{{{if($3~/chrM/)chrm=chrm+1}}}}END{{{{printf \"%34s\\t%11d\\n\", \"Total aligned reads before filtering:\",NR;printf \"%34s\\t%11d %1s%2.2f%2s\\n\", \"chrM aligned reads before filtering:\",chrm, \"(\", (chrm/NR)*100,\"%)\"}}}}' > {quote(atac_stats_path)}""")
+                    total_reads = int(
+                        subprocess.check_output(
+                            ["samtools", "view", "-@", str(samcores), "-c", local_input],
+                            text=True,
+                        ).strip()
+                    )
+                    chrm_reads = int(
+                        subprocess.check_output(
+                            ["samtools", "view", "-@", str(samcores), "-c", "-e", 'rname == "chrM"', local_input],
+                            text=True,
+                        ).strip()
+                    )
+                    chrm_fraction = (chrm_reads / total_reads) * 100 if total_reads else 0.0
+                    with open(atac_stats_path, "w", encoding="utf-8") as handle:
+                        handle.write(f"{'Total aligned reads before filtering:':>34}\t{total_reads:11d}\n")
+                        handle.write(
+                            f"{'chrM aligned reads before filtering:':>34}\t{chrm_reads:11d} ({chrm_fraction:2.2f}%)\n"
+                        )
 
                 shell(f"""echo "necessity file for touchup_bam. can delete this." > {quote(local_extra)}""")
                 record_step_note(master_config['touchup_rule_num'], sample, "copying_filtered_bam_back")
