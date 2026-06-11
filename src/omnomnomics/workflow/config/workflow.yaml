@@ -41,6 +41,7 @@ narrow_peak_strategy: "idr"
 idr_mode: "encode"
 idr_pair_fraction: 0.5
 idr_pairing_policy: "all_pairs"
+idr_min_input_peaks: 20
 spp_gate: "warn"
 
 

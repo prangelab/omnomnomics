@@ -433,6 +433,9 @@ Some job mode examples:
                                     Default: 0.5
     --idr-pairing-policy:   Replicate pairing policy for IDR when groups have more than two replicates.
                                     `all_pairs` or `anchor_vs_all`
+    --idr-min-input-peaks:  Minimum narrowPeak rows required before attempting an IDR comparison.
+                                    Sparse comparisons are skipped and reported; if no true-pair IDR comparison is usable, pooled MACS3 peaks are used as a flagged fallback.
+                                    Default: 20
     --spp-gate:             SPP QC gate mode for ATAC and ChIP peak-QC step.
                                     `none`, `warn`, `drop`, or `strict`
     -a STR:                 Appendix to add to track name

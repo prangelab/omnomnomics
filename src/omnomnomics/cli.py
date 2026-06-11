@@ -586,6 +586,7 @@ def parse_arguments(argv=None):
    parser.add_argument('--idr-mode', choices=['basic', 'encode'], help='IDR mode when --narrow-peak-strategy idr is active. basic runs true-replicate pairwise IDR consensus; encode additionally runs pseudo-replicate IDR diagnostics.')
    parser.add_argument('--idr-pair-fraction', type=float, help='Minimum fraction of replicate pairs that must support a peak in IDR basic/encode consensus. Value in [0,1]. Default: 0.5')
    parser.add_argument('--idr-pairing-policy', choices=['all_pairs', 'anchor_vs_all'], help='Replicate pairing policy for IDR when groups have >2 replicates. all_pairs uses all pairwise combinations; anchor_vs_all pairs the first replicate with every other replicate.')
+   parser.add_argument('--idr-min-input-peaks', type=int, help='Minimum narrowPeak rows required before attempting an IDR comparison. Sparse comparisons are skipped and reported. Default: 20')
    parser.add_argument('--spp-gate', choices=['none', 'warn', 'drop', 'strict'], help='SPP QC gate mode for ATAC/ChIP peak QC. none disables SPP gating, warn reports flags only, drop excludes flagged samples from downstream count/DE, strict aborts if any sample fails thresholds.')
    parser.add_argument('-a', '--appendix', help='Appendix to add to track name \n \t Default: hub')
    parser.add_argument('-k', '--keepunpaired', action='store_true', help='Keep unpaired or not in HISAT2')
@@ -1510,6 +1511,7 @@ def main():
     idr_mode = (args.idr_mode if args.idr_mode else config.get('idr_mode', 'encode')).strip().lower()
     idr_pair_fraction = args.idr_pair_fraction if args.idr_pair_fraction is not None else config.get('idr_pair_fraction', 0.5)
     idr_pairing_policy = (args.idr_pairing_policy if args.idr_pairing_policy else config.get('idr_pairing_policy', 'all_pairs')).strip().lower()
+    idr_min_input_peaks = args.idr_min_input_peaks if args.idr_min_input_peaks is not None else config.get('idr_min_input_peaks', 20)
     try:
         idr_pair_fraction = float(idr_pair_fraction)
     except (TypeError, ValueError):
@@ -1517,6 +1519,14 @@ def main():
         sys.exit(1)
     if not (0.0 <= idr_pair_fraction <= 1.0):
         print("--idr-pair-fraction must be within [0,1]. Aborting...", file=sys.stderr)
+        sys.exit(1)
+    try:
+        idr_min_input_peaks = int(idr_min_input_peaks)
+    except (TypeError, ValueError):
+        print("--idr-min-input-peaks must be an integer. Aborting...", file=sys.stderr)
+        sys.exit(1)
+    if idr_min_input_peaks < 0:
+        print("--idr-min-input-peaks must be >= 0. Aborting...", file=sys.stderr)
         sys.exit(1)
     try:
         chip_broad_qvalue = float(chip_broad_qvalue)
@@ -1861,6 +1871,7 @@ def main():
         'IDR_MODE': idr_mode,
         'IDR_PAIR_FRACTION': idr_pair_fraction,
         'IDR_PAIRING_POLICY': idr_pairing_policy,
+        'IDR_MIN_INPUT_PEAKS': idr_min_input_peaks,
         'SPP_GATE': spp_gate,
         'DE_DESIGN_MODE': de_design_mode,
         'DE_CONFIG_FILE': de_config_file_path,

@@ -767,6 +767,31 @@ else print >> "{sam2}";
                 return bam1, bam2
 
             def run_idr_pair(sorted_a, sorted_b, peak_list, output_path, log_path):
+                for stale_path in (output_path, log_path, f"{output_path}.png"):
+                    if os.path.exists(stale_path):
+                        os.remove(stale_path)
+                try:
+                    min_input_peaks = int(config.get("IDR_MIN_INPUT_PEAKS", 20))
+                except (TypeError, ValueError):
+                    min_input_peaks = 20
+                min_input_peaks = max(0, min_input_peaks)
+                input_counts = {
+                    "sample_a": count_peak_file_rows(sorted_a),
+                    "sample_b": count_peak_file_rows(sorted_b),
+                    "peak_list": count_peak_file_rows(peak_list),
+                }
+                too_sparse = {name: count for name, count in input_counts.items() if count < min_input_peaks}
+                if too_sparse:
+                    reason = ", ".join(f"{name}={count}" for name, count in too_sparse.items())
+                    message = (
+                        f"Skipping sparse IDR comparison for {os.path.basename(output_path)}: "
+                        f"{reason}; required >= {min_input_peaks} peaks."
+                    )
+                    log_it(logfile, message, "WARNING")
+                    open(output_path, "w", encoding="utf-8").close()
+                    with open(log_path, "w", encoding="utf-8") as handle:
+                        handle.write(message + "\n")
+                    return False
                 idr_cmd = (
                     f"idr --samples {quote(sorted_a)} {quote(sorted_b)} "
                     f"--peak-list {quote(peak_list)} "
@@ -774,7 +799,55 @@ else print >> "{sam2}";
                     f"--output-file {quote(output_path)} --output-file-type narrowPeak "
                     f"--plot --log-output-file {quote(log_path)} --soft-idr-threshold 0.05"
                 )
-                shell(idr_cmd)
+                result = subprocess.run(
+                    idr_cmd,
+                    shell=True,
+                    executable="/bin/bash",
+                    text=True,
+                    capture_output=True,
+                )
+                if result.returncode == 0:
+                    return True
+
+                combined_output = "\n".join(
+                    part for part in [result.stdout, result.stderr] if part
+                )
+                if os.path.exists(log_path):
+                    try:
+                        with open(log_path, "r", encoding="utf-8", errors="replace") as handle:
+                            combined_output += "\n" + handle.read()
+                    except OSError:
+                        pass
+                sparse_failure = (
+                    "Peak files must contain at least" in combined_output
+                    or "post-merge" in combined_output
+                )
+                if sparse_failure:
+                    message = (
+                        f"Skipping sparse IDR comparison for {os.path.basename(output_path)} "
+                        "after IDR reported too few post-merge peaks."
+                    )
+                    log_it(logfile, message, "WARNING")
+                    open(output_path, "w", encoding="utf-8").close()
+                    with open(log_path, "a", encoding="utf-8") as handle:
+                        handle.write("\n" + message + "\n")
+                        if combined_output:
+                            handle.write(combined_output + "\n")
+                    return False
+
+                raise RuntimeError(
+                    f"IDR failed for {os.path.basename(output_path)} with exit code {result.returncode}."
+                )
+
+            def count_peak_file_rows(path):
+                count = 0
+                if not os.path.exists(path):
+                    return count
+                with open(path, "r", encoding="utf-8", errors="replace") as handle:
+                    for line in handle:
+                        if line.strip() and not line.startswith("#"):
+                            count += 1
+                return count
 
             def idr_row_passes_threshold(row, threshold=0.05):
                 candidate_vals = []
@@ -894,7 +967,7 @@ else print >> "{sam2}";
                         log_it(logfile, f"Group {group} has <2 replicates. Falling back to pooled MACS3 peaks.")
                         final_bed = os.path.join(outputfolder, f"{group}.MACS3.optimized.bed")
                         shell(f"cut -f1-3 {quote(pooled_narrow)} | sort -k1,1 -k2,2n -k3,3n > {quote(final_bed)}")
-                        idr_summary_rows.append([group, "pooled_fallback", "NA", "NA", "NA", "NA", final_bed])
+                        idr_summary_rows.append([group, "pooled_fallback", "NA", "NA", "NA", "NA", final_bed, "fewer_than_two_replicates"])
                         continue
 
                     pair_pass_beds = []
@@ -905,16 +978,35 @@ else print >> "{sam2}";
                         pair_hash = hashlib.md5(pair_tag.encode("utf-8")).hexdigest()[:12]
                         idr_out = os.path.join(idr_root, f"{group}.pair.{pair_hash}.idr.narrowPeak")
                         idr_log = os.path.join(idr_root, f"{group}.pair.{pair_hash}.idr.log")
-                        run_idr_pair(rep1_sorted, rep2_sorted, pooled_sorted, idr_out, idr_log)
                         pair_pass_bed = os.path.join(idr_root, f"{group}.pair.{pair_hash}.idr.pass.bed")
-                        pass_count = extract_idr_pass_bed(idr_out, pair_pass_bed, threshold=0.05)
-                        pair_pass_beds.append(pair_pass_bed)
-                        idr_summary_rows.append([group, "true_pair_idr", rep1_name, rep2_name, "0.05", pass_count, pair_pass_bed])
+                        if run_idr_pair(rep1_sorted, rep2_sorted, pooled_sorted, idr_out, idr_log):
+                            pass_count = extract_idr_pass_bed(idr_out, pair_pass_bed, threshold=0.05)
+                            pair_pass_beds.append(pair_pass_bed)
+                            idr_summary_rows.append([group, "true_pair_idr", rep1_name, rep2_name, "0.05", pass_count, pair_pass_bed, "ok"])
+                        else:
+                            open(pair_pass_bed, "w", encoding="utf-8").close()
+                            idr_summary_rows.append([group, "true_pair_idr_skipped_sparse", rep1_name, rep2_name, "0.05", 0, pair_pass_bed, "too_few_peaks_for_idr"])
 
                     num_pairs = len(pair_pass_beds)
                     min_pairs = max(1, int(math.ceil(float(pair_fraction) * float(num_pairs))))
                     final_bed = os.path.join(outputfolder, f"{group}.MACS3.optimized.bed")
-                    if num_pairs == 1:
+                    if num_pairs == 0:
+                        shell(f"cut -f1-3 {quote(pooled_narrow)} | sort -k1,1 -k2,2n -k3,3n > {quote(final_bed)}")
+                        retained_count = int(
+                            subprocess.check_output(
+                                f"wc -l {quote(final_bed)} | awk '{{print $1}}'",
+                                shell=True,
+                                executable="/bin/bash",
+                                text=True,
+                            ).strip()
+                        )
+                        log_it(
+                            logfile,
+                            f"Group {group} had no usable true-replicate IDR comparisons. Falling back to pooled MACS3 peaks.",
+                            "WARNING",
+                        )
+                        idr_summary_rows.append([group, "pooled_fallback_no_usable_idr", "all", "all", "NA", retained_count, final_bed, "all_true_pair_idr_comparisons_skipped"])
+                    elif num_pairs == 1:
                         shell(f"cp {quote(pair_pass_beds[0])} {quote(final_bed)}")
                     else:
                         pair_join = " ".join(quote(p) for p in pair_pass_beds)
@@ -923,15 +1015,25 @@ else print >> "{sam2}";
                             f"awk 'BEGIN{{{{OFS=\"\\t\"}}}} $4>={min_pairs} {{{{print $1,$2,$3}}}}' | "
                             f"sort -k1,1 -k2,2n -k3,3n > {quote(final_bed)}"
                         )
-                    retained_count = int(
-                        subprocess.check_output(
-                            f"wc -l {quote(final_bed)} | awk '{{print $1}}'",
-                            shell=True,
-                            executable="/bin/bash",
-                            text=True,
-                        ).strip()
-                    )
-                    idr_summary_rows.append([group, "consensus_idr", "all", "all", f"0.05;pair_fraction={pair_fraction};min_pairs={min_pairs}", retained_count, final_bed])
+                        retained_count = int(
+                            subprocess.check_output(
+                                f"wc -l {quote(final_bed)} | awk '{{print $1}}'",
+                                shell=True,
+                                executable="/bin/bash",
+                                text=True,
+                            ).strip()
+                        )
+                        idr_summary_rows.append([group, "consensus_idr", "all", "all", f"0.05;pair_fraction={pair_fraction};min_pairs={min_pairs}", retained_count, final_bed, "ok"])
+                    if num_pairs == 1:
+                        retained_count = int(
+                            subprocess.check_output(
+                                f"wc -l {quote(final_bed)} | awk '{{print $1}}'",
+                                shell=True,
+                                executable="/bin/bash",
+                                text=True,
+                            ).strip()
+                        )
+                        idr_summary_rows.append([group, "consensus_idr", "all", "all", f"0.05;pair_fraction={pair_fraction};min_pairs={min_pairs}", retained_count, final_bed, "ok"])
 
                     if idr_mode == "encode":
                         pooled_bam = os.path.join(group_tmp, f"{group}.pooled.bam")
@@ -952,10 +1054,14 @@ else print >> "{sam2}";
                             pooled_ps.append(ps_sorted)
                         pooled_idr_out = os.path.join(idr_root, f"{group}.pooled_pseudorep.idr.narrowPeak")
                         pooled_idr_log = os.path.join(idr_root, f"{group}.pooled_pseudorep.idr.log")
-                        run_idr_pair(pooled_ps[0], pooled_ps[1], pooled_sorted, pooled_idr_out, pooled_idr_log)
                         pooled_pass_bed = os.path.join(idr_root, f"{group}.pooled_pseudorep.idr.pass.bed")
-                        pooled_pass_count = extract_idr_pass_bed(pooled_idr_out, pooled_pass_bed, threshold=0.05)
-                        idr_summary_rows.append([group, "pooled_pseudorep_idr", "ps1", "ps2", "0.05", pooled_pass_count, pooled_pass_bed])
+                        if run_idr_pair(pooled_ps[0], pooled_ps[1], pooled_sorted, pooled_idr_out, pooled_idr_log):
+                            pooled_pass_count = extract_idr_pass_bed(pooled_idr_out, pooled_pass_bed, threshold=0.05)
+                        else:
+                            open(pooled_pass_bed, "w", encoding="utf-8").close()
+                            pooled_pass_count = 0
+                        pooled_note = "ok" if pooled_pass_count > 0 else "zero_or_skipped_sparse"
+                        idr_summary_rows.append([group, "pooled_pseudorep_idr", "ps1", "ps2", "0.05", pooled_pass_count, pooled_pass_bed, pooled_note])
 
                         for sample_name, sample_bam in group_records:
                             self_seed = int(hashlib.md5(f"{group}|{sample_name}|self".encode("utf-8")).hexdigest()[:8], 16)
@@ -974,17 +1080,21 @@ else print >> "{sam2}";
                                 self_sorted.append(ps_sorted)
                             self_idr_out = os.path.join(idr_root, f"{group}.{sample_name}.self_pseudorep.idr.narrowPeak")
                             self_idr_log = os.path.join(idr_root, f"{group}.{sample_name}.self_pseudorep.idr.log")
-                            run_idr_pair(self_sorted[0], self_sorted[1], pooled_sorted, self_idr_out, self_idr_log)
                             self_pass_bed = os.path.join(idr_root, f"{group}.{sample_name}.self_pseudorep.idr.pass.bed")
-                            self_pass_count = extract_idr_pass_bed(self_idr_out, self_pass_bed, threshold=0.05)
-                            idr_summary_rows.append([group, "self_pseudorep_idr", sample_name, sample_name, "0.05", self_pass_count, self_pass_bed])
+                            if run_idr_pair(self_sorted[0], self_sorted[1], pooled_sorted, self_idr_out, self_idr_log):
+                                self_pass_count = extract_idr_pass_bed(self_idr_out, self_pass_bed, threshold=0.05)
+                            else:
+                                open(self_pass_bed, "w", encoding="utf-8").close()
+                                self_pass_count = 0
+                            self_note = "ok" if self_pass_count > 0 else "zero_or_skipped_sparse"
+                            idr_summary_rows.append([group, "self_pseudorep_idr", sample_name, sample_name, "0.05", self_pass_count, self_pass_bed, self_note])
                 finally:
                     shutil.rmtree(group_tmp, ignore_errors=True)
 
             summary_path = os.path.join(idr_root, "idr_selected_peaks.tsv")
             with open(summary_path, "w", newline="") as handle:
                 writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-                writer.writerow(["group", "strategy", "replicate_1", "replicate_2", "idr_threshold", "retained_peaks", "output_bed"])
+                writer.writerow(["group", "strategy", "replicate_1", "replicate_2", "idr_threshold", "retained_peaks", "output_bed", "note"])
                 writer.writerows(idr_summary_rows)
             log_it(logfile, f"IDR peak summary: {summary_path}")
 
