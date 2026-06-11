@@ -398,26 +398,14 @@ if (chrom != "" && len != "") print chrom, len;
             return " ".join(quote(str(x)) for x in cmd)
 
         def make_deterministic_pseudorep_bams(input_bam, work_dir, out_prefix, split_seed):
-            header = os.path.join(work_dir, f"{out_prefix}.header.sam")
-            sam1 = os.path.join(work_dir, f"{out_prefix}.ps1.sam")
-            sam2 = os.path.join(work_dir, f"{out_prefix}.ps2.sam")
             bam1 = os.path.join(work_dir, f"{out_prefix}.ps1.bam")
             bam2 = os.path.join(work_dir, f"{out_prefix}.ps2.bam")
-            shell(f"samtools view -H {quote(input_bam)} > {quote(header)}")
+            seed = int(split_seed) % 1000000
+            samtools_threads = max(1, min(int(threads), 8))
             shell(
-                f"""samtools view {quote(input_bam)} | awk 'BEGIN{{{{FS=OFS="\\t"; seed={int(split_seed)}}}}} {{{{
-key=$1;
-if (length(key)==0) next;
-h=seed;
-for (i=1; i<=length(key); i++) {{{{
-  h = (h * 33 + int(sprintf("%d", substr(key,i,1)))) % 2147483647;
-}}}}
-if (h % 2 == 0) print >> "{sam1}";
-else print >> "{sam2}";
-}}}}'"""
+                f"samtools view -@ {samtools_threads} -b -s {seed}.5 "
+                f"-o {quote(bam1)} -U {quote(bam2)} {quote(input_bam)}"
             )
-            shell(f"cat {quote(header)} {quote(sam1)} | samtools view -bS - > {quote(bam1)}")
-            shell(f"cat {quote(header)} {quote(sam2)} | samtools view -bS - > {quote(bam2)}")
             return bam1, bam2
 
         def read_bed_triplets(bed_path):
@@ -744,27 +732,7 @@ else print >> "{sam2}";
                 return list(itertools.combinations(replicates, 2))
 
             def make_pseudorep_bams(input_bam, out_prefix, split_seed):
-                header = os.path.join(group_tmp, f"{out_prefix}.header.sam")
-                sam1 = os.path.join(group_tmp, f"{out_prefix}.ps1.sam")
-                sam2 = os.path.join(group_tmp, f"{out_prefix}.ps2.sam")
-                bam1 = os.path.join(group_tmp, f"{out_prefix}.ps1.bam")
-                bam2 = os.path.join(group_tmp, f"{out_prefix}.ps2.bam")
-                shell(f"samtools view -H {quote(input_bam)} > {quote(header)}")
-                shell(
-                    f"""samtools view {quote(input_bam)} | awk 'BEGIN{{{{FS=OFS="\\t"; seed={int(split_seed)}}}}} {{{{
-key=$1;
-if (length(key)==0) next;
-h=seed;
-for (i=1; i<=length(key); i++) {{{{
-  h = (h * 33 + int(sprintf("%d", substr(key,i,1)))) % 2147483647;
-}}}}
-if (h % 2 == 0) print >> "{sam1}";
-else print >> "{sam2}";
-}}}}'"""
-                )
-                shell(f"cat {quote(header)} {quote(sam1)} | samtools view -bS - > {quote(bam1)}")
-                shell(f"cat {quote(header)} {quote(sam2)} | samtools view -bS - > {quote(bam2)}")
-                return bam1, bam2
+                return make_deterministic_pseudorep_bams(input_bam, group_tmp, out_prefix, split_seed)
 
             def run_idr_pair(sorted_a, sorted_b, peak_list, output_path, log_path):
                 for stale_path in (output_path, log_path, f"{output_path}.png"):
