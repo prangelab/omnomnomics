@@ -252,7 +252,7 @@ EXPERIMENT_DIR
           |- {sample}.cross_correlation.tsv
           |- {sample}.cross_correlation.pdf
 
-Peak-QC library complexity metrics use a deterministic subsample of up to 5,000,000 mapped primary alignments per BAM by default. This keeps NRF/PBC diagnostics scalable on large ATAC/ChIP BAMs while preserving reproducible estimates; set `--library-complexity-max-reads 0` to scan full BAMs.
+Peak-QC library complexity, SPP cross-correlation, and FRiP metrics use deterministic alignment caps by default to keep large ATAC/ChIP BAM diagnostics scalable. Defaults are 5,000,000 alignments for complexity and 10,000,000 alignments for SPP/FRiP; set `--library-complexity-max-reads 0`, `--spp-max-reads 0`, or `--frip-max-reads 0` to scan full BAMs. BigWig generation does not subsample BAMs and uses CPM normalization.
 |- DE_calling
      |- basename.EXPERIMENT_DIR.raw_read_quant.table.txt (from count_reads)
      |- metadata_derived.tsv (resolved metadata used by step 12)

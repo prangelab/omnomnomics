@@ -360,23 +360,59 @@ rule peak_qc:
             if shutil.which("run_spp.R"):
                 log_once(logfile, "step13.phantompeakqualtools", f"\nrun_spp.R: {shutil.which('run_spp.R')}\n", "PHANTOMPEAKQUALTOOLS")
 
+        def make_samtools_sample_arg(fraction, seed=13):
+            fraction_digits = f"{fraction:.9f}".split(".", 1)[1].rstrip("0") or "0"
+            return f" -s {seed}.{fraction_digits}"
+
+        def count_qc_alignments(bam_path, paired=False, proper_pair=False, filter_flags="2820"):
+            count_args = ["samtools", "view", "-@", "1", "-c"]
+            if paired and proper_pair:
+                count_args.extend(["-f", "2"])
+            count_args.extend(["-F", str(filter_flags), bam_path])
+            return int(subprocess.check_output(count_args, stderr=subprocess.STDOUT).decode("utf-8").strip())
+
+        def prepare_sampled_bam_for_qc(bam_path, tmpdir, label, max_alignments, paired=False, proper_pair=False, filter_flags="2820", seed=13):
+            total_alignments = count_qc_alignments(bam_path, paired=paired, proper_pair=proper_pair, filter_flags=filter_flags)
+            if max_alignments <= 0 or total_alignments <= max_alignments:
+                return {
+                    "bam_path": bam_path,
+                    "input_alignments": total_alignments,
+                    "counted_alignments": total_alignments,
+                    "max_alignments": max_alignments,
+                    "sampling_fraction": 1.0,
+                    "sampled": False,
+                    "samtools_sample_arg": "",
+                }
+            fraction = max_alignments / total_alignments
+            sample_arg = make_samtools_sample_arg(fraction, seed=seed)
+            sampled_bam = os.path.join(tmpdir, f"{label}.sampled.bam")
+            view_command = f"samtools view -@ {threads} -b"
+            if paired and proper_pair:
+                view_command += " -f 2"
+            view_command += f" -F {filter_flags}{sample_arg} {quote(bam_path)} > {quote(sampled_bam)}"
+            shell(view_command)
+            shell(f"samtools index -@ {threads} {quote(sampled_bam)}")
+            counted_alignments = count_qc_alignments(sampled_bam, paired=paired, proper_pair=proper_pair, filter_flags=filter_flags)
+            return {
+                "bam_path": sampled_bam,
+                "input_alignments": total_alignments,
+                "counted_alignments": counted_alignments,
+                "max_alignments": max_alignments,
+                "sampling_fraction": fraction,
+                "sampled": True,
+                "samtools_sample_arg": sample_arg,
+            }
+
         def complexity_sampling_parameters(bam_path, paired):
             max_alignments = int(config.get("LIBRARY_COMPLEXITY_MAX_READS", 5000000) or 0)
             if max_alignments < 0:
                 max_alignments = 0
-            count_args = ["samtools", "view", "-@", "1", "-c"]
-            if paired:
-                count_args.extend(["-f", "2"])
-            count_args.extend(["-F", "2820", bam_path])
-            total_alignments = int(
-                subprocess.check_output(count_args, stderr=subprocess.STDOUT).decode("utf-8").strip()
-            )
+            total_alignments = count_qc_alignments(bam_path, paired=paired, proper_pair=paired, filter_flags="2820")
             fraction = 1.0
             sample_arg = ""
             if max_alignments and total_alignments > max_alignments:
                 fraction = max_alignments / total_alignments
-                fraction_digits = f"{fraction:.9f}".split(".", 1)[1].rstrip("0") or "0"
-                sample_arg = f" -s 13.{fraction_digits}"
+                sample_arg = make_samtools_sample_arg(fraction)
             return {
                 "complexity_input_alignments": total_alignments,
                 "complexity_max_alignments": max_alignments,
@@ -454,14 +490,39 @@ rule peak_qc:
                     "crosscorr_table": "",
                     "crosscorr_pdf": "",
                     "spp_status": "run_spp.R_not_found",
+                    "spp_input_alignments": "",
+                    "spp_counted_alignments": "",
+                    "spp_max_alignments": "",
+                    "spp_sampling_fraction": "",
                 }
 
+            max_alignments = int(config.get("SPP_MAX_READS", 10000000) or 0)
+            if max_alignments < 0:
+                max_alignments = 0
             run_spp_command = (
-                f"run_spp.R -c={quote(bam_path)} -savp={quote(crosscorr_pdf)} "
+                f"run_spp.R -c={{spp_bam}} -savp={quote(crosscorr_pdf)} "
                 f"-out={quote(crosscorr_table)} -p={threads} -rf"
             )
-            log_it(logfile, run_spp_command, "PHANTOMPEAKQUALTOOLS COMMAND")
-            shell(run_spp_command)
+            with tempfile.TemporaryDirectory(prefix="omnomnomics_spp_qc_") as tmpdir:
+                spp_input = prepare_sampled_bam_for_qc(
+                    bam_path,
+                    tmpdir,
+                    sample_name,
+                    max_alignments,
+                    filter_flags="2820",
+                    seed=17,
+                )
+                log_it(
+                    logfile,
+                    "SPP sampling for "
+                    f"{sample_name}: input_alignments={spp_input['input_alignments']}, "
+                    f"counted_alignments={spp_input['counted_alignments']}, "
+                    f"max_alignments={spp_input['max_alignments']}, "
+                    f"fraction={spp_input['sampling_fraction']:.9f}"
+                )
+                formatted_command = run_spp_command.format(spp_bam=quote(spp_input["bam_path"]))
+                log_it(logfile, formatted_command, "PHANTOMPEAKQUALTOOLS COMMAND")
+                shell(formatted_command)
 
             metrics_line = ""
             with open(crosscorr_table) as handle:
@@ -485,18 +546,38 @@ rule peak_qc:
                 "crosscorr_table": crosscorr_table,
                 "crosscorr_pdf": crosscorr_pdf,
                 "spp_status": spp_status,
+                "spp_input_alignments": spp_input["input_alignments"],
+                "spp_counted_alignments": spp_input["counted_alignments"],
+                "spp_max_alignments": spp_input["max_alignments"],
+                "spp_sampling_fraction": spp_input["sampling_fraction"],
             }
 
         def calculate_peak_qc_metrics(peak_bed, bam_files):
             with tempfile.TemporaryDirectory(prefix="omnomnomics_peak_qc_") as tmpdir:
                 merged_bed = os.path.join(tmpdir, "merged_peaks.bed")
                 multicov_output = os.path.join(tmpdir, "multicov.tsv")
+                max_alignments = int(config.get("FRIP_MAX_READS", 10000000) or 0)
+                if max_alignments < 0:
+                    max_alignments = 0
                 shell(
                     f"sort -k1,1 -k2,2n -k3,3n {quote(peak_bed)} | "
                     f"bedtools merge -i - > {quote(merged_bed)}"
                 )
+                frip_inputs = []
+                for idx, bam_path in enumerate(bam_files, start=1):
+                    frip_inputs.append(
+                        prepare_sampled_bam_for_qc(
+                            bam_path,
+                            tmpdir,
+                            f"frip_{idx}",
+                            max_alignments,
+                            filter_flags="260",
+                            seed=23 + idx,
+                        )
+                    )
+                bams_for_frip = [entry["bam_path"] for entry in frip_inputs]
                 shell(
-                    f"bedtools multicov -bed {quote(merged_bed)} -bams {' '.join(quote(path) for path in bam_files)} "
+                    f"bedtools multicov -bed {quote(merged_bed)} -bams {' '.join(quote(path) for path in bams_for_frip)} "
                     f"> {quote(multicov_output)}"
                 )
 
@@ -510,14 +591,10 @@ rule peak_qc:
                         total_peak_bp += int(row[2]) - int(row[1])
                         reads_in_peaks += sum(int(value) for value in row[3:])
 
-                total_aligned_reads = 0
-                for bam_path in bam_files:
-                    total_aligned_reads += int(
-                        subprocess.check_output(
-                            ["samtools", "view", "-c", "-F", "260", bam_path],
-                            stderr=subprocess.STDOUT,
-                        ).decode("utf-8").strip()
-                    )
+                frip_input_alignments = sum(entry["input_alignments"] for entry in frip_inputs)
+                total_aligned_reads = sum(entry["counted_alignments"] for entry in frip_inputs)
+                min_sampling_fraction = min((entry["sampling_fraction"] for entry in frip_inputs), default=1.0)
+                frip_estimated = any(entry["sampled"] for entry in frip_inputs)
 
             frip = (reads_in_peaks / total_aligned_reads) if total_aligned_reads else 0.0
             return {
@@ -525,6 +602,10 @@ rule peak_qc:
                 "total_peak_bp": total_peak_bp,
                 "reads_in_peaks": reads_in_peaks,
                 "total_aligned_reads": total_aligned_reads,
+                "frip_input_alignments": frip_input_alignments,
+                "frip_max_alignments": max_alignments,
+                "frip_min_sampling_fraction": min_sampling_fraction,
+                "frip_estimated": "yes" if frip_estimated else "no",
                 "frip": frip,
             }
 
@@ -550,6 +631,10 @@ rule peak_qc:
                     "nrf",
                     "pbc1",
                     "pbc2",
+                    "spp_input_alignments",
+                    "spp_counted_alignments",
+                    "spp_max_alignments",
+                    "spp_sampling_fraction",
                     "est_frag_len",
                     "nsc",
                     "rsc",
@@ -572,6 +657,10 @@ rule peak_qc:
                         f"{row['nrf']:.6f}",
                         f"{row['pbc1']:.6f}",
                         row["pbc2"] if row["pbc2"] == "" else f"{float(row['pbc2']):.6f}",
+                        row["spp_input_alignments"],
+                        row["spp_counted_alignments"],
+                        row["spp_max_alignments"],
+                        row["spp_sampling_fraction"] if row["spp_sampling_fraction"] == "" else f"{float(row['spp_sampling_fraction']):.9f}",
                         row["est_frag_len"],
                         row["nsc"],
                         row["rsc"],
@@ -694,6 +783,10 @@ rule peak_qc:
                     "total_peak_bp",
                     "reads_in_peaks",
                     "total_aligned_reads",
+                    "frip_input_alignments",
+                    "frip_max_alignments",
+                    "frip_min_sampling_fraction",
+                    "frip_estimated",
                     "frip",
                 ])
                 for row in qc_rows:
@@ -707,6 +800,10 @@ rule peak_qc:
                         row["total_peak_bp"],
                         row["reads_in_peaks"],
                         row["total_aligned_reads"],
+                        row["frip_input_alignments"],
+                        row["frip_max_alignments"],
+                        f"{row['frip_min_sampling_fraction']:.9f}",
+                        row["frip_estimated"],
                         f"{row['frip']:.6f}",
                     ])
             return qc_table

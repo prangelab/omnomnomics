@@ -44,6 +44,8 @@ idr_pairing_policy: "all_pairs"
 idr_min_input_peaks: 20
 spp_gate: "warn"
 library_complexity_max_reads: 5000000
+spp_max_reads: 10000000
+frip_max_reads: 10000000
 
 
 trim:
