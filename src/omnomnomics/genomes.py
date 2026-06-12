@@ -344,10 +344,15 @@ def resolve_blacklist_bed(assembly_name, assembly_root, provider="UCSC", threads
     tmp_root = assembly_root / ".genomepy_blacklist_tmp"
     local_name = f"{assembly_name}.omnomnomics.blacklist"
     tmp_genome_dir = tmp_root / local_name
+    tmp_candidates = find_blacklist_beds(tmp_genome_dir)
+    if tmp_candidates and not force:
+        cached_path = copy_blacklist_bed(tmp_candidates[0], blacklist_aux_path(assembly_root, assembly_name))
+        shutil.rmtree(tmp_genome_dir)
+        return cached_path
 
     tmp_root.mkdir(parents=True, exist_ok=True)
-    genomepy.manage_plugins("enable", ["blacklist"])
     genomepy.manage_plugins("disable", ["hisat2", "star"])
+    genomepy.manage_plugins("enable", ["blacklist"])
     genomepy.install_genome(
         provider_assembly,
         provider=provider,
@@ -563,10 +568,10 @@ def install_assembly(
         enabled_plugins.append("blacklist")
     disabled_plugins = [plugin_name for plugin_name in ["hisat2", "star"] if plugin_name not in wanted_indexers]
 
-    if enabled_plugins:
-        genomepy.manage_plugins("enable", enabled_plugins)
     if disabled_plugins:
         genomepy.manage_plugins("disable", disabled_plugins)
+    if enabled_plugins:
+        genomepy.manage_plugins("enable", enabled_plugins)
 
     genome = genomepy.install_genome(assembly_name, **install_kwargs)
     normalized_root = normalize_genome_install(
