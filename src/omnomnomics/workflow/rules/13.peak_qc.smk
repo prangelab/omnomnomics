@@ -822,7 +822,7 @@ rule peak_qc:
                 filtered_dir, blacklist_bed, filtered_peak_beds, filtering_summary = build_filtered_peak_sets(
                     params.peak_outputfolder,
                     params.outputfolder,
-                    config["MYGENOME"],
+                    config["THEGENOME"],
                 )
                 peak_bed_source_folder = filtered_dir
                 log_it(logfile, f"ATAC blacklist BED: {blacklist_bed}")
