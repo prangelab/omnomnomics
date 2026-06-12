@@ -107,12 +107,19 @@ rule call_peaks:
             except ImportError:
                 return None
             try:
+                genome_aliases = {
+                    "GRCh38": "hg38",
+                    "GRCh38.p14": "hg38",
+                    "GRCm38": "mm10",
+                    "GRCm39": "mm39",
+                }
+                blacklist_genome = genome_aliases.get(genome_name, genome_name)
                 cache_root = os.path.join(outdir, ".genomepy_blacklist_cache")
                 os.makedirs(cache_root, exist_ok=True)
                 local_name = f"{genome_name}.omnomnomics.blacklist.{cache_label}"
                 genomepy.manage_plugins("enable", ["blacklist"])
                 genomepy.install_genome(
-                    genome_name,
+                    blacklist_genome,
                     provider="UCSC",
                     genomes_dir=cache_root,
                     localname=local_name,

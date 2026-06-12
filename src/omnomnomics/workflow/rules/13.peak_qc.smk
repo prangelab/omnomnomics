@@ -73,12 +73,19 @@ rule peak_qc:
                     "ATAC blacklist filtering requires genomepy in the active environment."
                 ) from exc
 
+            genome_aliases = {
+                "GRCh38": "hg38",
+                "GRCh38.p14": "hg38",
+                "GRCm38": "mm10",
+                "GRCm39": "mm39",
+            }
+            blacklist_genome = genome_aliases.get(genome_name, genome_name)
             cache_root = os.path.join(outputfolder, "peak_qc", ".genomepy_blacklist_cache")
             os.makedirs(cache_root, exist_ok=True)
             local_name = f"{genome_name}.omnomnomics.blacklist"
             genomepy.manage_plugins("enable", ["blacklist"])
             genomepy.install_genome(
-                genome_name,
+                blacklist_genome,
                 provider="UCSC",
                 genomes_dir=cache_root,
                 localname=local_name,
