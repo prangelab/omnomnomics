@@ -103,35 +103,9 @@ rule call_peaks:
 
         def maybe_resolve_blacklist_bed(genome_name, outdir, cache_label):
             try:
-                import genomepy
-            except ImportError:
-                return None
-            try:
-                genome_aliases = {
-                    "GRCh38": "hg38",
-                    "GRCh38.p14": "hg38",
-                    "GRCm38": "mm10",
-                    "GRCm39": "mm39",
-                }
-                blacklist_genome = genome_aliases.get(genome_name, genome_name)
-                cache_root = os.path.join(outdir, ".genomepy_blacklist_cache")
-                os.makedirs(cache_root, exist_ok=True)
-                local_name = f"{genome_name}.omnomnomics.blacklist.{cache_label}"
-                genomepy.manage_plugins("enable", ["blacklist"])
-                genomepy.install_genome(
-                    blacklist_genome,
-                    provider="UCSC",
-                    genomes_dir=cache_root,
-                    localname=local_name,
-                    annotation=False,
-                    threads=1,
-                    force=False,
-                )
-                genome_dir = os.path.join(cache_root, local_name)
-                candidates = sorted(
-                    glob.glob(os.path.join(genome_dir, "**", "*blacklist*.bed*"), recursive=True)
-                )
-                return candidates[0] if candidates else None
+                from omnomnomics.genomes import resolve_blacklist_bed
+
+                return str(resolve_blacklist_bed(genome_name, config["GENOME_ASSEMBLY_DIR"]))
             except Exception:
                 return None
 

@@ -101,6 +101,9 @@ omnomnomics genomes local --species mouse
 
 # Install the latest matching assembly for a species
 omnomnomics genomes install --species mouse
+
+# Download and cache an ENCODE blacklist BED for an installed assembly
+omnomnomics genomes blacklist --assembly GRCh38
 ```
 
 ## Overview of Omnomnomics

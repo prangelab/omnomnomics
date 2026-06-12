@@ -67,41 +67,13 @@ rule peak_qc:
 
         def resolve_encode_blacklist(genome_name, outputfolder):
             try:
-                import genomepy
+                from omnomnomics.genomes import resolve_blacklist_bed
             except ImportError as exc:
                 raise RuntimeError(
-                    "ATAC blacklist filtering requires genomepy in the active environment."
+                    "ATAC blacklist filtering requires the omnomnomics genome helper in the active environment."
                 ) from exc
 
-            genome_aliases = {
-                "GRCh38": "hg38",
-                "GRCh38.p14": "hg38",
-                "GRCm38": "mm10",
-                "GRCm39": "mm39",
-            }
-            blacklist_genome = genome_aliases.get(genome_name, genome_name)
-            cache_root = os.path.join(outputfolder, "peak_qc", ".genomepy_blacklist_cache")
-            os.makedirs(cache_root, exist_ok=True)
-            local_name = f"{genome_name}.omnomnomics.blacklist"
-            genomepy.manage_plugins("enable", ["blacklist"])
-            genomepy.install_genome(
-                blacklist_genome,
-                provider="UCSC",
-                genomes_dir=cache_root,
-                localname=local_name,
-                annotation=False,
-                threads=1,
-                force=False,
-            )
-            genome_dir = os.path.join(cache_root, local_name)
-            candidates = sorted(
-                glob.glob(os.path.join(genome_dir, "**", "*blacklist*.bed*"), recursive=True)
-            )
-            if not candidates:
-                raise FileNotFoundError(
-                    f"No blacklist BED found after genomepy install for '{genome_name}' in {genome_dir}."
-                )
-            return candidates[0]
+            return str(resolve_blacklist_bed(genome_name, config["GENOME_ASSEMBLY_DIR"]))
 
         def filter_peak_bed_file(in_bed, out_bed, keep_standard=True, drop_chrm=True, blacklist_bed=None):
             work = in_bed

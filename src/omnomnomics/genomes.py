@@ -46,6 +46,12 @@ INSTALLED_SPECIES_HINTS = {
     "homo sapiens": ("grch", "hg", "human", "homo_sapiens", "homo sapiens"),
     "mus musculus": ("grcm", "mm", "mouse", "mus_musculus", "mus musculus"),
 }
+UCSC_BLACKLIST_ASSEMBLY_ALIASES = {
+    "GRCh38": "hg38",
+    "GRCh38.p14": "hg38",
+    "GRCm38": "mm10",
+    "GRCm39": "mm39",
+}
 
 
 def load_site_settings(workflow_root, workflow_config_file, site_config_file):
@@ -81,6 +87,15 @@ def parse_genomes_arguments(argv):
         help="Optional species hint to filter installed assemblies by assembly name, e.g. human or mouse",
     )
     installed_parser.add_argument("--limit", type=int, default=100, help="Maximum number of rows to show")
+
+    blacklist_parser = subparsers.add_parser(
+        "blacklist",
+        help="Download and cache an ENCODE blacklist BED for an installed assembly",
+    )
+    blacklist_parser.add_argument("--assembly", required=True, help="Installed omnomnomics assembly name")
+    blacklist_parser.add_argument("--provider", default="UCSC", help="Provider name for blacklist lookup")
+    blacklist_parser.add_argument("--threads", type=int, default=1, help="Threads passed to genomepy")
+    blacklist_parser.add_argument("--force", action="store_true", help="Refresh an existing cached blacklist BED")
 
     install_parser = subparsers.add_parser("install", help="Download and normalize one or more assemblies")
     install_parser.add_argument("--species", default="homo sapiens", help="Species search term if no assemblies are given")
@@ -122,13 +137,19 @@ def normalize_species_name(species):
 
 def import_genomepy():
     try:
-        import genomepy
-    except ImportError:
-        print(
-            "The genome helper requires the 'genomepy' package in the active environment. Aborting...",
-            file=sys.stderr,
-        )
+        return load_genomepy()
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
         sys.exit(1)
+
+
+def load_genomepy():
+    try:
+        import genomepy
+    except ImportError as exc:
+        raise RuntimeError(
+            "The genome helper requires the 'genomepy' package in the active environment. Aborting...",
+        ) from exc
     return genomepy
 
 
@@ -258,6 +279,79 @@ def copy_annotation(annotation_file, dst):
             shutil.copyfileobj(src_handle, dst_handle)
     else:
         shutil.copy2(annotation_file, dst)
+
+
+def blacklist_aux_path(assembly_root, assembly_name):
+    return Path(assembly_root) / assembly_name / "aux" / f"{assembly_name}.blacklist.bed"
+
+
+def find_cached_blacklist_bed(assembly_root, assembly_name):
+    assembly_dir = Path(assembly_root) / assembly_name
+    aux_dir = assembly_dir / "aux"
+    candidates = [
+        blacklist_aux_path(assembly_root, assembly_name),
+        aux_dir / f"{assembly_name}.blacklist.bed.gz",
+    ]
+    candidates.extend(sorted(aux_dir.glob("*blacklist*.bed*")))
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def copy_blacklist_bed(src, dst):
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    src = Path(src)
+    dst = Path(dst)
+    if src.resolve() == dst.resolve():
+        return dst
+    if src.name.endswith(".gz"):
+        with gzip.open(src, "rt") as src_handle, open(dst, "w") as dst_handle:
+            shutil.copyfileobj(src_handle, dst_handle)
+    else:
+        shutil.copy2(src, dst)
+    return dst
+
+
+def resolve_blacklist_bed(assembly_name, assembly_root, provider="UCSC", threads=1, force=False):
+    assembly_root = Path(assembly_root)
+    assembly_dir = assembly_root / assembly_name
+    if not assembly_dir.is_dir():
+        raise FileNotFoundError(f"Assembly '{assembly_name}' is not installed under {assembly_root}.")
+
+    cached = find_cached_blacklist_bed(assembly_root, assembly_name)
+    if cached and not force:
+        return cached
+
+    genomepy = load_genomepy()
+    provider_assembly = UCSC_BLACKLIST_ASSEMBLY_ALIASES.get(assembly_name, assembly_name)
+    tmp_root = assembly_root / ".genomepy_blacklist_tmp"
+    local_name = f"{assembly_name}.omnomnomics.blacklist"
+    tmp_genome_dir = tmp_root / local_name
+
+    tmp_root.mkdir(parents=True, exist_ok=True)
+    genomepy.manage_plugins("enable", ["blacklist"])
+    genomepy.manage_plugins("disable", ["hisat2", "star"])
+    genomepy.install_genome(
+        provider_assembly,
+        provider=provider,
+        genomes_dir=str(tmp_root),
+        localname=local_name,
+        annotation=False,
+        threads=threads,
+        force=force,
+    )
+
+    candidates = sorted(tmp_genome_dir.rglob("*blacklist*.bed*"))
+    if not candidates:
+        raise FileNotFoundError(
+            f"No blacklist BED found after genomepy install for '{assembly_name}' in {tmp_genome_dir}."
+        )
+
+    cached_path = copy_blacklist_bed(candidates[0], blacklist_aux_path(assembly_root, assembly_name))
+    if tmp_genome_dir.exists():
+        shutil.rmtree(tmp_genome_dir)
+    return cached_path
 
 
 def parse_gtf_attributes(attribute_text):
@@ -462,6 +556,17 @@ def genomes_main(argv, workflow_root, workflow_config_file, default_site_config)
     if genomes_command == "installed":
         rows = list_installed_rows(config["genome_assembly_dir"], getattr(args, "species", None))
         print_installed_rows(rows, args.limit)
+        return
+
+    if genomes_command == "blacklist":
+        blacklist_bed = resolve_blacklist_bed(
+            assembly_name=args.assembly,
+            assembly_root=config["genome_assembly_dir"],
+            provider=args.provider,
+            threads=args.threads,
+            force=args.force,
+        )
+        print(f"Blacklist BED for '{args.assembly}': {blacklist_bed}")
         return
 
     genomepy = import_genomepy()
