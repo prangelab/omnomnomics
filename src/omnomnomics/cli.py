@@ -588,6 +588,7 @@ def parse_arguments(argv=None):
    parser.add_argument('--idr-pairing-policy', choices=['all_pairs', 'anchor_vs_all'], help='Replicate pairing policy for IDR when groups have >2 replicates. all_pairs uses all pairwise combinations; anchor_vs_all pairs the first replicate with every other replicate.')
    parser.add_argument('--idr-min-input-peaks', type=int, help='Minimum narrowPeak rows required before attempting an IDR comparison. Sparse comparisons are skipped and reported. Default: 20')
    parser.add_argument('--spp-gate', choices=['none', 'warn', 'drop', 'strict'], help='SPP QC gate mode for ATAC/ChIP peak QC. none disables SPP gating, warn reports flags only, drop excludes flagged samples from downstream count/DE, strict aborts if any sample fails thresholds.')
+   parser.add_argument('--library-complexity-max-reads', type=int, help='Maximum mapped primary alignments used for ATAC/ChIP library complexity QC. Default: 5000000. Set 0 to scan full BAMs.')
    parser.add_argument('-a', '--appendix', help='Appendix to add to track name \n \t Default: hub')
    parser.add_argument('-k', '--keepunpaired', action='store_true', help='Keep unpaired or not in HISAT2')
    parser.add_argument('--dry-run', action='store_true', help='Validate the workflow and build the Snakemake DAG without executing jobs')
@@ -1589,6 +1590,17 @@ def main():
             print("--chip-broad-max-gap must be >= 0. Aborting...", file=sys.stderr)
             sys.exit(1)
     spp_gate = (args.spp_gate if args.spp_gate else config.get('spp_gate', 'warn')).strip().lower()
+    library_complexity_max_reads = args.library_complexity_max_reads
+    if library_complexity_max_reads is None:
+        library_complexity_max_reads = config.get('library_complexity_max_reads', 5000000)
+    try:
+        library_complexity_max_reads = int(library_complexity_max_reads)
+    except (TypeError, ValueError):
+        print("--library-complexity-max-reads must be an integer. Aborting...", file=sys.stderr)
+        sys.exit(1)
+    if library_complexity_max_reads < 0:
+        print("--library-complexity-max-reads must be >= 0. Aborting...", file=sys.stderr)
+        sys.exit(1)
     appendix = args.appendix if args.appendix else config.get('appendix', "hub")
     keep_unpaired = args.keepunpaired if args.keepunpaired else config.get('keep_unpaired', False)
     dry_run = args.dry_run
@@ -1873,6 +1885,7 @@ def main():
         'IDR_PAIRING_POLICY': idr_pairing_policy,
         'IDR_MIN_INPUT_PEAKS': idr_min_input_peaks,
         'SPP_GATE': spp_gate,
+        'LIBRARY_COMPLEXITY_MAX_READS': library_complexity_max_reads,
         'DE_DESIGN_MODE': de_design_mode,
         'DE_CONFIG_FILE': de_config_file_path,
         'DE_CONFIG_RESOLVED_FILE': resolved_de_config_path,

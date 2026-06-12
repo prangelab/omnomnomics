@@ -251,6 +251,8 @@ EXPERIMENT_DIR
           |- {chip|atac}.peak_qc_summary.pdf
           |- {sample}.cross_correlation.tsv
           |- {sample}.cross_correlation.pdf
+
+Peak-QC library complexity metrics use a deterministic subsample of up to 5,000,000 mapped primary alignments per BAM by default. This keeps NRF/PBC diagnostics scalable on large ATAC/ChIP BAMs while preserving reproducible estimates; set `--library-complexity-max-reads 0` to scan full BAMs.
 |- DE_calling
      |- basename.EXPERIMENT_DIR.raw_read_quant.table.txt (from count_reads)
      |- metadata_derived.tsv (resolved metadata used by step 12)

@@ -360,14 +360,40 @@ rule peak_qc:
             if shutil.which("run_spp.R"):
                 log_once(logfile, "step13.phantompeakqualtools", f"\nrun_spp.R: {shutil.which('run_spp.R')}\n", "PHANTOMPEAKQUALTOOLS")
 
+        def complexity_sampling_parameters(bam_path, paired):
+            max_alignments = int(config.get("LIBRARY_COMPLEXITY_MAX_READS", 5000000) or 0)
+            if max_alignments < 0:
+                max_alignments = 0
+            count_args = ["samtools", "view", "-@", "1", "-c"]
+            if paired:
+                count_args.extend(["-f", "2"])
+            count_args.extend(["-F", "2820", bam_path])
+            total_alignments = int(
+                subprocess.check_output(count_args, stderr=subprocess.STDOUT).decode("utf-8").strip()
+            )
+            fraction = 1.0
+            sample_arg = ""
+            if max_alignments and total_alignments > max_alignments:
+                fraction = max_alignments / total_alignments
+                fraction_digits = f"{fraction:.9f}".split(".", 1)[1].rstrip("0") or "0"
+                sample_arg = f" -s 13.{fraction_digits}"
+            return {
+                "complexity_input_alignments": total_alignments,
+                "complexity_max_alignments": max_alignments,
+                "complexity_sampling_fraction": fraction,
+                "samtools_sample_arg": sample_arg,
+            }
+
         def calculate_library_complexity_metrics(bam_path):
             with tempfile.TemporaryDirectory(prefix="omnomnomics_library_qc_") as tmpdir:
                 counts_path = os.path.join(tmpdir, "fragment_counts.tsv")
+                sampling = complexity_sampling_parameters(bam_path, config["PAIRED"])
                 if config["PAIRED"]:
                     collate_prefix = os.path.join(tmpdir, "collated")
                     bedpe_stderr = os.path.join(tmpdir, "bamtobed_bedpe.stderr")
                     complexity_command = (
-                        f"samtools collate -@ {threads} -u -O {quote(bam_path)} {quote(collate_prefix)} | "
+                        f"samtools view -@ {threads} -u -f 2 -F 2820{sampling['samtools_sample_arg']} {quote(bam_path)} | "
+                        f"samtools collate -@ {threads} -u -O - {quote(collate_prefix)} | "
                         f"bedtools bamtobed -bedpe -i stdin 2> {quote(bedpe_stderr)} | "
                         "awk 'BEGIN{{OFS=\"\\t\"}} $1==$4 && $1!=\".\" {{"
                         "start=($2<$5?$2:$5); end=($3>$6?$3:$6); print $1,start,end"
@@ -376,7 +402,8 @@ rule peak_qc:
                     )
                 else:
                     complexity_command = (
-                        f"bedtools bamtobed -i {quote(bam_path)} | "
+                        f"samtools view -@ {threads} -u -F 2820{sampling['samtools_sample_arg']} {quote(bam_path)} | "
+                        "bedtools bamtobed -i stdin | "
                         "awk 'BEGIN{{OFS=\"\\t\"}} {{print $1,$2,$3,$6}}' | "
                         f"sort -T {quote(tmpdir)} -k1,1 -k2,2n -k3,3n -k4,4 | uniq -c > {quote(counts_path)}"
                     )
@@ -409,6 +436,9 @@ rule peak_qc:
                 "nrf": nrf,
                 "pbc1": pbc1,
                 "pbc2": pbc2,
+                "complexity_input_alignments": sampling["complexity_input_alignments"],
+                "complexity_max_alignments": sampling["complexity_max_alignments"],
+                "complexity_sampling_fraction": sampling["complexity_sampling_fraction"],
             }
 
         def calculate_cross_correlation_metrics(bam_path, output_dir, sample_name):
@@ -510,6 +540,9 @@ rule peak_qc:
                     "assay",
                     "sample",
                     "bam_file",
+                    "complexity_input_alignments",
+                    "complexity_max_alignments",
+                    "complexity_sampling_fraction",
                     "total_reads",
                     "distinct_reads",
                     "one_read_sites",
@@ -529,6 +562,9 @@ rule peak_qc:
                         row["assay"],
                         row["sample"],
                         row["bam_file"],
+                        row["complexity_input_alignments"],
+                        row["complexity_max_alignments"],
+                        f"{row['complexity_sampling_fraction']:.9f}",
                         row["total_reads"],
                         row["distinct_reads"],
                         row["one_read_sites"],
@@ -758,6 +794,13 @@ rule peak_qc:
                     continue
                 log_it(logfile, f"Calculating library complexity metrics for {sample}...")
                 complexity_metrics = calculate_library_complexity_metrics(bam_path)
+                log_it(
+                    logfile,
+                    "Library complexity sampling for "
+                    f"{sample}: input_alignments={complexity_metrics['complexity_input_alignments']}, "
+                    f"max_alignments={complexity_metrics['complexity_max_alignments']}, "
+                    f"fraction={complexity_metrics['complexity_sampling_fraction']:.9f}"
+                )
                 log_it(logfile, f"Calculating cross-correlation metrics for {sample}...")
                 crosscorr_metrics = calculate_cross_correlation_metrics(bam_path, qc_dir, sample)
                 sample_rows.append({
