@@ -102,9 +102,11 @@ omnomnomics genomes local --species mouse
 # Install the latest matching assembly for a species
 omnomnomics genomes install --species mouse
 
-# Download and cache an ENCODE blacklist BED for an installed assembly
+# Backfill or refresh an ENCODE blacklist BED for an installed assembly
 omnomnomics genomes blacklist --assembly GRCh38
 ```
+
+When available through genomepy, `omnomnomics genomes install` also caches the ENCODE blacklist BED into the normalized assembly `aux/` directory. The separate `genomes blacklist` command is mainly for older genome installs or explicit refreshes.
 
 ## Overview of Omnomnomics
 OMNOM_HOME, is the directory containing _Omnomnomics_. This is where you installed _Omnomnomics_ and where the wrapper script, main snakefile, bin folder, genomes and slurm_profile are. The default directory structure generated and used by the pipeline is the EXPERIMENT_DIR. This is the main input directory containing your experiment and all your files folders for the in- and output. 

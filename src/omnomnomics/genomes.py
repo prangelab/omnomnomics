@@ -110,6 +110,11 @@ def parse_genomes_arguments(argv):
     install_parser.add_argument("--force", action="store_true", help="Overwrite an existing normalized assembly")
     install_parser.add_argument("--keep-alt", action="store_true", help="Keep alternative contigs if supported by provider")
     install_parser.add_argument(
+        "--skip-blacklist",
+        action="store_true",
+        help="Do not cache a genomepy-provided blacklist BED during assembly install",
+    )
+    install_parser.add_argument(
         "--indexers",
         nargs="+",
         default=["hisat2", "star"],
@@ -292,11 +297,15 @@ def find_cached_blacklist_bed(assembly_root, assembly_name):
         blacklist_aux_path(assembly_root, assembly_name),
         aux_dir / f"{assembly_name}.blacklist.bed.gz",
     ]
-    candidates.extend(sorted(aux_dir.glob("*blacklist*.bed*")))
+    candidates.extend(find_blacklist_beds(aux_dir))
     for candidate in candidates:
         if candidate.is_file():
             return candidate
     return None
+
+
+def find_blacklist_beds(root):
+    return sorted(Path(root).rglob("*blacklist*.bed*"))
 
 
 def copy_blacklist_bed(src, dst):
@@ -311,6 +320,13 @@ def copy_blacklist_bed(src, dst):
     else:
         shutil.copy2(src, dst)
     return dst
+
+
+def cache_blacklist_from_install(install_root, assembly_root, assembly_name):
+    candidates = find_blacklist_beds(install_root)
+    if not candidates:
+        return None
+    return copy_blacklist_bed(candidates[0], blacklist_aux_path(assembly_root, assembly_name))
 
 
 def resolve_blacklist_bed(assembly_name, assembly_root, provider="UCSC", threads=1, force=False):
@@ -457,7 +473,7 @@ def find_hisat2_dir(genome_dir):
     return sorted(candidates, key=lambda path: (len(path.parts), str(path)))[0]
 
 
-def normalize_genome_install(genome, assembly_name, assembly_root, force, indexers):
+def normalize_genome_install(genome, assembly_name, assembly_root, force, indexers, cache_blacklist=True):
     final_root = Path(assembly_root) / assembly_name
     if final_root.exists():
         if not force:
@@ -490,6 +506,8 @@ def normalize_genome_install(genome, assembly_name, assembly_root, force, indexe
         create_gene_bed_files(annotation_dir / "genes.gtf", assembly_name, aux_dir)
 
     install_root = genome_install_root(genome)
+    if cache_blacklist:
+        cache_blacklist_from_install(install_root, assembly_root, assembly_name)
 
     if "star" in indexers:
         star_source = find_star_dir(install_root)
@@ -508,7 +526,19 @@ def normalize_genome_install(genome, assembly_name, assembly_root, force, indexe
     return final_root
 
 
-def install_assembly(genomepy, assembly_name, provider, assembly_root, threads, force, keep_alt, mask, ucsc_annotation, indexers):
+def install_assembly(
+    genomepy,
+    assembly_name,
+    provider,
+    assembly_root,
+    threads,
+    force,
+    keep_alt,
+    mask,
+    ucsc_annotation,
+    indexers,
+    cache_blacklist=True,
+):
     assembly_root = Path(assembly_root)
     assembly_root.mkdir(parents=True, exist_ok=True)
     tmp_root = assembly_root / ".genomepy_tmp"
@@ -529,6 +559,8 @@ def install_assembly(genomepy, assembly_name, provider, assembly_root, threads, 
 
     wanted_indexers = set(indexers)
     enabled_plugins = [plugin_name for plugin_name in ["hisat2", "star"] if plugin_name in wanted_indexers]
+    if cache_blacklist:
+        enabled_plugins.append("blacklist")
     disabled_plugins = [plugin_name for plugin_name in ["hisat2", "star"] if plugin_name not in wanted_indexers]
 
     if enabled_plugins:
@@ -537,7 +569,14 @@ def install_assembly(genomepy, assembly_name, provider, assembly_root, threads, 
         genomepy.manage_plugins("disable", disabled_plugins)
 
     genome = genomepy.install_genome(assembly_name, **install_kwargs)
-    normalized_root = normalize_genome_install(genome, assembly_name, assembly_root, force, indexers)
+    normalized_root = normalize_genome_install(
+        genome,
+        assembly_name,
+        assembly_root,
+        force,
+        indexers,
+        cache_blacklist=cache_blacklist,
+    )
 
     tmp_assembly_root = tmp_root / assembly_name
     if tmp_assembly_root.exists():
@@ -602,5 +641,11 @@ def genomes_main(argv, workflow_root, workflow_config_file, default_site_config)
             indexers=args.indexers,
             mask=args.mask,
             ucsc_annotation=args.ucsc_annotation,
+            cache_blacklist=not args.skip_blacklist,
         )
         print(f"Installed '{assembly_name}' to {installed_path}")
+        cached_blacklist = find_cached_blacklist_bed(config["genome_assembly_dir"], assembly_name)
+        if cached_blacklist:
+            print(f"Cached blacklist BED: {cached_blacklist}")
+        elif not args.skip_blacklist:
+            print(f"No blacklist BED was cached for '{assembly_name}'. Use 'omnomnomics genomes blacklist' to backfill one if needed.")
