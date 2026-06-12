@@ -364,8 +364,11 @@ rule peak_qc:
             with tempfile.TemporaryDirectory(prefix="omnomnomics_library_qc_") as tmpdir:
                 counts_path = os.path.join(tmpdir, "fragment_counts.tsv")
                 if config["PAIRED"]:
+                    collate_prefix = os.path.join(tmpdir, "collated")
+                    bedpe_stderr = os.path.join(tmpdir, "bamtobed_bedpe.stderr")
                     complexity_command = (
-                        f"bedtools bamtobed -bedpe -i {quote(bam_path)} | "
+                        f"samtools collate -@ {threads} -u -O {quote(bam_path)} {quote(collate_prefix)} | "
+                        f"bedtools bamtobed -bedpe -i stdin 2> {quote(bedpe_stderr)} | "
                         "awk 'BEGIN{{OFS=\"\\t\"}} $1==$4 && $1!=\".\" {{"
                         "start=($2<$5?$2:$5); end=($3>$6?$3:$6); print $1,start,end"
                         "}}' | "
