@@ -6,6 +6,7 @@
 # Affiliation: Prangelab AMC / Amsterdam UMC's Core Facility Genomics
 # Copyright PrangeLab 2024 ##
 #=============================================
+import csv
 import json
 import os
 import re
@@ -236,6 +237,73 @@ chrom_de_peak_metadata_file = _chrom_de_peak_metadata_file()
 chrom_de_peak_metadata_dependency = _chrom_de_peak_metadata_dependency()
 
 
+def _chrom_de_peak_annotation_file():
+    if config['THETYPE'] in {"ATAC", "CHIP"}:
+        return (
+            f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num']-1]}"
+            f"/peak_qc/peak_annotations/{config['THETYPE'].lower()}.all_groups.merged_peaks.annotated.bed"
+        )
+    return "NA"
+
+
+chrom_de_peak_annotation_file = _chrom_de_peak_annotation_file()
+
+
+def _write_peak_metadata_from_annotation(annotation_bed, output_path):
+    expected = {
+        "#chrom",
+        "start",
+        "end",
+        "underscore",
+        "genomic_region",
+        "assigned_genes",
+        "nearest_gene",
+        "distance_to_nearest_gene_bp",
+        "width_bp",
+    }
+    with open(annotation_bed, newline="") as inp:
+        reader = csv.DictReader(inp, delimiter="\t")
+        if reader.fieldnames is None:
+            raise ValueError(f"Peak annotation BED has no header: {annotation_bed}")
+        missing = [field for field in expected if field not in reader.fieldnames]
+        if missing:
+            raise ValueError(
+                "Peak annotation BED is missing required columns: "
+                + ", ".join(missing)
+            )
+        rows = list(reader)
+
+    with open(output_path, "w", newline="") as out:
+        writer = csv.writer(out, delimiter="\t", lineterminator="\n")
+        writer.writerow(
+            [
+                "underscore",
+                "chrom",
+                "start",
+                "end",
+                "genomic_region",
+                "assigned_genes",
+                "nearest_gene",
+                "distance_to_nearest_gene_bp",
+                "width_bp",
+            ]
+        )
+        for row in rows:
+            writer.writerow(
+                [
+                    row["underscore"],
+                    row["#chrom"],
+                    row["start"],
+                    row["end"],
+                    row["genomic_region"],
+                    row["assigned_genes"],
+                    row["nearest_gene"],
+                    row["distance_to_nearest_gene_bp"],
+                    row["width_bp"],
+                ]
+            )
+
+
 rule call_DE_chrom:
     input:
         counts_table=(
@@ -253,6 +321,7 @@ rule call_DE_chrom:
         inputfolder=f"{experiment_dir}/{master_config['input_folders'][master_config['dechrom_rule_num']-1]}",
         outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num']-1]}",
         peak_metadata_file=chrom_de_peak_metadata_file,
+        peak_annotation_file=chrom_de_peak_annotation_file,
         metadata_file=config.get("DERIVED_METADATA_FILE", "NA"),
         metadata_source=config.get("MYMETADATA", "NA"),
         resolved_formula=config.get("RESOLVED_DE_FORMULA", "NA"),
@@ -288,11 +357,21 @@ rule call_DE_chrom:
             sanity_check_dir(logfile, params.inputfolder, master_config['input_file_types'][master_config['dechrom_rule_num']-1], "step15.sanity")
             if params.metadata_file == "NA" or not os.path.isfile(params.metadata_file):
                 raise FileNotFoundError("Derived metadata file for step 12 was not found.")
-            if not os.path.isfile(params.peak_metadata_file):
+            peak_metadata_source = params.peak_metadata_file
+            if not os.path.isfile(peak_metadata_source) and params.thetype == "ATAC":
+                if os.path.isfile(params.peak_annotation_file):
+                    peak_metadata_source = params.peak_annotation_file
+                    log_it(
+                        logfile,
+                        f"Step 15 peak metadata fallback: rebuilding from annotated peaks {params.peak_annotation_file}"
+                    )
+                else:
+                    peak_metadata_source = params.peak_metadata_file
+            if not os.path.isfile(peak_metadata_source):
                 raise FileNotFoundError(
                     f"{metadata_label} file for step 15 was not found. "
                     "Run the required peak annotation step before DE_chrom. Missing: "
-                    f"{params.peak_metadata_file}"
+                    f"{params.peak_metadata_file}; fallback: {params.peak_annotation_file}"
                 )
 
             resolved_de_configs = []
@@ -329,10 +408,13 @@ rule call_DE_chrom:
             metadata_copy = os.path.join(params.outputfolder, "metadata_derived.tsv")
             shutil.copy2(params.metadata_file, metadata_copy)
             peak_metadata_copy = os.path.join(params.outputfolder, "peak_metadata.tsv")
-            shutil.copy2(params.peak_metadata_file, peak_metadata_copy)
+            if peak_metadata_source == params.peak_annotation_file:
+                _write_peak_metadata_from_annotation(peak_metadata_source, peak_metadata_copy)
+            else:
+                shutil.copy2(peak_metadata_source, peak_metadata_copy)
             if params.thetype == "CHIP" and params.broad_mode in {"genebody", "diffuse"}:
                 feature_metadata_copy = os.path.join(params.outputfolder, "feature_metadata.tsv")
-                shutil.copy2(params.peak_metadata_file, feature_metadata_copy)
+                shutil.copy2(peak_metadata_source, feature_metadata_copy)
 
             template_path = os.path.join(workflow_root, "templates", "de_core_chrom.R.tmpl")
             if not os.path.isfile(template_path):
