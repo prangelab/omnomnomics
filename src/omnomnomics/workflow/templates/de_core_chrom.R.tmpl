@@ -211,6 +211,52 @@ categorical_palette <- function(levels_vec, palette_name = NULL) {
   stats::setNames(base_palette, levels_vec)
 }
 
+prepare_pheatmap_annotations <- function(annotation_df, annotation_colors = NULL) {
+  if (is.null(annotation_df) || !nrow(annotation_df) || !ncol(annotation_df)) {
+    return(list(annotation_df = NULL, annotation_colors = NULL))
+  }
+
+  cleaned_df <- as.data.frame(annotation_df, stringsAsFactors = FALSE)
+  cleaned_colors <- list()
+  keep_columns <- character(0)
+
+  for (column_name in colnames(cleaned_df)) {
+    values <- as.character(cleaned_df[[column_name]])
+    values[is.na(values) | !nzchar(values)] <- NA_character_
+    levels_vec <- unique(values[!is.na(values)])
+    if (length(levels_vec) < 1) {
+      next
+    }
+    cleaned_df[[column_name]] <- factor(values, levels = levels_vec)
+
+    column_colors <- NULL
+    if (!is.null(annotation_colors) && column_name %in% names(annotation_colors)) {
+      column_colors <- annotation_colors[[column_name]]
+      column_colors <- column_colors[names(column_colors) %in% levels_vec]
+    }
+    if (is.null(column_colors) || !all(levels_vec %in% names(column_colors))) {
+      column_colors <- categorical_palette(
+        levels_vec,
+        palette_name = palette_name_for_column(column_name)
+      )
+    } else {
+      column_colors <- column_colors[levels_vec]
+    }
+
+    keep_columns <- c(keep_columns, column_name)
+    cleaned_colors[[column_name]] <- column_colors
+  }
+
+  if (!length(keep_columns)) {
+    return(list(annotation_df = NULL, annotation_colors = NULL))
+  }
+
+  list(
+    annotation_df = cleaned_df[, keep_columns, drop = FALSE],
+    annotation_colors = cleaned_colors
+  )
+}
+
 gradient_palette <- function(n) {
   n <- max(3, as.integer(n))
   base_steps <- max(9, min(11, n))
@@ -1338,6 +1384,7 @@ if (qc_enabled) {
       max_abs <- 1
     }
     hm_breaks <- seq(-max_abs, max_abs, length.out = 256)
+    top_annotation <- prepare_pheatmap_annotations(annotation_df_informative, annotation_colors_informative)
     grDevices::pdf(file.path(qc_dir, "top_variable_genes.kmeans_heatmap.pdf"), width = 12, height = 10)
     pheatmap::pheatmap(
       top_mat,
@@ -1345,8 +1392,8 @@ if (qc_enabled) {
       cluster_cols = TRUE,
       breaks = hm_breaks,
       color = hm_colors,
-      annotation_col = annotation_df_informative,
-      annotation_colors = annotation_colors_informative,
+      annotation_col = top_annotation$annotation_df,
+      annotation_colors = top_annotation$annotation_colors,
       show_rownames = FALSE,
       show_colnames = TRUE,
       main = paste("Top variable", feature_label_plural)
@@ -1937,7 +1984,9 @@ for (contrast_cfg in contrast_plan) {
     ann_keep <- intersect(contrast_sample_ids, rownames(annotation_df_informative))
     if (length(ann_keep) > 0) {
       contrast_annotation_df <- annotation_df_informative[ann_keep, , drop = FALSE]
-      contrast_annotation_colors <- annotation_colors_informative
+      contrast_annotation <- prepare_pheatmap_annotations(contrast_annotation_df, annotation_colors_informative)
+      contrast_annotation_df <- contrast_annotation$annotation_df
+      contrast_annotation_colors <- contrast_annotation$annotation_colors
     }
   }
 
