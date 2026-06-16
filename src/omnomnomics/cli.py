@@ -1156,6 +1156,17 @@ def metadata_required_for_mode(mode_steps):
 
 
 def validate_metadata_sample_roots(derived_rows, expected_sample_roots):
+    expected_roots = sorted(expected_sample_roots)
+    metadata_sample_ids = sorted(
+        {
+            row.get("sample_id", "").strip()
+            for row in derived_rows
+            if row.get("sample_id", "").strip()
+        }
+    )
+    if expected_roots == metadata_sample_ids:
+        return
+
     metadata_roots = []
     for row in derived_rows:
         filename_key = row.get("filename_key", "").strip()
@@ -1164,7 +1175,6 @@ def validate_metadata_sample_roots(derived_rows, expected_sample_roots):
             continue
         metadata_roots.append(normalize_metadata_filename(row["filename"]))
     metadata_roots = sorted(metadata_roots)
-    expected_roots = sorted(expected_sample_roots)
     missing = sorted(set(expected_roots) - set(metadata_roots))
     extra = sorted(set(metadata_roots) - set(expected_roots))
     if missing or extra:
