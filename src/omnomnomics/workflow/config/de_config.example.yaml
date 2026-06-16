@@ -38,7 +38,7 @@ deseq2:
   fit_type: "parametric"
   sf_type: "ratio"
   beta_prior: false
-  parallel: true
+  parallel: false
   latent_factors:
     enabled: false
     method: "sva"

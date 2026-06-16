@@ -44,7 +44,7 @@ DEFAULT_DE_CONFIG: dict = {
         "fit_type": "parametric",
         "sf_type": "ratio",
         "beta_prior": False,
-        "parallel": True,
+        "parallel": False,
         "latent_factors": {
             "enabled": False,
             "method": "sva",

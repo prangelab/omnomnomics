@@ -538,7 +538,7 @@ rule call_DE_chrom:
                     "__ATAC_FILTER_MIN_SAMPLES_MODE__": _r_string(str(filtering_cfg.get("min_samples_mode", default_filtering["min_samples_mode"]))),
                     "__DESEQ_FIT_TYPE__": _r_string(str(deseq2_cfg.get("fit_type", "parametric"))),
                     "__DESEQ_SF_TYPE__": _r_string(str(deseq2_cfg.get("sf_type", "ratio"))),
-                    "__DESEQ_PARALLEL__": _r_bool(deseq2_cfg.get("parallel", True)),
+                    "__DESEQ_PARALLEL__": _r_bool(deseq2_cfg.get("parallel", False)),
                     "__LATENT_ENABLED__": _r_bool(latent_cfg.get("enabled", False)),
                     "__LATENT_METHOD__": _r_string(str(latent_cfg.get("method", "sva"))),
                     "__LATENT_N_SV__": (

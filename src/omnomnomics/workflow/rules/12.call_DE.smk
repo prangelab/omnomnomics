@@ -365,7 +365,7 @@ rule call_DE:
                     "__FILTERING_MIN_SAMPLES__": str(int(filtering_cfg.get("min_samples", 2))),
                     "__DESEQ_FIT_TYPE__": _r_string(str(deseq2_cfg.get("fit_type", "parametric"))),
                     "__DESEQ_SF_TYPE__": _r_string(str(deseq2_cfg.get("sf_type", "ratio"))),
-                    "__DESEQ_PARALLEL__": _r_bool(deseq2_cfg.get("parallel", True)),
+                    "__DESEQ_PARALLEL__": _r_bool(deseq2_cfg.get("parallel", False)),
                     "__LATENT_ENABLED__": _r_bool(latent_cfg.get("enabled", False)),
                     "__LATENT_METHOD__": _r_string(str(latent_cfg.get("method", "sva"))),
                     "__LATENT_N_SV__": (
