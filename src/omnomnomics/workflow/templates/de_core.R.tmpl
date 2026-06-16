@@ -144,6 +144,62 @@ is_categorical_grouping_column <- function(df, column_name) {
   is_informative_column(df, column_name)
 }
 
+metadata_column_signature <- function(df, column_name) {
+  values <- as.character(df[[column_name]])
+  values[is.na(values) | !nzchar(values)] <- "<NA>"
+  paste(values, collapse = "\r")
+}
+
+metadata_columns_redundant <- function(df, column_a, column_b) {
+  if (!(column_a %in% colnames(df)) || !(column_b %in% colnames(df))) {
+    return(FALSE)
+  }
+  identical(metadata_column_signature(df, column_a), metadata_column_signature(df, column_b))
+}
+
+select_nonredundant_metadata_columns <- function(candidates, df, max_columns = 3, existing_columns = character(0)) {
+  selected <- character(0)
+  signatures <- character(0)
+  for (column_name in unique(existing_columns)) {
+    if (column_name %in% colnames(df)) {
+      signatures <- c(signatures, metadata_column_signature(df, column_name))
+    }
+  }
+  for (column_name in unique(candidates)) {
+    if (!(column_name %in% colnames(df)) || !is_informative_column(df, column_name)) {
+      next
+    }
+    signature <- metadata_column_signature(df, column_name)
+    if (signature %in% signatures) {
+      next
+    }
+    selected <- c(selected, column_name)
+    signatures <- c(signatures, signature)
+    if (length(selected) >= max_columns) {
+      break
+    }
+  }
+  selected
+}
+
+unique_pca_pairs <- function(pair_list, max_pc) {
+  selected <- list()
+  seen <- character(0)
+  for (pair in pair_list) {
+    pair <- as.integer(pair)
+    if (length(pair) < 2 || any(is.na(pair[1:2])) || any(pair[1:2] < 1) || any(pair[1:2] > max_pc) || pair[1] == pair[2]) {
+      next
+    }
+    key <- paste(pair[1], pair[2], sep = "_")
+    if (key %in% seen) {
+      next
+    }
+    seen <- c(seen, key)
+    selected[[length(selected) + 1]] <- pair[1:2]
+  }
+  selected
+}
+
 qualitative_palette_names <- c("Set1", "Dark2", "Paired", "Set2", "Accent", "Pastel1", "Pastel2", "Set3")
 palette_cache <- new.env(parent = emptyenv())
 palette_assignment_rows <- list()
@@ -1168,16 +1224,25 @@ if (!is.null(cooks_mat)) {
 }
 
 if (qc_enabled) {
-  pca_color_by_use <- pca_color_by[
-    pca_color_by %in% colnames(col_data) &
-      vapply(pca_color_by, function(x) is_informative_column(col_data, x), logical(1))
-  ]
-  pca_shape_by_values_use <- pca_shape_by_values[
-    pca_shape_by_values %in% colnames(col_data) &
-      vapply(pca_shape_by_values, function(x) is_informative_column(col_data, x), logical(1))
-  ]
-  pca_color_by_use <- unique(c(pca_color_by_use, auto_categorical_columns))
-  pca_color_by_use <- unique(c(de_columns_resolved, pca_color_by_use))
+  pca_color_candidates <- unique(c(de_columns_resolved, pca_color_by, auto_categorical_columns))
+  pca_color_by_use <- select_nonredundant_metadata_columns(
+    pca_color_candidates,
+    col_data,
+    max_columns = 3
+  )
+  if (length(pca_color_by_use) == 0) {
+    pca_color_by_use <- select_nonredundant_metadata_columns(
+      auto_categorical_columns,
+      col_data,
+      max_columns = 1
+    )
+  }
+  pca_shape_by_values_use <- select_nonredundant_metadata_columns(
+    pca_shape_by_values,
+    col_data,
+    max_columns = 1,
+    existing_columns = pca_color_by_use
+  )
 
   if (distance_plot_enabled) {
     dist_mat <- as.matrix(stats::dist(t(SummarizedExperiment::assay(vst_obj))))
@@ -1334,14 +1399,17 @@ if (qc_enabled) {
       )
     }
 
+    pca_pairs <- unique_pca_pairs(c(list(c(1, 2)), pca_extra_pairs), ncol(pca$x))
+    pca_plot_rows <- list()
+
     plot_pca_pair <- function(pc_x, pc_y, color_col, shape_col = "") {
       xcol <- paste0("PC", pc_x)
       ycol <- paste0("PC", pc_y)
       if (!(xcol %in% colnames(pca_df)) || !(ycol %in% colnames(pca_df))) {
-        return()
+        return(NULL)
       }
       if (!(color_col %in% colnames(pca_df))) {
-        return()
+        return(NULL)
       }
       plot_df <- pca_df
       plot_df[[color_col]] <- as.factor(as.character(plot_df[[color_col]]))
@@ -1350,11 +1418,13 @@ if (qc_enabled) {
         palette_name = palette_name_for_column(color_col)
       )
       if (length(color_map) == 0) {
-        return()
+        return(NULL)
       }
       if (nzchar(shape_col) && shape_col %in% colnames(plot_df)) {
         plot_df[[shape_col]] <- as.factor(as.character(plot_df[[shape_col]]))
       }
+      title_text <- paste0("PCA colored by ", color_col)
+      subtitle_text <- if (nzchar(shape_col)) paste0("Shape: ", shape_col) else NULL
       p <- ggplot2::ggplot(plot_df, ggplot2::aes_string(x = xcol, y = ycol, color = color_col))
       if (nzchar(shape_col) && shape_col %in% colnames(plot_df)) {
         p <- p + ggplot2::geom_point(ggplot2::aes_string(shape = shape_col), size = 3)
@@ -1365,23 +1435,55 @@ if (qc_enabled) {
         ggplot2::scale_color_manual(values = color_map, drop = FALSE) +
         ggplot2::xlab(paste0(xcol, ": ", pct[pc_x], "% variance")) +
         ggplot2::ylab(paste0(ycol, ": ", pct[pc_y], "% variance")) +
+        ggplot2::labs(color = color_col, shape = if (nzchar(shape_col)) shape_col else NULL, title = title_text, subtitle = subtitle_text) +
         ggplot2::theme_light() +
         ggplot2::theme(panel.grid = ggplot2::element_blank(), aspect.ratio = 1)
       shape_suffix <- if (nzchar(shape_col)) paste0("_shape_", sanitize_file_component(shape_col, "shape")) else ""
-      out_name <- paste0("top_variable_genes.PCA_plot_", color_col, shape_suffix, "_PC", pc_x, "_PC", pc_y, ".pdf")
+      out_name <- paste0("top_variable_genes.PCA_plot_", sanitize_file_component(color_col, "color"), shape_suffix, "_PC", pc_x, "_PC", pc_y, ".pdf")
       ggplot2::ggsave(filename = file.path(qc_dir, out_name), plot = p, width = 8, height = 8)
+      data.frame(
+        file = out_name,
+        color_by = color_col,
+        shape_by = if (nzchar(shape_col)) shape_col else "",
+        pc_x = pc_x,
+        pc_y = pc_y,
+        stringsAsFactors = FALSE
+      )
     }
 
-    for (color_col in pca_color_by_use) {
-      shape_options <- c("", pca_shape_by_values_use)
-      for (shape_col in shape_options) {
-        plot_pca_pair(1, 2, color_col, shape_col)
-        if (length(pca_extra_pairs) > 0) {
-          for (pair in pca_extra_pairs) {
-            plot_pca_pair(pair[1], pair[2], color_col, shape_col)
+    if (length(pca_pairs) > 0) {
+      for (color_col in pca_color_by_use) {
+        for (pair in pca_pairs) {
+          plot_row <- plot_pca_pair(pair[1], pair[2], color_col, "")
+          if (!is.null(plot_row)) {
+            pca_plot_rows[[length(pca_plot_rows) + 1]] <- plot_row
           }
         }
       }
+      if (length(pca_color_by_use) > 0 && length(pca_shape_by_values_use) > 0) {
+        primary_color_col <- pca_color_by_use[[1]]
+        for (shape_col in pca_shape_by_values_use) {
+          if (metadata_columns_redundant(col_data, primary_color_col, shape_col)) {
+            next
+          }
+          for (pair in pca_pairs) {
+            plot_row <- plot_pca_pair(pair[1], pair[2], primary_color_col, shape_col)
+            if (!is.null(plot_row)) {
+              pca_plot_rows[[length(pca_plot_rows) + 1]] <- plot_row
+            }
+          }
+        }
+      }
+    }
+
+    if (length(pca_plot_rows) > 0) {
+      utils::write.table(
+        do.call(rbind, pca_plot_rows),
+        file = file.path(qc_dir, "pca_plot_manifest.tsv"),
+        sep = "\t",
+        quote = FALSE,
+        row.names = FALSE
+      )
     }
   }
 }

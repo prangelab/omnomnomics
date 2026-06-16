@@ -72,7 +72,7 @@ DEFAULT_DE_CONFIG: dict = {
             "enabled": True,
             "color_by": ["sample_type", "sample_color", "replicate"],
             "shape_by": ["donor", "replicate"],
-            "extra_pairs": [[1, 2], [2, 3]],
+            "extra_pairs": [[2, 3]],
         },
     },
     "plots": {
