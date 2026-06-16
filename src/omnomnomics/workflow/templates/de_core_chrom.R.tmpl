@@ -489,11 +489,65 @@ if (filtering_enabled && filtering_method == "min_count_samples") {
 genes_after_filter <- nrow(count_matrix)
 
 design_formula_base <- stats::as.formula(design_formula_text)
+design_term_is_informative <- function(term_label, metadata_table) {
+  term_vars <- all.vars(stats::as.formula(paste("~", term_label)))
+  if (length(term_vars) == 0) {
+    return(TRUE)
+  }
+  for (term_var in term_vars) {
+    if (!(term_var %in% colnames(metadata_table))) {
+      return(FALSE)
+    }
+    values <- metadata_table[[term_var]]
+    if (is.numeric(values) || is.integer(values)) {
+      values <- values[is.finite(values)]
+      if (length(unique(values)) < 2) {
+        return(FALSE)
+      }
+    } else {
+      values <- as.character(values)
+      values <- values[!is.na(values) & nzchar(values)]
+      if (length(unique(values)) < 2) {
+        return(FALSE)
+      }
+    }
+  }
+  TRUE
+}
+
+design_terms_requested <- attr(stats::terms(design_formula_base), "term.labels")
+design_term_status <- data.frame(
+  term = design_terms_requested,
+  retained = logical(length(design_terms_requested)),
+  reason = character(length(design_terms_requested)),
+  stringsAsFactors = FALSE
+)
+if (length(design_terms_requested) > 0) {
+  retained_terms <- vapply(design_terms_requested, design_term_is_informative, logical(1), metadata_table = col_data)
+  design_term_status$retained <- retained_terms
+  design_term_status$reason <- ifelse(retained_terms, "informative", "not variable after count-table matching/filtering")
+  informative_terms <- design_terms_requested[retained_terms]
+  if (length(informative_terms) == 0) {
+    design_formula_base <- stats::as.formula("~ 1")
+  } else if (length(informative_terms) < length(design_terms_requested)) {
+    design_formula_base <- stats::reformulate(informative_terms)
+  }
+}
+utils::write.table(
+  design_term_status,
+  file = file.path(qc_dir, "design_term_status.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
 design_formula <- design_formula_base
-design_formula_effective_text <- design_formula_text
+design_formula_effective_text <- paste(deparse(design_formula_base), collapse = " ")
 latent_sv_columns <- character(0)
 latent_message <- "Latent-factor correction disabled."
-if (isTRUE(latent_enabled)) {
+design_terms_effective <- attr(stats::terms(design_formula_base), "term.labels")
+if (isTRUE(latent_enabled) && length(design_terms_effective) == 0) {
+  latent_message <- "Latent-factor correction disabled because the effective design is intercept-only."
+} else if (isTRUE(latent_enabled)) {
   latent_method <- tolower(trimws(as.character(latent_method)))
   if (!nzchar(latent_method) || latent_method != "sva") {
     stop("Unsupported latent factor method: ", latent_method, ". Currently supported: sva.")
@@ -1684,23 +1738,36 @@ if (qc_enabled) {
   }
 }
 
+skipped_contrast_rows <- list()
+record_skipped_contrast <- function(contrast_label, contrast_type, reason) {
+  skipped_contrast_rows[[length(skipped_contrast_rows) + 1]] <<- data.frame(
+    contrast_label = sanitize_name(as.character(contrast_label)),
+    contrast_type = as.character(contrast_type),
+    reason = as.character(reason),
+    stringsAsFactors = FALSE
+  )
+}
+
 build_auto_contrasts <- function() {
   candidate <- auto_primary_variable
   if (!nzchar(candidate)) {
     terms_vec <- attr(stats::terms(design_formula_base), "term.labels")
     terms_vec <- terms_vec[!grepl(":", terms_vec, fixed = TRUE)]
     if (length(terms_vec) == 0) {
-      stop("Could not infer an auto contrast variable from the design formula.")
+      record_skipped_contrast("auto", "factor", "Could not infer an auto contrast variable from the effective design formula.")
+      return(list())
     }
     candidate <- terms_vec[length(terms_vec)]
   }
   if (!(candidate %in% colnames(col_data))) {
-    stop("Auto contrast variable '", candidate, "' is not present in metadata.")
+    record_skipped_contrast("auto", "factor", paste0("Auto contrast variable '", candidate, "' is not present in metadata."))
+    return(list())
   }
   values <- as.factor(col_data[[candidate]])
   levels_vec <- levels(values)
   if (length(levels_vec) < 2) {
-    stop("Auto contrast variable '", candidate, "' has fewer than two levels.")
+    record_skipped_contrast("auto", "factor", paste0("Auto contrast variable '", candidate, "' has fewer than two levels after count-table matching/filtering."))
+    return(list())
   }
   contrast_list <- list()
   if (auto_pairwise) {
@@ -1780,9 +1847,6 @@ normalize_contrast_item <- function(item, index = NA_integer_) {
 
 contrast_plan_raw <- if (contrast_mode == "explicit") explicit_contrasts else build_auto_contrasts()
 contrast_plan <- lapply(seq_along(contrast_plan_raw), function(i) normalize_contrast_item(contrast_plan_raw[[i]], i))
-if (length(contrast_plan) == 0) {
-  stop("No DE contrasts were resolved.")
-}
 
 resolve_coefficient_shorthand <- function(raw_name, available_coefficients) {
   name <- trimws(as.character(raw_name))
@@ -1825,6 +1889,7 @@ resolve_coefficient_shorthand <- function(raw_name, available_coefficients) {
 validate_contrast_plan <- function(plan, available_coefficients, metadata_df) {
   available_coefficients <- unique(as.character(available_coefficients))
   available_coefficients <- available_coefficients[!is.na(available_coefficients) & nzchar(available_coefficients)]
+  valid_plan <- list()
   for (i in seq_along(plan)) {
     item <- plan[[i]]
     ctype <- as.character(item$contrast_type)
@@ -1833,22 +1898,27 @@ validate_contrast_plan <- function(plan, available_coefficients, metadata_df) {
       numerator <- as.character(item$numerator)
       denominator <- as.character(item$denominator)
       if (!(factor_name %in% colnames(metadata_df))) {
-        stop("Factor contrast ", i, " references metadata column '", factor_name, "' which is not present.")
+        record_skipped_contrast(item$label, ctype, paste0("Metadata column '", factor_name, "' is not present."))
+        next
       }
       level_values <- unique(as.character(metadata_df[[factor_name]]))
       level_values <- level_values[!is.na(level_values) & nzchar(level_values)]
       if (!(numerator %in% level_values)) {
-        stop("Factor contrast ", i, " numerator '", numerator, "' is not a level of metadata column '", factor_name, "'.")
+        record_skipped_contrast(item$label, ctype, paste0("Numerator '", numerator, "' is not present after count-table matching/filtering."))
+        next
       }
       if (!(denominator %in% level_values)) {
-        stop("Factor contrast ", i, " denominator '", denominator, "' is not a level of metadata column '", factor_name, "'.")
+        record_skipped_contrast(item$label, ctype, paste0("Denominator '", denominator, "' is not present after count-table matching/filtering."))
+        next
       }
+      valid_plan[[length(valid_plan) + 1]] <- item
       next
     }
     if (identical(ctype, "coefficient")) {
       coef_name <- as.character(item$coefficient_name)
       if (!nzchar(coef_name)) {
-        stop("Coefficient contrast ", i, " has empty coefficient_name.")
+        record_skipped_contrast(item$label, ctype, "Empty coefficient_name.")
+        next
       }
       resolved_coef <- resolve_coefficient_shorthand(coef_name, available_coefficients)
       if (!is.null(resolved_coef) && nzchar(resolved_coef)) {
@@ -1875,20 +1945,29 @@ validate_contrast_plan <- function(plan, available_coefficients, metadata_df) {
           candidates <- available_coefficients
         }
         candidates <- head(candidates, 10)
-        stop(
-          "Coefficient contrast ", i, " requested coefficient_name '", coef_name, "' which is not present in resultsNames(dds). ",
-          "Check results/qc/deseq2_results_names.tsv. ",
-          "Available examples: ", paste(candidates, collapse = ", ")
+        record_skipped_contrast(
+          item$label,
+          ctype,
+          paste0(
+            "Requested coefficient_name '", coef_name,
+            "' is not present in resultsNames(dds). Available examples: ",
+            paste(candidates, collapse = ", ")
+          )
         )
+        next
       }
+      valid_plan[[length(valid_plan) + 1]] <- item
       next
     }
     stop("Contrast ", i, " has unsupported contrast_type '", ctype, "'.")
   }
-  plan
+  valid_plan
 }
 
 contrast_plan <- validate_contrast_plan(contrast_plan, results_names_tbl$coefficient, col_data)
+if (length(contrast_plan) == 0) {
+  message("No valid DE contrasts remain after count-table matching/filtering. Writing QC-only DE output.")
+}
 
 safe_pkg_version <- function(pkg_name) {
   if (!requireNamespace(pkg_name, quietly = TRUE)) {
@@ -1989,23 +2068,69 @@ utils::write.table(
   row.names = FALSE
 )
 
-contrast_manifest <- do.call(
-  rbind,
-  lapply(contrast_plan, function(x) {
-    data.frame(
-      contrast_type = as.character(x$contrast_type),
-      factor = as.character(x$factor),
-      numerator = as.character(x$numerator),
-      denominator = as.character(x$denominator),
-      coefficient_name = as.character(x$coefficient_name),
-      contrast_label = sanitize_name(as.character(x$label)),
-      stringsAsFactors = FALSE
-    )
-  })
+contrast_manifest <- data.frame(
+  contrast_type = character(0),
+  factor = character(0),
+  numerator = character(0),
+  denominator = character(0),
+  coefficient_name = character(0),
+  contrast_label = character(0),
+  stringsAsFactors = FALSE
 )
+if (length(contrast_plan) > 0) {
+  contrast_manifest <- do.call(
+    rbind,
+    lapply(contrast_plan, function(x) {
+      data.frame(
+        contrast_type = as.character(x$contrast_type),
+        factor = as.character(x$factor),
+        numerator = as.character(x$numerator),
+        denominator = as.character(x$denominator),
+        coefficient_name = as.character(x$coefficient_name),
+        contrast_label = sanitize_name(as.character(x$label)),
+        stringsAsFactors = FALSE
+      )
+    })
+  )
+}
 utils::write.table(
   contrast_manifest,
   file = file.path(de_dir, "contrast_plan.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+skipped_contrast_table <- data.frame(
+  contrast_label = character(0),
+  contrast_type = character(0),
+  reason = character(0),
+  stringsAsFactors = FALSE
+)
+if (length(skipped_contrast_rows) > 0) {
+  skipped_contrast_table <- do.call(rbind, skipped_contrast_rows)
+}
+utils::write.table(
+  skipped_contrast_table,
+  file = file.path(de_dir, "skipped_contrasts.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+de_status <- data.frame(
+  status = if (length(contrast_plan) > 0) "de_contrasts_ready" else "qc_only_no_valid_contrasts",
+  n_valid_contrasts = length(contrast_plan),
+  n_skipped_contrasts = nrow(skipped_contrast_table),
+  design_formula_requested = design_formula_text,
+  design_formula_effective = design_formula_effective_text,
+  n_samples = ncol(count_matrix),
+  n_features_after_filtering = nrow(count_matrix),
+  stringsAsFactors = FALSE
+)
+utils::write.table(
+  de_status,
+  file = file.path(qc_dir, "de_status.tsv"),
   sep = "\t",
   quote = FALSE,
   row.names = FALSE
@@ -3335,10 +3460,65 @@ if (length(contrast_summaries) > 0) {
     width = 10,
     height = 6
   )
+} else {
+  contrast_summary_table <- data.frame(
+    contrast = character(0),
+    contrast_type = character(0),
+    positive_direction = character(0),
+    negative_direction = character(0),
+    factor = character(0),
+    numerator = character(0),
+    denominator = character(0),
+    coefficient_name = character(0),
+    genes_tested = integer(0),
+    genes_with_pvalue = integer(0),
+    genes_with_padj = integer(0),
+    genes_padj_na_with_pvalue = integer(0),
+    sig_total = integer(0),
+    sig_up = integer(0),
+    sig_down = integer(0),
+    alpha = numeric(0),
+    lfc_threshold = numeric(0),
+    stringsAsFactors = FALSE
+  )
+  utils::write.table(
+    contrast_summary_table,
+    file = file.path(de_dir, "contrast_summary.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
 }
 
 if (length(contrast_testing_summaries) > 0) {
   contrast_testing_table <- do.call(rbind, contrast_testing_summaries)
+  utils::write.table(
+    contrast_testing_table,
+    file = file.path(qc_dir, "contrast_testing_summary.tsv"),
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+} else {
+  contrast_testing_table <- data.frame(
+    contrast = character(0),
+    positive_direction = character(0),
+    negative_direction = character(0),
+    total_genes = integer(0),
+    genes_with_pvalue = integer(0),
+    genes_with_padj = integer(0),
+    genes_pvalue_na = integer(0),
+    genes_padj_na = integer(0),
+    genes_padj_na_with_pvalue = integer(0),
+    genes_lfc_na = integer(0),
+    genes_lfcse_na = integer(0),
+    independent_filtering_enabled = logical(0),
+    filter_threshold = numeric(0),
+    cooks_cutoff = numeric(0),
+    alpha = numeric(0),
+    lfc_for_sig = numeric(0),
+    stringsAsFactors = FALSE
+  )
   utils::write.table(
     contrast_testing_table,
     file = file.path(qc_dir, "contrast_testing_summary.tsv"),

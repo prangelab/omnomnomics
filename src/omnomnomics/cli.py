@@ -1972,7 +1972,7 @@ def main():
     cmd = [ "snakemake",  "--profile", os.path.join(str(workflow_root), "slurm_profile"), "--snakefile", f"{workflow_root}/Snakefile.smk",
         "--config", "config_file="+os.path.join(experiment_dir, "run_configs", f'omnomnomics.run.{run_date}.config.yaml'), "--jobs", max_jobs,
         "--cores", max_cores, "--max-jobs-per-second", max_jobs_per_second, "--max-status-checks-per-second", max_status_checks_per_second,
-        "--default-resources", f"partition={config['partition']}", f"runtime={config['default_runtime']}", "--rerun-triggers", "mtime", "--keep-going"
+        "--default-resources", f"partition={config['partition']}", f"runtime={config['default_runtime']}", "--rerun-triggers", "mtime", "--rerun-incomplete", "--keep-going"
     ]
 
     if dry_run:
