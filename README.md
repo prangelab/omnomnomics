@@ -513,6 +513,7 @@ Utility commands:
   - `results/qc/contrast_testing_summary.tsv`
   - `results/differential_expression/contrast_summary.tsv`
   (Per-contrast folders keep only contrast-specific result files and plots.)
+- DESeq2 runs serially inside each DE job by default. This avoids nested parallelism where Snakemake/Slurm already parallelizes across jobs, which can otherwise inflate memory use on large chromatin analyses. Advanced users can opt in with `deseq2.parallel: true` in a DE config when their scheduler and memory limits are appropriate.
 
 Step 12 DE config run patterns:
 - Single DE config:
