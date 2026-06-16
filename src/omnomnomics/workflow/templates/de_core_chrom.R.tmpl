@@ -20,6 +20,7 @@ de_dir <- __DE_DIR__
 peak_metadata_path <- __PEAK_METADATA_PATH__
 peak_id_column <- __PEAK_ID_COLUMN__
 assay_lower <- __ASSAY_LOWER__
+genome_version <- __GENOME_VERSION__
 feature_label_singular <- __FEATURE_LABEL_SINGULAR__
 feature_label_plural <- __FEATURE_LABEL_PLURAL__
 feature_file_stem <- __FEATURE_FILE_STEM__
@@ -578,6 +579,29 @@ detect_species_from_gene_ids <- function(gene_ids) {
   list(species_label = "unknown", msig_species = NULL, orgdb = NULL)
 }
 
+detect_species_from_context <- function(gene_ids, genome = NA_character_) {
+  genome_norm <- tolower(as.character(genome))
+  genome_norm <- genome_norm[!is.na(genome_norm) & nzchar(genome_norm)]
+  if (length(genome_norm) > 0) {
+    genome_norm <- genome_norm[[1]]
+    if (genome_norm %in% c("grch38", "grch37", "hg38", "hg19", "human", "homo_sapiens", "homo sapiens")) {
+      return(list(
+        species_label = "human",
+        msig_species = "Homo sapiens",
+        orgdb = if (requireNamespace("org.Hs.eg.db", quietly = TRUE)) org.Hs.eg.db::org.Hs.eg.db else NULL
+      ))
+    }
+    if (genome_norm %in% c("grcm39", "grcm38", "mm39", "mm10", "mouse", "mus_musculus", "mus musculus")) {
+      return(list(
+        species_label = "mouse",
+        msig_species = "Mus musculus",
+        orgdb = if (requireNamespace("org.Mm.eg.db", quietly = TRUE)) org.Mm.eg.db::org.Mm.eg.db else NULL
+      ))
+    }
+  }
+  detect_species_from_gene_ids(gene_ids)
+}
+
 is_valid_symbol <- function(x) {
   x <- as.character(x)
   !is.na(x) & nzchar(x) & !grepl("^ENS(?:MUSG|G)[0-9]+$", strip_ensembl_version(x))
@@ -864,7 +888,7 @@ if (enrichment_enabled && decoupler_enabled && !decoupler_available) {
   message("Decoupler enrichment requested but decoupleR is not available. Skipping decoupler outputs.")
 }
 
-species_info <- detect_species_from_gene_ids(rownames(dds))
+species_info <- detect_species_from_context(rownames(dds), genome_version)
 msig_term2gene <- list()
 if (cp_available && enrichment_enabled && enrichment_cp_enabled) {
   if (!requireNamespace("msigdbr", quietly = TRUE) || is.null(species_info$msig_species)) {
@@ -1199,6 +1223,7 @@ if (!is.na(peak_qc_metrics_path) && file.exists(peak_qc_metrics_path)) {
     required_cols <- c("group", "frip", "peak_count")
     if (all(required_cols %in% colnames(peak_qc_tbl))) {
       frip_df <- peak_qc_tbl
+      frip_df <- unique(frip_df)
       frip_df$group <- as.factor(as.character(frip_df$group))
       frip_df$frip <- suppressWarnings(as.numeric(frip_df$frip))
       frip_df$peak_count <- suppressWarnings(as.numeric(frip_df$peak_count))
@@ -1213,7 +1238,8 @@ if (!is.na(peak_qc_metrics_path) && file.exists(peak_qc_metrics_path)) {
           ggplot2::theme(panel.grid = ggplot2::element_blank()) +
           ggplot2::xlab(paste(feature_label_singular_title, "count")) +
           ggplot2::ylab("FRiP") +
-          ggplot2::ggtitle(paste(feature_label_plural_title, "QC: FRiP vs", tolower(feature_label_singular), "count"))
+          ggplot2::ggtitle(paste(feature_label_plural_title, "feature-set QC: FRiP vs", tolower(feature_label_singular), "count")) +
+          ggplot2::labs(subtitle = "Each point represents one peak/bin/gene-body set from peak QC, not one sample.")
         if (requireNamespace("ggrepel", quietly = TRUE)) {
           p_frip <- p_frip + ggrepel::geom_text_repel(size = 3, max.overlaps = 100)
         } else {
@@ -2728,7 +2754,14 @@ for (contrast_cfg in contrast_plan) {
     dir.create(dc_dir, recursive = TRUE, showWarnings = FALSE)
 
     contrast_vst <- SummarizedExperiment::assay(vst_obj)[, contrast_sample_ids, drop = FALSE]
-    sample_symbol_ids <- symbols_for_ids(rownames(contrast_vst), fallback_to_ids = FALSE)
+    sample_symbol_ids <- enrich_df$gene_symbol_clean[match(rownames(contrast_vst), enrich_df$gene_id)]
+    missing_sample_symbols <- is.na(sample_symbol_ids) | !nzchar(sample_symbol_ids)
+    if (any(missing_sample_symbols)) {
+      sample_symbol_ids[missing_sample_symbols] <- symbols_for_ids(
+        rownames(contrast_vst)[missing_sample_symbols],
+        fallback_to_ids = FALSE
+      )
+    }
     sample_symbol_ids[!is_valid_symbol(sample_symbol_ids)] <- NA_character_
     dc_sample_mat <- aggregate_symbol_matrix(contrast_vst, sample_symbol_ids)
 

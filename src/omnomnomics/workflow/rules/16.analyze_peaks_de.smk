@@ -216,8 +216,10 @@ rule analyze_peaks_de:
             region = str(region_text).strip().lower()
             if region.startswith("promoter"):
                 return "promoter"
-            if region in {"intergenic", "intronic", "exonic", "distal"}:
+            if region in {"intergenic", "distal"}:
                 return "distal"
+            if region in {"intron", "exon", "intronic", "exonic", "gene_body", "body"}:
+                return "gene_body"
             return "other"
 
         def build_de_sets(table_path, peak_region_map, sets_dir, broad_mode, promoter_map):
@@ -436,9 +438,9 @@ rule analyze_peaks_de:
                 set_name = "all_gene_bodies"
             elif broad_mode == "diffuse":
                 set_name = "all_bins"
-            out_path = os.path.join(sets_dir, set_name, f"{set_name}.bed")
+            out_path = os.path.join(ensure_dir(os.path.join(sets_dir, set_name)), f"{set_name}.bed")
             write_bed_from_rows(rows_all, out_path)
-            return [
+            out_rows = [
                 {
                     "set_name": set_name,
                     "set_type": set_name,
@@ -449,6 +451,28 @@ rule analyze_peaks_de:
                     "peak_count": len(rows_all),
                 }
             ]
+            if broad_mode != "genebody":
+                region_specs = [
+                    ("all_promoter", "promoter"),
+                    ("all_distal", "distal"),
+                    ("all_gene_body", "gene_body"),
+                ]
+                for split_name, split_class in region_specs:
+                    split_rows = [row for row in rows_all if classify_region(row[6]) == split_class]
+                    split_path = os.path.join(ensure_dir(os.path.join(sets_dir, split_name)), f"{split_name}.bed")
+                    write_bed_from_rows(split_rows, split_path)
+                    out_rows.append(
+                        {
+                            "set_name": split_name,
+                            "set_type": split_name,
+                            "contrast_group": "global",
+                            "contrast_label": split_name,
+                            "source_table": os.path.join(params.de_outputfolder, "peak_metadata.tsv"),
+                            "peak_bed": split_path,
+                            "peak_count": len(split_rows),
+                        }
+                    )
+            return out_rows
 
         def collect_unique_sets_from_prede(sets_dir):
             unique_input_dir = os.path.join(params.prede_outputfolder, "analyze_peaks", "intersections", "unique")
@@ -485,6 +509,30 @@ rule analyze_peaks_de:
             if not all(tool_available(x) for x in required):
                 log_it(logfile, "deepTools executables not fully available. Skipping signal plots in analyze_peaks_de.")
                 return
+
+            def regions_label_for_set(item):
+                set_type = str(item.get("set_type", "features"))
+                label_map = {
+                    "all_features": "all peaks",
+                    "all_promoter": "promoter peaks",
+                    "all_distal": "distal peaks",
+                    "all_gene_body": "gene-body peaks",
+                    "all_gene_bodies": "gene bodies",
+                    "all_bins": "bins",
+                    "de_significant": "DE features",
+                    "de_up": "DE up features",
+                    "de_down": "DE down features",
+                    "de_significant_promoter": "DE promoter peaks",
+                    "de_significant_distal": "DE distal peaks",
+                    "de_significant_domains": "DE domains",
+                    "de_up_domains": "DE up domains",
+                    "de_down_domains": "DE down domains",
+                    "de_significant_promoter_regions": "DE promoter regions",
+                    "de_up_promoter_regions": "DE up promoter regions",
+                    "de_down_promoter_regions": "DE down promoter regions",
+                    "unique_from_prede": "unique pre-DE peaks",
+                }
+                return label_map.get(set_type, set_type.replace("_", " "))
 
             matrices_dir = ensure_dir(os.path.join(signal_dir, "matrices"))
             heatmaps_dir = ensure_dir(os.path.join(signal_dir, "heatmaps"))
@@ -524,16 +572,23 @@ rule analyze_peaks_de:
                     )
                     shell(
                         f"plotHeatmap -m {quote(matrix_path)} -out {quote(heatmap_path)} "
-                        f"--whatToShow 'heatmap and colorbar' --sortRegions descend"
+                        f"--whatToShow 'heatmap and colorbar' --sortRegions descend "
+                        f"--regionsLabel {quote(regions_label_for_set(item))} "
+                        f"--xAxisLabel 'distance from center (bp)' --refPointLabel center"
                     )
                     shell(
                         f"plotProfile -m {quote(matrix_path)} -out {quote(profile_path)} "
-                        f"--perGroup --plotTitle {quote(item['set_name'])}"
+                        f"--perGroup --plotTitle {quote(item['set_name'])} "
+                        f"--regionsLabel {quote(regions_label_for_set(item))} "
+                        f"--xAxisLabel 'distance from center (bp)' --refPointLabel center"
                     )
 
         def run_gimme_motifs(set_manifest_rows, motifs_dir):
             motif_summary_path = os.path.join(motifs_dir, "motif_runs.tsv")
             eligible_set_types = {
+                "de_significant",
+                "de_up",
+                "de_down",
                 "de_significant_promoter",
                 "de_significant_distal",
                 "unique_from_prede",

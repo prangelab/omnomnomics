@@ -771,6 +771,14 @@ rule peak_qc:
 
             qc_dir = ensure_peak_qc_dir(outputfolder)
             qc_table = os.path.join(qc_dir, f"{thetype.lower()}.peak_qc_metrics.tsv")
+            unique_rows = []
+            seen_rows = set()
+            for row in qc_rows:
+                row_key = (row["assay"], row["group"], row["peak_set"], row["peak_file"])
+                if row_key in seen_rows:
+                    continue
+                seen_rows.add(row_key)
+                unique_rows.append(row)
             with open(qc_table, "w", newline="") as handle:
                 writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
                 writer.writerow([
@@ -789,7 +797,7 @@ rule peak_qc:
                     "frip_estimated",
                     "frip",
                 ])
-                for row in qc_rows:
+                for row in unique_rows:
                     writer.writerow([
                         row["assay"],
                         row["group"],
@@ -961,7 +969,7 @@ rule peak_qc:
                     else:
                         preferred = os.path.join(peak_bed_source_folder, f"{group}.MACS3.optimized.bed")
                         fallback_glob = sorted(glob.glob(os.path.join(peak_bed_source_folder, f"{group}.MACS3*.bed")))
-                        candidate_peak_sets = [preferred, *fallback_glob]
+                        candidate_peak_sets = list(dict.fromkeys([preferred, *fallback_glob]))
                     for peak_bed in candidate_peak_sets:
                         if not os.path.exists(peak_bed):
                             continue

@@ -520,6 +520,7 @@ rule call_DE_chrom:
                     "__PEAK_METADATA_PATH__": _r_string(peak_metadata_copy),
                     "__PEAK_ID_COLUMN__": _r_string("underscore"),
                     "__ASSAY_LOWER__": _r_string(str(params.thetype).strip().lower()),
+                    "__GENOME_VERSION__": _r_string(str(master_config.get("GENOME_VERSION", ""))),
                     "__FEATURE_LABEL_SINGULAR__": _r_string(feature_label_singular),
                     "__FEATURE_LABEL_PLURAL__": _r_string(feature_label_plural),
                     "__FEATURE_FILE_STEM__": _r_string(feature_file_stem),
