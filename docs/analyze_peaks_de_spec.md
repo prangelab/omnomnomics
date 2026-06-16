@@ -1,9 +1,9 @@
 # analyze_peaks_de (post-DE) specification
 
 ## Scope
-- Assay: ATAC (and future ChIP if DE-like quantification is enabled).
+- Assay: ATAC and ChIP chromatin DE modes.
 - Position in flow: after DE/count-model outputs are available.
-- Purpose: run peak-set interpretation specifically on DE-significant subsets, with an optional layer for pre-DE unique peaks.
+- Purpose: run peak-set interpretation on DE-significant subsets, top-ranked DE fallback subsets, and optional pre-DE unique peaks.
 
 ## Inputs
 - Peak-level quantification and DE results tables.
@@ -18,11 +18,12 @@
   - `de_down/*.bed`
   - `de_significant_promoter/*.bed`
   - `de_significant_distal/*.bed`
+  - `top_de_ranked*.bed`
   - `unique_from_prede/*.bed` (optional extra layer from step 14)
 - `peak_calling/analyze_peaks_de/signal/`
   - deepTools matrices, heatmaps, and profiles for DE subsets.
 - `peak_calling/analyze_peaks_de/motifs/`
-  - promoter and distal motif runs per DE subset.
+  - promoter, distal, and top-ranked motif runs per DE subset.
   - optional motif runs for pre-DE unique sets.
   - motif summary table.
 - `peak_calling/analyze_peaks_de/summary/`
@@ -33,6 +34,7 @@
 1. DE subset creation:
    - read contrast-level DE peak tables.
    - generate combined/up/down DE sets.
+   - generate top-ranked DE fallback sets from the full DE table where available.
 2. Context split:
    - split DE sets into promoter and distal subsets using peak metadata.
 3. Optional unique layer:
@@ -40,7 +42,7 @@
 4. Signal summaries:
    - run deepTools on sufficiently sized sets.
 5. Motif analysis:
-   - run GimmeMotifs on sufficiently sized promoter/distal DE sets.
+   - run GimmeMotifs on sufficiently sized promoter/distal DE sets and top-ranked fallback sets.
    - optionally run on pre-DE unique sets.
 
 ## Config notes
@@ -48,7 +50,7 @@
 - Fine-grained motif background matching controls are reserved for a follow-up refinement.
 
 ## Status
-- Implemented as workflow step 16 (`analyze_peaks_de`) for ATAC.
+- Implemented as workflow step 16 (`analyze_peaks_de`) for ATAC and ChIP.
 - Fail-soft behavior:
   - DE set generation and manifests are always attempted.
   - deepTools and GimmeMotifs blocks are skipped with clear logs if executables are unavailable.

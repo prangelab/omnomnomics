@@ -2018,7 +2018,8 @@ onsuccess:
             multiqc_config = write_multiqc_runtime_config()
             log_it(logfile, f"MultiQC runtime config file: {multiqc_config}")
             multiqc_command = (
-                f"multiqc --config {multiqc_config} --filename MultiQC/omnomnomics.run.{run_date}.multiqc_report.html --dirs --export ."
+                f"multiqc --config {multiqc_config} --outdir MultiQC "
+                f"--filename omnomnomics.run.{run_date}.multiqc_report.html --dirs --export --force ."
             )
             log_it(logfile, multiqc_command, "MULTIQC COMMAND")
             shell(multiqc_command)

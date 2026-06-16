@@ -123,6 +123,13 @@ sanitize_file_component <- function(x, fallback = "item") {
   if (!nzchar(x)) fallback else x
 }
 
+humanize_label <- function(x) {
+  x <- gsub("[_.-]+", " ", as.character(x))
+  x <- gsub("\\s+", " ", x)
+  x <- trimws(x)
+  if (!nzchar(x)) "metadata" else x
+}
+
 is_informative_column <- function(df, column_name) {
   if (!(column_name %in% colnames(df))) {
     return(FALSE)
@@ -832,8 +839,10 @@ if (enrichment_enabled && decoupler_enabled && !decoupler_available) {
 species_info <- detect_species_from_gene_ids(rownames(dds))
 msig_term2gene <- list()
 if (cp_available && enrichment_enabled && enrichment_cp_enabled) {
-  if (!requireNamespace("msigdbr", quietly = TRUE) || is.null(species_info$msig_species)) {
-    message("MSigDB enrichment requested but msigdbr and/or species detection is unavailable. MSigDB enrichment will be skipped.")
+  if (!requireNamespace("msigdbr", quietly = TRUE)) {
+    message("MSigDB enrichment requested but msigdbr is not available. MSigDB enrichment will be skipped.")
+  } else if (is.null(species_info$msig_species)) {
+    message("MSigDB enrichment requested but species detection failed from gene identifiers. MSigDB enrichment will be skipped.")
   } else if (!is.list(enrichment_msigdb_sets) || length(enrichment_msigdb_sets) == 0) {
     message("No MSigDB sets configured for clusterProfiler enrichment. Skipping clusterProfiler enrichment.")
   } else {
@@ -1228,7 +1237,7 @@ if (qc_enabled) {
   pca_color_by_use <- select_nonredundant_metadata_columns(
     pca_color_candidates,
     col_data,
-    max_columns = 3
+    max_columns = 1
   )
   if (length(pca_color_by_use) == 0) {
     pca_color_by_use <- select_nonredundant_metadata_columns(
@@ -1423,8 +1432,8 @@ if (qc_enabled) {
       if (nzchar(shape_col) && shape_col %in% colnames(plot_df)) {
         plot_df[[shape_col]] <- as.factor(as.character(plot_df[[shape_col]]))
       }
-      title_text <- paste0("PCA colored by ", color_col)
-      subtitle_text <- if (nzchar(shape_col)) paste0("Shape: ", shape_col) else NULL
+      title_text <- paste0("PCA colored by ", humanize_label(color_col))
+      subtitle_text <- if (nzchar(shape_col)) paste0("Shape: ", humanize_label(shape_col)) else NULL
       p <- ggplot2::ggplot(plot_df, ggplot2::aes_string(x = xcol, y = ycol, color = color_col))
       if (nzchar(shape_col) && shape_col %in% colnames(plot_df)) {
         p <- p + ggplot2::geom_point(ggplot2::aes_string(shape = shape_col), size = 3)
@@ -1435,7 +1444,7 @@ if (qc_enabled) {
         ggplot2::scale_color_manual(values = color_map, drop = FALSE) +
         ggplot2::xlab(paste0(xcol, ": ", pct[pc_x], "% variance")) +
         ggplot2::ylab(paste0(ycol, ": ", pct[pc_y], "% variance")) +
-        ggplot2::labs(color = color_col, shape = if (nzchar(shape_col)) shape_col else NULL, title = title_text, subtitle = subtitle_text) +
+        ggplot2::labs(color = humanize_label(color_col), shape = if (nzchar(shape_col)) humanize_label(shape_col) else NULL, title = title_text, subtitle = subtitle_text) +
         ggplot2::theme_light() +
         ggplot2::theme(panel.grid = ggplot2::element_blank(), aspect.ratio = 1)
       shape_suffix <- if (nzchar(shape_col)) paste0("_shape_", sanitize_file_component(shape_col, "shape")) else ""

@@ -8,6 +8,7 @@
 #=============================================
 import csv
 import glob
+import math
 import os
 import re
 import shlex
@@ -222,6 +223,82 @@ rule analyze_peaks_de:
                 return "gene_body"
             return "other"
 
+        def ranked_rows_from_de_table(table_path, peak_region_map, broad_mode, promoter_map, top_n=500):
+            ranked = []
+            with open(table_path, newline="") as handle:
+                reader = csv.DictReader(handle, delimiter="\t")
+                if reader.fieldnames is None:
+                    return {}
+                for row in reader:
+                    peak_id = str(row.get("gene_id", "")).strip()
+                    if not peak_id:
+                        continue
+                    parsed = parse_peak_coord(peak_id)
+                    if parsed is None:
+                        continue
+                    chrom, start, end = parsed
+                    try:
+                        lfc = float(row.get("log2FoldChange", "0"))
+                    except (TypeError, ValueError):
+                        lfc = 0.0
+                    padj_text = row.get("padj", row.get("pvalue", "1"))
+                    try:
+                        padj = float(padj_text)
+                    except (TypeError, ValueError):
+                        padj = 1.0
+                    if not math.isfinite(padj):
+                        padj = 1.0
+                    region_info = peak_region_map.get(peak_id, {})
+                    region = region_info.get("genomic_region", "NA")
+                    assigned = region_info.get("assigned_genes", "NA")
+                    nearest = region_info.get("nearest_gene", "NA")
+                    bed_row = [chrom, start, end, peak_id, f"{lfc:.6f}", ".", region, assigned, nearest]
+                    ranked.append(
+                        {
+                            "rank_key": (padj, -abs(lfc), chrom, start, end),
+                            "bed_row": bed_row,
+                            "region_class": classify_region(region),
+                            "region_info": region_info,
+                            "lfc": lfc,
+                        }
+                    )
+            ranked = sorted(ranked, key=lambda item: item["rank_key"])
+            top_all = ranked[:top_n]
+            top_promoter = [item for item in ranked if item["region_class"] == "promoter"][:top_n]
+            top_distal = [item for item in ranked if item["region_class"] == "distal"][:top_n]
+            top_sets = {
+                "top_de_ranked": [item["bed_row"] for item in top_all],
+                "top_de_ranked_promoter": [item["bed_row"] for item in top_promoter],
+                "top_de_ranked_distal": [item["bed_row"] for item in top_distal],
+            }
+            if broad_mode == "genebody":
+                promoter_region_rows = []
+                for item in top_all:
+                    peak_id = item["bed_row"][3]
+                    for gene_label in labels_for_feature(item["region_info"]):
+                        promoter_coords = promoter_map.get(gene_label)
+                        if promoter_coords is None:
+                            continue
+                        prom_chrom, prom_start, prom_end = promoter_coords
+                        promoter_region_rows.append(
+                            [
+                                prom_chrom,
+                                prom_start,
+                                prom_end,
+                                peak_id,
+                                f"{item['lfc']:.6f}",
+                                ".",
+                                item["bed_row"][6],
+                                item["bed_row"][7],
+                                item["bed_row"][8],
+                            ]
+                        )
+                top_sets["top_de_ranked_promoter_regions"] = sorted(
+                    {tuple(row) for row in promoter_region_rows},
+                    key=lambda x: (x[0], x[1], x[2], x[3]),
+                )
+            return top_sets
+
         def build_de_sets(table_path, peak_region_map, sets_dir, broad_mode, promoter_map):
             rel_name = os.path.relpath(table_path, params.de_outputfolder)
             parts = rel_name.split(os.sep)
@@ -318,6 +395,9 @@ rule analyze_peaks_de:
 
             out_rows = []
             prefix = f"{de_subdir}__{contrast_dir}__{contrast_label}"
+            ranked_source_table = table_path.replace(f".sig_diff_{file_stem}.DESeq2.txt", f".diff_{file_stem}.DESeq2.txt")
+            if not os.path.exists(ranked_source_table):
+                ranked_source_table = table_path
             set_specs = [
                 ("de_significant", rows_all),
                 ("de_up", rows_up),
@@ -325,16 +405,30 @@ rule analyze_peaks_de:
                 ("de_significant_promoter", rows_promoter),
                 ("de_significant_distal", rows_distal),
             ]
+            ranked_sets = ranked_rows_from_de_table(
+                ranked_source_table,
+                peak_region_map,
+                broad_mode,
+                promoter_map,
+            )
+            set_specs.extend(
+                [
+                    ("top_de_ranked", ranked_sets.get("top_de_ranked", [])),
+                    ("top_de_ranked_promoter", ranked_sets.get("top_de_ranked_promoter", [])),
+                    ("top_de_ranked_distal", ranked_sets.get("top_de_ranked_distal", [])),
+                ]
+            )
             if broad_mode == "genebody":
                 set_specs.extend(
                     [
                         ("de_significant_promoter_regions", rows_promoter_regions),
                         ("de_up_promoter_regions", rows_up_promoter_regions),
                         ("de_down_promoter_regions", rows_down_promoter_regions),
+                        ("top_de_ranked_promoter_regions", ranked_sets.get("top_de_ranked_promoter_regions", [])),
                     ]
                 )
             for set_name, set_rows in set_specs:
-                out_path = os.path.join(sets_dir, set_name, f"{prefix}.{set_name}.bed")
+                out_path = os.path.join(ensure_dir(os.path.join(sets_dir, set_name)), f"{prefix}.{set_name}.bed")
                 if broad_mode == "genebody" and set_name.endswith("_promoter_regions"):
                     set_rows = sorted({tuple(row) for row in set_rows}, key=lambda x: (x[0], x[1], x[2], x[3]))
                 write_bed_from_rows(set_rows, out_path)
@@ -530,6 +624,10 @@ rule analyze_peaks_de:
                     "de_significant_promoter_regions": "DE promoter regions",
                     "de_up_promoter_regions": "DE up promoter regions",
                     "de_down_promoter_regions": "DE down promoter regions",
+                    "top_de_ranked": "top ranked DE features",
+                    "top_de_ranked_promoter": "top ranked promoter peaks",
+                    "top_de_ranked_distal": "top ranked distal peaks",
+                    "top_de_ranked_promoter_regions": "top ranked promoter regions",
                     "unique_from_prede": "unique pre-DE peaks",
                 }
                 return label_map.get(set_type, set_type.replace("_", " "))
@@ -540,6 +638,7 @@ rule analyze_peaks_de:
 
             with tempfile.TemporaryDirectory(prefix="omnomnomics_deeptools_de_") as tmpdir:
                 bigwigs = []
+                sample_labels = []
                 bam_suffix = ".sorted.dups_marked.filtered.bam" if params.thetype == "ATAC" else ".filtered.bam"
                 for sample in samples2:
                     bam_path = os.path.join(params.bam_inputfolder, f"{sample}{bam_suffix}")
@@ -551,6 +650,7 @@ rule analyze_peaks_de:
                         f"--binSize 25 --normalizeUsing CPM --numberOfProcessors {threads}"
                     )
                     bigwigs.append(bw_path)
+                    sample_labels.append(sample)
                 if not bigwigs:
                     log_it(logfile, "No BAM files found for analyze_peaks_de deepTools. Skipping signal plots.")
                     return
@@ -562,6 +662,7 @@ rule analyze_peaks_de:
                     if int(item["peak_count"]) < 20:
                         continue
                     safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", item["set_name"])
+                    region_label = regions_label_for_set(item)
                     matrix_path = os.path.join(matrices_dir, f"{safe_name}.matrix.gz")
                     heatmap_path = os.path.join(heatmaps_dir, f"{safe_name}.heatmap.pdf")
                     profile_path = os.path.join(profiles_dir, f"{safe_name}.profile.pdf")
@@ -573,13 +674,16 @@ rule analyze_peaks_de:
                     shell(
                         f"plotHeatmap -m {quote(matrix_path)} -out {quote(heatmap_path)} "
                         f"--whatToShow 'heatmap and colorbar' --sortRegions descend "
-                        f"--regionsLabel {quote(regions_label_for_set(item))} "
+                        f"--plotTitle {quote(region_label)} --regionsLabel {quote(region_label)} "
+                        f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
                         f"--xAxisLabel 'distance from center (bp)' --refPointLabel center"
                     )
                     shell(
                         f"plotProfile -m {quote(matrix_path)} -out {quote(profile_path)} "
-                        f"--perGroup --plotTitle {quote(item['set_name'])} "
-                        f"--regionsLabel {quote(regions_label_for_set(item))} "
+                        f"--perGroup --plotTitle {quote(region_label)} "
+                        f"--regionsLabel {quote(region_label)} "
+                        f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
+                        f"--xAxisLabel 'distance from center (bp)' "
                         f"--refPointLabel center"
                     )
 
@@ -595,7 +699,12 @@ rule analyze_peaks_de:
                 "de_significant_promoter_regions",
                 "de_up_promoter_regions",
                 "de_down_promoter_regions",
+                "top_de_ranked",
+                "top_de_ranked_promoter",
+                "top_de_ranked_distal",
+                "top_de_ranked_promoter_regions",
             }
+            min_motif_peaks = 10
             motif_summary = []
             if not tool_available("gimme"):
                 log_it(logfile, "gimme executable not found. Skipping motif analysis in analyze_peaks_de.")
@@ -616,8 +725,8 @@ rule analyze_peaks_de:
                 if item["set_type"] not in eligible_set_types:
                     motif_summary.append([item["set_name"], "SKIP", item["peak_bed"], "", motif_genome, "set type is not configured for motif analysis"])
                     continue
-                if int(item["peak_count"]) < 50:
-                    motif_summary.append([item["set_name"], "SKIP", item["peak_bed"], "", motif_genome, "fewer than 50 peaks"])
+                if int(item["peak_count"]) < min_motif_peaks:
+                    motif_summary.append([item["set_name"], "SKIP", item["peak_bed"], "", motif_genome, f"fewer than {min_motif_peaks} peaks"])
                     continue
                 safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", item["set_name"])
                 out_dir = ensure_dir(os.path.join(motifs_dir, safe_name))

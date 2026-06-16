@@ -562,7 +562,7 @@ rule call_DE_chrom:
                     "__PCA_ENABLED__": _r_bool(pca_cfg.get("enabled", True)),
                     "__PCA_COLOR_BY__": _r_char_vector(pca_cfg.get("color_by", [])),
                     "__PCA_SHAPE_BY_VALUES__": _r_char_vector(pca_shape_values),
-                    "__PCA_EXTRA_PAIRS__": _r_numeric_pair_list(pca_cfg.get("extra_pairs", [[1, 2], [2, 3]])),
+                    "__PCA_EXTRA_PAIRS__": _r_numeric_pair_list(pca_cfg.get("extra_pairs", [])),
                     "__DE_COLUMNS_RESOLVED__": _r_char_vector(params.de_columns_resolved),
                     "__DE_BLOCK_RESOLVED__": _r_char_vector(params.de_block_resolved),
                     "__MA_PLOT_ENABLED__": _r_bool(plots_cfg.get("ma_plot", True)),

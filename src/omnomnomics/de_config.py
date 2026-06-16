@@ -70,9 +70,9 @@ DEFAULT_DE_CONFIG: dict = {
         "variable_gene_heatmap": True,
         "pca": {
             "enabled": True,
-            "color_by": ["sample_type", "sample_color", "replicate"],
-            "shape_by": ["donor", "replicate"],
-            "extra_pairs": [[2, 3]],
+            "color_by": ["sample_type", "condition", "sample_color"],
+            "shape_by": [],
+            "extra_pairs": [],
         },
     },
     "plots": {

@@ -198,6 +198,7 @@ rule analyze_peaks:
 
             with tempfile.TemporaryDirectory(prefix="omnomnomics_deeptools_bw_") as tmpdir:
                 bigwigs = []
+                sample_labels = []
                 bam_suffix = ".sorted.dups_marked.filtered.bam" if assay_type == "ATAC" else ".filtered.bam"
                 for sample in samples2:
                     bam_path = os.path.join(bam_inputfolder, f"{sample}{bam_suffix}")
@@ -208,12 +209,14 @@ rule analyze_peaks:
                         f"bamCoverage --bam {quote(bam_path)} --outFileName {quote(bw_path)} --binSize 25 --normalizeUsing CPM --numberOfProcessors {threads}"
                     )
                     bigwigs.append(bw_path)
+                    sample_labels.append(sample)
 
                 if not bigwigs:
                     log_it(logfile, "No BAM files found for deepTools signal plotting. Skipping signal plots.")
                     return
 
                 for group, region_bed in sorted(union_paths.items()):
+                    group_label = group.replace("_", " ")
                     matrix_path = os.path.join(matrices_dir, f"{group}.matrix.gz")
                     heatmap_path = os.path.join(heatmaps_dir, f"{group}.heatmap.pdf")
                     profile_path = os.path.join(profiles_dir, f"{group}.profile.pdf")
@@ -224,11 +227,17 @@ rule analyze_peaks:
                     )
                     shell(
                         f"plotHeatmap -m {quote(matrix_path)} -out {quote(heatmap_path)} "
-                        f"--whatToShow 'heatmap and colorbar' --sortRegions descend"
+                        f"--whatToShow 'heatmap and colorbar' --sortRegions descend "
+                        f"--plotTitle {quote(group_label)} --regionsLabel {quote(group_label)} "
+                        f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
+                        f"--xAxisLabel 'distance from center (bp)' --refPointLabel center"
                     )
                     shell(
                         f"plotProfile -m {quote(matrix_path)} -out {quote(profile_path)} "
-                        f"--perGroup --plotTitle {quote(group)}"
+                        f"--perGroup --plotTitle {quote(group_label)} "
+                        f"--regionsLabel {quote(group_label)} "
+                        f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
+                        f"--xAxisLabel 'distance from center (bp)' --refPointLabel center"
                     )
 
         def build_peak_metadata_for_r(annotation_bed, output_path):
@@ -383,6 +392,7 @@ rule analyze_peaks:
 
             with tempfile.TemporaryDirectory(prefix="omnomnomics_genebody_bw_") as tmpdir:
                 bigwigs = []
+                sample_labels = []
                 for sample in samples2:
                     bam_path = os.path.join(bam_inputfolder, f"{sample}.filtered.bam")
                     if not os.path.exists(bam_path):
@@ -393,6 +403,7 @@ rule analyze_peaks:
                         f"--binSize 25 --normalizeUsing CPM --numberOfProcessors {threads}"
                     )
                     bigwigs.append(bw_path)
+                    sample_labels.append(sample)
 
                 if not bigwigs:
                     log_it(logfile, "No BAM files found for gene-body signal plotting. Skipping pre-DE gene-body summaries.")
@@ -411,11 +422,17 @@ rule analyze_peaks:
                 shell(
                     f"plotHeatmap -m {quote(matrix_path)} -out {quote(heatmap_path)} "
                     f"--whatToShow 'heatmap and colorbar' --sortRegions descend "
-                    f"--plotTitle {quote('All gene bodies')}"
+                    f"--plotTitle {quote('All gene bodies')} --regionsLabel {quote('gene bodies')} "
+                    f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
+                    f"--startLabel TSS --endLabel TES --xAxisLabel {quote('gene body scaled to 5 kb')} "
+                    f"--heatmapWidth 8 --heatmapHeight 14"
                 )
                 shell(
                     f"plotProfile -m {quote(matrix_path)} -out {quote(profile_path)} "
-                    f"--perGroup --plotTitle {quote('All gene bodies')}"
+                    f"--perGroup --plotTitle {quote('All gene bodies')} "
+                    f"--regionsLabel {quote('gene bodies')} "
+                    f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
+                    f"--startLabel TSS --endLabel TES --xAxisLabel {quote('gene body scaled to 5 kb')}"
                 )
                 return {
                     "matrix": matrix_path,

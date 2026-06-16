@@ -609,6 +609,116 @@ rule peak_qc:
                 "frip": frip,
             }
 
+        def calculate_sample_frip_metrics(peak_bed, sample_bams):
+            with tempfile.TemporaryDirectory(prefix="omnomnomics_sample_frip_") as tmpdir:
+                merged_bed = os.path.join(tmpdir, "merged_peaks.bed")
+                multicov_output = os.path.join(tmpdir, "multicov.tsv")
+                max_alignments = int(config.get("FRIP_MAX_READS", 10000000) or 0)
+                if max_alignments < 0:
+                    max_alignments = 0
+                shell(
+                    f"sort -k1,1 -k2,2n -k3,3n {quote(peak_bed)} | "
+                    f"bedtools merge -i - > {quote(merged_bed)}"
+                )
+                frip_inputs = []
+                for idx, (sample_name, bam_path) in enumerate(sample_bams, start=1):
+                    sampled = prepare_sampled_bam_for_qc(
+                        bam_path,
+                        tmpdir,
+                        f"sample_frip_{idx}",
+                        max_alignments,
+                        filter_flags="260",
+                        seed=101 + idx,
+                    )
+                    sampled["sample_name"] = sample_id_for_sample(sample_name)
+                    sampled["bam_file"] = os.path.basename(bam_path)
+                    frip_inputs.append(sampled)
+                bams_for_frip = [entry["bam_path"] for entry in frip_inputs]
+                if not bams_for_frip:
+                    return []
+                shell(
+                    f"bedtools multicov -bed {quote(merged_bed)} -bams {' '.join(quote(path) for path in bams_for_frip)} "
+                    f"> {quote(multicov_output)}"
+                )
+
+                peak_count = 0
+                total_peak_bp = 0
+                reads_by_sample = [0 for _ in frip_inputs]
+                with open(multicov_output, newline="") as handle:
+                    reader = csv.reader(handle, delimiter="\t")
+                    for row in reader:
+                        peak_count += 1
+                        total_peak_bp += int(row[2]) - int(row[1])
+                        for idx, value in enumerate(row[3:]):
+                            reads_by_sample[idx] += int(value)
+
+            sample_rows = []
+            for idx, entry in enumerate(frip_inputs):
+                total_aligned_reads = entry["counted_alignments"]
+                reads_in_peaks = reads_by_sample[idx]
+                frip = (reads_in_peaks / total_aligned_reads) if total_aligned_reads else 0.0
+                sample_rows.append(
+                    {
+                        "sample": entry["sample_name"],
+                        "bam_file": entry["bam_file"],
+                        "peak_count": peak_count,
+                        "total_peak_bp": total_peak_bp,
+                        "reads_in_peaks": reads_in_peaks,
+                        "total_aligned_reads": total_aligned_reads,
+                        "frip_input_alignments": entry["input_alignments"],
+                        "frip_max_alignments": max_alignments,
+                        "frip_sampling_fraction": entry["sampling_fraction"],
+                        "frip_estimated": "yes" if entry["sampled"] else "no",
+                        "frip": frip,
+                    }
+                )
+            return sample_rows
+
+        def write_sample_frip_outputs(outputfolder, thetype, sample_frip_rows):
+            if not sample_frip_rows:
+                return None
+
+            qc_dir = ensure_peak_qc_dir(outputfolder)
+            qc_table = os.path.join(qc_dir, f"{thetype.lower()}.sample_frip_metrics.tsv")
+            with open(qc_table, "w", newline="") as handle:
+                writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+                writer.writerow([
+                    "assay",
+                    "group",
+                    "peak_set",
+                    "peak_file",
+                    "sample",
+                    "bam_file",
+                    "peak_count",
+                    "total_peak_bp",
+                    "reads_in_peaks",
+                    "total_aligned_reads",
+                    "frip_input_alignments",
+                    "frip_max_alignments",
+                    "frip_sampling_fraction",
+                    "frip_estimated",
+                    "frip",
+                ])
+                for row in sample_frip_rows:
+                    writer.writerow([
+                        row["assay"],
+                        row["group"],
+                        row["peak_set"],
+                        row["peak_file"],
+                        row["sample"],
+                        row["bam_file"],
+                        row["peak_count"],
+                        row["total_peak_bp"],
+                        row["reads_in_peaks"],
+                        row["total_aligned_reads"],
+                        row["frip_input_alignments"],
+                        row["frip_max_alignments"],
+                        f"{row['frip_sampling_fraction']:.9f}",
+                        row["frip_estimated"],
+                        f"{row['frip']:.6f}",
+                    ])
+            return qc_table
+
         def write_sample_qc_outputs(outputfolder, thetype, qc_rows):
             if not qc_rows:
                 return None
@@ -816,8 +926,8 @@ rule peak_qc:
                     ])
             return qc_table
 
-        def write_peak_qc_summary_pdf(outputfolder, thetype, sample_rows, peak_rows):
-            if not sample_rows and not peak_rows:
+        def write_peak_qc_summary_pdf(outputfolder, thetype, sample_rows, peak_rows, sample_frip_rows):
+            if not sample_rows and not peak_rows and not sample_frip_rows:
                 return
 
             import matplotlib
@@ -848,6 +958,27 @@ rule peak_qc:
                     fig.tight_layout()
                     pdf.savefig(fig, bbox_inches="tight")
                     plt.close(fig)
+
+                if sample_frip_rows:
+                    frip_sets = sorted(set((row["group"], row["peak_set"]) for row in sample_frip_rows))
+                    for group, peak_set in frip_sets:
+                        plot_rows = [
+                            row for row in sample_frip_rows
+                            if row["group"] == group and row["peak_set"] == peak_set
+                        ]
+                        if not plot_rows:
+                            continue
+                        sample_labels = [row["sample"] for row in plot_rows]
+                        frip_values = [float(row["frip"]) for row in plot_rows]
+                        fig, ax = plt.subplots(1, 1, figsize=(max(8, len(sample_labels) * 0.55), 5))
+                        ax.bar(sample_labels, frip_values, color="#4C78A8")
+                        ax.set_title(f"{thetype} sample FRiP: {group} / {peak_set}")
+                        ax.set_ylabel("FRiP")
+                        ax.set_xlabel("Sample")
+                        ax.tick_params(axis="x", rotation=45, labelsize=9)
+                        fig.tight_layout()
+                        pdf.savefig(fig, bbox_inches="tight")
+                        plt.close(fig)
 
                 if sample_rows:
                     sample_labels = [row["sample"] for row in sample_rows]
@@ -945,6 +1076,7 @@ rule peak_qc:
             bam_suffix = ".sorted.dups_marked.filtered.bam" if assay == "ATAC" else ".filtered.bam"
             grouped_bams = grouped_bams_by_sample_type(params.bam_inputfolder, bam_suffix)
             peak_qc_rows = []
+            sample_frip_rows = []
             generated_peak_annotation_files = []
             generated_distribution_files = []
             peak_bed_source_folder = params.peak_outputfolder
@@ -961,7 +1093,8 @@ rule peak_qc:
             with tempfile.TemporaryDirectory(prefix="omnomnomics_gene_anno_") as anno_tmpdir:
                 annotation_beds = build_gene_annotation_beds(params.gtf_file, anno_tmpdir)
                 for group in sorted(grouped_bams):
-                    bams = [bam_path for _, bam_path in grouped_bams[group]]
+                    sample_bams = grouped_bams[group]
+                    bams = [bam_path for _, bam_path in sample_bams]
                     if assay == "ATAC":
                         preferred = os.path.join(peak_bed_source_folder, f"{group}.MACS3.optimized.bed")
                         fallback = os.path.join(peak_bed_source_folder, f"{group}.MACS3.q-0p01.shiftm100.ext200.group_peaks.bed")
@@ -983,6 +1116,14 @@ rule peak_qc:
                             **metrics,
                         })
                         peak_set_name = os.path.basename(peak_bed).replace(".bed", "")
+                        for sample_frip in calculate_sample_frip_metrics(peak_bed, sample_bams):
+                            sample_frip_rows.append({
+                                "assay": assay,
+                                "group": group,
+                                "peak_set": peak_set_name,
+                                "peak_file": os.path.basename(peak_bed),
+                                **sample_frip,
+                            })
                         if assay != "ATAC":
                             ann_file, dist_file = annotate_peak_regions(
                                 peak_bed=peak_bed,
@@ -1014,10 +1155,13 @@ rule peak_qc:
 
             sample_qc_rows = collect_sample_qc_rows(params.bam_inputfolder, assay)
             peak_qc_table = write_peak_qc_outputs(params.outputfolder, assay, peak_qc_rows)
+            sample_frip_table = write_sample_frip_outputs(params.outputfolder, assay, sample_frip_rows)
             sample_qc_table = write_sample_qc_outputs(params.outputfolder, assay, sample_qc_rows)
             spp_qc_table, spp_flagged = write_spp_qc_summary(params.outputfolder, assay, sample_qc_rows)
             if peak_qc_table:
                 log_it(logfile, f"Peak QC metrics: {peak_qc_table}")
+            if sample_frip_table:
+                log_it(logfile, f"Sample FRiP metrics: {sample_frip_table}")
             if sample_qc_table:
                 log_it(logfile, f"Sample QC metrics: {sample_qc_table}")
             if spp_qc_table:
@@ -1054,7 +1198,7 @@ rule peak_qc:
                     logfile,
                     "Peak genomic distribution summaries:\n" + "\n".join(generated_distribution_files),
                 )
-            write_peak_qc_summary_pdf(params.outputfolder, assay, sample_qc_rows, peak_qc_rows)
+            write_peak_qc_summary_pdf(params.outputfolder, assay, sample_qc_rows, peak_qc_rows, sample_frip_rows)
             write_tmp_file(params.outputfolder)
             finish_step_sample(master_config["peakqc_rule_num"], "aggregate", "peak_qc", tracking["start_time"], "OK")
         except Exception:

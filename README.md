@@ -247,6 +247,7 @@ EXPERIMENT_DIR
      |- THENAME.MACS3.q-0p001_peaks.bed (if the data type = ChIP, from call_peaks)
      |- peak_qc
           |- {chip|atac}.peak_qc_metrics.tsv
+          |- {chip|atac}.sample_frip_metrics.tsv
           |- {chip|atac}.sample_qc_metrics.tsv
           |- {chip|atac}.peak_qc_summary.pdf
           |- {sample}.cross_correlation.tsv
@@ -269,7 +270,7 @@ Peak-QC library complexity, SPP cross-correlation, and FRiP metrics use determin
 
 ```
 Peak QC notes:
-- `FRiP` and `peak_count` are reported per MACS3 peak set.
+- `FRiP` and `peak_count` are reported per MACS3 peak set, and per-sample FRiP is reported for each selected peak set.
 - `NRF`, `PBC1`, and `PBC2` are reported per BAM as library complexity metrics.
 - `NSC` and `RSC` are reported from strand cross-correlation analysis via `phantompeakqualtools` / SPP when `scripts/install_spp_helper.sh` has installed the `run_spp.R` wrapper.
 - `NSC` and `RSC` are most informative for `TF / narrow peaks` and should be interpreted more cautiously for broad histone marks.
