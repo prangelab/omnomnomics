@@ -401,9 +401,9 @@ if (!("sample_id" %in% colnames(metadata_df))) {
 }
 
 sample_columns <- colnames(counts_df)[-1]
-if (all(metadata_df$sample_id %in% sample_columns)) {
+if (all(sample_columns %in% metadata_df$sample_id)) {
   match_key <- "sample_id"
-} else if ("filename_key" %in% colnames(metadata_df) && all(metadata_df$filename_key %in% sample_columns)) {
+} else if ("filename_key" %in% colnames(metadata_df) && all(sample_columns %in% metadata_df$filename_key)) {
   match_key <- "filename_key"
 } else {
   stop("Could not match count table sample columns to metadata sample_id or filename_key.")

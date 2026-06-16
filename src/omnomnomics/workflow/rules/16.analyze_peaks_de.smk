@@ -580,7 +580,7 @@ rule analyze_peaks_de:
                         f"plotProfile -m {quote(matrix_path)} -out {quote(profile_path)} "
                         f"--perGroup --plotTitle {quote(item['set_name'])} "
                         f"--regionsLabel {quote(regions_label_for_set(item))} "
-                        f"--xAxisLabel 'distance from center (bp)' --refPointLabel center"
+                        f"--refPointLabel center"
                     )
 
         def run_gimme_motifs(set_manifest_rows, motifs_dir):
