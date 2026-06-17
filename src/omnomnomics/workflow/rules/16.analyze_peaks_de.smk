@@ -738,7 +738,10 @@ rule analyze_peaks_de:
                     motif_summary.append([item["set_name"], "SKIP", item["peak_bed"], "", motif_genome, f"fewer than {min_motif_peaks} peaks"])
                     continue
                 safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", item["set_name"])
-                out_dir = ensure_dir(os.path.join(motifs_dir, safe_name))
+                out_dir = os.path.join(motifs_dir, safe_name)
+                if os.path.isdir(out_dir):
+                    shutil.rmtree(out_dir)
+                out_dir = ensure_dir(out_dir)
                 cmd = (
                     f"gimme motifs {quote(item['peak_bed'])} {quote(out_dir)} "
                     f"--known --denovo --nthreads {threads} -g {quote(motif_genome)}"

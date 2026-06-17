@@ -1756,15 +1756,16 @@ def main():
                 sample_type_selector=sample_type,
                 sample_color_selector=sample_color,
             )
-            de_steps = {
+            metadata_sample_id_steps = {
                 config.get('de_rule_num'),
                 config.get('dechrom_rule_num'),
+                config.get('analyzepeaksde_rule_num'),
             }
-            de_steps = {step for step in de_steps if isinstance(step, int)}
-            if de_steps and min(mode_steps) in de_steps:
+            metadata_sample_id_steps = {step for step in metadata_sample_id_steps if isinstance(step, int)}
+            if metadata_sample_id_steps and min(mode_steps) in metadata_sample_id_steps:
                 count_table_path = os.path.join(
                     experiment_dir,
-                    config['input_folders'][config['de_rule_num'] - 1],
+                    config['output_folders'][config['countreads_rule_num'] - 1],
                     f"{os.path.basename(experiment_dir)}.raw_read_quant.table.txt",
                 )
                 validate_metadata_sample_ids(
