@@ -225,7 +225,7 @@ def _chrom_de_peak_metadata_file():
 
 def _chrom_de_peak_metadata_dependency():
     if config['THETYPE'] == "ATAC":
-        return _chrom_de_peak_metadata_file()
+        return _chrom_de_peak_annotation_file()
     if config['THETYPE'] == "CHIP":
         if str(config.get("BROAD_MODE", "off")).strip().lower() in {"genebody", "diffuse"}:
             return _chrom_de_peak_metadata_file()

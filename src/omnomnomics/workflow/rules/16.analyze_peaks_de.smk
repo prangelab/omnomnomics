@@ -26,9 +26,6 @@ def analyze_peaks_de_input(_wildcards):
         input_files.append(
             f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num'] - 1]}/peak_metadata.tsv"
         )
-        input_files.append(
-            f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num'] - 1]}/analyze_peaks/summary/analyze_peaks_report.tsv"
-        )
         bam_inputfolder = master_config["output_folders"][master_config["touchup_rule_num"] - 1]
         bam_suffix = ".sorted.dups_marked.filtered.bam" if config["THETYPE"] == "ATAC" else ".filtered.bam"
         input_files.extend(
