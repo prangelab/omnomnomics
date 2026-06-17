@@ -225,10 +225,10 @@ def _chrom_de_peak_metadata_file():
 
 def _chrom_de_peak_metadata_dependency():
     if config['THETYPE'] == "ATAC":
-        return f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num']-1]}/extra_{master_config['analyzepeaks_rule_num']}.tmp"
+        return _chrom_de_peak_metadata_file()
     if config['THETYPE'] == "CHIP":
         if str(config.get("BROAD_MODE", "off")).strip().lower() in {"genebody", "diffuse"}:
-            return f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num']-1]}/extra_{master_config['analyzepeaks_rule_num']}.tmp"
+            return _chrom_de_peak_metadata_file()
         return _chrom_de_peak_metadata_file()
     return []
 
