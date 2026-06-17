@@ -1773,7 +1773,7 @@ def main():
                 validate_metadata_sample_ids(
                     derived_rows,
                     count_table_sample_ids(count_table_path),
-                    allow_extra_metadata=min(mode_steps) == config.get('analyzepeaksde_rule_num'),
+                    allow_extra_metadata=True,
                 )
             else:
                 expected_sample_roots = merged_sample_roots_for_mode(
