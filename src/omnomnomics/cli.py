@@ -1215,6 +1215,8 @@ def validate_metadata_sample_ids(derived_rows, expected_sample_ids, allow_extra_
         problems.append("missing metadata rows for count-table samples: " + ", ".join(missing))
     if extra:
         problems.append("metadata rows without matching count-table samples: " + ", ".join(extra))
+    if not problems:
+        return
     raise MetadataError(
         "Metadata sample matching failed: "
         + "; ".join(problems)
