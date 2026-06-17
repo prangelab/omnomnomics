@@ -683,7 +683,6 @@ rule analyze_peaks_de:
                         f"--perGroup --plotTitle {quote(region_label)} "
                         f"--regionsLabel {quote(region_label)} "
                         f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
-                        f"--xAxisLabel 'distance from center (bp)' "
                         f"--refPointLabel center"
                     )
 

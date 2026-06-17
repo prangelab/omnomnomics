@@ -237,7 +237,7 @@ rule analyze_peaks:
                         f"--perGroup --plotTitle {quote(group_label)} "
                         f"--regionsLabel {quote(group_label)} "
                         f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
-                        f"--xAxisLabel 'distance from center (bp)' --refPointLabel center"
+                        f"--refPointLabel center"
                     )
 
         def build_peak_metadata_for_r(annotation_bed, output_path):
@@ -432,7 +432,7 @@ rule analyze_peaks:
                     f"--perGroup --plotTitle {quote('All gene bodies')} "
                     f"--regionsLabel {quote('gene bodies')} "
                     f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
-                    f"--startLabel TSS --endLabel TES --xAxisLabel {quote('gene body scaled to 5 kb')}"
+                    f"--startLabel TSS --endLabel TES"
                 )
                 return {
                     "matrix": matrix_path,
