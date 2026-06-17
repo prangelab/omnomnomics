@@ -56,6 +56,7 @@ rule analyze_peaks_de:
         prede_outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num'] - 1]}",
         bam_inputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['touchup_rule_num'] - 1]}",
         genome_version=config["THEGENOME"],
+        genome_fasta=os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "fasta", "genome.fa"),
         gtf_file=os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "annotation", "genes.gtf"),
     threads:
         Threads_Per_Rule[str(master_config["analyzepeaksde_rule_num"])]
@@ -725,7 +726,10 @@ rule analyze_peaks_de:
                 "GRCm38": "mm10",
                 "GRCm39": "mm39",
             }
-            motif_genome = genome_map.get(str(params.genome_version), str(params.genome_version))
+            if os.path.isfile(params.genome_fasta):
+                motif_genome = params.genome_fasta
+            else:
+                motif_genome = genome_map.get(str(params.genome_version), str(params.genome_version))
             for item in set_manifest_rows:
                 if item["set_type"] not in eligible_set_types:
                     motif_summary.append([item["set_name"], "SKIP", item["peak_bed"], "", motif_genome, "set type is not configured for motif analysis"])
