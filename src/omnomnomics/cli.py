@@ -1195,7 +1195,7 @@ def count_table_sample_ids(count_table_path):
     return header[1:]
 
 
-def validate_metadata_sample_ids(derived_rows, expected_sample_ids):
+def validate_metadata_sample_ids(derived_rows, expected_sample_ids, allow_extra_metadata=False):
     expected_id_set = set(expected_sample_ids)
     metadata_sample_id_set = {row["sample_id"] for row in derived_rows}
     metadata_filename_key_set = {
@@ -1209,7 +1209,7 @@ def validate_metadata_sample_ids(derived_rows, expected_sample_ids):
         return
 
     missing = sorted(expected_id_set - metadata_sample_id_set)
-    extra = sorted(metadata_sample_id_set - expected_id_set)
+    extra = [] if allow_extra_metadata else sorted(metadata_sample_id_set - expected_id_set)
     problems = []
     if missing:
         problems.append("missing metadata rows for count-table samples: " + ", ".join(missing))
@@ -1771,6 +1771,7 @@ def main():
                 validate_metadata_sample_ids(
                     derived_rows,
                     count_table_sample_ids(count_table_path),
+                    allow_extra_metadata=min(mode_steps) == config.get('analyzepeaksde_rule_num'),
                 )
             else:
                 expected_sample_roots = merged_sample_roots_for_mode(
