@@ -69,7 +69,7 @@ def _r_contrast_list(items):
 
 def _r_numeric_pair_list(items):
     if not items:
-        return "list(c(1, 2), c(2, 3))"
+        return "list()"
     pairs = []
     for item in items:
         if isinstance(item, list) and len(item) == 2:
@@ -80,7 +80,7 @@ def _r_numeric_pair_list(items):
                 continue
             pairs.append(f"c({first}, {second})")
     if not pairs:
-        return "list(c(1, 2), c(2, 3))"
+        return "list()"
     return "list(" + ", ".join(pairs) + ")"
 
 

@@ -105,9 +105,15 @@ rule analyze_peaks_de:
         def parse_peak_coord(gene_id):
             text = str(gene_id)
             match = re.match(r"^([^:]+):([0-9]+)-([0-9]+)$", text)
-            if not match:
-                return None
-            chrom, start_text, end_text = match.groups()
+            if match:
+                chrom, start_text, end_text = match.groups()
+            else:
+                parts = text.rsplit("_", 2)
+                if len(parts) != 3:
+                    return None
+                chrom, start_text, end_text = parts
+                if not start_text.isdigit() or not end_text.isdigit():
+                    return None
             start = int(start_text)
             end = int(end_text)
             if end <= start:

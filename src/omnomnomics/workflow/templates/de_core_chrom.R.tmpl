@@ -913,6 +913,26 @@ resolve_peak_qc_metrics_path <- function(output_root_path) {
   NA_character_
 }
 
+resolve_sample_frip_metrics_path <- function(output_root_path) {
+  project_root <- dirname(output_root_path)
+  qc_basename <- paste0(assay_lower, ".sample_frip_metrics.tsv")
+  candidates <- c(
+    file.path(project_root, "filtered_BAM", "peak_qc", qc_basename),
+    file.path(project_root, "peak_calling", "peak_qc", qc_basename),
+    file.path(project_root, "peak_qc", qc_basename)
+  )
+  for (candidate in candidates) {
+    if (file.exists(candidate)) {
+      return(candidate)
+    }
+  }
+  discovered <- Sys.glob(file.path(project_root, "**", "peak_qc", qc_basename))
+  if (length(discovered) > 0) {
+    return(discovered[[1]])
+  }
+  NA_character_
+}
+
 aggregate_symbol_matrix <- function(mat, symbols) {
   keep <- !is.na(symbols) & nzchar(symbols)
   mat <- mat[keep, , drop = FALSE]
@@ -1125,6 +1145,29 @@ annotation_colors_informative <- list()
 dir.create(output_root, recursive = TRUE, showWarnings = FALSE)
 dir.create(qc_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(de_dir, recursive = TRUE, showWarnings = FALSE)
+
+cleanup_stale_qc_outputs <- function() {
+  stale_patterns <- c(
+    "top_variable_genes.PCA_plot_*.pdf",
+    "pca_plot_manifest.tsv",
+    "pca_variance_explained.tsv",
+    "pca_factor_association.tsv",
+    "top_variable_genes.distance_plot.pdf",
+    "top_variable_genes.kmeans_heatmap.pdf",
+    paste0(feature_file_stem, "_qc*.pdf"),
+    paste0(feature_file_stem, "_region_distribution.tsv"),
+    "cooks_distance.*.pdf",
+    "dispersion_plot.pdf"
+  )
+  stale_files <- unique(unlist(lapply(stale_patterns, function(pattern) {
+    Sys.glob(file.path(qc_dir, pattern))
+  })))
+  if (length(stale_files) > 0) {
+    file.remove(stale_files[file.exists(stale_files)])
+  }
+}
+
+cleanup_stale_qc_outputs()
 
 palette_rows <- list()
 add_palette_rows <- function(column_name) {
@@ -1368,6 +1411,56 @@ if (!is.na(peak_qc_metrics_path) && file.exists(peak_qc_metrics_path)) {
           filename = file.path(qc_dir, paste0(feature_file_stem, "_qc.frip_vs_", feature_file_stem, "_count.pdf")),
           plot = p_frip,
           width = 8,
+          height = 6
+        )
+      }
+    }
+  }
+}
+
+sample_frip_metrics_path <- resolve_sample_frip_metrics_path(output_root)
+if (!is.na(sample_frip_metrics_path) && file.exists(sample_frip_metrics_path)) {
+  sample_frip_tbl <- tryCatch(
+    utils::read.delim(sample_frip_metrics_path, check.names = FALSE, stringsAsFactors = FALSE),
+    error = function(e) NULL
+  )
+  if (!is.null(sample_frip_tbl) && nrow(sample_frip_tbl) > 0) {
+    utils::write.table(
+      sample_frip_tbl,
+      file = file.path(qc_dir, paste0(feature_file_stem, "_sample_frip_metrics.imported.tsv")),
+      sep = "\t",
+      quote = FALSE,
+      row.names = FALSE
+    )
+    required_cols <- c("group", "sample", "peak_set", "frip")
+    if (all(required_cols %in% colnames(sample_frip_tbl))) {
+      sample_frip_df <- sample_frip_tbl
+      sample_frip_df$frip <- suppressWarnings(as.numeric(sample_frip_df$frip))
+      sample_frip_df <- sample_frip_df[is.finite(sample_frip_df$frip), , drop = FALSE]
+      if (nrow(sample_frip_df) > 0) {
+        sample_frip_df$group <- as.factor(as.character(sample_frip_df$group))
+        sample_frip_df$peak_set <- as.factor(as.character(sample_frip_df$peak_set))
+        sample_frip_df$sample <- as.character(sample_frip_df$sample)
+        p_sample_frip <- ggplot2::ggplot(
+          sample_frip_df,
+          ggplot2::aes(x = group, y = frip, color = group)
+        ) +
+          ggplot2::geom_boxplot(outlier.shape = NA, alpha = 0.25, width = 0.55) +
+          ggplot2::geom_jitter(width = 0.12, height = 0, size = 2.5, alpha = 0.85) +
+          ggplot2::facet_wrap(~ peak_set, scales = "free_y") +
+          ggplot2::theme_light() +
+          ggplot2::theme(
+            panel.grid = ggplot2::element_blank(),
+            axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
+            legend.position = "none"
+          ) +
+          ggplot2::xlab(NULL) +
+          ggplot2::ylab("Sample FRiP") +
+          ggplot2::ggtitle(paste(feature_label_plural_title, "sample-level FRiP by peak/bin/gene-body set"))
+        ggplot2::ggsave(
+          filename = file.path(qc_dir, paste0(feature_file_stem, "_qc.sample_frip.pdf")),
+          plot = p_sample_frip,
+          width = 9,
           height = 6
         )
       }

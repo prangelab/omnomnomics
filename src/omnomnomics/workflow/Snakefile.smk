@@ -1998,6 +1998,32 @@ onsuccess:
                     yaml.safe_dump(runtime_config, handle, sort_keys=False)
                 return config_path
 
+            def archive_previous_multiqc_outputs():
+                multiqc_dir = f"{experiment_dir}/MultiQC"
+                if not os.path.isdir(multiqc_dir):
+                    return
+                archive_dir = os.path.join(multiqc_dir, "archive")
+                os.makedirs(archive_dir, exist_ok=True)
+                stale_patterns = [
+                    "omnomnomics.run.*.multiqc_report.html",
+                    "omnomnomics.run.*.multiqc_report_data",
+                    "omnomnomics.run.*.multiqc_report_plots",
+                    "test_hex.multiqc_report.html",
+                    "test_hex.multiqc_report_data",
+                    "test_hex.multiqc_report_plots",
+                ]
+                stale_paths = []
+                for pattern in stale_patterns:
+                    stale_paths.extend(glob.glob(os.path.join(multiqc_dir, pattern)))
+                timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+                for path in sorted(set(stale_paths)):
+                    if not os.path.exists(path):
+                        continue
+                    target = os.path.join(archive_dir, os.path.basename(path))
+                    if os.path.exists(target):
+                        target = os.path.join(archive_dir, f"{timestamp}.{os.path.basename(path)}")
+                    shutil.move(path, target)
+
             stats_tsv_paths = [sample_qc_stats_path(sample_name) for sample_name in samples2]
             existing_stats_tsvs = [path for path in stats_tsv_paths if os.path.exists(path)]
             if existing_stats_tsvs:
@@ -2015,6 +2041,7 @@ onsuccess:
             log_it(logfile, "Running multiQC...", "STATS")
             multiqc_version = subprocess.check_output(["multiqc", "--version"])
             log_it(logfile, "\n" + multiqc_version.decode("utf-8"), "MULTIQC VERSION")
+            archive_previous_multiqc_outputs()
             multiqc_config = write_multiqc_runtime_config()
             log_it(logfile, f"MultiQC runtime config file: {multiqc_config}")
             multiqc_command = (
