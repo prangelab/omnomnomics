@@ -21,10 +21,12 @@ def analyze_peaks_de_input(_wildcards):
     input_files = []
     if config["THETYPE"] in {"ATAC", "CHIP"}:
         input_files.append(
-            f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num'] - 1]}/{os.path.basename(config['EXPERIMENT_DIR'])}.chrom.results.zip"
+            ancient(
+                f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num'] - 1]}/{os.path.basename(config['EXPERIMENT_DIR'])}.chrom.results.zip"
+            )
         )
         input_files.append(
-            f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num'] - 1]}/peak_metadata.tsv"
+            ancient(f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num'] - 1]}/peak_metadata.tsv")
         )
         bam_inputfolder = master_config["output_folders"][master_config["touchup_rule_num"] - 1]
         bam_suffix = ".sorted.dups_marked.filtered.bam" if config["THETYPE"] == "ATAC" else ".filtered.bam"
