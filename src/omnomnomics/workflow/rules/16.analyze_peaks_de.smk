@@ -14,7 +14,6 @@ import re
 import shlex
 import shutil
 import subprocess
-import tempfile
 
 
 def analyze_peaks_de_input(_wildcards):
@@ -636,6 +635,12 @@ rule analyze_peaks_de:
                 max_signal_regions = 100
             deeptools_threads = 1
 
+            def write_signal_summary():
+                with open(signal_summary_path, "w", newline="") as handle:
+                    writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+                    writer.writerow(["set_name", "status", "source_bed", "signal_bed", "matrix", "heatmap", "reason"])
+                    writer.writerows(signal_summary_rows)
+
             def regions_label_for_set(item):
                 set_type = str(item.get("set_type", "features"))
                 label_map = {
@@ -691,82 +696,79 @@ rule analyze_peaks_de:
             profiles_dir = ensure_dir(os.path.join(signal_dir, "profiles"))
             regions_dir = ensure_dir(os.path.join(signal_dir, "regions"))
 
-            with tempfile.TemporaryDirectory(prefix="omnomnomics_deeptools_de_") as tmpdir:
-                bigwigs = []
-                sample_labels = []
-                bam_suffix = ".sorted.dups_marked.filtered.bam" if params.thetype == "ATAC" else ".filtered.bam"
-                for sample in samples2:
-                    bw_path = existing_bigwig_for_sample(sample)
-                    if bw_path:
-                        bigwigs.append(bw_path)
-                        sample_labels.append(sample)
-                        continue
-                    if not tool_available("bamCoverage"):
-                        continue
-                    bam_path = os.path.join(params.bam_inputfolder, f"{sample}{bam_suffix}")
-                    if not os.path.isfile(bam_path):
-                        continue
-                    bw_path = os.path.join(tmpdir, f"{sample}.bw")
-                    shell(
-                        f"bamCoverage --bam {quote(bam_path)} --outFileName {quote(bw_path)} "
-                        f"--binSize 50 --normalizeUsing CPM --numberOfProcessors {deeptools_threads}"
-                    )
+            bigwigs = []
+            sample_labels = []
+            missing_bigwig_samples = []
+            for sample in samples2:
+                bw_path = existing_bigwig_for_sample(sample)
+                if bw_path:
                     bigwigs.append(bw_path)
                     sample_labels.append(sample)
-                if not bigwigs:
-                    log_it(logfile, "No BAM files found for analyze_peaks_de deepTools. Skipping signal plots.")
-                    return
-
+                else:
+                    missing_bigwig_samples.append(sample)
+            if missing_bigwig_samples:
+                missing_text = ", ".join(missing_bigwig_samples)
+                reason = f"missing existing BigWigs for samples: {missing_text}"
+                log_it(logfile, f"Skipping analyze_peaks_de signal plots because {reason}. Run step 8 before step 16 to enable these plots.")
                 for item in set_manifest_rows:
-                    set_type = str(item.get("set_type", ""))
-                    if set_type not in eligible_set_types:
-                        signal_summary_rows.append([item["set_name"], "SKIP", item["peak_bed"], "", "", "", "set type is not configured for signal plotting"])
-                        continue
-                    bed_path = item["peak_bed"]
-                    if not os.path.isfile(bed_path):
-                        signal_summary_rows.append([item["set_name"], "SKIP", bed_path, "", "", "", "BED file missing"])
-                        continue
-                    if int(item["peak_count"]) < min_signal_regions:
-                        signal_summary_rows.append([item["set_name"], "SKIP", bed_path, "", "", "", f"fewer than {min_signal_regions} regions"])
-                        continue
-                    safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", item["set_name"])
-                    region_label = regions_label_for_set(item)
-                    signal_bed_path = os.path.join(regions_dir, f"{safe_name}.signal_regions.bed")
-                    signal_region_count = copy_bed_limit(bed_path, signal_bed_path, max_signal_regions)
-                    if signal_region_count < min_signal_regions:
-                        signal_summary_rows.append([item["set_name"], "SKIP", bed_path, signal_bed_path, "", "", f"fewer than {min_signal_regions} copied regions"])
-                        continue
-                    matrix_path = os.path.join(matrices_dir, f"{safe_name}.matrix.gz")
-                    heatmap_path = os.path.join(heatmaps_dir, f"{safe_name}.heatmap.pdf")
-                    profile_path = os.path.join(profiles_dir, f"{safe_name}.profile.pdf")
-                    shell(
-                        f"computeMatrix reference-point --referencePoint center -b 1000 -a 1000 "
-                        f"-R {quote(signal_bed_path)} -S {' '.join(quote(x) for x in bigwigs)} "
-                        f"--missingDataAsZero --binSize 100 --numberOfProcessors {deeptools_threads} -o {quote(matrix_path)}"
-                    )
-                    shell(
-                        f"plotHeatmap -m {quote(matrix_path)} -out {quote(heatmap_path)} "
-                        f"--whatToShow 'heatmap and colorbar' --sortRegions descend "
-                        f"--plotTitle {quote(region_label)} --regionsLabel {quote(region_label)} "
-                        f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
-                        f"--xAxisLabel 'distance from center (bp)' --refPointLabel center"
-                    )
-                    shell(
-                        f"plotProfile -m {quote(matrix_path)} -out {quote(profile_path)} "
-                        f"--perGroup --plotTitle {quote(region_label)} "
-                        f"--regionsLabel {quote(region_label)} "
-                        f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
-                        f"--refPointLabel center"
-                    )
-                    reason = ""
-                    if int(item["peak_count"]) > signal_region_count:
-                        reason = f"signal input capped at first {signal_region_count} of {item['peak_count']} regions"
-                    signal_summary_rows.append([item["set_name"], "OK", bed_path, signal_bed_path, matrix_path, heatmap_path, reason])
+                    signal_summary_rows.append([item["set_name"], "SKIP", item["peak_bed"], "", "", "", reason])
+                write_signal_summary()
+                return
+            if not bigwigs:
+                reason = "no existing BigWigs found"
+                log_it(logfile, "No existing BigWigs found for analyze_peaks_de deepTools. Skipping signal plots.")
+                for item in set_manifest_rows:
+                    signal_summary_rows.append([item["set_name"], "SKIP", item["peak_bed"], "", "", "", reason])
+                write_signal_summary()
+                return
 
-            with open(signal_summary_path, "w", newline="") as handle:
-                writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-                writer.writerow(["set_name", "status", "source_bed", "signal_bed", "matrix", "heatmap", "reason"])
-                writer.writerows(signal_summary_rows)
+            for item in set_manifest_rows:
+                set_type = str(item.get("set_type", ""))
+                if set_type not in eligible_set_types:
+                    signal_summary_rows.append([item["set_name"], "SKIP", item["peak_bed"], "", "", "", "set type is not configured for signal plotting"])
+                    continue
+                bed_path = item["peak_bed"]
+                if not os.path.isfile(bed_path):
+                    signal_summary_rows.append([item["set_name"], "SKIP", bed_path, "", "", "", "BED file missing"])
+                    continue
+                if int(item["peak_count"]) < min_signal_regions:
+                    signal_summary_rows.append([item["set_name"], "SKIP", bed_path, "", "", "", f"fewer than {min_signal_regions} regions"])
+                    continue
+                safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", item["set_name"])
+                region_label = regions_label_for_set(item)
+                signal_bed_path = os.path.join(regions_dir, f"{safe_name}.signal_regions.bed")
+                signal_region_count = copy_bed_limit(bed_path, signal_bed_path, max_signal_regions)
+                if signal_region_count < min_signal_regions:
+                    signal_summary_rows.append([item["set_name"], "SKIP", bed_path, signal_bed_path, "", "", f"fewer than {min_signal_regions} copied regions"])
+                    continue
+                matrix_path = os.path.join(matrices_dir, f"{safe_name}.matrix.gz")
+                heatmap_path = os.path.join(heatmaps_dir, f"{safe_name}.heatmap.pdf")
+                profile_path = os.path.join(profiles_dir, f"{safe_name}.profile.pdf")
+                shell(
+                    f"computeMatrix reference-point --referencePoint center -b 1000 -a 1000 "
+                    f"-R {quote(signal_bed_path)} -S {' '.join(quote(x) for x in bigwigs)} "
+                    f"--missingDataAsZero --binSize 100 --numberOfProcessors {deeptools_threads} -o {quote(matrix_path)}"
+                )
+                shell(
+                    f"plotHeatmap -m {quote(matrix_path)} -out {quote(heatmap_path)} "
+                    f"--whatToShow 'heatmap and colorbar' --sortRegions descend "
+                    f"--plotTitle {quote(region_label)} --regionsLabel {quote(region_label)} "
+                    f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
+                    f"--xAxisLabel 'distance from center (bp)' --refPointLabel center"
+                )
+                shell(
+                    f"plotProfile -m {quote(matrix_path)} -out {quote(profile_path)} "
+                    f"--perGroup --plotTitle {quote(region_label)} "
+                    f"--regionsLabel {quote(region_label)} "
+                    f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
+                    f"--refPointLabel center"
+                )
+                reason = ""
+                if int(item["peak_count"]) > signal_region_count:
+                    reason = f"signal input capped at first {signal_region_count} of {item['peak_count']} regions"
+                signal_summary_rows.append([item["set_name"], "OK", bed_path, signal_bed_path, matrix_path, heatmap_path, reason])
+
+            write_signal_summary()
 
         def run_gimme_motifs(set_manifest_rows, motifs_dir):
             motif_summary_path = os.path.join(motifs_dir, "motif_runs.tsv")

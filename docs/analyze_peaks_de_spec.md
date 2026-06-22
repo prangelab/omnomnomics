@@ -9,7 +9,7 @@
 - Peak-level quantification and DE results tables.
 - Pre-DE set outputs from `analyze_peaks` (union/shared/unique beds).
 - Peak annotation beds from peak QC (`*.annotated.bed`) for promoter/distal split.
-- BAM or BigWig signal tracks.
+- Existing per-sample BigWig signal tracks from the BigWig creation stage.
 
 ## Outputs
 - `peak_calling/analyze_peaks_de/sets/`
@@ -40,7 +40,8 @@
 3. Optional unique layer:
    - import pre-DE unique peak BED files from `analyze_peaks/intersections/unique`.
 4. Signal summaries:
-   - run deepTools on sufficiently sized sets.
+   - run deepTools on sufficiently sized sets using existing BigWigs.
+   - skip signal plots with a summary-table reason if required BigWigs are absent.
 5. Motif analysis:
    - run GimmeMotifs on sufficiently sized promoter/distal DE sets and top-ranked fallback sets.
    - optionally run on pre-DE unique sets.
@@ -54,3 +55,4 @@
 - Fail-soft behavior:
   - DE set generation and manifests are always attempted.
   - deepTools and GimmeMotifs blocks are skipped with clear logs if executables are unavailable.
+  - Post-DE signal plotting does not regenerate BigWigs from BAMs; users should run the BigWig stage before post-DE analyses when these plots are needed.
