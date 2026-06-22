@@ -710,6 +710,7 @@ rule analyze_peaks_de:
                 "top_de_ranked_promoter_regions",
             }
             min_motif_peaks = 10
+            max_motif_peaks = 100
             motif_summary = []
             if not tool_available("gimme"):
                 log_it(logfile, "gimme executable not found. Skipping motif analysis in analyze_peaks_de.")
@@ -729,6 +730,19 @@ rule analyze_peaks_de:
                 motif_genome = params.genome_fasta
             else:
                 motif_genome = genome_map.get(str(params.genome_version), str(params.genome_version))
+
+            def copy_bed_head(source_bed, target_bed, limit):
+                copied = 0
+                with open(source_bed, "r", newline="") as source, open(target_bed, "w", newline="") as target:
+                    for line in source:
+                        if copied >= limit:
+                            break
+                        if not line.strip():
+                            continue
+                        target.write(line)
+                        copied += 1
+                return copied
+
             for item in set_manifest_rows:
                 if item["set_type"] not in eligible_set_types:
                     motif_summary.append([item["set_name"], "SKIP", item["peak_bed"], "", motif_genome, "set type is not configured for motif analysis"])
@@ -741,9 +755,14 @@ rule analyze_peaks_de:
                 if os.path.isdir(out_dir):
                     shutil.rmtree(out_dir)
                 out_dir = ensure_dir(out_dir)
+                motif_input_bed = os.path.join(out_dir, "motif_input.bed")
+                motif_peak_count = copy_bed_head(item["peak_bed"], motif_input_bed, max_motif_peaks)
+                cap_reason = ""
+                if int(item["peak_count"]) > motif_peak_count:
+                    cap_reason = f"motif input capped at first {motif_peak_count} of {item['peak_count']} peaks"
                 cmd = (
-                    f"gimme motifs {quote(item['peak_bed'])} {quote(out_dir)} "
-                    f"--known --denovo --nthreads {threads} -g {quote(motif_genome)}"
+                    f"gimme motifs {quote(motif_input_bed)} {quote(out_dir)} "
+                    f"--known --nthreads {threads} -g {quote(motif_genome)}"
                 )
                 try:
                     completed = subprocess.run(
@@ -766,9 +785,11 @@ rule analyze_peaks_de:
                         and os.path.splitext(path)[1].lower() in {".html", ".pdf", ".png", ".svg", ".txt", ".tsv", ".xls", ".xlsx"}
                     ]
                     if report_files:
-                        motif_summary.append([item["set_name"], "OK", item["peak_bed"], out_dir, motif_genome, ""])
+                        motif_summary.append([item["set_name"], "OK", item["peak_bed"], out_dir, motif_genome, cap_reason])
                     else:
                         reason = "gimme completed but produced no motif report files"
+                        if cap_reason:
+                            reason = f"{reason}; {cap_reason}"
                         motif_summary.append([item["set_name"], "NO_MOTIFS", item["peak_bed"], out_dir, motif_genome, reason])
                 except Exception as motif_error:
                     log_it(logfile, f"Motif run failed for {item['set_name']}: {motif_error}")

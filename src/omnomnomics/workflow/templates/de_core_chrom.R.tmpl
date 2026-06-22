@@ -58,6 +58,7 @@ max_volcano_labels <- __MAX_VOLCANO_LABELS__
 qc_enabled <- __QC_ENABLED__
 vst_blind <- __VST_BLIND__
 top_variable_genes <- __TOP_VARIABLE_GENES__
+top_variable_feature_stem <- paste0("top_variable_", feature_file_stem)
 distance_plot_enabled <- __DISTANCE_PLOT_ENABLED__
 variable_heatmap_enabled <- __VARIABLE_HEATMAP_ENABLED__
 pca_enabled <- __PCA_ENABLED__
@@ -1149,11 +1150,14 @@ dir.create(de_dir, recursive = TRUE, showWarnings = FALSE)
 cleanup_stale_qc_outputs <- function() {
   stale_patterns <- c(
     "top_variable_genes.PCA_plot_*.pdf",
+    paste0(top_variable_feature_stem, ".PCA_plot_*.pdf"),
     "pca_plot_manifest.tsv",
     "pca_variance_explained.tsv",
     "pca_factor_association.tsv",
     "top_variable_genes.distance_plot.pdf",
     "top_variable_genes.kmeans_heatmap.pdf",
+    paste0(top_variable_feature_stem, ".distance_plot.pdf"),
+    paste0(top_variable_feature_stem, ".kmeans_heatmap.pdf"),
     paste0(feature_file_stem, "_qc*.pdf"),
     paste0(feature_file_stem, "_region_distribution.tsv"),
     "cooks_distance.*.pdf",
@@ -1609,7 +1613,7 @@ if (qc_enabled) {
       rownames(dist_mat) <- sample_labels
       colnames(dist_mat) <- sample_labels
     }
-    grDevices::pdf(file.path(qc_dir, "top_variable_genes.distance_plot.pdf"), width = 10, height = 10)
+    grDevices::pdf(file.path(qc_dir, paste0(top_variable_feature_stem, ".distance_plot.pdf")), width = 10, height = 10)
     pheatmap::pheatmap(dist_mat, main = paste("Sample distance (", feature_label_plural, ")", sep = ""))
     grDevices::dev.off()
   }
@@ -1632,7 +1636,7 @@ if (qc_enabled) {
     }
     hm_breaks <- seq(-max_abs, max_abs, length.out = 256)
     top_annotation <- prepare_pheatmap_annotations(annotation_df_informative, annotation_colors_informative)
-    grDevices::pdf(file.path(qc_dir, "top_variable_genes.kmeans_heatmap.pdf"), width = 12, height = 10)
+    grDevices::pdf(file.path(qc_dir, paste0(top_variable_feature_stem, ".kmeans_heatmap.pdf")), width = 12, height = 10)
     pheatmap::pheatmap(
       top_mat,
       cluster_rows = FALSE,
@@ -1791,7 +1795,7 @@ if (qc_enabled) {
         ggplot2::theme_light() +
         ggplot2::theme(panel.grid = ggplot2::element_blank(), aspect.ratio = 1)
       shape_suffix <- if (nzchar(shape_col)) paste0("_shape_", sanitize_file_component(shape_col, "shape")) else ""
-      out_name <- paste0("top_variable_genes.PCA_plot_", sanitize_file_component(color_col, "color"), shape_suffix, "_PC", pc_x, "_PC", pc_y, ".pdf")
+      out_name <- paste0(top_variable_feature_stem, ".PCA_plot_", sanitize_file_component(color_col, "color"), shape_suffix, "_PC", pc_x, "_PC", pc_y, ".pdf")
       ggplot2::ggsave(filename = file.path(qc_dir, out_name), plot = p, width = 8, height = 8)
       data.frame(
         file = out_name,

@@ -2006,11 +2006,17 @@ onsuccess:
                 os.makedirs(archive_dir, exist_ok=True)
                 stale_patterns = [
                     "omnomnomics.run.*.multiqc_report.html",
+                    "omnomnomics.run.*.multiqc_report_*.html",
                     "omnomnomics.run.*.multiqc_report_data",
+                    "omnomnomics.run.*.multiqc_report_*_data",
                     "omnomnomics.run.*.multiqc_report_plots",
+                    "omnomnomics.run.*.multiqc_report_*_plots",
                     "test_hex.multiqc_report.html",
+                    "test_hex.multiqc_report_*.html",
                     "test_hex.multiqc_report_data",
+                    "test_hex.multiqc_report_*_data",
                     "test_hex.multiqc_report_plots",
+                    "test_hex.multiqc_report_*_plots",
                 ]
                 stale_paths = []
                 for pattern in stale_patterns:
