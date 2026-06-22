@@ -33,6 +33,13 @@ def analyze_peaks_de_input(_wildcards):
             f"{experiment_dir}/{bam_inputfolder}/{sample}{bam_suffix}"
             for sample in samples2
         )
+        post_de_signal_policy = str(config.get("POST_DE_SIGNAL_POLICY", "auto")).strip().lower()
+        if post_de_signal_policy == "auto" and int(config.get("MAX_PROJECT_SIZE_BYTES", 0) or 0) <= 0:
+            bigwig_inputfolder = master_config["output_folders"][master_config["wig_rule_num"] - 1]
+            input_files.extend(
+                f"{experiment_dir}/{bigwig_inputfolder}/{sample}.bw"
+                for sample in samples2
+            )
         if config["THETYPE"] == "CHIP" and str(config.get("BROAD_MODE", "off")).strip().lower() == "genebody":
             input_files.append(
                 os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "annotation", "genes.gtf")
@@ -54,6 +61,8 @@ rule analyze_peaks_de:
         prede_outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num'] - 1]}",
         bam_inputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['touchup_rule_num'] - 1]}",
         bigwig_inputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['wig_rule_num'] - 1]}",
+        post_de_signal_policy=str(config.get("POST_DE_SIGNAL_POLICY", "auto")).strip().lower(),
+        post_de_signal_auto_dependencies=int(config.get("MAX_PROJECT_SIZE_BYTES", 0) or 0) <= 0,
         genome_version=config["THEGENOME"],
         genome_fasta=os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "fasta", "genome.fa"),
         gtf_file=os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "annotation", "genes.gtf"),
@@ -709,6 +718,13 @@ rule analyze_peaks_de:
             if missing_bigwig_samples:
                 missing_text = ", ".join(missing_bigwig_samples)
                 reason = f"missing existing BigWigs for samples: {missing_text}"
+                if params.post_de_signal_policy == "require" or (
+                    params.post_de_signal_policy == "auto" and params.post_de_signal_auto_dependencies
+                ):
+                    raise RuntimeError(
+                        f"Post-DE signal plots require BigWigs, but {reason}. "
+                        "Run step 8 first or use --post-de-signal-policy skip."
+                    )
                 log_it(logfile, f"Skipping analyze_peaks_de signal plots because {reason}. Run step 8 before step 16 to enable these plots.")
                 for item in set_manifest_rows:
                     signal_summary_rows.append([item["set_name"], "SKIP", item["peak_bed"], "", "", "", reason])
@@ -716,6 +732,13 @@ rule analyze_peaks_de:
                 return
             if not bigwigs:
                 reason = "no existing BigWigs found"
+                if params.post_de_signal_policy == "require" or (
+                    params.post_de_signal_policy == "auto" and params.post_de_signal_auto_dependencies
+                ):
+                    raise RuntimeError(
+                        "Post-DE signal plots require BigWigs, but no existing BigWigs were found. "
+                        "Run step 8 first or use --post-de-signal-policy skip."
+                    )
                 log_it(logfile, "No existing BigWigs found for analyze_peaks_de deepTools. Skipping signal plots.")
                 for item in set_manifest_rows:
                     signal_summary_rows.append([item["set_name"], "SKIP", item["peak_bed"], "", "", "", reason])

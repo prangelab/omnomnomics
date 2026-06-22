@@ -591,6 +591,7 @@ def parse_arguments(argv=None):
    parser.add_argument('--library-complexity-max-reads', type=int, help='Maximum mapped primary alignments used for ATAC/ChIP library complexity QC. Default: 5000000. Set 0 to scan full BAMs.')
    parser.add_argument('--spp-max-reads', type=int, help='Maximum mapped primary alignments used for ATAC/ChIP SPP cross-correlation QC. Default: 10000000. Set 0 to scan full BAMs.')
    parser.add_argument('--frip-max-reads', type=int, help='Maximum mapped primary alignments per BAM used for ATAC/ChIP FRiP QC. Default: 10000000. Set 0 to scan full BAMs.')
+   parser.add_argument('--post-de-signal-policy', choices=['auto', 'require', 'skip'], help='Policy for post-DE chromatin heatmaps/profiles. auto schedules missing BigWigs through step 8, require uses existing BigWigs and fails if they are absent, skip records skips when BigWigs are absent. Default: auto')
    parser.add_argument('-a', '--appendix', help='Appendix to add to track name \n \t Default: hub')
    parser.add_argument('-k', '--keepunpaired', action='store_true', help='Keep unpaired or not in HISAT2')
    parser.add_argument('--dry-run', action='store_true', help='Validate the workflow and build the Snakemake DAG without executing jobs')
@@ -1693,6 +1694,15 @@ def main():
     if frip_max_reads < 0:
         print("--frip-max-reads must be >= 0. Aborting...", file=sys.stderr)
         sys.exit(1)
+    post_de_signal_policy = (
+        args.post_de_signal_policy
+        if args.post_de_signal_policy
+        else config.get('post_de_signal_policy', 'auto')
+    )
+    post_de_signal_policy = str(post_de_signal_policy).strip().lower()
+    if post_de_signal_policy not in {'auto', 'require', 'skip'}:
+        print("--post-de-signal-policy must be one of auto, require, or skip. Aborting...", file=sys.stderr)
+        sys.exit(1)
     appendix = args.appendix if args.appendix else config.get('appendix', "hub")
     keep_unpaired = args.keepunpaired if args.keepunpaired else config.get('keep_unpaired', False)
     dry_run = args.dry_run
@@ -1982,6 +1992,7 @@ def main():
         'LIBRARY_COMPLEXITY_MAX_READS': library_complexity_max_reads,
         'SPP_MAX_READS': spp_max_reads,
         'FRIP_MAX_READS': frip_max_reads,
+        'POST_DE_SIGNAL_POLICY': post_de_signal_policy,
         'DE_DESIGN_MODE': de_design_mode,
         'DE_CONFIG_FILE': de_config_file_path,
         'DE_CONFIG_RESOLVED_FILE': resolved_de_config_path,
@@ -2041,13 +2052,27 @@ def main():
     # Only force selected routines when the user explicitly asks to recompute them
     if rerun_selected_steps:
         selected_rule_names = []
+        allowed_rule_names = []
         cmd.append("--forcerun")
         for i in mode_steps:
             routine = config['routines'][i-1]
-            selected_rule_names.append(config[routine][selected_routines[f'selected_routine_{routine}']])
+            rule_name = config[routine][selected_routines[f'selected_routine_{routine}']]
+            selected_rule_names.append(rule_name)
+            allowed_rule_names.append(rule_name)
         cmd.extend(selected_rule_names)
+        if (
+            config.get('analyzepeaksde_rule_num') in mode_steps
+            and the_type in {'ATAC', 'CHIP'}
+            and post_de_signal_policy == 'auto'
+            and max_project_size_bytes <= 0
+        ):
+            for upstream_rule_num in (config.get('index_rule_num'), config.get('wig_rule_num')):
+                routine = config['routines'][upstream_rule_num - 1]
+                rule_name = config[routine][selected_routines[f'selected_routine_{routine}']]
+                if rule_name not in allowed_rule_names:
+                    allowed_rule_names.append(rule_name)
         cmd.append("--allowed-rules")
-        cmd.extend(selected_rule_names)
+        cmd.extend(allowed_rule_names)
 
     with open(log_file, 'a') as log:
         log.write(f"Invocation:\t{the_command}\n")

@@ -884,6 +884,7 @@ if not is_worker_job:
     log_it(logfile, f"Duplicate handling: {config['DUPLICATE_HANDLING']}")
     log_it(logfile, f"Retention policy: {retention_policy}")
     log_it(logfile, f"Max project size: {max_project_size_raw}")
+    log_it(logfile, f"Post-DE signal policy: {config.get('POST_DE_SIGNAL_POLICY', 'auto')}")
 
     log_it(logfile, f"Requested DE formula: {config['DE_FORMULA']}", "READ COUNTING SETTINGS")
     log_it(logfile, f"Resolved DE formula: {config['RESOLVED_DE_FORMULA']}")
@@ -1325,6 +1326,8 @@ for rule_num in themode:
             all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.filtered.bam.qc_summary.svg", sample = samples2)
     if rule_num == 8:
         all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.extra_8.tmp",  sample = samples2)
+        if config['THETYPE'] != "RNA" and max_project_size_bytes <= 0:
+            all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.bw", sample=samples2)
     if rule_num == 9:
         all_outputs.append( f"{experiment_dir}/{output_folder}/extra_9.tmp")
     if rule_num == 10:

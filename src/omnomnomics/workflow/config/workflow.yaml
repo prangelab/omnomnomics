@@ -46,6 +46,7 @@ spp_gate: "warn"
 library_complexity_max_reads: 5000000
 spp_max_reads: 10000000
 frip_max_reads: 10000000
+post_de_signal_policy: "auto"
 
 
 trim:

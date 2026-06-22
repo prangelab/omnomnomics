@@ -41,7 +41,9 @@
    - import pre-DE unique peak BED files from `analyze_peaks/intersections/unique`.
 4. Signal summaries:
    - run deepTools on sufficiently sized sets using existing BigWigs.
-   - skip signal plots with a summary-table reason if required BigWigs are absent.
+   - with `--post-de-signal-policy auto`, schedule missing BigWigs through step 8 before plotting.
+   - with `--post-de-signal-policy require`, fail clearly if required BigWigs are absent.
+   - with `--post-de-signal-policy skip`, skip signal plots with a summary-table reason if required BigWigs are absent.
 5. Motif analysis:
    - run GimmeMotifs on sufficiently sized promoter/distal DE sets and top-ranked fallback sets.
    - optionally run on pre-DE unique sets.
@@ -55,4 +57,4 @@
 - Fail-soft behavior:
   - DE set generation and manifests are always attempted.
   - deepTools and GimmeMotifs blocks are skipped with clear logs if executables are unavailable.
-  - Post-DE signal plotting does not regenerate BigWigs from BAMs; users should run the BigWig stage before post-DE analyses when these plots are needed.
+  - Post-DE signal plotting does not regenerate BigWigs inside the post-DE worker; missing BigWigs are either scheduled through step 8, required, or skipped according to `--post-de-signal-policy`.
