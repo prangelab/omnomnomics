@@ -54,6 +54,7 @@ rule analyze_peaks_de:
         de_outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num'] - 1]}",
         prede_outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num'] - 1]}",
         bam_inputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['touchup_rule_num'] - 1]}",
+        bigwig_inputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['wig_rule_num'] - 1]}",
         genome_version=config["THEGENOME"],
         genome_fasta=os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "fasta", "genome.fa"),
         gtf_file=os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "annotation", "genes.gtf"),
@@ -605,10 +606,35 @@ rule analyze_peaks_de:
             return out_rows
 
         def run_deeptools(set_manifest_rows, signal_dir):
-            required = ["bamCoverage", "computeMatrix", "plotHeatmap", "plotProfile"]
+            required = ["computeMatrix", "plotHeatmap", "plotProfile"]
             if not all(tool_available(x) for x in required):
                 log_it(logfile, "deepTools executables not fully available. Skipping signal plots in analyze_peaks_de.")
                 return
+
+            signal_summary_path = os.path.join(signal_dir, "signal_runs.tsv")
+            signal_summary_rows = []
+            eligible_set_types = {
+                "de_significant",
+                "de_up",
+                "de_down",
+                "de_significant_promoter",
+                "de_significant_distal",
+                "de_significant_domains",
+                "de_up_domains",
+                "de_down_domains",
+                "de_significant_promoter_regions",
+                "de_up_promoter_regions",
+                "de_down_promoter_regions",
+                "top_de_ranked",
+                "top_de_ranked_promoter",
+                "top_de_ranked_distal",
+                "top_de_ranked_promoter_regions",
+            }
+            min_signal_regions = 10
+            max_signal_regions = 250
+            if params.thetype == "CHIP" and params.broad_mode in {"genebody", "diffuse"}:
+                max_signal_regions = 100
+            deeptools_threads = 1
 
             def regions_label_for_set(item):
                 set_type = str(item.get("set_type", "features"))
@@ -638,22 +664,52 @@ rule analyze_peaks_de:
                 }
                 return label_map.get(set_type, set_type.replace("_", " "))
 
+            def copy_bed_limit(source_bed, target_bed, limit):
+                copied = 0
+                with open(source_bed, "r", newline="") as source, open(target_bed, "w", newline="") as target:
+                    for line in source:
+                        if copied >= limit:
+                            break
+                        if not line.strip():
+                            continue
+                        target.write(line)
+                        copied += 1
+                return copied
+
+            def existing_bigwig_for_sample(sample):
+                candidates = [
+                    os.path.join(params.bigwig_inputfolder, f"{sample}.bw"),
+                    os.path.join(params.bigwig_inputfolder, f"{sample}.CPM.bw"),
+                ]
+                for candidate in candidates:
+                    if os.path.isfile(candidate):
+                        return candidate
+                return None
+
             matrices_dir = ensure_dir(os.path.join(signal_dir, "matrices"))
             heatmaps_dir = ensure_dir(os.path.join(signal_dir, "heatmaps"))
             profiles_dir = ensure_dir(os.path.join(signal_dir, "profiles"))
+            regions_dir = ensure_dir(os.path.join(signal_dir, "regions"))
 
             with tempfile.TemporaryDirectory(prefix="omnomnomics_deeptools_de_") as tmpdir:
                 bigwigs = []
                 sample_labels = []
                 bam_suffix = ".sorted.dups_marked.filtered.bam" if params.thetype == "ATAC" else ".filtered.bam"
                 for sample in samples2:
+                    bw_path = existing_bigwig_for_sample(sample)
+                    if bw_path:
+                        bigwigs.append(bw_path)
+                        sample_labels.append(sample)
+                        continue
+                    if not tool_available("bamCoverage"):
+                        continue
                     bam_path = os.path.join(params.bam_inputfolder, f"{sample}{bam_suffix}")
                     if not os.path.isfile(bam_path):
                         continue
                     bw_path = os.path.join(tmpdir, f"{sample}.bw")
                     shell(
                         f"bamCoverage --bam {quote(bam_path)} --outFileName {quote(bw_path)} "
-                        f"--binSize 25 --normalizeUsing CPM --numberOfProcessors {threads}"
+                        f"--binSize 50 --normalizeUsing CPM --numberOfProcessors {deeptools_threads}"
                     )
                     bigwigs.append(bw_path)
                     sample_labels.append(sample)
@@ -662,20 +718,31 @@ rule analyze_peaks_de:
                     return
 
                 for item in set_manifest_rows:
+                    set_type = str(item.get("set_type", ""))
+                    if set_type not in eligible_set_types:
+                        signal_summary_rows.append([item["set_name"], "SKIP", item["peak_bed"], "", "", "", "set type is not configured for signal plotting"])
+                        continue
                     bed_path = item["peak_bed"]
                     if not os.path.isfile(bed_path):
+                        signal_summary_rows.append([item["set_name"], "SKIP", bed_path, "", "", "", "BED file missing"])
                         continue
-                    if int(item["peak_count"]) < 20:
+                    if int(item["peak_count"]) < min_signal_regions:
+                        signal_summary_rows.append([item["set_name"], "SKIP", bed_path, "", "", "", f"fewer than {min_signal_regions} regions"])
                         continue
                     safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", item["set_name"])
                     region_label = regions_label_for_set(item)
+                    signal_bed_path = os.path.join(regions_dir, f"{safe_name}.signal_regions.bed")
+                    signal_region_count = copy_bed_limit(bed_path, signal_bed_path, max_signal_regions)
+                    if signal_region_count < min_signal_regions:
+                        signal_summary_rows.append([item["set_name"], "SKIP", bed_path, signal_bed_path, "", "", f"fewer than {min_signal_regions} copied regions"])
+                        continue
                     matrix_path = os.path.join(matrices_dir, f"{safe_name}.matrix.gz")
                     heatmap_path = os.path.join(heatmaps_dir, f"{safe_name}.heatmap.pdf")
                     profile_path = os.path.join(profiles_dir, f"{safe_name}.profile.pdf")
                     shell(
-                        f"computeMatrix reference-point --referencePoint center -b 3000 -a 3000 "
-                        f"-R {quote(bed_path)} -S {' '.join(quote(x) for x in bigwigs)} "
-                        f"--skipZeros --binSize 50 --numberOfProcessors {threads} -o {quote(matrix_path)}"
+                        f"computeMatrix reference-point --referencePoint center -b 1000 -a 1000 "
+                        f"-R {quote(signal_bed_path)} -S {' '.join(quote(x) for x in bigwigs)} "
+                        f"--missingDataAsZero --binSize 100 --numberOfProcessors {deeptools_threads} -o {quote(matrix_path)}"
                     )
                     shell(
                         f"plotHeatmap -m {quote(matrix_path)} -out {quote(heatmap_path)} "
@@ -691,6 +758,15 @@ rule analyze_peaks_de:
                         f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
                         f"--refPointLabel center"
                     )
+                    reason = ""
+                    if int(item["peak_count"]) > signal_region_count:
+                        reason = f"signal input capped at first {signal_region_count} of {item['peak_count']} regions"
+                    signal_summary_rows.append([item["set_name"], "OK", bed_path, signal_bed_path, matrix_path, heatmap_path, reason])
+
+            with open(signal_summary_path, "w", newline="") as handle:
+                writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+                writer.writerow(["set_name", "status", "source_bed", "signal_bed", "matrix", "heatmap", "reason"])
+                writer.writerows(signal_summary_rows)
 
         def run_gimme_motifs(set_manifest_rows, motifs_dir):
             motif_summary_path = os.path.join(motifs_dir, "motif_runs.tsv")
