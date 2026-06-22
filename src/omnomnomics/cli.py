@@ -2040,10 +2040,14 @@ def main():
 
     # Only force selected routines when the user explicitly asks to recompute them
     if rerun_selected_steps:
+        selected_rule_names = []
         cmd.append("--forcerun")
         for i in mode_steps:
             routine = config['routines'][i-1]
-            cmd.append(config[routine][selected_routines[f'selected_routine_{routine}']])
+            selected_rule_names.append(config[routine][selected_routines[f'selected_routine_{routine}']])
+        cmd.extend(selected_rule_names)
+        cmd.append("--allowed-rules")
+        cmd.extend(selected_rule_names)
 
     with open(log_file, 'a') as log:
         log.write(f"Invocation:\t{the_command}\n")
