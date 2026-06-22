@@ -746,8 +746,30 @@ rule analyze_peaks_de:
                     f"--known --denovo --nthreads {threads} -g {quote(motif_genome)}"
                 )
                 try:
-                    shell(cmd)
-                    motif_summary.append([item["set_name"], "OK", item["peak_bed"], out_dir, motif_genome, ""])
+                    completed = subprocess.run(
+                        cmd,
+                        shell=True,
+                        executable="/bin/bash",
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                    )
+                    if completed.stdout:
+                        for line in completed.stdout.splitlines():
+                            log_it(logfile, line)
+                    if completed.returncode != 0:
+                        raise RuntimeError(f"gimme motifs exited with status {completed.returncode}")
+                    report_files = [
+                        path
+                        for path in glob.glob(os.path.join(out_dir, "**", "*"), recursive=True)
+                        if os.path.isfile(path)
+                        and os.path.splitext(path)[1].lower() in {".html", ".pdf", ".png", ".svg", ".txt", ".tsv", ".xls", ".xlsx"}
+                    ]
+                    if report_files:
+                        motif_summary.append([item["set_name"], "OK", item["peak_bed"], out_dir, motif_genome, ""])
+                    else:
+                        reason = "gimme completed but produced no motif report files"
+                        motif_summary.append([item["set_name"], "NO_MOTIFS", item["peak_bed"], out_dir, motif_genome, reason])
                 except Exception as motif_error:
                     log_it(logfile, f"Motif run failed for {item['set_name']}: {motif_error}")
                     motif_summary.append([item["set_name"], "FAIL", item["peak_bed"], out_dir, motif_genome, str(motif_error)])
