@@ -1342,7 +1342,56 @@ def reset_step_tracking(mode_steps, experiment_dir):
 ##--------------------------------------------------------------------------------------------------------------
 def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
     print("FORCING RECOMPUTATION OF SELECTED STEP OUTPUTS")
+    explicit_outputs = {
+        config.get('mergewig_rule_num'): [
+            os.path.join(
+                experiment_dir,
+                config['output_folders'][config['mergewig_rule_num'] - 1],
+                "extra_9.tmp",
+            )
+        ],
+        config.get('callpeaks_rule_num'): [
+            os.path.join(
+                experiment_dir,
+                config['output_folders'][config['callpeaks_rule_num'] - 1],
+                "extra_10.tmp",
+            )
+        ],
+        config.get('countreads_rule_num'): [
+            os.path.join(
+                experiment_dir,
+                config['output_folders'][config['countreads_rule_num'] - 1],
+                "extra_11.tmp",
+            )
+        ],
+        config.get('peakqc_rule_num'): [
+            os.path.join(
+                experiment_dir,
+                config['output_folders'][config['peakqc_rule_num'] - 1],
+                f"extra_{config['peakqc_rule_num']}.tmp",
+            )
+        ],
+        config.get('analyzepeaks_rule_num'): [
+            os.path.join(
+                experiment_dir,
+                config['output_folders'][config['analyzepeaks_rule_num'] - 1],
+                f"extra_{config['analyzepeaks_rule_num']}.tmp",
+            )
+        ],
+        config.get('analyzepeaksde_rule_num'): [
+            os.path.join(
+                experiment_dir,
+                config['output_folders'][config['analyzepeaksde_rule_num'] - 1],
+                f"extra_{config['analyzepeaksde_rule_num']}.tmp",
+            )
+        ],
+    }
     for num in mode_steps: # Loop over all the to run steps
+        for output_path in explicit_outputs.get(num, []):
+            if os.path.isdir(output_path):
+                shutil.rmtree(output_path)
+            elif os.path.exists(output_path):
+                os.remove(output_path)
         outputfolder = config['output_folders'][num-1]
         output_filetype = config['output_file_types'][num-1]
         if isinstance(output_filetype, list): # If multiple output filetypes
