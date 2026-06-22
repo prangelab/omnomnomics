@@ -1382,6 +1382,11 @@ def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
             os.path.join(
                 experiment_dir,
                 config['output_folders'][config['analyzepeaksde_rule_num'] - 1],
+                "analyze_peaks_de",
+            ),
+            os.path.join(
+                experiment_dir,
+                config['output_folders'][config['analyzepeaksde_rule_num'] - 1],
                 f"extra_{config['analyzepeaksde_rule_num']}.tmp",
             )
         ],
@@ -1392,6 +1397,8 @@ def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
                 shutil.rmtree(output_path)
             elif os.path.exists(output_path):
                 os.remove(output_path)
+        if num == config.get('analyzepeaksde_rule_num'):
+            continue
         outputfolder = config['output_folders'][num-1]
         output_filetype = config['output_file_types'][num-1]
         if isinstance(output_filetype, list): # If multiple output filetypes
