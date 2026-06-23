@@ -789,7 +789,7 @@ rule analyze_peaks_de:
                     f"plotProfile -m {quote(matrix_path)} -out {quote(profile_path)} "
                     f"--perGroup --plotTitle {quote(region_label)} "
                     f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
-                    f"--refPointLabel center --xAxisLabel 'distance from center (bp)' "
+                    f"--refPointLabel center "
                     f"--yAxisLabel 'normalized signal' --legendLocation upper-right "
                     f"--plotWidth 10 --plotHeight 6"
                 )
