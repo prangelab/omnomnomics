@@ -787,7 +787,7 @@ rule analyze_peaks_de:
                 )
                 shell(
                     f"plotProfile -m {quote(matrix_path)} -out {quote(profile_path)} "
-                    f"--perGroup --plotTitle {quote(region_label)} "
+                    f"--perGroup --plotTitle {quote(region_label)} --regionsLabel {quote(region_label)} "
                     f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
                     f"--refPointLabel center "
                     f"--yAxisLabel 'normalized signal' --legendLocation upper-right "
