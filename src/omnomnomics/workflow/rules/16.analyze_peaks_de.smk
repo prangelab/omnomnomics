@@ -790,7 +790,7 @@ rule analyze_peaks_de:
                     f"--perGroup --plotTitle {quote(region_label)} --regionsLabel {quote(region_label)} "
                     f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
                     f"--refPointLabel center "
-                    f"--yAxisLabel 'normalized signal' --legendLocation upper-right "
+                    f"--yAxisLabel 'normalized signal' --legendLocation lower-center "
                     f"--plotWidth 10 --plotHeight 6"
                 )
                 reason = ""
