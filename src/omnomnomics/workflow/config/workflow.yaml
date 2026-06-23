@@ -51,6 +51,8 @@ post_de_motif_max_sets: 6
 post_de_motif_max_peaks: 100
 post_de_motif_timeout_seconds: 1200
 post_de_motif_threads: 1
+post_de_motif_window_bp: 200
+post_de_motif_database: "auto"
 
 
 trim:

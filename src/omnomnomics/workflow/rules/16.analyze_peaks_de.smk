@@ -67,6 +67,8 @@ rule analyze_peaks_de:
         post_de_motif_max_peaks=int(master_config.get("post_de_motif_max_peaks", 100) or 100),
         post_de_motif_timeout_seconds=int(master_config.get("post_de_motif_timeout_seconds", 1200) or 1200),
         post_de_motif_threads=int(master_config.get("post_de_motif_threads", 1) or 1),
+        post_de_motif_window_bp=int(master_config.get("post_de_motif_window_bp", 200) or 200),
+        post_de_motif_database=str(master_config.get("post_de_motif_database", "auto")),
         genome_version=config["THEGENOME"],
         genome_fasta=os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "fasta", "genome.fa"),
         gtf_file=os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "annotation", "genes.gtf"),
@@ -797,7 +799,7 @@ rule analyze_peaks_de:
 
             write_signal_summary()
 
-        def run_gimme_motifs(set_manifest_rows, motifs_dir):
+        def run_meme_motifs(set_manifest_rows, motifs_dir):
             motif_summary_path = os.path.join(motifs_dir, "motif_runs.tsv")
             eligible_set_types = {
                 "de_significant",
@@ -819,29 +821,79 @@ rule analyze_peaks_de:
             max_motif_sets = max(0, int(params.post_de_motif_max_sets))
             motif_timeout_seconds = max(60, int(params.post_de_motif_timeout_seconds))
             motif_threads = max(1, min(int(params.post_de_motif_threads), int(threads)))
+            motif_window_bp = max(50, int(params.post_de_motif_window_bp))
             motif_summary = []
 
             def write_motif_summary():
                 with open(motif_summary_path, "w", newline="") as handle:
                     writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-                    writer.writerow(["set_name", "status", "peak_bed", "output_dir", "genome", "reason"])
+                    writer.writerow(["set_name", "method", "status", "peak_bed", "input_fasta", "output_dir", "motif_database", "reason"])
                     writer.writerows(motif_summary)
 
-            if not tool_available("gimme"):
-                log_it(logfile, "gimme executable not found. Skipping motif analysis in analyze_peaks_de.")
-                motif_summary.append(["ALL", "SKIP", "", "", "", "gimme executable not found"])
+            required_tools = ["bedtools", "sea"]
+            missing_tools = [tool_name for tool_name in required_tools if not tool_available(tool_name)]
+            if missing_tools:
+                reason = "missing required executable(s): " + ", ".join(missing_tools)
+                log_it(logfile, f"Skipping MEME motif analysis in analyze_peaks_de because {reason}.")
+                motif_summary.append(["ALL", "MEME", "SKIP", "", "", "", "", reason])
                 write_motif_summary()
                 return motif_summary_path
 
-            genome_map = {
-                "GRCh38": "hg38",
-                "GRCm38": "mm10",
-                "GRCm39": "mm39",
-            }
-            if os.path.isfile(params.genome_fasta):
-                motif_genome = params.genome_fasta
-            else:
-                motif_genome = genome_map.get(str(params.genome_version), str(params.genome_version))
+            def resolve_meme_motif_database():
+                requested = str(params.post_de_motif_database).strip()
+                if requested and requested.lower() != "auto":
+                    if os.path.isfile(requested):
+                        return requested
+                    return None
+
+                for env_var in ("OMNOMNOMICS_MEME_MOTIF_DATABASE", "MEME_MOTIF_DATABASE", "JASPAR_MOTIF_DATABASE"):
+                    env_path = os.environ.get(env_var, "").strip()
+                    if env_path and os.path.isfile(env_path):
+                        return env_path
+
+                search_roots = []
+                conda_prefix = os.environ.get("CONDA_PREFIX")
+                if conda_prefix:
+                    search_roots.extend(
+                        [
+                            os.path.join(conda_prefix, "share", "meme", "motif_databases"),
+                            os.path.join(conda_prefix, "share", "meme", "db", "motif_databases"),
+                            os.path.join(conda_prefix, "share", "meme", "db"),
+                            os.path.join(conda_prefix, "share", "meme"),
+                            *glob.glob(os.path.join(conda_prefix, "share", "meme-*", "db", "motif_databases")),
+                            *glob.glob(os.path.join(conda_prefix, "share", "meme-*", "motif_databases")),
+                        ]
+                    )
+                search_roots.extend(["/usr/local/share", "/usr/share"])
+                patterns = [
+                    "**/JASPAR*CORE*vertebrates*non-redundant*.meme",
+                    "**/JASPAR*CORE*vertebrates*.meme",
+                    "**/HOCOMOCO*.meme",
+                    "**/*.meme",
+                ]
+                for root in search_roots:
+                    if not root or not os.path.isdir(root):
+                        continue
+                    for pattern in patterns:
+                        matches = sorted(glob.glob(os.path.join(root, pattern), recursive=True))
+                        for candidate in matches:
+                            candidate_parts = set(os.path.normpath(candidate).split(os.sep))
+                            if "doc" in candidate_parts or "examples" in candidate_parts:
+                                continue
+                            if os.path.isfile(candidate) and os.path.getsize(candidate) > 0:
+                                return candidate
+                return None
+
+            motif_database = resolve_meme_motif_database()
+            if not motif_database:
+                reason = (
+                    "no MEME motif database found; set post_de_motif_database to a MEME-format motif file "
+                    "or install the MEME Suite motif databases"
+                )
+                log_it(logfile, f"Skipping MEME motif analysis in analyze_peaks_de because {reason}.")
+                motif_summary.append(["ALL", "MEME", "SKIP", "", "", "", "", reason])
+                write_motif_summary()
+                return motif_summary_path
 
             priority_by_set_type = {
                 "de_significant_promoter": 0,
@@ -885,33 +937,84 @@ rule analyze_peaks_de:
             log_it(
                 logfile,
                 f"Motif analysis settings: max_sets={max_motif_sets or 'unlimited'}, "
-                f"max_peaks={max_motif_peaks}, timeout_seconds={motif_timeout_seconds}, threads={motif_threads}",
+                f"max_peaks={max_motif_peaks}, window_bp={motif_window_bp}, "
+                f"timeout_seconds={motif_timeout_seconds}, threads={motif_threads}, motif_database={motif_database}",
             )
 
-            def copy_bed_head(source_bed, target_bed, limit):
+            def write_centered_bed_and_scores(source_bed, target_bed, limit, window_bp):
                 copied = 0
+                scores = {}
+                half_window = window_bp // 2
                 with open(source_bed, "r", newline="") as source, open(target_bed, "w", newline="") as target:
                     for line in source:
                         if copied >= limit:
                             break
-                        if not line.strip():
+                        if not line.strip() or line.startswith("#"):
                             continue
-                        target.write(line)
+                        fields = line.rstrip("\n").split("\t")
+                        if len(fields) < 3:
+                            continue
+                        try:
+                            start = int(fields[1])
+                            end = int(fields[2])
+                        except ValueError:
+                            continue
+                        if end <= start:
+                            continue
+                        chrom = fields[0]
+                        center = (start + end) // 2
+                        window_start = max(0, center - half_window)
+                        window_end = window_start + window_bp
+                        raw_name = fields[3] if len(fields) > 3 and fields[3] else f"{chrom}:{start}-{end}"
+                        safe_name = re.sub(r"[^A-Za-z0-9._:-]+", "_", raw_name)
+                        fasta_name = f"{copied + 1}_{safe_name}"
+                        score_value = float(copied + 1)
+                        scores[fasta_name] = score_value
+                        target.write("\t".join([chrom, str(window_start), str(window_end), fasta_name, f"{score_value:.6f}"]) + "\n")
                         copied += 1
-                return copied
+                return copied, scores
+
+            def rewrite_fasta_headers_with_scores(fasta_path, scores):
+                tmp_path = f"{fasta_path}.tmp"
+                with open(fasta_path, "r", newline="") as source, open(tmp_path, "w", newline="") as target:
+                    for line in source:
+                        if not line.startswith(">"):
+                            target.write(line)
+                            continue
+                        header = line[1:].strip()
+                        name = header.split("::", 1)[0].split()[0]
+                        score = scores.get(name, 0.0)
+                        target.write(f">{name} {score:.6f}\n")
+                os.replace(tmp_path, fasta_path)
+
+            def run_meme_command(cmd, timeout_seconds, env):
+                completed = subprocess.run(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    timeout=timeout_seconds,
+                    env=env,
+                )
+                if completed.stdout:
+                    for line in completed.stdout.splitlines():
+                        log_it(logfile, line)
+                if completed.returncode != 0:
+                    raise RuntimeError(f"{cmd[0]} exited with status {completed.returncode}")
+                return completed
 
             for index, item in enumerate(set_manifest_rows):
                 if item["set_type"] not in eligible_set_types:
-                    motif_summary.append([item["set_name"], "SKIP", item["peak_bed"], "", motif_genome, "set type is not configured for motif analysis"])
+                    motif_summary.append([item["set_name"], "MEME", "SKIP", item["peak_bed"], "", "", motif_database, "set type is not configured for motif analysis"])
                     write_motif_summary()
                     continue
                 if int(item["peak_count"]) < min_motif_peaks:
-                    motif_summary.append([item["set_name"], "SKIP", item["peak_bed"], "", motif_genome, f"fewer than {min_motif_peaks} peaks"])
+                    motif_summary.append([item["set_name"], "MEME", "SKIP", item["peak_bed"], "", "", motif_database, f"fewer than {min_motif_peaks} peaks"])
                     write_motif_summary()
                     continue
                 if index not in selected_indices:
                     reason = f"motif set cap reached; retained top {max_motif_sets} highest-priority sets"
-                    motif_summary.append([item["set_name"], "SKIP", item["peak_bed"], "", motif_genome, reason])
+                    motif_summary.append([item["set_name"], "MEME", "SKIP", item["peak_bed"], "", "", motif_database, reason])
                     write_motif_summary()
                     continue
                 safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", item["set_name"])
@@ -919,53 +1022,92 @@ rule analyze_peaks_de:
                 if os.path.isdir(out_dir):
                     shutil.rmtree(out_dir)
                 out_dir = ensure_dir(out_dir)
-                motif_input_bed = os.path.join(out_dir, "motif_input.bed")
-                motif_peak_count = copy_bed_head(item["peak_bed"], motif_input_bed, max_motif_peaks)
+                motif_input_bed = os.path.join(out_dir, "motif_input.centered.bed")
+                motif_input_fasta = os.path.join(out_dir, "motif_input.fa")
+                motif_peak_count, fasta_scores = write_centered_bed_and_scores(
+                    item["peak_bed"],
+                    motif_input_bed,
+                    max_motif_peaks,
+                    motif_window_bp,
+                )
+                if motif_peak_count < min_motif_peaks:
+                    motif_summary.append([item["set_name"], "MEME", "SKIP", item["peak_bed"], "", out_dir, motif_database, f"fewer than {min_motif_peaks} valid centered windows"])
+                    write_motif_summary()
+                    continue
                 cap_reason = ""
                 if int(item["peak_count"]) > motif_peak_count:
                     cap_reason = f"motif input capped at first {motif_peak_count} of {item['peak_count']} peaks"
-                cmd = [
-                    "gimme",
-                    "motifs",
+                fasta_cmd = [
+                    "bedtools",
+                    "getfasta",
+                    "-fi",
+                    params.genome_fasta,
+                    "-bed",
                     motif_input_bed,
-                    out_dir,
-                    "--known",
-                    "--nthreads",
-                    str(motif_threads),
-                    "-g",
-                    motif_genome,
+                    "-name",
+                    "-fo",
+                    motif_input_fasta,
                 ]
                 env = os.environ.copy()
                 for thread_var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
                     env[thread_var] = str(motif_threads)
                 try:
-                    log_it(logfile, f"Running motif analysis for {item['set_name']} with {motif_peak_count} peaks.")
-                    completed = subprocess.run(
-                        cmd,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        timeout=motif_timeout_seconds,
-                        env=env,
-                    )
-                    if completed.stdout:
-                        for line in completed.stdout.splitlines():
-                            log_it(logfile, line)
-                    if completed.returncode != 0:
-                        raise RuntimeError(f"gimme motifs exited with status {completed.returncode}")
-                    report_files = [
-                        path
-                        for path in glob.glob(os.path.join(out_dir, "**", "*"), recursive=True)
-                        if os.path.isfile(path)
-                        and os.path.splitext(path)[1].lower() in {".html", ".pdf", ".png", ".svg", ".txt", ".tsv", ".xls", ".xlsx"}
+                    log_it(logfile, f"Preparing MEME motif FASTA for {item['set_name']} with {motif_peak_count} centered windows.")
+                    run_meme_command(fasta_cmd, motif_timeout_seconds, env)
+                    rewrite_fasta_headers_with_scores(motif_input_fasta, fasta_scores)
+
+                    sea_dir = ensure_dir(os.path.join(out_dir, "sea"))
+                    sea_cmd = [
+                        "sea",
+                        "--p",
+                        motif_input_fasta,
+                        "--m",
+                        motif_database,
+                        "--oc",
+                        sea_dir,
+                        "--qvalue",
+                        "--noseqs",
+                        "--align",
+                        "center",
+                        "--verbosity",
+                        "1",
                     ]
-                    if report_files:
-                        motif_summary.append([item["set_name"], "OK", item["peak_bed"], out_dir, motif_genome, cap_reason])
+                    log_it(logfile, f"Running MEME SEA for {item['set_name']}.")
+                    run_meme_command(sea_cmd, motif_timeout_seconds, env)
+                    sea_tsv = os.path.join(sea_dir, "sea.tsv")
+                    if os.path.isfile(sea_tsv):
+                        motif_summary.append([item["set_name"], "SEA", "OK", item["peak_bed"], motif_input_fasta, sea_dir, motif_database, cap_reason])
                     else:
-                        reason = "gimme completed but produced no motif report files"
+                        reason = "SEA completed but did not produce sea.tsv"
                         if cap_reason:
                             reason = f"{reason}; {cap_reason}"
-                        motif_summary.append([item["set_name"], "NO_MOTIFS", item["peak_bed"], out_dir, motif_genome, reason])
+                        motif_summary.append([item["set_name"], "SEA", "NO_MOTIFS", item["peak_bed"], motif_input_fasta, sea_dir, motif_database, reason])
+
+                    if item["set_type"].startswith("top_de_ranked") and tool_available("ame"):
+                        ame_dir = ensure_dir(os.path.join(out_dir, "ame"))
+                        ame_cmd = [
+                            "ame",
+                            "--oc",
+                            ame_dir,
+                            "--method",
+                            "ranksum",
+                            "--scoring",
+                            "max",
+                            motif_input_fasta,
+                            motif_database,
+                        ]
+                        log_it(logfile, f"Running MEME AME ranked enrichment for {item['set_name']}.")
+                        run_meme_command(ame_cmd, motif_timeout_seconds, env)
+                        ame_tsv = os.path.join(ame_dir, "ame.tsv")
+                        if os.path.isfile(ame_tsv):
+                            motif_summary.append([item["set_name"], "AME", "OK", item["peak_bed"], motif_input_fasta, ame_dir, motif_database, cap_reason])
+                        else:
+                            reason = "AME completed but did not produce ame.tsv"
+                            if cap_reason:
+                                reason = f"{reason}; {cap_reason}"
+                            motif_summary.append([item["set_name"], "AME", "NO_MOTIFS", item["peak_bed"], motif_input_fasta, ame_dir, motif_database, reason])
+                    elif item["set_type"].startswith("top_de_ranked"):
+                        motif_summary.append([item["set_name"], "AME", "SKIP", item["peak_bed"], motif_input_fasta, "", motif_database, "ame executable not found"])
                 except subprocess.TimeoutExpired as motif_timeout:
                     if motif_timeout.stdout:
                         output_text = motif_timeout.stdout
@@ -973,14 +1115,14 @@ rule analyze_peaks_de:
                             output_text = output_text.decode(errors="replace")
                         for line in str(output_text).splitlines():
                             log_it(logfile, line)
-                    reason = f"gimme motifs exceeded {motif_timeout_seconds} seconds"
+                    reason = f"MEME motif command exceeded {motif_timeout_seconds} seconds"
                     if cap_reason:
                         reason = f"{reason}; {cap_reason}"
-                    log_it(logfile, f"Motif run timed out for {item['set_name']}: {reason}")
-                    motif_summary.append([item["set_name"], "TIMEOUT", item["peak_bed"], out_dir, motif_genome, reason])
+                    log_it(logfile, f"MEME motif run timed out for {item['set_name']}: {reason}")
+                    motif_summary.append([item["set_name"], "MEME", "TIMEOUT", item["peak_bed"], motif_input_fasta, out_dir, motif_database, reason])
                 except Exception as motif_error:
-                    log_it(logfile, f"Motif run failed for {item['set_name']}: {motif_error}")
-                    motif_summary.append([item["set_name"], "FAIL", item["peak_bed"], out_dir, motif_genome, str(motif_error)])
+                    log_it(logfile, f"MEME motif run failed for {item['set_name']}: {motif_error}")
+                    motif_summary.append([item["set_name"], "MEME", "FAIL", item["peak_bed"], motif_input_fasta, out_dir, motif_database, str(motif_error)])
                 write_motif_summary()
 
             write_motif_summary()
@@ -1099,7 +1241,7 @@ rule analyze_peaks_de:
                     )
 
             run_deeptools(set_manifest_rows, signal_dir)
-            motif_summary_path = run_gimme_motifs(set_manifest_rows, motifs_dir)
+            motif_summary_path = run_meme_motifs(set_manifest_rows, motifs_dir)
 
             report_path = os.path.join(summary_dir, "analyze_peaks_de_report.tsv")
             with open(report_path, "w", newline="") as handle:

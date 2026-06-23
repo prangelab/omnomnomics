@@ -45,20 +45,22 @@
    - with `--post-de-signal-policy require`, fail clearly if required BigWigs are absent.
    - with `--post-de-signal-policy skip`, skip signal plots with a summary-table reason if required BigWigs are absent.
 5. Motif analysis:
-   - run GimmeMotifs on sufficiently sized promoter/distal DE sets and top-ranked fallback sets.
+   - run MEME SEA on sufficiently sized promoter/distal DE sets and top-ranked fallback sets.
+   - run MEME AME on top-ranked DE sets using rank scores derived from BED order.
    - optionally run on pre-DE unique sets.
    - prioritize promoter/promoter-region sets before distal, unique, and all-peak fallback sets.
-   - cap motif set count, peaks per set, per-set runtime, and motif threads via workflow defaults so motif failures remain report-level outcomes.
+   - cap motif set count, peaks per set, centered FASTA window size, per-set runtime, and motif threads via workflow defaults so motif failures remain report-level outcomes.
 
 ## Config notes
 - Current implementation runs with practical defaults and tool-availability checks.
-- Motif defaults are `post_de_motif_max_sets: 6`, `post_de_motif_max_peaks: 100`, `post_de_motif_timeout_seconds: 1200`, and `post_de_motif_threads: 1`.
+- Motif defaults are `post_de_motif_max_sets: 6`, `post_de_motif_max_peaks: 100`, `post_de_motif_window_bp: 200`, `post_de_motif_timeout_seconds: 1200`, `post_de_motif_threads: 1`, and `post_de_motif_database: auto`.
+- `post_de_motif_database: auto` searches the active environment and the `OMNOMNOMICS_MEME_MOTIF_DATABASE`, `MEME_MOTIF_DATABASE`, or `JASPAR_MOTIF_DATABASE` environment variables for a MEME-format vertebrate motif database. Set it to an explicit `.meme` motif file for reproducible database pinning.
 - Fine-grained motif background matching controls are reserved for a follow-up refinement.
 
 ## Status
 - Implemented as workflow step 16 (`analyze_peaks_de`) for ATAC and ChIP.
 - Fail-soft behavior:
   - DE set generation and manifests are always attempted.
-  - deepTools and GimmeMotifs blocks are skipped with clear logs if executables are unavailable.
+  - deepTools and MEME motif blocks are skipped with clear logs if executables are unavailable.
   - Post-DE signal plotting does not regenerate BigWigs inside the post-DE worker; missing BigWigs are either scheduled through step 8, required, or skipped according to `--post-de-signal-policy`.
   - Motif runs write progress incrementally and record per-set `TIMEOUT`, `FAIL`, `NO_MOTIFS`, `SKIP`, or `OK` statuses.

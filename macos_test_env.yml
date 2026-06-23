@@ -44,7 +44,7 @@ dependencies:
   - ucsc-gtftogenepred
   - ucsc-gff3togenepred
   - deeptools
-  - gimmemotifs
+  - meme
   - subread
   - macs3
   - idr
