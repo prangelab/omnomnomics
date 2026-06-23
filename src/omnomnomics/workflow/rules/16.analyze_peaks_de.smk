@@ -788,9 +788,10 @@ rule analyze_peaks_de:
                 shell(
                     f"plotProfile -m {quote(matrix_path)} -out {quote(profile_path)} "
                     f"--perGroup --plotTitle {quote(region_label)} "
-                    f"--regionsLabel {quote(region_label)} "
                     f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
-                    f"--refPointLabel center"
+                    f"--refPointLabel center --xAxisLabel 'distance from center (bp)' "
+                    f"--yAxisLabel 'normalized signal' --legendLocation upper-right "
+                    f"--plotWidth 10 --plotHeight 6"
                 )
                 reason = ""
                 if int(item["peak_count"]) > signal_region_count:
@@ -800,6 +801,9 @@ rule analyze_peaks_de:
             write_signal_summary()
 
         def run_meme_motifs(set_manifest_rows, motifs_dir):
+            if os.path.isdir(motifs_dir):
+                shutil.rmtree(motifs_dir)
+            motifs_dir = ensure_dir(motifs_dir)
             motif_summary_path = os.path.join(motifs_dir, "motif_runs.tsv")
             eligible_set_types = {
                 "de_significant",
