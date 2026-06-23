@@ -1,7 +1,7 @@
 import unittest
 
 from omnomnomics.cli import (
-    describe_public_internal_mapping,
+    describe_public_steps,
     map_public_to_internal_steps,
     resolve_public_mode_steps,
 )
@@ -20,10 +20,11 @@ class StepMappingTests(unittest.TestCase):
         public_steps = [10, 11, 12, 13, 14, 15]
         self.assertEqual(map_public_to_internal_steps("CHIP", public_steps), [10, 11, 13, 14, 15, 16])
 
-    def test_post_de_public_step_description_explains_internal_rule(self):
-        description = describe_public_internal_mapping("ATAC", [15])
+    def test_post_de_public_step_description_hides_internal_rule(self):
+        description = describe_public_steps("ATAC", [15])
         self.assertIn("15 (analyze differential peaks post-DE)", description)
-        self.assertIn("internal 16", description)
+        self.assertNotIn("internal", description)
+        self.assertNotIn("16", description)
 
 
 if __name__ == "__main__":

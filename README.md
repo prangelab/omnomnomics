@@ -298,7 +298,7 @@ Post-processing steps:
 8:	Create BigWigs
 9:	Merge Bigwigs and trackhubs by experimental group. Optional, will even in 'auto' mode only be run if the -E flag is set. See below.
 
-Assay dependent follow-up steps use assay-specific public numbering. For ATAC and ChIP, these public step numbers are translated internally to the historical Snakefile rule numbers; the CLI prints that mapping at run start.
+Assay dependent follow-up steps use assay-specific public numbering:
 
 RNA public steps:
 10:	Create trackhubs

@@ -108,31 +108,31 @@ ASSAY_PUBLIC_INTERNAL_STEP_MAP = {
         15: 16,
     },
 }
-INTERNAL_STEP_LABELS = {
-    1: "trim FASTQ",
-    2: "run FastQC",
-    3: "align reads",
-    4: "merge lanes",
-    5: "touch up BAM",
-    6: "index BAM",
-    7: "alignment QC",
-    8: "create BigWigs",
-    9: "merge BigWigs / track hubs",
-    10: "call peaks",
-    11: "count reads",
-    12: "RNA DE",
-    13: "peak QC",
-    14: "analyze peaks pre-DE",
-    15: "chromatin DE",
-    16: "analyze differential peaks post-DE",
-}
 PUBLIC_STEP_LABELS = {
     "RNA": {
+        1: "trim FASTQ",
+        2: "run FastQC",
+        3: "align reads",
+        4: "merge lanes",
+        5: "touch up BAM",
+        6: "index BAM",
+        7: "alignment QC",
+        8: "create BigWigs",
+        9: "merge BigWigs / track hubs",
         10: "create track hubs",
         11: "count reads",
         12: "RNA DE",
     },
     "ATAC": {
+        1: "trim FASTQ",
+        2: "run FastQC",
+        3: "align reads",
+        4: "merge lanes",
+        5: "touch up BAM",
+        6: "index BAM",
+        7: "alignment QC",
+        8: "create BigWigs",
+        9: "merge BigWigs / track hubs",
         10: "call peaks",
         11: "peak QC",
         12: "analyze peaks pre-DE",
@@ -141,6 +141,15 @@ PUBLIC_STEP_LABELS = {
         15: "analyze differential peaks post-DE",
     },
     "CHIP": {
+        1: "trim FASTQ",
+        2: "run FastQC",
+        3: "align reads",
+        4: "merge lanes",
+        5: "touch up BAM",
+        6: "index BAM",
+        7: "alignment QC",
+        8: "create BigWigs",
+        9: "merge BigWigs / track hubs",
         10: "call peaks",
         11: "peak QC",
         12: "analyze peaks pre-DE",
@@ -1123,31 +1132,12 @@ def map_public_to_internal_steps(assay_type, public_steps):
     return sorted(internal)
 
 
-def describe_steps(steps, labels):
-    descriptions = []
-    for step in steps:
-        label = labels.get(step)
-        if label:
-            descriptions.append(f"{step} ({label})")
-        else:
-            descriptions.append(str(step))
-    return ", ".join(descriptions)
-
-
-def describe_public_internal_mapping(assay_type, public_steps):
-    mapping = ASSAY_PUBLIC_INTERNAL_STEP_MAP.get(assay_type, {})
+def describe_public_steps(assay_type, public_steps):
     public_labels = PUBLIC_STEP_LABELS.get(assay_type, {})
     descriptions = []
     for public_step in public_steps:
-        internal_step = mapping.get(public_step)
-        public_label = public_labels.get(public_step, INTERNAL_STEP_LABELS.get(internal_step, "workflow step"))
-        internal_label = INTERNAL_STEP_LABELS.get(internal_step, "workflow step")
-        if public_step == internal_step:
-            descriptions.append(f"{public_step} ({public_label})")
-        else:
-            descriptions.append(
-                f"{public_step} ({public_label}) -> internal {internal_step} ({internal_label})"
-            )
+        public_label = public_labels.get(public_step, "workflow step")
+        descriptions.append(f"{public_step} ({public_label})")
     return "; ".join(descriptions)
 
 ##---------------------------------------------------------------------------------------------------------------
@@ -1814,7 +1804,7 @@ def main():
     # Setup variables
     run_date = setup_variables(experiment_dir, config)
 
-    # Resolve assay-specific public job mode and map it to internal workflow steps
+    # Resolve assay-specific public job mode to workflow execution steps
     public_step_map = ASSAY_PUBLIC_INTERNAL_STEP_MAP.get(the_type)
     if not public_step_map:
         print(f"No public step map is defined for assay type {the_type}. Aborting...", file=sys.stderr)
@@ -1823,8 +1813,7 @@ def main():
     public_mode_steps = resolve_public_mode_steps(mode, public_max_step)
     mode_steps = map_public_to_internal_steps(the_type, public_mode_steps)
     print(f"PUBLIC MODE STEPS = {public_mode_steps}")
-    print(f"PUBLIC STEP PLAN = {describe_public_internal_mapping(the_type, public_mode_steps)}")
-    print(f"INTERNAL SNAKEMAKE STEPS = {mode_steps}")
+    print(f"PUBLIC STEP PLAN = {describe_public_steps(the_type, public_mode_steps)}")
 
     # Check if pipeline needed or user first has to run separate scripts
     if 10 in mode_steps and the_type == "RNA":
@@ -1839,7 +1828,7 @@ def main():
         if not mode_steps:
             print("For the rest no steps to run. Done!")
             return
-    print(f"INTERNAL SNAKEMAKE STEPS AFTER ASSAY FILTERS = {describe_steps(mode_steps, INTERNAL_STEP_LABELS)}")
+    print(f"SELECTED PUBLIC STEPS = {describe_public_steps(the_type, public_mode_steps)}")
 
     # Reset selected step bookkeeping for the new run
     reset_step_tracking(mode_steps, experiment_dir)
