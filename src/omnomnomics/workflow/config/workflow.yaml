@@ -47,6 +47,10 @@ library_complexity_max_reads: 5000000
 spp_max_reads: 10000000
 frip_max_reads: 10000000
 post_de_signal_policy: "auto"
+post_de_motif_max_sets: 6
+post_de_motif_max_peaks: 100
+post_de_motif_timeout_seconds: 1200
+post_de_motif_threads: 1
 
 
 trim:

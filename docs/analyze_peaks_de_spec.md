@@ -47,9 +47,12 @@
 5. Motif analysis:
    - run GimmeMotifs on sufficiently sized promoter/distal DE sets and top-ranked fallback sets.
    - optionally run on pre-DE unique sets.
+   - prioritize promoter/promoter-region sets before distal, unique, and all-peak fallback sets.
+   - cap motif set count, peaks per set, per-set runtime, and motif threads via workflow defaults so motif failures remain report-level outcomes.
 
 ## Config notes
 - Current implementation runs with practical defaults and tool-availability checks.
+- Motif defaults are `post_de_motif_max_sets: 6`, `post_de_motif_max_peaks: 100`, `post_de_motif_timeout_seconds: 1200`, and `post_de_motif_threads: 1`.
 - Fine-grained motif background matching controls are reserved for a follow-up refinement.
 
 ## Status
@@ -58,3 +61,4 @@
   - DE set generation and manifests are always attempted.
   - deepTools and GimmeMotifs blocks are skipped with clear logs if executables are unavailable.
   - Post-DE signal plotting does not regenerate BigWigs inside the post-DE worker; missing BigWigs are either scheduled through step 8, required, or skipped according to `--post-de-signal-policy`.
+  - Motif runs write progress incrementally and record per-set `TIMEOUT`, `FAIL`, `NO_MOTIFS`, `SKIP`, or `OK` statuses.

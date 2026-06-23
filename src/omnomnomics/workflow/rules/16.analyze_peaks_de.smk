@@ -63,6 +63,10 @@ rule analyze_peaks_de:
         bigwig_inputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['wig_rule_num'] - 1]}",
         post_de_signal_policy=str(config.get("POST_DE_SIGNAL_POLICY", "auto")).strip().lower(),
         post_de_signal_auto_dependencies=int(config.get("MAX_PROJECT_SIZE_BYTES", 0) or 0) <= 0,
+        post_de_motif_max_sets=int(master_config.get("post_de_motif_max_sets", 6) or 0),
+        post_de_motif_max_peaks=int(master_config.get("post_de_motif_max_peaks", 100) or 100),
+        post_de_motif_timeout_seconds=int(master_config.get("post_de_motif_timeout_seconds", 1200) or 1200),
+        post_de_motif_threads=int(master_config.get("post_de_motif_threads", 1) or 1),
         genome_version=config["THEGENOME"],
         genome_fasta=os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "fasta", "genome.fa"),
         gtf_file=os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "annotation", "genes.gtf"),
@@ -811,15 +815,22 @@ rule analyze_peaks_de:
                 "top_de_ranked_promoter_regions",
             }
             min_motif_peaks = 10
-            max_motif_peaks = 100
+            max_motif_peaks = max(10, int(params.post_de_motif_max_peaks))
+            max_motif_sets = max(0, int(params.post_de_motif_max_sets))
+            motif_timeout_seconds = max(60, int(params.post_de_motif_timeout_seconds))
+            motif_threads = max(1, min(int(params.post_de_motif_threads), int(threads)))
             motif_summary = []
-            if not tool_available("gimme"):
-                log_it(logfile, "gimme executable not found. Skipping motif analysis in analyze_peaks_de.")
-                motif_summary.append(["ALL", "SKIP", "", "", "", "gimme executable not found"])
+
+            def write_motif_summary():
                 with open(motif_summary_path, "w", newline="") as handle:
                     writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
                     writer.writerow(["set_name", "status", "peak_bed", "output_dir", "genome", "reason"])
                     writer.writerows(motif_summary)
+
+            if not tool_available("gimme"):
+                log_it(logfile, "gimme executable not found. Skipping motif analysis in analyze_peaks_de.")
+                motif_summary.append(["ALL", "SKIP", "", "", "", "gimme executable not found"])
+                write_motif_summary()
                 return motif_summary_path
 
             genome_map = {
@@ -831,6 +842,51 @@ rule analyze_peaks_de:
                 motif_genome = params.genome_fasta
             else:
                 motif_genome = genome_map.get(str(params.genome_version), str(params.genome_version))
+
+            priority_by_set_type = {
+                "de_significant_promoter": 0,
+                "de_significant_promoter_regions": 0,
+                "de_up_promoter_regions": 1,
+                "de_down_promoter_regions": 1,
+                "de_significant_distal": 2,
+                "top_de_ranked_promoter": 3,
+                "top_de_ranked_promoter_regions": 3,
+                "top_de_ranked_distal": 4,
+                "unique_from_prede": 5,
+                "de_significant": 6,
+                "de_up": 7,
+                "de_down": 7,
+                "top_de_ranked": 8,
+            }
+
+            candidate_indices = []
+            for index, item in enumerate(set_manifest_rows):
+                if item["set_type"] not in eligible_set_types:
+                    continue
+                if int(item["peak_count"]) < min_motif_peaks:
+                    continue
+                candidate_indices.append(index)
+            candidate_indices = sorted(
+                candidate_indices,
+                key=lambda index: (
+                    priority_by_set_type.get(set_manifest_rows[index]["set_type"], 99),
+                    set_manifest_rows[index]["contrast_group"],
+                    set_manifest_rows[index]["contrast_label"],
+                    set_manifest_rows[index]["set_name"],
+                ),
+            )
+            selected_indices = set(candidate_indices[:max_motif_sets]) if max_motif_sets > 0 else set(candidate_indices)
+            if max_motif_sets > 0 and len(candidate_indices) > max_motif_sets:
+                log_it(
+                    logfile,
+                    f"Motif analysis capped at {max_motif_sets} highest-priority sets "
+                    f"out of {len(candidate_indices)} eligible sets.",
+                )
+            log_it(
+                logfile,
+                f"Motif analysis settings: max_sets={max_motif_sets or 'unlimited'}, "
+                f"max_peaks={max_motif_peaks}, timeout_seconds={motif_timeout_seconds}, threads={motif_threads}",
+            )
 
             def copy_bed_head(source_bed, target_bed, limit):
                 copied = 0
@@ -844,12 +900,19 @@ rule analyze_peaks_de:
                         copied += 1
                 return copied
 
-            for item in set_manifest_rows:
+            for index, item in enumerate(set_manifest_rows):
                 if item["set_type"] not in eligible_set_types:
                     motif_summary.append([item["set_name"], "SKIP", item["peak_bed"], "", motif_genome, "set type is not configured for motif analysis"])
+                    write_motif_summary()
                     continue
                 if int(item["peak_count"]) < min_motif_peaks:
                     motif_summary.append([item["set_name"], "SKIP", item["peak_bed"], "", motif_genome, f"fewer than {min_motif_peaks} peaks"])
+                    write_motif_summary()
+                    continue
+                if index not in selected_indices:
+                    reason = f"motif set cap reached; retained top {max_motif_sets} highest-priority sets"
+                    motif_summary.append([item["set_name"], "SKIP", item["peak_bed"], "", motif_genome, reason])
+                    write_motif_summary()
                     continue
                 safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", item["set_name"])
                 out_dir = os.path.join(motifs_dir, safe_name)
@@ -861,18 +924,29 @@ rule analyze_peaks_de:
                 cap_reason = ""
                 if int(item["peak_count"]) > motif_peak_count:
                     cap_reason = f"motif input capped at first {motif_peak_count} of {item['peak_count']} peaks"
-                cmd = (
-                    f"gimme motifs {quote(motif_input_bed)} {quote(out_dir)} "
-                    f"--known --nthreads {threads} -g {quote(motif_genome)}"
-                )
+                cmd = [
+                    "gimme",
+                    "motifs",
+                    motif_input_bed,
+                    out_dir,
+                    "--known",
+                    "--nthreads",
+                    str(motif_threads),
+                    "-g",
+                    motif_genome,
+                ]
+                env = os.environ.copy()
+                for thread_var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+                    env[thread_var] = str(motif_threads)
                 try:
+                    log_it(logfile, f"Running motif analysis for {item['set_name']} with {motif_peak_count} peaks.")
                     completed = subprocess.run(
                         cmd,
-                        shell=True,
-                        executable="/bin/bash",
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
                         text=True,
+                        timeout=motif_timeout_seconds,
+                        env=env,
                     )
                     if completed.stdout:
                         for line in completed.stdout.splitlines():
@@ -892,14 +966,24 @@ rule analyze_peaks_de:
                         if cap_reason:
                             reason = f"{reason}; {cap_reason}"
                         motif_summary.append([item["set_name"], "NO_MOTIFS", item["peak_bed"], out_dir, motif_genome, reason])
+                except subprocess.TimeoutExpired as motif_timeout:
+                    if motif_timeout.stdout:
+                        output_text = motif_timeout.stdout
+                        if isinstance(output_text, bytes):
+                            output_text = output_text.decode(errors="replace")
+                        for line in str(output_text).splitlines():
+                            log_it(logfile, line)
+                    reason = f"gimme motifs exceeded {motif_timeout_seconds} seconds"
+                    if cap_reason:
+                        reason = f"{reason}; {cap_reason}"
+                    log_it(logfile, f"Motif run timed out for {item['set_name']}: {reason}")
+                    motif_summary.append([item["set_name"], "TIMEOUT", item["peak_bed"], out_dir, motif_genome, reason])
                 except Exception as motif_error:
                     log_it(logfile, f"Motif run failed for {item['set_name']}: {motif_error}")
                     motif_summary.append([item["set_name"], "FAIL", item["peak_bed"], out_dir, motif_genome, str(motif_error)])
+                write_motif_summary()
 
-            with open(motif_summary_path, "w", newline="") as handle:
-                writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-                writer.writerow(["set_name", "status", "peak_bed", "output_dir", "genome", "reason"])
-                writer.writerows(motif_summary)
+            write_motif_summary()
             log_it(logfile, f"Motif run summary: {motif_summary_path}")
             return motif_summary_path
 
