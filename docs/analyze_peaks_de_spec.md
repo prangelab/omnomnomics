@@ -47,6 +47,7 @@
 5. Motif analysis:
    - run MEME SEA on sufficiently sized promoter/distal DE sets and top-ranked fallback sets.
    - run MEME AME on top-ranked DE sets using rank scores derived from BED order.
+   - write MEME text-mode TSV outputs to avoid HTML-template failures on minimal HPC MEME installations.
    - optionally run on pre-DE unique sets.
    - prioritize promoter/promoter-region sets before distal, unique, and all-peak fallback sets.
    - cap motif set count, peaks per set, centered FASTA window size, per-set runtime, and motif threads via workflow defaults so motif failures remain report-level outcomes.

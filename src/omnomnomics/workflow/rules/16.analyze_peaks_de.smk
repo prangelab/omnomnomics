@@ -1003,6 +1003,25 @@ rule analyze_peaks_de:
                     raise RuntimeError(f"{cmd[0]} exited with status {completed.returncode}")
                 return completed
 
+            def run_meme_text_command(cmd, output_path, timeout_seconds, env):
+                completed = subprocess.run(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=timeout_seconds,
+                    env=env,
+                )
+                if completed.stderr:
+                    for line in completed.stderr.splitlines():
+                        log_it(logfile, line)
+                if completed.stdout:
+                    with open(output_path, "w", newline="") as output_handle:
+                        output_handle.write(completed.stdout)
+                if completed.returncode != 0:
+                    raise RuntimeError(f"{cmd[0]} exited with status {completed.returncode}")
+                return completed
+
             for index, item in enumerate(set_manifest_rows):
                 if item["set_type"] not in eligible_set_types:
                     motif_summary.append([item["set_name"], "MEME", "SKIP", item["peak_bed"], "", "", motif_database, "set type is not configured for motif analysis"])
@@ -1057,24 +1076,22 @@ rule analyze_peaks_de:
                     rewrite_fasta_headers_with_scores(motif_input_fasta, fasta_scores)
 
                     sea_dir = ensure_dir(os.path.join(out_dir, "sea"))
+                    sea_tsv = os.path.join(sea_dir, "sea.tsv")
                     sea_cmd = [
                         "sea",
                         "--p",
                         motif_input_fasta,
                         "--m",
                         motif_database,
-                        "--oc",
-                        sea_dir,
                         "--qvalue",
-                        "--noseqs",
                         "--align",
                         "center",
+                        "--text",
                         "--verbosity",
                         "1",
                     ]
                     log_it(logfile, f"Running MEME SEA for {item['set_name']}.")
-                    run_meme_command(sea_cmd, motif_timeout_seconds, env)
-                    sea_tsv = os.path.join(sea_dir, "sea.tsv")
+                    run_meme_text_command(sea_cmd, sea_tsv, motif_timeout_seconds, env)
                     if os.path.isfile(sea_tsv):
                         motif_summary.append([item["set_name"], "SEA", "OK", item["peak_bed"], motif_input_fasta, sea_dir, motif_database, cap_reason])
                     else:
@@ -1085,20 +1102,19 @@ rule analyze_peaks_de:
 
                     if item["set_type"].startswith("top_de_ranked") and tool_available("ame"):
                         ame_dir = ensure_dir(os.path.join(out_dir, "ame"))
+                        ame_tsv = os.path.join(ame_dir, "ame.tsv")
                         ame_cmd = [
                             "ame",
-                            "--oc",
-                            ame_dir,
                             "--method",
                             "ranksum",
                             "--scoring",
                             "max",
+                            "--text",
                             motif_input_fasta,
                             motif_database,
                         ]
                         log_it(logfile, f"Running MEME AME ranked enrichment for {item['set_name']}.")
-                        run_meme_command(ame_cmd, motif_timeout_seconds, env)
-                        ame_tsv = os.path.join(ame_dir, "ame.tsv")
+                        run_meme_text_command(ame_cmd, ame_tsv, motif_timeout_seconds, env)
                         if os.path.isfile(ame_tsv):
                             motif_summary.append([item["set_name"], "AME", "OK", item["peak_bed"], motif_input_fasta, ame_dir, motif_database, cap_reason])
                         else:
