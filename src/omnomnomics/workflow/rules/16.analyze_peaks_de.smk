@@ -8,6 +8,8 @@
 #=============================================
 import csv
 import glob
+import gzip
+import json
 import math
 import os
 import re
@@ -621,7 +623,7 @@ rule analyze_peaks_de:
             return out_rows
 
         def run_deeptools(set_manifest_rows, signal_dir):
-            required = ["computeMatrix", "plotHeatmap", "plotProfile"]
+            required = ["computeMatrix", "plotHeatmap"]
             if not all(tool_available(x) for x in required):
                 log_it(logfile, "deepTools executables not fully available. Skipping signal plots in analyze_peaks_de.")
                 return
@@ -707,6 +709,116 @@ rule analyze_peaks_de:
                         return candidate
                 return None
 
+            def render_profile_from_matrix(matrix_path, profile_path, region_label, sample_labels):
+                try:
+                    import matplotlib
+                    matplotlib.use("Agg")
+                    import matplotlib.pyplot as plt
+                except Exception as exc:
+                    raise RuntimeError(f"matplotlib import failed: {exc}") from exc
+
+                with gzip.open(matrix_path, "rt") as handle:
+                    header_line = handle.readline().strip()
+                    if not header_line.startswith("@"):
+                        raise RuntimeError("deepTools matrix header is missing")
+                    matrix_header = json.loads(header_line[1:])
+
+                    sample_boundaries = [int(x) for x in matrix_header.get("sample_boundaries", [])]
+                    if len(sample_boundaries) < 2:
+                        raise RuntimeError("deepTools matrix header lacks sample boundaries")
+                    n_samples = len(sample_boundaries) - 1
+                    if len(sample_labels) != n_samples:
+                        sample_labels = [str(x) for x in matrix_header.get("sample_labels", sample_labels)]
+                    if len(sample_labels) != n_samples:
+                        sample_labels = [f"sample_{index + 1}" for index in range(n_samples)]
+
+                    bin_counts = [sample_boundaries[i + 1] - sample_boundaries[i] for i in range(n_samples)]
+                    if not bin_counts or any(count <= 0 for count in bin_counts):
+                        raise RuntimeError("deepTools matrix sample boundaries are invalid")
+
+                    sums = [[0.0 for _ in range(bin_counts[i])] for i in range(n_samples)]
+                    counts = [[0 for _ in range(bin_counts[i])] for i in range(n_samples)]
+                    for line in handle:
+                        if not line.strip():
+                            continue
+                        fields = line.rstrip("\n").split("\t")
+                        values = fields[6:]
+                        for sample_index in range(n_samples):
+                            start = sample_boundaries[sample_index]
+                            end = sample_boundaries[sample_index + 1]
+                            for bin_index, raw_value in enumerate(values[start:end]):
+                                try:
+                                    value = float(raw_value)
+                                except ValueError:
+                                    continue
+                                if not math.isfinite(value):
+                                    continue
+                                sums[sample_index][bin_index] += value
+                                counts[sample_index][bin_index] += 1
+
+                upstream = int(matrix_header.get("upstream", [1000])[0] or 1000)
+                downstream = int(matrix_header.get("downstream", [1000])[0] or 1000)
+                bin_size = int(matrix_header.get("bin size", [100])[0] or 100)
+                n_bins = bin_counts[0]
+                x_values = [(-upstream + (index + 0.5) * bin_size) / 1000.0 for index in range(n_bins)]
+                profiles = []
+                for sample_index in range(n_samples):
+                    sample_profile = []
+                    for bin_index in range(bin_counts[sample_index]):
+                        if counts[sample_index][bin_index] == 0:
+                            sample_profile.append(float("nan"))
+                        else:
+                            sample_profile.append(sums[sample_index][bin_index] / counts[sample_index][bin_index])
+                    profiles.append(sample_profile)
+
+                color_cycle = [
+                    "#1f77b4",
+                    "#2ca02c",
+                    "#ff7f0e",
+                    "#d62728",
+                    "#9467bd",
+                    "#17becf",
+                    "#bcbd22",
+                    "#8c564b",
+                ]
+                fig = plt.figure(figsize=(9.5, 6.5))
+                grid = fig.add_gridspec(nrows=2, ncols=1, height_ratios=[4.8, 1.0], hspace=0.28)
+                ax = fig.add_subplot(grid[0])
+                legend_ax = fig.add_subplot(grid[1])
+                legend_ax.axis("off")
+
+                lines = []
+                for sample_index, sample_profile in enumerate(profiles):
+                    line, = ax.plot(
+                        x_values[: len(sample_profile)],
+                        sample_profile,
+                        linewidth=2.4,
+                        color=color_cycle[sample_index % len(color_cycle)],
+                        label=sample_labels[sample_index],
+                    )
+                    lines.append(line)
+
+                ax.axvline(0, color="#555555", linewidth=1.0, alpha=0.6)
+                ax.set_title(region_label, fontsize=16, pad=12)
+                ax.set_xlabel("distance from center (kb)", fontsize=12)
+                ax.set_ylabel("normalized signal", fontsize=12)
+                ax.set_xlim(-upstream / 1000.0, downstream / 1000.0)
+                ax.set_xticks([-upstream / 1000.0, 0, downstream / 1000.0])
+                ax.set_xticklabels([f"-{upstream / 1000.0:.1f}", "center", f"{downstream / 1000.0:.1f}Kb"])
+                ax.spines["top"].set_visible(False)
+                ax.spines["right"].set_visible(False)
+                ax.grid(True, axis="y", color="#dddddd", linewidth=0.8)
+                legend_ax.legend(
+                    handles=lines,
+                    labels=sample_labels,
+                    loc="center",
+                    ncol=min(3, max(1, len(sample_labels))),
+                    frameon=False,
+                    fontsize=11,
+                )
+                fig.savefig(profile_path, bbox_inches="tight")
+                plt.close(fig)
+
             matrices_dir = ensure_dir(os.path.join(signal_dir, "matrices"))
             heatmaps_dir = ensure_dir(os.path.join(signal_dir, "heatmaps"))
             profiles_dir = ensure_dir(os.path.join(signal_dir, "profiles"))
@@ -786,14 +898,20 @@ rule analyze_peaks_de:
                     f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
                     f"--xAxisLabel 'distance from center (bp)' --refPointLabel center"
                 )
-                shell(
-                    f"plotProfile -m {quote(matrix_path)} -out {quote(profile_path)} "
-                    f"--perGroup --regionsLabel {quote(region_label)} "
-                    f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
-                    f"--refPointLabel center "
-                    f"--yAxisLabel 'normalized signal' --legendLocation upper-right "
-                    f"--plotWidth 10 --plotHeight 6"
-                )
+                try:
+                    render_profile_from_matrix(matrix_path, profile_path, region_label, sample_labels)
+                except Exception as exc:
+                    if not tool_available("plotProfile"):
+                        raise RuntimeError(f"Custom profile rendering failed for {item['set_name']}, and plotProfile is not available: {exc}") from exc
+                    log_it(logfile, f"Custom profile rendering failed for {item['set_name']}: {exc}. Falling back to deepTools plotProfile.")
+                    shell(
+                        f"plotProfile -m {quote(matrix_path)} -out {quote(profile_path)} "
+                        f"--perGroup --regionsLabel {quote(region_label)} "
+                        f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
+                        f"--refPointLabel center "
+                        f"--yAxisLabel 'normalized signal' --legendLocation upper-right "
+                        f"--plotWidth 10 --plotHeight 6"
+                    )
                 reason = ""
                 if int(item["peak_count"]) > signal_region_count:
                     reason = f"signal input capped at first {signal_region_count} of {item['peak_count']} regions"
