@@ -9,6 +9,7 @@
 import csv
 import glob
 import gzip
+import hashlib
 import json
 import math
 import os
@@ -699,6 +700,13 @@ rule analyze_peaks_de:
                         copied += 1
                 return copied
 
+            def file_sha256(path):
+                digest = hashlib.sha256()
+                with open(path, "rb") as handle:
+                    for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                return digest.hexdigest()
+
             def existing_bigwig_for_sample(sample):
                 candidates = [
                     os.path.join(params.bigwig_inputfolder, f"{sample}.bw"),
@@ -864,6 +872,7 @@ rule analyze_peaks_de:
                 write_signal_summary()
                 return
 
+            signal_artifact_cache = {}
             for item in set_manifest_rows:
                 set_type = str(item.get("set_type", ""))
                 if set_type not in eligible_set_types:
@@ -886,6 +895,28 @@ rule analyze_peaks_de:
                 matrix_path = os.path.join(matrices_dir, f"{safe_name}.matrix.gz")
                 heatmap_path = os.path.join(heatmaps_dir, f"{safe_name}.heatmap.pdf")
                 profile_path = os.path.join(profiles_dir, f"{safe_name}.profile.pdf")
+                cap_reason = ""
+                if int(item["peak_count"]) > signal_region_count:
+                    cap_reason = f"signal input capped at first {signal_region_count} of {item['peak_count']} regions"
+                signal_signature = (
+                    file_sha256(signal_bed_path),
+                    tuple(bigwigs),
+                    tuple(sample_labels),
+                    region_label,
+                    "reference-point:center:-1000:+1000:bin100:missingDataAsZero",
+                )
+                cached = signal_artifact_cache.get(signal_signature)
+                if cached:
+                    shutil.copy2(cached["matrix"], matrix_path)
+                    shutil.copy2(cached["heatmap"], heatmap_path)
+                    shutil.copy2(cached["profile"], profile_path)
+                    reason_parts = [f"reused signal plots from {cached['set_name']}"]
+                    if cap_reason:
+                        reason_parts.append(cap_reason)
+                    signal_summary_rows.append(
+                        [item["set_name"], "REUSE", bed_path, signal_bed_path, matrix_path, heatmap_path, "; ".join(reason_parts)]
+                    )
+                    continue
                 shell(
                     f"computeMatrix reference-point --referencePoint center -b 1000 -a 1000 "
                     f"-R {quote(signal_bed_path)} -S {' '.join(quote(x) for x in bigwigs)} "
@@ -912,10 +943,13 @@ rule analyze_peaks_de:
                         f"--yAxisLabel 'normalized signal' --legendLocation upper-right "
                         f"--plotWidth 10 --plotHeight 6"
                     )
-                reason = ""
-                if int(item["peak_count"]) > signal_region_count:
-                    reason = f"signal input capped at first {signal_region_count} of {item['peak_count']} regions"
-                signal_summary_rows.append([item["set_name"], "OK", bed_path, signal_bed_path, matrix_path, heatmap_path, reason])
+                signal_artifact_cache[signal_signature] = {
+                    "set_name": item["set_name"],
+                    "matrix": matrix_path,
+                    "heatmap": heatmap_path,
+                    "profile": profile_path,
+                }
+                signal_summary_rows.append([item["set_name"], "OK", bed_path, signal_bed_path, matrix_path, heatmap_path, cap_reason])
 
             write_signal_summary()
 
