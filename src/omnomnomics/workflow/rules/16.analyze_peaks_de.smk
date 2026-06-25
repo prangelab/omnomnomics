@@ -782,13 +782,13 @@ rule analyze_peaks_de:
                 shell(
                     f"plotHeatmap -m {quote(matrix_path)} -out {quote(heatmap_path)} "
                     f"--whatToShow 'heatmap and colorbar' --sortRegions descend "
-                    f"--plotTitle {quote(region_label)} --regionsLabel {quote(region_label)} "
+                    f"--regionsLabel {quote(region_label)} "
                     f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
                     f"--xAxisLabel 'distance from center (bp)' --refPointLabel center"
                 )
                 shell(
                     f"plotProfile -m {quote(matrix_path)} -out {quote(profile_path)} "
-                    f"--perGroup --plotTitle {quote(region_label)} --regionsLabel {quote(region_label)} "
+                    f"--perGroup --regionsLabel {quote(region_label)} "
                     f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
                     f"--refPointLabel center "
                     f"--yAxisLabel 'normalized signal' --legendLocation upper-right "
