@@ -55,7 +55,7 @@
 ## Config notes
 - Current implementation runs with practical defaults and tool-availability checks.
 - Motif defaults are `post_de_motif_max_sets: 6`, `post_de_motif_max_peaks: 100`, `post_de_motif_window_bp: 200`, `post_de_motif_timeout_seconds: 1200`, `post_de_motif_threads: 1`, and `post_de_motif_database: auto`.
-- `post_de_motif_database: auto` searches the active environment and the `OMNOMNOMICS_MEME_MOTIF_DATABASE`, `MEME_MOTIF_DATABASE`, or `JASPAR_MOTIF_DATABASE` environment variables for a MEME-format vertebrate motif database. Set it to an explicit `.meme` motif file for reproducible database pinning.
+- `post_de_motif_database: auto` first uses the permanent MEME-format motif database cache under the configured genome assembly root, then falls back to the active environment or `OMNOMNOMICS_MEME_MOTIF_DATABASE`, `MEME_MOTIF_DATABASE`, or `JASPAR_MOTIF_DATABASE`. If no database is available, omnomnomics downloads the default JASPAR vertebrate database into `motif_databases/` for reuse. Run `omnomnomics genomes motifs` to prefetch or refresh this cache, or set `post_de_motif_database` to an explicit `.meme` motif file for reproducible database pinning.
 - Fine-grained motif background matching controls are reserved for a follow-up refinement.
 
 ## Status

@@ -70,6 +70,7 @@ rule analyze_peaks_de:
         post_de_motif_window_bp=int(master_config.get("post_de_motif_window_bp", 200) or 200),
         post_de_motif_database=str(master_config.get("post_de_motif_database", "auto")),
         genome_version=config["THEGENOME"],
+        genome_assembly_dir=config["GENOME_ASSEMBLY_DIR"],
         genome_fasta=os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "fasta", "genome.fa"),
         gtf_file=os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "annotation", "genes.gtf"),
     threads:
@@ -844,55 +845,26 @@ rule analyze_peaks_de:
                 return motif_summary_path
 
             def resolve_meme_motif_database():
-                requested = str(params.post_de_motif_database).strip()
-                if requested and requested.lower() != "auto":
-                    if os.path.isfile(requested):
-                        return requested
+                try:
+                    from omnomnomics.genomes import resolve_meme_motif_database as resolve_reference_motif_database
+                except Exception:
                     return None
 
-                for env_var in ("OMNOMNOMICS_MEME_MOTIF_DATABASE", "MEME_MOTIF_DATABASE", "JASPAR_MOTIF_DATABASE"):
-                    env_path = os.environ.get(env_var, "").strip()
-                    if env_path and os.path.isfile(env_path):
-                        return env_path
-
-                search_roots = []
-                conda_prefix = os.environ.get("CONDA_PREFIX")
-                if conda_prefix:
-                    search_roots.extend(
-                        [
-                            os.path.join(conda_prefix, "share", "meme", "motif_databases"),
-                            os.path.join(conda_prefix, "share", "meme", "db", "motif_databases"),
-                            os.path.join(conda_prefix, "share", "meme", "db"),
-                            os.path.join(conda_prefix, "share", "meme"),
-                            *glob.glob(os.path.join(conda_prefix, "share", "meme-*", "db", "motif_databases")),
-                            *glob.glob(os.path.join(conda_prefix, "share", "meme-*", "motif_databases")),
-                        ]
+                try:
+                    return resolve_reference_motif_database(
+                        params.genome_assembly_dir,
+                        requested=params.post_de_motif_database,
                     )
-                search_roots.extend(["/usr/local/share", "/usr/share"])
-                patterns = [
-                    "**/JASPAR*CORE*vertebrates*non-redundant*.meme",
-                    "**/JASPAR*CORE*vertebrates*.meme",
-                    "**/HOCOMOCO*.meme",
-                    "**/*.meme",
-                ]
-                for root in search_roots:
-                    if not root or not os.path.isdir(root):
-                        continue
-                    for pattern in patterns:
-                        matches = sorted(glob.glob(os.path.join(root, pattern), recursive=True))
-                        for candidate in matches:
-                            candidate_parts = set(os.path.normpath(candidate).split(os.sep))
-                            if "doc" in candidate_parts or "examples" in candidate_parts:
-                                continue
-                            if os.path.isfile(candidate) and os.path.getsize(candidate) > 0:
-                                return candidate
+                except Exception as exc:
+                    log_it(logfile, f"Could not resolve MEME motif database in analyze_peaks_de: {exc}")
+                    return None
                 return None
 
             motif_database = resolve_meme_motif_database()
             if not motif_database:
                 reason = (
-                    "no MEME motif database found; set post_de_motif_database to a MEME-format motif file "
-                    "or install the MEME Suite motif databases"
+                    "no MEME motif database found or cached; run 'omnomnomics genomes motifs' "
+                    "or set post_de_motif_database to a MEME-format motif file"
                 )
                 log_it(logfile, f"Skipping MEME motif analysis in analyze_peaks_de because {reason}.")
                 motif_summary.append(["ALL", "MEME", "SKIP", "", "", "", "", reason])

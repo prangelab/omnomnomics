@@ -1,7 +1,10 @@
 import argparse
 import gzip
+import os
 import shutil
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 import yaml
@@ -52,6 +55,16 @@ UCSC_BLACKLIST_ASSEMBLY_ALIASES = {
     "GRCm38": "mm10",
     "GRCm39": "mm39",
 }
+DEFAULT_MEME_MOTIF_DATABASE_URL = (
+    "https://jaspar.elixir.no/download/data/2024/CORE/"
+    "JASPAR2024_CORE_vertebrates_non-redundant_pfms_meme.txt"
+)
+DEFAULT_MEME_MOTIF_DATABASE_NAME = "JASPAR2024_CORE_vertebrates_non-redundant.meme"
+MEME_MOTIF_DATABASE_ENV_VARS = (
+    "OMNOMNOMICS_MEME_MOTIF_DATABASE",
+    "MEME_MOTIF_DATABASE",
+    "JASPAR_MOTIF_DATABASE",
+)
 
 
 def load_site_settings(workflow_root, workflow_config_file, site_config_file):
@@ -97,6 +110,20 @@ def parse_genomes_arguments(argv):
     blacklist_parser.add_argument("--threads", type=int, default=1, help="Threads passed to genomepy")
     blacklist_parser.add_argument("--force", action="store_true", help="Refresh an existing cached blacklist BED")
 
+    motifs_parser = subparsers.add_parser(
+        "motifs",
+        aliases=["motif-db"],
+        help="Download or show the cached MEME motif database used by post-DE peak analysis",
+    )
+    motifs_parser.add_argument("--force", action="store_true", help="Refresh the cached motif database")
+    motifs_parser.add_argument("--url", default=DEFAULT_MEME_MOTIF_DATABASE_URL, help="MEME motif database URL")
+    motifs_parser.add_argument("--name", default=DEFAULT_MEME_MOTIF_DATABASE_NAME, help="Cached database filename")
+    motifs_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the cache path without downloading",
+    )
+
     install_parser = subparsers.add_parser("install", help="Download and normalize one or more assemblies")
     install_parser.add_argument("--species", default="homo sapiens", help="Species search term if no assemblies are given")
     install_parser.add_argument(
@@ -113,6 +140,11 @@ def parse_genomes_arguments(argv):
         "--skip-blacklist",
         action="store_true",
         help="Do not cache a genomepy-provided blacklist BED during assembly install",
+    )
+    install_parser.add_argument(
+        "--skip-motif-db",
+        action="store_true",
+        help="Do not cache the default MEME motif database during assembly install",
     )
     install_parser.add_argument(
         "--indexers",
@@ -320,6 +352,158 @@ def copy_blacklist_bed(src, dst):
     else:
         shutil.copy2(src, dst)
     return dst
+
+
+def meme_motif_database_dir(assembly_root):
+    return Path(assembly_root) / "motif_databases"
+
+
+def meme_motif_database_path(assembly_root, name=DEFAULT_MEME_MOTIF_DATABASE_NAME):
+    return meme_motif_database_dir(assembly_root) / name
+
+
+def looks_like_meme_database(path):
+    try:
+        with open(path, "r", errors="replace") as handle:
+            head = "".join(handle.readline() for _ in range(50))
+    except OSError:
+        return False
+    return "MEME version" in head and "ALPHABET" in head
+
+
+def find_cached_meme_motif_database(assembly_root, name=DEFAULT_MEME_MOTIF_DATABASE_NAME):
+    primary = meme_motif_database_path(assembly_root, name)
+    candidates = [primary]
+    motif_dir = meme_motif_database_dir(assembly_root)
+    if motif_dir.is_dir():
+        candidates.extend(sorted(motif_dir.glob("*.meme")))
+        candidates.extend(sorted(motif_dir.glob("*_meme.txt")))
+        candidates.extend(sorted(motif_dir.glob("*.txt")))
+
+    seen = set()
+    for candidate in candidates:
+        candidate = Path(candidate)
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if candidate.is_file() and candidate.stat().st_size > 0 and looks_like_meme_database(candidate):
+            return candidate
+    return None
+
+
+def find_environment_meme_motif_database():
+    for env_var in MEME_MOTIF_DATABASE_ENV_VARS:
+        env_value = os.environ.get(env_var, "").strip()
+        if not env_value:
+            continue
+        env_path = Path(env_value).expanduser()
+        if env_path.is_file() and looks_like_meme_database(env_path):
+            return env_path
+
+    search_roots = []
+    try:
+        import glob
+
+        conda_prefix = os.environ.get("CONDA_PREFIX")
+        if conda_prefix:
+            search_roots.extend(
+                [
+                    Path(conda_prefix) / "share" / "meme" / "motif_databases",
+                    Path(conda_prefix) / "share" / "meme" / "db" / "motif_databases",
+                    Path(conda_prefix) / "share" / "meme" / "db",
+                    Path(conda_prefix) / "share" / "meme",
+                ]
+            )
+            search_roots.extend(
+                Path(path)
+                for path in glob.glob(str(Path(conda_prefix) / "share" / "meme-*" / "db" / "motif_databases"))
+            )
+            search_roots.extend(
+                Path(path)
+                for path in glob.glob(str(Path(conda_prefix) / "share" / "meme-*" / "motif_databases"))
+            )
+    except Exception:
+        pass
+    search_roots.extend([Path("/usr/local/share"), Path("/usr/share")])
+
+    patterns = [
+        "JASPAR*CORE*vertebrates*non-redundant*.meme",
+        "JASPAR*CORE*vertebrates*.meme",
+        "HOCOMOCO*.meme",
+        "*.meme",
+    ]
+    for root in search_roots:
+        if not root.is_dir():
+            continue
+        for pattern in patterns:
+            for candidate in sorted(root.rglob(pattern)):
+                candidate_parts = set(candidate.parts)
+                if "doc" in candidate_parts or "examples" in candidate_parts:
+                    continue
+                if candidate.is_file() and candidate.stat().st_size > 0 and looks_like_meme_database(candidate):
+                    return candidate
+    return None
+
+
+def copy_meme_motif_database(src, dst):
+    src = Path(src).expanduser()
+    dst = Path(dst)
+    if not src.is_file() or not looks_like_meme_database(src):
+        raise FileNotFoundError(f"MEME motif database '{src}' was not found or is not a valid MEME-format file.")
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if src.resolve() != dst.resolve():
+        shutil.copy2(src, dst)
+    return dst
+
+
+def download_meme_motif_database(url, dst, force=False):
+    dst = Path(dst)
+    if dst.is_file() and not force and looks_like_meme_database(dst):
+        return dst
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = dst.with_name(f"{dst.name}.{os.getpid()}.tmp")
+    try:
+        with urllib.request.urlopen(url, timeout=120) as response, open(tmp_path, "wb") as handle:
+            shutil.copyfileobj(response, handle)
+        if not looks_like_meme_database(tmp_path):
+            raise ValueError(f"Downloaded motif database from '{url}' is not a valid MEME-format file.")
+        tmp_path.replace(dst)
+    except (OSError, urllib.error.URLError, ValueError):
+        if tmp_path.exists():
+            tmp_path.unlink()
+        raise
+    return dst
+
+
+def resolve_meme_motif_database(
+    assembly_root,
+    requested="auto",
+    force=False,
+    download=True,
+    url=DEFAULT_MEME_MOTIF_DATABASE_URL,
+    name=DEFAULT_MEME_MOTIF_DATABASE_NAME,
+):
+    requested = str(requested or "auto").strip()
+    if requested and requested.lower() != "auto":
+        requested_path = Path(requested).expanduser()
+        if requested_path.is_file() and looks_like_meme_database(requested_path):
+            return requested_path
+        return None
+
+    cached = find_cached_meme_motif_database(assembly_root, name=name)
+    if cached and not force:
+        return cached
+
+    cache_path = meme_motif_database_path(assembly_root, name=name)
+    env_db = find_environment_meme_motif_database()
+    if env_db and not force:
+        return copy_meme_motif_database(env_db, cache_path)
+
+    if download:
+        return download_meme_motif_database(url, cache_path, force=force)
+
+    return None
 
 
 def cache_blacklist_from_install(install_root, assembly_root, assembly_name):
@@ -595,7 +779,11 @@ def genomes_main(argv, workflow_root, workflow_config_file, default_site_config)
     site_config_file = Path(args.site_config).expanduser().resolve() if args.site_config else default_site_config
     config = load_site_settings(workflow_root, workflow_config_file, site_config_file)
 
-    genomes_command = {"ls": "list", "local": "installed"}.get(args.genomes_command, args.genomes_command)
+    genomes_command = {
+        "ls": "list",
+        "local": "installed",
+        "motif-db": "motifs",
+    }.get(args.genomes_command, args.genomes_command)
 
     if genomes_command == "installed":
         rows = list_installed_rows(config["genome_assembly_dir"], getattr(args, "species", None))
@@ -611,6 +799,24 @@ def genomes_main(argv, workflow_root, workflow_config_file, default_site_config)
             force=args.force,
         )
         print(f"Blacklist BED for '{args.assembly}': {blacklist_bed}")
+        return
+
+    if genomes_command == "motifs":
+        motif_path = meme_motif_database_path(config["genome_assembly_dir"], name=args.name)
+        if args.dry_run:
+            print(f"MEME motif database cache path: {motif_path}")
+            return
+        try:
+            cached_motif_db = resolve_meme_motif_database(
+                config["genome_assembly_dir"],
+                force=args.force,
+                url=args.url,
+                name=args.name,
+            )
+        except Exception as exc:
+            print(f"Could not cache MEME motif database: {exc}", file=sys.stderr)
+            sys.exit(1)
+        print(f"MEME motif database: {cached_motif_db}")
         return
 
     genomepy = import_genomepy()
@@ -654,3 +860,9 @@ def genomes_main(argv, workflow_root, workflow_config_file, default_site_config)
             print(f"Cached blacklist BED: {cached_blacklist}")
         elif not args.skip_blacklist:
             print(f"No blacklist BED was cached for '{assembly_name}'. Use 'omnomnomics genomes blacklist' to backfill one if needed.")
+        if not args.skip_motif_db:
+            try:
+                cached_motif_db = resolve_meme_motif_database(config["genome_assembly_dir"])
+                print(f"Cached MEME motif database: {cached_motif_db}")
+            except Exception as exc:
+                print(f"No MEME motif database was cached: {exc}", file=sys.stderr)
