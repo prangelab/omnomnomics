@@ -804,7 +804,7 @@ rule analyze_peaks_de:
                 ax.set_ylabel("normalized signal", fontsize=12)
                 ax.set_xlim(-upstream / 1000.0, downstream / 1000.0)
                 ax.set_xticks([-upstream / 1000.0, 0, downstream / 1000.0])
-                ax.set_xticklabels([f"-{upstream / 1000.0:.1f}", "center", f"{downstream / 1000.0:.1f}Kb"])
+                ax.set_xticklabels([f"-{upstream / 1000.0:.1f}", "center", f"{downstream / 1000.0:.1f}"])
                 ax.spines["top"].set_visible(False)
                 ax.spines["right"].set_visible(False)
                 ax.grid(True, axis="y", color="#dddddd", linewidth=0.8)
