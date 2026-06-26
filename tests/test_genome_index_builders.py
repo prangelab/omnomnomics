@@ -6,12 +6,30 @@ from unittest.mock import patch
 from omnomnomics.genomes import (
     build_hisat2_index,
     build_star_index,
+    configure_genomepy_reference_plugins,
     has_complete_hisat2_index,
     star_sa_index_nbases,
 )
 
 
 class GenomeIndexBuilderTests(unittest.TestCase):
+    def test_genomepy_reference_plugins_disable_aligner_indexes(self):
+        class FakeGenomepy:
+            def __init__(self):
+                self.calls = []
+
+            def manage_plugins(self, action, plugins):
+                self.calls.append((action, plugins))
+
+        fake_genomepy = FakeGenomepy()
+
+        configure_genomepy_reference_plugins(fake_genomepy, cache_blacklist=True)
+
+        self.assertEqual(
+            fake_genomepy.calls,
+            [("disable", ["hisat2", "star"]), ("enable", ["blacklist"])],
+        )
+
     def test_hisat2_completion_accepts_large_indexes(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             index_dir = Path(tmpdir)

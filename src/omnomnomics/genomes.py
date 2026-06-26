@@ -515,6 +515,12 @@ def cache_blacklist_from_install(install_root, assembly_root, assembly_name):
     return copy_blacklist_bed(candidates[0], blacklist_aux_path(assembly_root, assembly_name))
 
 
+def configure_genomepy_reference_plugins(genomepy, cache_blacklist=True):
+    genomepy.manage_plugins("disable", ["hisat2", "star"])
+    if cache_blacklist:
+        genomepy.manage_plugins("enable", ["blacklist"])
+
+
 def resolve_blacklist_bed(assembly_name, assembly_root, provider="UCSC", threads=1, force=False):
     assembly_root = Path(assembly_root)
     assembly_dir = assembly_root / assembly_name
@@ -537,8 +543,7 @@ def resolve_blacklist_bed(assembly_name, assembly_root, provider="UCSC", threads
         return cached_path
 
     tmp_root.mkdir(parents=True, exist_ok=True)
-    genomepy.manage_plugins("disable", ["hisat2", "star"])
-    genomepy.manage_plugins("enable", ["blacklist"])
+    configure_genomepy_reference_plugins(genomepy, cache_blacklist=True)
     genomepy.install_genome(
         provider_assembly,
         provider=provider,
@@ -840,16 +845,7 @@ def install_assembly(
     if ucsc_annotation:
         install_kwargs["ucsc_annotation"] = ucsc_annotation
 
-    wanted_indexers = set(indexers)
-    enabled_plugins = [plugin_name for plugin_name in ["hisat2", "star"] if plugin_name in wanted_indexers]
-    if cache_blacklist:
-        enabled_plugins.append("blacklist")
-    disabled_plugins = [plugin_name for plugin_name in ["hisat2", "star"] if plugin_name not in wanted_indexers]
-
-    if disabled_plugins:
-        genomepy.manage_plugins("disable", disabled_plugins)
-    if enabled_plugins:
-        genomepy.manage_plugins("enable", enabled_plugins)
+    configure_genomepy_reference_plugins(genomepy, cache_blacklist=cache_blacklist)
 
     genome = genomepy.install_genome(assembly_name, **install_kwargs)
     normalized_root = normalize_genome_install(

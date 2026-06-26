@@ -109,7 +109,7 @@ omnomnomics genomes blacklist --assembly GRCh38
 omnomnomics genomes motifs
 ```
 
-When available through genomepy, `omnomnomics genomes install` also caches the ENCODE blacklist BED into the normalized assembly `aux/` directory. Requested STAR and HISAT2 indexes are reused from genomepy when present; otherwise omnomnomics builds the missing indexes directly from the normalized FASTA/GTF. The separate `genomes blacklist` command is mainly for older genome installs or explicit refreshes.
+When available through genomepy, `omnomnomics genomes install` also caches the ENCODE blacklist BED into the normalized assembly `aux/` directory. Omnomnomics disables genomepy STAR/HISAT2 plugins during install and builds requested aligner indexes directly from the normalized FASTA/GTF, so index layout stays predictable. The separate `genomes blacklist` command is mainly for older genome installs or explicit refreshes.
 STAR genome indexing can require substantially more memory than HISAT2 indexing. On HPC systems where memory scales with requested CPU cores, request a larger CPU slice for whole-genome installs.
 Genome installs also cache the default JASPAR MEME-format motif database under the configured genome assembly root in `motif_databases/`. Post-DE motif analysis reuses this permanent cache and will try to create it on first run if it is missing. Use `omnomnomics genomes motifs --force` to refresh the cached database, or set `post_de_motif_database` to an explicit MEME-format file for strict database pinning.
 
