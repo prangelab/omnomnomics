@@ -21,7 +21,9 @@
   - `top_de_ranked*.bed`
   - `unique_from_prede/*.bed` (optional extra layer from step 14)
 - `peak_calling/analyze_peaks_de/signal/`
-  - deepTools matrices, heatmaps, and profiles for DE subsets.
+  - deepTools matrices and heatmaps for DE subsets.
+  - matplotlib-rendered profile PDFs built from the deepTools matrices.
+  - `signal_runs.tsv` with per-set `OK`, `REUSE`, or `SKIP` status.
 - `peak_calling/analyze_peaks_de/motifs/`
   - promoter, distal, and top-ranked motif runs per DE subset.
   - optional motif runs for pre-DE unique sets.
@@ -44,6 +46,10 @@
    - with `--post-de-signal-policy auto`, schedule missing BigWigs through step 8 before plotting.
    - with `--post-de-signal-policy require`, fail clearly if required BigWigs are absent.
    - with `--post-de-signal-policy skip`, skip signal plots with a summary-table reason if required BigWigs are absent.
+   - render heatmaps with deepTools `plotHeatmap`.
+   - render profile PDFs from the deepTools matrix with matplotlib, with the sample legend placed outside the signal axes.
+   - reuse equivalent signal outputs when another set has the same capped BED content, BigWig list, sample labels, region label, and matrix settings.
+   - mark copied signal outputs as `REUSE` in `signal_runs.tsv`, including the source set name and any region-cap reason.
 5. Motif analysis:
    - run MEME SEA on sufficiently sized promoter/distal DE sets and top-ranked fallback sets.
    - run MEME AME on top-ranked DE sets using rank scores derived from BED order.
@@ -64,4 +70,5 @@
   - DE set generation and manifests are always attempted.
   - deepTools and MEME motif blocks are skipped with clear logs if executables are unavailable.
   - Post-DE signal plotting does not regenerate BigWigs inside the post-DE worker; missing BigWigs are either scheduled through step 8, required, or skipped according to `--post-de-signal-policy`.
+  - Post-DE signal plotting records per-set outcomes in `signal_runs.tsv`: `OK` for newly computed signal artifacts, `REUSE` for copied equivalent artifacts, and `SKIP` for ineligible or unavailable signal sets.
   - Motif runs write progress incrementally and record per-set `TIMEOUT`, `FAIL`, `NO_MOTIFS`, `SKIP`, or `OK` statuses.
