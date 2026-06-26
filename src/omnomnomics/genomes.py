@@ -1,7 +1,9 @@
 import argparse
 import gzip
+import math
 import os
 import shutil
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -632,9 +634,87 @@ def has_complete_star_index(index_dir):
 
 def has_complete_hisat2_index(index_dir, assembly_name):
     index_path = Path(index_dir)
-    required = [index_path / f"{assembly_name}.{i}.ht2" for i in range(1, 9)]
+    required_ht2 = [index_path / f"{assembly_name}.{i}.ht2" for i in range(1, 9)]
+    required_ht2l = [index_path / f"{assembly_name}.{i}.ht2l" for i in range(1, 9)]
     no_intermediates = not any(index_path.glob("*.rf"))
-    return index_path.is_dir() and all(path.exists() for path in required) and no_intermediates
+    has_small_index = all(path.exists() for path in required_ht2)
+    has_large_index = all(path.exists() for path in required_ht2l)
+    return index_path.is_dir() and (has_small_index or has_large_index) and no_intermediates
+
+
+def require_executable(name):
+    executable = shutil.which(name)
+    if not executable:
+        print(
+            f"Requested indexer '{name}' is not available in the active environment.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return executable
+
+
+def fasta_total_bases(fai_path):
+    total = 0
+    with open(fai_path, "r") as handle:
+        for line in handle:
+            fields = line.rstrip("\n").split("\t")
+            if len(fields) >= 2:
+                total += int(fields[1])
+    return total
+
+
+def star_sa_index_nbases(fai_path):
+    total_bases = fasta_total_bases(fai_path)
+    if total_bases <= 0:
+        return 1
+    return max(1, min(14, int(math.log2(total_bases) / 2 - 1)))
+
+
+def run_checked_command(command, label):
+    print(f"Running {label}: {' '.join(map(str, command))}", file=sys.stderr)
+    try:
+        subprocess.run(command, check=True)
+    except subprocess.CalledProcessError as exc:
+        print(f"{label} failed with exit code {exc.returncode}", file=sys.stderr)
+        sys.exit(exc.returncode)
+
+
+def build_star_index(star_dir, fasta_path, gtf_path, fai_path, threads):
+    require_executable("STAR")
+    star_dir = Path(star_dir)
+    star_dir.mkdir(parents=True, exist_ok=True)
+    command = [
+        "STAR",
+        "--runThreadN",
+        str(threads),
+        "--runMode",
+        "genomeGenerate",
+        "--genomeDir",
+        str(star_dir),
+        "--genomeFastaFiles",
+        str(fasta_path),
+        "--genomeSAindexNbases",
+        str(star_sa_index_nbases(fai_path)),
+    ]
+    if gtf_path and Path(gtf_path).exists():
+        command.extend(["--sjdbGTFfile", str(gtf_path), "--sjdbOverhang", "100"])
+    run_checked_command(command, "STAR genomeGenerate")
+
+
+def build_hisat2_index(hisat2_dir, fasta_path, assembly_name, threads):
+    require_executable("hisat2-build")
+    hisat2_dir = Path(hisat2_dir)
+    hisat2_dir.mkdir(parents=True, exist_ok=True)
+    run_checked_command(
+        [
+            "hisat2-build",
+            "-p",
+            str(threads),
+            str(fasta_path),
+            str(hisat2_dir / assembly_name),
+        ],
+        "hisat2-build",
+    )
 
 
 def find_star_dir(genome_dir):
@@ -662,7 +742,7 @@ def find_hisat2_dir(genome_dir):
     return sorted(candidates, key=lambda path: (len(path.parts), str(path)))[0]
 
 
-def normalize_genome_install(genome, assembly_name, assembly_root, force, indexers, cache_blacklist=True):
+def normalize_genome_install(genome, assembly_name, assembly_root, force, indexers, threads, cache_blacklist=True):
     final_root = Path(assembly_root) / assembly_name
     if final_root.exists():
         if not force:
@@ -700,17 +780,31 @@ def normalize_genome_install(genome, assembly_name, assembly_root, force, indexe
 
     if "star" in indexers:
         star_source = find_star_dir(install_root)
-        if star_source is None or not has_complete_star_index(star_source):
+        if star_source is not None and has_complete_star_index(star_source):
+            shutil.copytree(star_source, star_dir, dirs_exist_ok=True)
+        else:
+            print(f"Building STAR index for '{assembly_name}' because genomepy did not provide one.", file=sys.stderr)
+            build_star_index(
+                star_dir,
+                fasta_dir / "genome.fa",
+                annotation_dir / "genes.gtf",
+                fasta_dir / "genome.fa.fai",
+                threads,
+            )
+        if not has_complete_star_index(star_dir):
             print(f"Incomplete STAR index for '{assembly_name}' under {install_root}", file=sys.stderr)
             sys.exit(1)
-        shutil.copytree(star_source, star_dir, dirs_exist_ok=True)
 
     if "hisat2" in indexers:
         hisat2_source = find_hisat2_dir(install_root)
-        if hisat2_source is None or not has_complete_hisat2_index(hisat2_source, assembly_name):
+        if hisat2_source is not None and has_complete_hisat2_index(hisat2_source, assembly_name):
+            shutil.copytree(hisat2_source, hisat2_dir, dirs_exist_ok=True)
+        else:
+            print(f"Building HISAT2 index for '{assembly_name}' because genomepy did not provide one.", file=sys.stderr)
+            build_hisat2_index(hisat2_dir, fasta_dir / "genome.fa", assembly_name, threads)
+        if not has_complete_hisat2_index(hisat2_dir, assembly_name):
             print(f"Incomplete HISAT2 index for '{assembly_name}' under {install_root}", file=sys.stderr)
             sys.exit(1)
-        shutil.copytree(hisat2_source, hisat2_dir, dirs_exist_ok=True)
 
     return final_root
 
@@ -764,6 +858,7 @@ def install_assembly(
         assembly_root,
         force,
         indexers,
+        threads,
         cache_blacklist=cache_blacklist,
     )
 
