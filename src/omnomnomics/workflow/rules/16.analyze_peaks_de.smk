@@ -832,6 +832,14 @@ rule analyze_peaks_de:
             profiles_dir = ensure_dir(os.path.join(signal_dir, "profiles"))
             regions_dir = ensure_dir(os.path.join(signal_dir, "regions"))
 
+            if params.post_de_signal_policy == "skip":
+                reason = "post-DE signal plotting skipped by --post-de-signal-policy skip"
+                log_it(logfile, f"Skipping analyze_peaks_de signal plots because {reason}.")
+                for item in set_manifest_rows:
+                    signal_summary_rows.append([item["set_name"], "SKIP", item["peak_bed"], "", "", "", reason])
+                write_signal_summary()
+                return
+
             bigwigs = []
             sample_labels = []
             missing_bigwig_samples = []

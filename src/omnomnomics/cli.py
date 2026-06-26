@@ -641,7 +641,7 @@ def parse_arguments(argv=None):
    parser.add_argument('--library-complexity-max-reads', type=int, help='Maximum mapped primary alignments used for ATAC/ChIP library complexity QC. Default: 5000000. Set 0 to scan full BAMs.')
    parser.add_argument('--spp-max-reads', type=int, help='Maximum mapped primary alignments used for ATAC/ChIP SPP cross-correlation QC. Default: 10000000. Set 0 to scan full BAMs.')
    parser.add_argument('--frip-max-reads', type=int, help='Maximum mapped primary alignments per BAM used for ATAC/ChIP FRiP QC. Default: 10000000. Set 0 to scan full BAMs.')
-   parser.add_argument('--post-de-signal-policy', choices=['auto', 'require', 'skip'], help='Policy for post-DE chromatin heatmaps/profiles. auto schedules missing BigWigs through step 8, require uses existing BigWigs and fails if they are absent, skip records skips when BigWigs are absent. Default: auto')
+   parser.add_argument('--post-de-signal-policy', choices=['auto', 'require', 'skip'], help='Policy for post-DE chromatin heatmaps/profiles. auto schedules missing BigWigs through step 8, require uses existing BigWigs and fails if they are absent, skip disables post-DE signal plotting and records explicit skips. Default: auto')
    parser.add_argument('-a', '--appendix', help='Appendix to add to track name \n \t Default: hub')
    parser.add_argument('-k', '--keepunpaired', action='store_true', help='Keep unpaired or not in HISAT2')
    parser.add_argument('--dry-run', action='store_true', help='Validate the workflow and build the Snakemake DAG without executing jobs')
