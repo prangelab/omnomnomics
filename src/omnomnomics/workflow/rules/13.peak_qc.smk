@@ -73,7 +73,11 @@ rule peak_qc:
                     "ATAC blacklist filtering requires the omnomnomics genome helper in the active environment."
                 ) from exc
 
-            return str(resolve_blacklist_bed(genome_name, config["GENOME_ASSEMBLY_DIR"]))
+            try:
+                return str(resolve_blacklist_bed(genome_name, config["GENOME_ASSEMBLY_DIR"]))
+            except FileNotFoundError as exc:
+                log_it(logfile, f"ATAC blacklist BED not available for {genome_name}: {exc}")
+                return None
 
         def filter_peak_bed_file(in_bed, out_bed, keep_standard=True, drop_chrm=True, blacklist_bed=None):
             work = in_bed
@@ -1087,7 +1091,7 @@ rule peak_qc:
                     config["THEGENOME"],
                 )
                 peak_bed_source_folder = filtered_dir
-                log_it(logfile, f"ATAC blacklist BED: {blacklist_bed}")
+                log_it(logfile, f"ATAC blacklist BED: {blacklist_bed if blacklist_bed else 'NA'}")
                 log_it(logfile, f"ATAC filtered peak BEDs: {len(filtered_peak_beds)} files in {filtered_dir}")
                 log_it(logfile, f"ATAC peak filtering summary: {filtering_summary}")
             with tempfile.TemporaryDirectory(prefix="omnomnomics_gene_anno_") as anno_tmpdir:
