@@ -31,8 +31,9 @@ def load_and_validate_yaml(config_file_path, expected_header):
 
 
 def merge_configs(base_config, override_config):
-    merged_config = dict(base_config)
-    merged_config.update(override_config)
+    merged_config = dict(base_config or {})
+    if override_config:
+        merged_config.update(override_config)
     return merged_config
 
 
@@ -71,8 +72,10 @@ MEME_MOTIF_DATABASE_ENV_VARS = (
 
 def load_site_settings(workflow_root, workflow_config_file, site_config_file):
     workflow_config = load_and_validate_yaml(workflow_config_file, "## Omnomnomics pipeline config ##")
+    default_site_config_file = Path(workflow_root) / "config" / "site.yaml"
+    default_site_config = load_and_validate_yaml(default_site_config_file, "## Omnomnomics pipeline config ##")
     site_config = load_and_validate_yaml(site_config_file, "## Omnomnomics pipeline config ##")
-    config = merge_configs(workflow_config, site_config)
+    config = merge_configs(merge_configs(workflow_config, default_site_config), site_config)
     config["genome_assembly_dir"] = resolve_config_path(config["genome_assembly_dir"], workflow_root)
     config["cellranger_reference_dir"] = resolve_config_path(config["cellranger_reference_dir"], workflow_root)
     return config

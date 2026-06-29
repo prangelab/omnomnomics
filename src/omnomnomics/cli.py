@@ -687,9 +687,17 @@ def load_and_validate_yaml(config_file_path, expected_header):
    return config_content
 
 def merge_configs(base_config, override_config):
-   merged_config = dict(base_config)
-   merged_config.update(override_config)
+   merged_config = dict(base_config or {})
+   if override_config:
+       merged_config.update(override_config)
    return merged_config
+
+
+def load_pipeline_config(workflow_config_file, site_config_file):
+   workflow_config = load_and_validate_yaml(workflow_config_file, "## Omnomnomics pipeline config ##")
+   default_site_config = load_and_validate_yaml(DEFAULT_SITE_CONFIG, "## Omnomnomics pipeline config ##")
+   site_config = load_and_validate_yaml(site_config_file, "## Omnomnomics pipeline config ##")
+   return merge_configs(merge_configs(workflow_config, default_site_config), site_config)
 
 
 def positive_int_or_none(value):
@@ -1566,9 +1574,7 @@ def main():
         print(f"Site config file '{site_config_file}' does not exist. Please make sure it exists. Aborting...")
         sys.exit(1)
 
-    workflow_config = load_and_validate_yaml(workflow_config_file, "## Omnomnomics pipeline config ##")
-    site_config = load_and_validate_yaml(site_config_file, "## Omnomnomics pipeline config ##")
-    config = merge_configs(workflow_config, site_config)
+    config = load_pipeline_config(workflow_config_file, site_config_file)
     config['WORKFLOW_ROOT'] = str(workflow_root)
     config['genome_assembly_dir'] = resolve_config_path(config['genome_assembly_dir'], workflow_root)
     config['cellranger_reference_dir'] = resolve_config_path(config['cellranger_reference_dir'], workflow_root)

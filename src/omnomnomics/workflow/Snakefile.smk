@@ -378,12 +378,14 @@ def load_and_validate_yaml(logfile, config_file_path, expected_header):
     return config_content
 
 def merge_configs(base_config, override_config):
-    merged_config = dict(base_config)
-    merged_config.update(override_config)
+    merged_config = dict(base_config or {})
+    if override_config:
+        merged_config.update(override_config)
     return merged_config
 
 workflow_config_file = config['WORKFLOW_CONFIG_FILE']
 site_config_file = config['SITE_CONFIG_FILE']
+default_site_config_file = os.path.join(workflow_root, "config", "site.yaml")
 
 if not os.path.isfile(workflow_config_file):
     log_it(logfile, "Workflow config file does not exist! Aborting...", "ERROR")
@@ -395,9 +397,15 @@ if not os.path.isfile(site_config_file):
     print(f"Site config file '{site_config_file}' does not exist. Please make sure it exists. Aborting...")
     sys.exit(1)
 
+if not os.path.isfile(default_site_config_file):
+    log_it(logfile, "Packaged site config file does not exist! Aborting...", "ERROR")
+    print(f"Packaged site config file '{default_site_config_file}' does not exist. Please make sure it exists. Aborting...")
+    sys.exit(1)
+
 workflow_config = load_and_validate_yaml(logfile, workflow_config_file, "## Omnomnomics pipeline config ##")
+default_site_config = load_and_validate_yaml(logfile, default_site_config_file, "## Omnomnomics pipeline config ##")
 site_config = load_and_validate_yaml(logfile, site_config_file, "## Omnomnomics pipeline config ##")
-master_config = merge_configs(workflow_config, site_config)
+master_config = merge_configs(merge_configs(workflow_config, default_site_config), site_config)
 for runtime_key in ("default_runtime", "controller_runtime", "rule_runtime"):
     if runtime_key in config and config[runtime_key] is not None:
         master_config[runtime_key] = config[runtime_key]
