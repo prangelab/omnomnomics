@@ -36,7 +36,10 @@ rule run_fastp:
     params:
         seq_type=config["THETYPE"],
         inputfolder=f"{experiment_dir}/{master_config['input_folders'][master_config['trim_rule_num']-1]}",
-        outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}"
+        outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}",
+        adapter_mode=config.get("FASTP_ADAPTER_MODE", "overlap"),
+        adapter_sequence=config.get("FASTP_ADAPTER_SEQUENCE", ""),
+        adapter_sequence_r2=config.get("FASTP_ADAPTER_SEQUENCE_R2", "")
     threads:
         Threads_Per_Rule['1']
     resources:
@@ -44,11 +47,12 @@ rule run_fastp:
         partition=master_config['partition'],
         runtime=Runtime_Per_Rule['1']
     run:
-        def run_fastp(logfile, trim_tool, seq_type, threads, fastq1, fastq2, inputfolder, outputfolder, sample, trimmed_fastq1, trimmed_fastq2, trim_metrics_output):
+        def run_fastp(logfile, trim_tool, seq_type, threads, fastq1, fastq2, inputfolder, outputfolder, sample, trimmed_fastq1, trimmed_fastq2, trim_metrics_output, adapter_mode, adapter_sequence, adapter_sequence_r2):
             log_once(logfile, "step1.header", "Trimming reads...", f"EXECUTING STEP {master_config['trim_rule_num']}")
             log_once(logfile, "step1.inputfolder", f"Input folder: {inputfolder}")
             log_once(logfile, "step1.outputfolder", f"Output folder: {outputfolder}")
             log_once(logfile, "step1.trimtool", f"Trim Tool: {trim_tool}")
+            log_once(logfile, "step1.fastp_adapter_mode", f"fastp adapter mode: {adapter_mode}")
             tracking = begin_step_sample(master_config['trim_rule_num'], sample, "run_fastp")
 
             fastp_version = subprocess.check_output(["fastp", "--version"], stderr=subprocess.STDOUT)
@@ -70,6 +74,21 @@ rule run_fastp:
                 shell(stage_command)
                 return local_path
 
+            def adapter_args(paired):
+                mode = str(adapter_mode or "overlap").strip().lower()
+                if mode == "off":
+                    return "--disable_adapter_trimming"
+                if paired and mode == "auto_detect":
+                    return "--detect_adapter_for_pe"
+                if mode in {"nextera", "truseq", "explicit"}:
+                    args = []
+                    if adapter_sequence:
+                        args.append(f"--adapter_sequence {quote(adapter_sequence)}")
+                    if paired and adapter_sequence_r2:
+                        args.append(f"--adapter_sequence_r2 {quote(adapter_sequence_r2)}")
+                    return " ".join(args)
+                return ""
+
             try:
                 local_fastq1 = stage_input(fastq1)
                 local_fastq2 = stage_input(fastq2) if fastq2 else ""
@@ -81,17 +100,22 @@ rule run_fastp:
 
                 if fastq2:
                     record_step_note(master_config['trim_rule_num'], sample, "running_fastp_paired_end")
+                    adapter_option = adapter_args(True)
+                    record_step_note(master_config['trim_rule_num'], sample, f"fastp_adapter_option={adapter_option or 'overlap_default'}")
                     fastp_command = f"""
                         fastp --in1 {quote(local_fastq1)} --in2 {quote(local_fastq2)} \
                         --out1 {quote(local_trimmed_fastq1)} --out2 {quote(local_trimmed_fastq2)} \
                         --thread {threads} --html {quote(html_report)} --json {quote(json_report)} \
-                        --detect_adapter_for_pe
+                        {adapter_option}
                     """
                 else:
                     record_step_note(master_config['trim_rule_num'], sample, "running_fastp_single_end")
+                    adapter_option = adapter_args(False)
+                    record_step_note(master_config['trim_rule_num'], sample, f"fastp_adapter_option={adapter_option or 'single_end_default'}")
                     fastp_command = f"""
                         fastp --in1 {quote(local_fastq1)} --out1 {quote(local_trimmed_fastq1)} \
-                        --thread {threads} --html {quote(html_report)} --json {quote(json_report)}
+                        --thread {threads} --html {quote(html_report)} --json {quote(json_report)} \
+                        {adapter_option}
                     """
 
                 fastp_command = " ".join(fastp_command.split())
@@ -139,4 +163,7 @@ rule run_fastp:
             output.trimmed_fastq1,
             output.trimmed_fastq2,
             output.trim_metrics,
+            params.adapter_mode,
+            params.adapter_sequence,
+            params.adapter_sequence_r2,
         )

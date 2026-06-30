@@ -394,6 +394,16 @@ Some job mode examples:
                                     Default: auto
     -T TOOL:                Trimming tool choice. Can be fastp or skewer
                                     Default: fastp
+    --fastp-adapter-mode:   fastp adapter handling mode. Choices: assay, overlap, auto_detect,
+                            nextera, truseq, explicit, off.
+                                    Default: assay
+                            `assay` resolves to explicit Nextera adapters for ATAC and fastp's
+                            paired-end overlap trimming for RNA/ChIP. Use `auto_detect` only when
+                            you specifically want fastp's paired-end adapter auto-detection.
+    --fastp-adapter-sequence:
+                            Read 1 adapter sequence when --fastp-adapter-mode explicit is used.
+    --fastp-adapter-sequence-r2:
+                            Read 2 adapter sequence when --fastp-adapter-mode explicit is used.
     -M TOOL:                Mapping tool choice. Can be HISAT2, STAR, or STAR_TE. STAR(_TE) can only be used 
 							for RNA-seq data.
                                     Default: HISAT2

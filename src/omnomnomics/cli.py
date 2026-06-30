@@ -44,6 +44,11 @@ PACKAGE_ROOT = Path(__file__).resolve().parent
 WORKFLOW_ROOT = PACKAGE_ROOT / "workflow"
 DEFAULT_WORKFLOW_CONFIG = WORKFLOW_ROOT / "config" / "workflow.yaml"
 DEFAULT_SITE_CONFIG = WORKFLOW_ROOT / "config" / "site.yaml"
+FASTP_ADAPTER_MODES = {"assay", "overlap", "auto_detect", "nextera", "truseq", "explicit", "off"}
+FASTP_NEXTERA_R1 = "CTGTCTCTTATACACATCTCCGAGCCCACGAGAC"
+FASTP_NEXTERA_R2 = "CTGTCTCTTATACACATCTGACGCTGCCGACGA"
+FASTP_TRUSEQ_R1 = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
+FASTP_TRUSEQ_R2 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
 
 ANSI_RESET = "\033[0m"
 ANSI_BOLD = "\033[1m"
@@ -596,6 +601,9 @@ def parse_arguments(argv=None):
    parser.add_argument('-g', '--genome', help='Genome assembly name. Must match an available directory under the configured genome assembly root')
    parser.add_argument('-j', '--mode', help='Job mode. Can be auto, all or a range of jobs. See readme for some examples. \n \t Default: auto')
    parser.add_argument('-T', '--trim-tool', help='Trimming tool choice. Can be fastp or skewer. \n \t Default: fastp')
+   parser.add_argument('--fastp-adapter-mode', choices=sorted(FASTP_ADAPTER_MODES), help='fastp adapter handling mode. assay resolves to Nextera for ATAC and overlap trimming for RNA/ChIP. auto_detect enables --detect_adapter_for_pe for paired-end input. Default: assay')
+   parser.add_argument('--fastp-adapter-sequence', help='Adapter sequence for fastp read 1 when --fastp-adapter-mode explicit is used.')
+   parser.add_argument('--fastp-adapter-sequence-r2', help='Adapter sequence for fastp read 2 when --fastp-adapter-mode explicit is used with paired-end input.')
    parser.add_argument('-M', '--map-tool', help='Mapping tool choice. Can be HISAT2, STAR, or STAR_TE. STAR(_TE) can only be used for RNA-seq data. \n \t Default: HISAT2')
    parser.add_argument('--de-formula', help='Explicit DESeq2 design formula for step 12. If provided, it overrides --de-columns and --de-block.')
    parser.add_argument('--de-config', action='append', help='Optional YAML file with DE analysis settings for step 12. Can be passed multiple times to run multiple DE analyses sequentially.')
@@ -706,6 +714,54 @@ def positive_int_or_none(value):
    except (TypeError, ValueError):
        return None
    return parsed if parsed > 0 else None
+
+
+def clean_optional_sequence(value):
+   value = "" if value is None else str(value).strip()
+   return "" if value.upper() == "NA" else value
+
+
+def resolve_fastp_adapter_settings(args, config, assay_type, paired):
+   requested_mode = args.fastp_adapter_mode if args.fastp_adapter_mode else config.get("fastp_adapter_mode", "assay")
+   requested_mode = str(requested_mode).strip().lower()
+   if requested_mode not in FASTP_ADAPTER_MODES:
+      print(
+         "--fastp-adapter-mode must be one of: "
+         f"{', '.join(sorted(FASTP_ADAPTER_MODES))}. Aborting...",
+         file=sys.stderr,
+      )
+      sys.exit(1)
+
+   resolved_mode = requested_mode
+   if requested_mode == "assay":
+      resolved_mode = "nextera" if assay_type == "ATAC" else "overlap"
+
+   cli_sequence = clean_optional_sequence(args.fastp_adapter_sequence)
+   cli_sequence_r2 = clean_optional_sequence(args.fastp_adapter_sequence_r2)
+   config_sequence = clean_optional_sequence(config.get("fastp_adapter_sequence", ""))
+   config_sequence_r2 = clean_optional_sequence(config.get("fastp_adapter_sequence_r2", ""))
+
+   adapter_sequence = cli_sequence or config_sequence
+   adapter_sequence_r2 = cli_sequence_r2 or config_sequence_r2
+
+   if resolved_mode == "nextera":
+      adapter_sequence = FASTP_NEXTERA_R1
+      adapter_sequence_r2 = FASTP_NEXTERA_R2
+   elif resolved_mode == "truseq":
+      adapter_sequence = FASTP_TRUSEQ_R1
+      adapter_sequence_r2 = FASTP_TRUSEQ_R2
+   elif resolved_mode == "explicit":
+      if not adapter_sequence:
+         print("--fastp-adapter-mode explicit requires --fastp-adapter-sequence. Aborting...", file=sys.stderr)
+         sys.exit(1)
+      if paired and not adapter_sequence_r2:
+         print("--fastp-adapter-mode explicit requires --fastp-adapter-sequence-r2 for paired-end input. Aborting...", file=sys.stderr)
+         sys.exit(1)
+
+   if not paired and resolved_mode == "overlap":
+      resolved_mode = "auto_detect"
+
+   return requested_mode, resolved_mode, adapter_sequence, adapter_sequence_r2
 
 
 def apply_assay_runtime_defaults(config, assay_type):
@@ -1847,6 +1903,12 @@ def main():
 
     #checking input files
     num_files, num_pairs, paired, input_folder_mod_range_min, input_file_type_mod_range_min = validate_input_files(the_type, config, min(mode_steps),experiment_dir)
+    fastp_adapter_mode_requested, fastp_adapter_mode, fastp_adapter_sequence, fastp_adapter_sequence_r2 = resolve_fastp_adapter_settings(
+        args,
+        config,
+        the_type,
+        paired,
+    )
 
     metadata_required = metadata_required_for_mode(mode_steps)
     derived_metadata_path = "NA"
@@ -2077,6 +2139,10 @@ def main():
         'DE_COLUMNS_RESOLVED': de_columns_resolved,
         'DE_BLOCK_RESOLVED': de_block_resolved,
         'THETRIMTOOL': trim_tool,
+        'FASTP_ADAPTER_MODE_REQUESTED': fastp_adapter_mode_requested,
+        'FASTP_ADAPTER_MODE': fastp_adapter_mode,
+        'FASTP_ADAPTER_SEQUENCE': fastp_adapter_sequence,
+        'FASTP_ADAPTER_SEQUENCE_R2': fastp_adapter_sequence_r2,
         'THEMAPTOOL': map_tool,
         'NO_MULTIQC': no_multiqc,
         'CREATE_HOMER_TAGDIRS': create_homer_tagdirs,
