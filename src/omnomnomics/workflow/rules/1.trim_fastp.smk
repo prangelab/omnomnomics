@@ -112,20 +112,25 @@ rule run_fastp:
                 record_step_command(master_config['trim_rule_num'], sample, command_string)
                 record_step_note(master_config['trim_rule_num'], sample, "fastp_start")
                 start_time = time.time()
-                process = subprocess.Popen(
-                    command_args,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=1,
-                )
-                for line in process.stdout:
-                    print(f"[fastp:{sample}] {line}", end="", flush=True)
-                return_code = process.wait()
+                stdout_log = os.path.join(local_workdir, f"{sample}.fastp.stdout.txt")
+                stderr_log = os.path.join(local_workdir, f"{sample}.fastp.stderr.txt")
+                with open(stdout_log, "w") as stdout_handle, open(stderr_log, "w") as stderr_handle:
+                    completed = subprocess.run(
+                        command_args,
+                        stdout=stdout_handle,
+                        stderr=stderr_handle,
+                        text=True,
+                        check=False,
+                    )
+                return_code = completed.returncode
                 elapsed_seconds = time.time() - start_time
                 record_step_note(master_config['trim_rule_num'], sample, f"fastp_exit_code={return_code} elapsed_seconds={elapsed_seconds:.1f}")
                 if return_code != 0:
+                    with open(stderr_log, "r", errors="replace") as stderr_handle:
+                        for line in stderr_handle.readlines()[-80:]:
+                            print(f"[fastp:{sample}:stderr] {line}", end="", flush=True)
                     raise subprocess.CalledProcessError(return_code, command_args)
+                return stdout_log, stderr_log
 
             def require_output(path, label):
                 if not path or not os.path.exists(path):
@@ -168,7 +173,7 @@ rule run_fastp:
                         "--json", json_report,
                     ] + shlex.split(adapter_option)
 
-                run_fastp_command(fastp_command)
+                fastp_stdout_log, fastp_stderr_log = run_fastp_command(fastp_command)
                 require_output(local_trimmed_fastq1, "trimmed_fastq1")
                 if local_trimmed_fastq2:
                     require_output(local_trimmed_fastq2, "trimmed_fastq2")
@@ -195,6 +200,8 @@ rule run_fastp:
                     copy_fastq2_command = f"cp {quote(local_trimmed_fastq2)} {quote(trimmed_fastq2)}"
                     record_step_note(master_config['trim_rule_num'], sample, "copying_trimmed_r2_back")
                     shell(copy_fastq2_command)
+                shell(f"cp {quote(fastp_stdout_log)} {quote(os.path.join(outputfolder, f'{sample}.fastp.stdout.txt'))}")
+                shell(f"cp {quote(fastp_stderr_log)} {quote(os.path.join(outputfolder, f'{sample}.fastp.stderr.txt'))}")
                 shell(f"cp {quote(trim_metrics_path)} {quote(trim_metrics_output)}")
                 finish_step_sample(master_config['trim_rule_num'], sample, "run_fastp", tracking["start_time"], "OK")
             except Exception:
