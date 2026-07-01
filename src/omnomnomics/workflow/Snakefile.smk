@@ -196,23 +196,38 @@ def update_step_summary_row(summary_tsv, row):
         "elapsed_seconds",
         "worker_log",
     ]
-    rows = []
-    if os.path.exists(summary_tsv):
-        with open(summary_tsv, newline="") as handle:
-            reader = csv.DictReader(handle, delimiter="\t")
-            rows = list(reader)
-    updated = False
-    for existing in rows:
-        if existing["sample"] == row["sample"]:
-            existing.update(row)
-            updated = True
-            break
-    if not updated:
-        rows.append(row)
-    with open(summary_tsv, "w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t", lineterminator="\n")
-        writer.writeheader()
-        writer.writerows(rows)
+    lock_path = f"{summary_tsv}.lock"
+    os.makedirs(os.path.dirname(summary_tsv), exist_ok=True)
+    with open(lock_path, "a") as lock_handle:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        try:
+            rows = []
+            if os.path.exists(summary_tsv):
+                with open(summary_tsv, newline="") as handle:
+                    reader = csv.DictReader(handle, delimiter="\t")
+                    rows = [
+                        {field: existing.get(field, "") for field in fieldnames}
+                        for existing in reader
+                        if existing.get("sample")
+                    ]
+            updated = False
+            for existing in rows:
+                if existing.get("sample") == row["sample"]:
+                    existing.update(row)
+                    updated = True
+                    break
+            if not updated:
+                rows.append({field: row.get(field, "") for field in fieldnames})
+            tmp_path = f"{summary_tsv}.tmp.{os.getpid()}"
+            with open(tmp_path, "w", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t", lineterminator="\n")
+                writer.writeheader()
+                writer.writerows(rows)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp_path, summary_tsv)
+        finally:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
 
 
 def worker_log_path(rule_log_subdir):
