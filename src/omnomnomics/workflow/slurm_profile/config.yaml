@@ -1,9 +1,9 @@
 cluster:
   mkdir -p slurm_logs/{rule} &&
   worker_constraint="{resources.worker_constraint}" &&
-  constraint_args=() &&
+  constraint_arg="" &&
   if [ -n "$worker_constraint" ] && [ "$worker_constraint" != "NA" ] && [ "$worker_constraint" != "None" ]; then
-    constraint_args=(--constraint="$worker_constraint");
+    constraint_arg="--constraint=$worker_constraint";
   fi &&
   sbatch
     --partition={resources.partition}
@@ -11,5 +11,5 @@ cluster:
     --time={resources.runtime}
     --cpus-per-task={threads}
     --mem={resources.mem_mb}
-    "${constraint_args[@]}"
+    $constraint_arg
     --output=slurm_logs/{rule}/{rule}.%j.out
