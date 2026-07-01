@@ -729,7 +729,13 @@ To ensure proper logging, multiple logs can be found. Inside the run_logs folder
 ## Config files
 For a run of _Omnomnomics_, three config layers are involved. The packaged workflow config contains pipeline defaults. The site config contains cluster-specific defaults such as partition and node characteristics. By default the CLI now looks for a user site config in `$XDG_CONFIG_HOME/omnomnomics/site.yaml` or `~/.config/omnomnomics/site.yaml` before falling back to the packaged site config. During a run, the CLI builds a run config that passes the resolved settings to Snakemake. This run config is written into the `run_configs` folder inside `EXPERIMENT_DIR`.
 
-The packaged site-config template lives at [src/omnomnomics/workflow/config/site.yaml](/Users/k.h.prange/Library/CloudStorage/OneDrive-AmsterdamUMC/Documenten/Tech/omnomnomics/src/omnomnomics/workflow/config/site.yaml). Copy that file and edit the cluster-specific values for your own environment. Important site-level settings include the partition defaults, node layout, controller settings, and the Snakemake submission pacing controls `max_jobs`, `max_jobs_per_second`, and `max_status_checks_per_second`.
+The packaged site-config template lives at [src/omnomnomics/workflow/config/site.yaml](/Users/k.h.prange/Library/CloudStorage/OneDrive-AmsterdamUMC/Documenten/Tech/omnomnomics/src/omnomnomics/workflow/config/site.yaml). Copy that file and edit the cluster-specific values for your own environment. Important site-level settings include the partition defaults, node layout, controller settings, worker constraints, and the Snakemake submission pacing controls `max_jobs`, `max_jobs_per_second`, and `max_status_checks_per_second`.
+
+Set `worker_constraint` only when worker jobs must request a scheduler feature on your HPC. For example, on Snellius this can be set to `scratch-node` when jobs need reliable node-local scratch. Other clusters may use a different constraint name, or no worker constraint at all:
+
+```yaml
+worker_constraint: "scratch-node"
+```
 
 On clusters other than Snellius, the intended setup is therefore:
 
