@@ -7,11 +7,13 @@
 # Copyright PrangeLab 2024 ##
 #=============================================
 import os
+import gzip
 import json
 import shlex
 import shutil
 import subprocess
 import tempfile
+import time
 
 rule run_fastp:
     wildcard_constraints:
@@ -67,11 +69,27 @@ rule run_fastp:
             def quote(path):
                 return shlex.quote(path)
 
+            def format_bytes(path):
+                try:
+                    return f"{os.path.getsize(path)} bytes"
+                except OSError as exc:
+                    return f"unavailable ({exc})"
+
+            def first_fastq_read_id(path):
+                opener = gzip.open if str(path).endswith(".gz") else open
+                try:
+                    with opener(path, "rt") as handle:
+                        first_line = handle.readline().strip()
+                    return first_line.split()[0] if first_line else "empty_file"
+                except Exception as exc:
+                    return f"unavailable ({exc})"
+
             def stage_input(path):
                 local_path = os.path.join(local_workdir, os.path.basename(path))
                 stage_command = f"cp {quote(path)} {quote(local_path)}"
-                record_step_note(master_config['trim_rule_num'], sample, f"staging {os.path.basename(path)}")
+                record_step_note(master_config['trim_rule_num'], sample, f"staging {os.path.basename(path)} size={format_bytes(path)}")
                 shell(stage_command)
+                record_step_note(master_config['trim_rule_num'], sample, f"staged {os.path.basename(local_path)} size={format_bytes(local_path)} first_read={first_fastq_read_id(local_path)}")
                 return local_path
 
             def adapter_args(paired):
@@ -89,6 +107,31 @@ rule run_fastp:
                     return " ".join(args)
                 return ""
 
+            def run_fastp_command(command_args):
+                command_string = shlex.join(command_args)
+                record_step_command(master_config['trim_rule_num'], sample, command_string)
+                record_step_note(master_config['trim_rule_num'], sample, "fastp_start")
+                start_time = time.time()
+                process = subprocess.Popen(
+                    command_args,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                )
+                for line in process.stdout:
+                    print(f"[fastp:{sample}] {line}", end="", flush=True)
+                return_code = process.wait()
+                elapsed_seconds = time.time() - start_time
+                record_step_note(master_config['trim_rule_num'], sample, f"fastp_exit_code={return_code} elapsed_seconds={elapsed_seconds:.1f}")
+                if return_code != 0:
+                    raise subprocess.CalledProcessError(return_code, command_args)
+
+            def require_output(path, label):
+                if not path or not os.path.exists(path):
+                    raise RuntimeError(f"fastp did not create expected {label}: {path}")
+                record_step_note(master_config['trim_rule_num'], sample, f"{label}_created size={format_bytes(path)}")
+
             try:
                 local_fastq1 = stage_input(fastq1)
                 local_fastq2 = stage_input(fastq2) if fastq2 else ""
@@ -102,25 +145,35 @@ rule run_fastp:
                     record_step_note(master_config['trim_rule_num'], sample, "running_fastp_paired_end")
                     adapter_option = adapter_args(True)
                     record_step_note(master_config['trim_rule_num'], sample, f"fastp_adapter_option={adapter_option or 'overlap_default'}")
-                    fastp_command = f"""
-                        fastp --in1 {quote(local_fastq1)} --in2 {quote(local_fastq2)} \
-                        --out1 {quote(local_trimmed_fastq1)} --out2 {quote(local_trimmed_fastq2)} \
-                        --thread {threads} --html {quote(html_report)} --json {quote(json_report)} \
-                        {adapter_option}
-                    """
+                    fastp_command = [
+                        "fastp",
+                        "--in1", local_fastq1,
+                        "--in2", local_fastq2,
+                        "--out1", local_trimmed_fastq1,
+                        "--out2", local_trimmed_fastq2,
+                        "--thread", str(threads),
+                        "--html", html_report,
+                        "--json", json_report,
+                    ] + shlex.split(adapter_option)
                 else:
                     record_step_note(master_config['trim_rule_num'], sample, "running_fastp_single_end")
                     adapter_option = adapter_args(False)
                     record_step_note(master_config['trim_rule_num'], sample, f"fastp_adapter_option={adapter_option or 'single_end_default'}")
-                    fastp_command = f"""
-                        fastp --in1 {quote(local_fastq1)} --out1 {quote(local_trimmed_fastq1)} \
-                        --thread {threads} --html {quote(html_report)} --json {quote(json_report)} \
-                        {adapter_option}
-                    """
+                    fastp_command = [
+                        "fastp",
+                        "--in1", local_fastq1,
+                        "--out1", local_trimmed_fastq1,
+                        "--thread", str(threads),
+                        "--html", html_report,
+                        "--json", json_report,
+                    ] + shlex.split(adapter_option)
 
-                fastp_command = " ".join(fastp_command.split())
-                record_step_command(master_config['trim_rule_num'], sample, fastp_command)
-                shell(fastp_command)
+                run_fastp_command(fastp_command)
+                require_output(local_trimmed_fastq1, "trimmed_fastq1")
+                if local_trimmed_fastq2:
+                    require_output(local_trimmed_fastq2, "trimmed_fastq2")
+                require_output(html_report, "fastp_html_report")
+                require_output(json_report, "fastp_json_report")
 
                 with open(json_report, "r") as handle:
                     fastp_metrics = json.load(handle)
