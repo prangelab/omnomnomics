@@ -78,7 +78,7 @@ rule run_skewer:
             def compress_to_output(source_path, target_path, count_path=None):
                 if count_path:
                     command = (
-                        f"bash -lc \"cat {quote(source_path)} | tee >(awk 'END {{print NR/4}}' > {quote(count_path)}) "
+                        f"bash -lc \"cat {quote(source_path)} | tee >(awk 'END {{{{print NR/4}}}}' > {quote(count_path)}) "
                         f"| pigz -p {threads} -c > {quote(target_path)}\""
                     )
                 else:
@@ -95,7 +95,7 @@ rule run_skewer:
                 raw_count_r1 = os.path.join(local_workdir, f"{sample}.raw_r1.count.txt")
                 decompress_fastq1_command = (
                     f"bash -lc \"pigz -d -p {threads} -c {quote(local_fastq1_gz)} "
-                    f"| tee >(awk 'END {{print NR/4}}' > {quote(raw_count_r1)}) > {quote(local_fastq1)}\""
+                    f"| tee >(awk 'END {{{{print NR/4}}}}' > {quote(raw_count_r1)}) > {quote(local_fastq1)}\""
                 )
                 record_step_note(master_config['trim_rule_num'], sample, f"decompressing {os.path.basename(local_fastq1_gz)}")
                 shell(decompress_fastq1_command)
@@ -111,7 +111,7 @@ rule run_skewer:
                     raw_count_r2 = os.path.join(local_workdir, f"{sample}.raw_r2.count.txt")
                     decompress_fastq2_command = (
                         f"bash -lc \"pigz -d -p {threads} -c {quote(local_fastq2_gz)} "
-                        f"| tee >(awk 'END {{print NR/4}}' > {quote(raw_count_r2)}) > {quote(local_fastq2)}\""
+                        f"| tee >(awk 'END {{{{print NR/4}}}}' > {quote(raw_count_r2)}) > {quote(local_fastq2)}\""
                     )
                     record_step_note(master_config['trim_rule_num'], sample, f"decompressing {os.path.basename(local_fastq2_gz)}")
                     shell(decompress_fastq2_command)
@@ -132,7 +132,6 @@ rule run_skewer:
                 skewer_command = " ".join(skewer_command.split())
                 record_step_command(master_config['trim_rule_num'], sample, skewer_command)
 
-                # Run the skewer command
                 shell(skewer_command)
                 record_step_note(master_config['trim_rule_num'], sample, "compressing_and_staging_trimmed_results")
 
