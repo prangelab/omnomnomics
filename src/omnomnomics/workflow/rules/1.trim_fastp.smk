@@ -75,14 +75,54 @@ rule run_fastp:
                 except OSError as exc:
                     return f"unavailable ({exc})"
 
-            def first_fastq_read_id(path):
+            def read_first_fastq_record(path):
                 opener = gzip.open if str(path).endswith(".gz") else open
+                with opener(path, "rt") as handle:
+                    return [handle.readline().rstrip("\n") for _ in range(4)]
+
+            def normalize_fastq_read_id(read_id):
+                token = read_id.split()[0] if read_id else ""
+                if token.startswith("@"):
+                    token = token[1:]
+                if token.endswith("/1") or token.endswith("/2"):
+                    token = token[:-2]
+                return token
+
+            def first_fastq_read_id(path):
                 try:
-                    with opener(path, "rt") as handle:
-                        first_line = handle.readline().strip()
+                    first_line = read_first_fastq_record(path)[0].strip()
                     return first_line.split()[0] if first_line else "empty_file"
                 except Exception as exc:
                     return f"unavailable ({exc})"
+
+            def validate_staged_fastq(path, label):
+                if not path or not os.path.exists(path):
+                    raise RuntimeError(f"{label} staged FASTQ is missing: {path}")
+                if os.path.getsize(path) == 0:
+                    raise RuntimeError(f"{label} staged FASTQ is empty: {path}")
+                try:
+                    header, sequence, separator, quality = read_first_fastq_record(path)
+                except Exception as exc:
+                    raise RuntimeError(f"{label} staged FASTQ first record cannot be read: {path} ({exc})") from exc
+                if not header.startswith("@"):
+                    raise RuntimeError(f"{label} staged FASTQ first record does not start with '@': {path}")
+                if not separator.startswith("+"):
+                    raise RuntimeError(f"{label} staged FASTQ first record separator does not start with '+': {path}")
+                if not sequence or not quality:
+                    raise RuntimeError(f"{label} staged FASTQ first record has empty sequence or quality: {path}")
+                if len(sequence) != len(quality):
+                    raise RuntimeError(f"{label} staged FASTQ first record sequence/quality length mismatch: {path}")
+                read_id = normalize_fastq_read_id(header)
+                record_step_note(master_config['trim_rule_num'], sample, f"{label}_validated first_read={read_id} size={format_bytes(path)}")
+                return read_id
+
+            def validate_staged_fastq_pair(path1, path2):
+                read_id1 = validate_staged_fastq(path1, "fastq1")
+                if path2:
+                    read_id2 = validate_staged_fastq(path2, "fastq2")
+                    if read_id1 != read_id2:
+                        raise RuntimeError(f"Staged FASTQ pair first read IDs differ: R1={read_id1}, R2={read_id2}")
+                    record_step_note(master_config['trim_rule_num'], sample, f"fastq_pair_validated first_read={read_id1}")
 
             def stage_input(path):
                 local_path = os.path.join(local_workdir, os.path.basename(path))
@@ -140,6 +180,7 @@ rule run_fastp:
             try:
                 local_fastq1 = stage_input(fastq1)
                 local_fastq2 = stage_input(fastq2) if fastq2 else ""
+                validate_staged_fastq_pair(local_fastq1, local_fastq2)
 
                 local_trimmed_fastq1 = os.path.join(local_workdir, os.path.basename(trimmed_fastq1))
                 local_trimmed_fastq2 = os.path.join(local_workdir, os.path.basename(trimmed_fastq2)) if fastq2 else ""
