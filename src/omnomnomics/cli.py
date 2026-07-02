@@ -600,7 +600,7 @@ def parse_arguments(argv=None):
    parser.add_argument('-i', '--experiment-dir', help='Path to the experiment directory')
    parser.add_argument('-g', '--genome', help='Genome assembly name. Must match an available directory under the configured genome assembly root')
    parser.add_argument('-j', '--mode', help='Job mode. Can be auto, all or a range of jobs. See readme for some examples. \n \t Default: auto')
-   parser.add_argument('-T', '--trim-tool', help='Trimming tool choice. Can be fastp or skewer. \n \t Default: fastp')
+   parser.add_argument('-T', '--trim-tool', help='Trimming tool choice. Can be skewer or fastp. \n \t Default: skewer')
    parser.add_argument('--fastp-adapter-mode', choices=sorted(FASTP_ADAPTER_MODES), help='fastp adapter handling mode. assay resolves to Nextera for ATAC and overlap trimming for RNA/ChIP. auto_detect enables --detect_adapter_for_pe for paired-end input. Default: assay')
    parser.add_argument('--fastp-adapter-sequence', help='Adapter sequence for fastp read 1 when --fastp-adapter-mode explicit is used.')
    parser.add_argument('--fastp-adapter-sequence-r2', help='Adapter sequence for fastp read 2 when --fastp-adapter-mode explicit is used with paired-end input.')
@@ -1641,7 +1641,7 @@ def main():
     the_type = assay.upper()
     apply_assay_runtime_defaults(config, the_type)
     genome = args.genome
-    trim_tool = args.trim_tool.lower() if args.trim_tool else config.get("trim_tool","fastp").lower()
+    trim_tool = args.trim_tool.lower() if args.trim_tool else config.get("trim_tool","skewer").lower()
     map_tool = args.map_tool.lower() if args.map_tool else config.get('map_tool', "hisat2").lower()
     mode = args.mode.lower() if args.mode else config.get('mode', "auto")
     de_formula = args.de_formula if args.de_formula else config.get('de_formula', "NA")

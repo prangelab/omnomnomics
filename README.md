@@ -392,8 +392,8 @@ Some job mode examples:
     -j MODE:                Job mode. Can be 'auto', 'all' or a range of jobs. See below (-h) for some 
 							examples.
                                     Default: auto
-    -T TOOL:                Trimming tool choice. Can be fastp or skewer
-                                    Default: fastp
+    -T TOOL:                Trimming tool choice. Can be skewer or fastp
+                                    Default: skewer
     --fastp-adapter-mode:   fastp adapter handling mode. Choices: assay, overlap, auto_detect,
                             nextera, truseq, explicit, off.
                                     Default: assay
@@ -404,6 +404,7 @@ Some job mode examples:
                             Read 1 adapter sequence when --fastp-adapter-mode explicit is used.
     --fastp-adapter-sequence-r2:
                             Read 2 adapter sequence when --fastp-adapter-mode explicit is used.
+                            fastp is available as an opt-in trimmer, but skewer is the default because validation on HPC test data showed intermittent fastp worker hangs before any useful fastp log output.
     -M TOOL:                Mapping tool choice. Can be HISAT2, STAR, or STAR_TE. STAR(_TE) can only be used 
 							for RNA-seq data.
                                     Default: HISAT2

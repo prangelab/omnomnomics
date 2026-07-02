@@ -310,7 +310,7 @@ TRIMMERS: ["fastp", "skewer"]
 TYPES: ["RNA", "CHIP", "ATAC"]
 GENOMES: ["hg38", "mm10", "mm39", "GRCh38.p14", "GRCm39"]
 
-trim_tool: "fastp"
+trim_tool: "skewer"
 map_tool: "hisat2"
 omnomnomics: 0.4
 mode: "auto"
