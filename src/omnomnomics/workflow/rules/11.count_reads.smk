@@ -7,9 +7,11 @@
 # Copyright PrangeLab 2024 ##
 #=============================================
 import csv
+import hashlib
 import os
 import shlex
 import subprocess
+import shutil
 
 
 def count_reads_input(_wildcards):
@@ -122,6 +124,131 @@ rule count_reads:
         def rna_featurecounts_summary_path(outputfolder):
             return os.path.join(outputfolder, f"{os.path.basename(params.experiment_dir)}.featureCounts.summary.txt")
 
+        def count_cache_dir():
+            path = os.path.join(experiment_dir, "run_logs", "count_cache")
+            os.makedirs(path, exist_ok=True)
+            return path
+
+        def file_state_token(path):
+            stat = os.stat(path)
+            return f"{path}\t{stat.st_size}\t{stat.st_mtime_ns}"
+
+        def sha256_file(path):
+            digest = hashlib.sha256()
+            with open(path, "rb") as handle:
+                for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            return digest.hexdigest()
+
+        def count_cache_key(feature_bed, bam_files, selected_samples, feature_label, paired, featurecounts_version):
+            digest = hashlib.sha256()
+            digest.update(f"feature_label={feature_label}\npaired={paired}\n".encode("utf-8"))
+            digest.update(f"featurecounts={featurecounts_version}\n".encode("utf-8"))
+            digest.update(f"feature_bed_sha256={sha256_file(feature_bed)}\n".encode("utf-8"))
+            for sample, bam in zip(selected_samples, bam_files):
+                digest.update(f"{sample}\t{sample_id_for_sample(sample)}\t{file_state_token(bam)}\n".encode("utf-8"))
+            return digest.hexdigest()
+
+        def prepare_featurecount_inputs(feature_bed, output_folder, feature_label):
+            prep_dir = os.path.join(output_folder, "count_features")
+            os.makedirs(prep_dir, exist_ok=True)
+            cleaned_bed = os.path.join(prep_dir, f"{feature_label.lower()}.cleaned.bed")
+            saf_file = os.path.join(prep_dir, f"{feature_label.lower()}.cleaned.saf")
+
+            rows = set()
+            with open(feature_bed, "r", encoding="utf-8", errors="replace") as handle:
+                for line in handle:
+                    if not line.strip() or line.startswith("#"):
+                        continue
+                    fields = line.rstrip("\n").split("\t")
+                    if len(fields) < 3:
+                        continue
+                    try:
+                        start = int(fields[1])
+                        end = int(fields[2])
+                    except ValueError:
+                        continue
+                    if end <= start:
+                        continue
+                    rows.add((fields[0], start, end))
+
+            cleaned_rows = sorted(rows, key=lambda item: (item[0], item[1], item[2]))
+            with open(cleaned_bed, "w", encoding="utf-8") as bed_handle, open(saf_file, "w", encoding="utf-8") as saf_handle:
+                saf_handle.write("GeneID\tChr\tStart\tEnd\tStrand\n")
+                for chrom, start, end in cleaned_rows:
+                    feature_id = f"{chrom}_{start}_{end}"
+                    bed_handle.write(f"{chrom}\t{start}\t{end}\n")
+                    saf_handle.write(f"{feature_id}\t{chrom}\t{start + 1}\t{end}\t.\n")
+
+            if not cleaned_rows:
+                raise RuntimeError(f"No valid intervals remained after cleaning feature BED: {feature_bed}")
+            return cleaned_bed, saf_file, len(cleaned_rows)
+
+        def count_reads_over_features_with_featurecounts(input_folder, peak_bed, output_folder, selected_samples, bam_suffix, feature_label):
+            featurecounts_version = subprocess.check_output(["featureCounts", "-v"], stderr=subprocess.STDOUT).decode("utf-8").strip()
+            log_once(logfile, "step11.featurecounts_version", "\n" + featurecounts_version, "FEATURECOUNTS VERSION")
+
+            bam_files = [os.path.join(input_folder, f"{sample}{bam_suffix}") for sample in selected_samples]
+            if not bam_files:
+                raise RuntimeError("No BAM files selected for count matrix generation.")
+            for bam in bam_files:
+                if not os.path.exists(bam):
+                    raise FileNotFoundError(f"Required BAM for count matrix generation not found: {bam}")
+
+            cleaned_bed, saf_file, feature_count = prepare_featurecount_inputs(peak_bed, output_folder, feature_label)
+            final_output = rna_output_path(output_folder)
+            summary_output = os.path.join(output_folder, f"{os.path.basename(params.experiment_dir)}.featureCounts.summary.txt")
+            cache_key = count_cache_key(cleaned_bed, bam_files, selected_samples, feature_label, params.paired, featurecounts_version)
+            cache_table = os.path.join(count_cache_dir(), f"{cache_key}.raw_read_quant.table.txt")
+            cache_summary = os.path.join(count_cache_dir(), f"{cache_key}.featureCounts.summary.txt")
+            cache_manifest = os.path.join(count_cache_dir(), f"{cache_key}.manifest.tsv")
+
+            if os.path.exists(cache_table):
+                shutil.copy2(cache_table, final_output)
+                if os.path.exists(cache_summary):
+                    shutil.copy2(cache_summary, summary_output)
+                log_it(logfile, f"Reused cached {feature_label} count matrix: {cache_table}")
+                return
+
+            log_it(logfile, f"Cleaned {feature_label} BED for counting: {cleaned_bed} ({feature_count} intervals)")
+            log_it(logfile, f"SAF annotation for featureCounts: {saf_file}")
+            featurecounts_output = os.path.join(output_folder, f"{os.path.basename(params.experiment_dir)}.featureCounts.tmp.txt")
+            paired_flags = "-p --countReadPairs" if params.paired else ""
+            featurecounts_command = (
+                f"featureCounts -T {threads} -F SAF -a {quote(saf_file)} -o {quote(featurecounts_output)} "
+                f"{paired_flags} {' '.join(quote(path) for path in bam_files)}"
+            ).strip()
+            log_it(logfile, featurecounts_command, "FEATURECOUNTS COMMAND")
+            shell(featurecounts_command)
+
+            with open(featurecounts_output, newline="") as source, open(final_output, "w", newline="") as destination:
+                reader = csv.reader((line for line in source if not line.startswith("#")), delimiter="\t")
+                header = next(reader)
+                writer = csv.writer(destination, delimiter="\t", lineterminator="\n")
+                writer.writerow([feature_label, *[sample_id_for_sample(sample) for sample in selected_samples]])
+                for row in reader:
+                    writer.writerow([row[0], *row[6:]])
+
+            featurecounts_summary = f"{featurecounts_output}.summary"
+            if os.path.exists(featurecounts_summary):
+                os.replace(featurecounts_summary, summary_output)
+            os.remove(featurecounts_output)
+            shutil.copy2(final_output, cache_table)
+            if os.path.exists(summary_output):
+                shutil.copy2(summary_output, cache_summary)
+            with open(cache_manifest, "w", newline="", encoding="utf-8") as handle:
+                writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+                writer.writerow(["key", "value"])
+                writer.writerow(["feature_label", feature_label])
+                writer.writerow(["feature_bed", peak_bed])
+                writer.writerow(["cleaned_bed", cleaned_bed])
+                writer.writerow(["feature_count", feature_count])
+                writer.writerow(["featurecounts_version", featurecounts_version])
+                writer.writerow(["sample_count", len(selected_samples)])
+                for sample, bam in zip(selected_samples, bam_files):
+                    writer.writerow([f"sample:{sample}", bam])
+            log_it(logfile, f"Cached {feature_label} count matrix: {cache_table}")
+
         def count_reads_rna(input_folder, output_folder, gtf_file, paired):
             log_once(logfile, "step11.rna_mode", "Counting RNA reads from BAMs with featureCounts...")
             sanity_check_dir(logfile, input_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][0], "step11.rna_sanity")
@@ -163,12 +290,9 @@ rule count_reads:
             os.remove(featurecounts_output)
 
         def count_reads_atac(input_folder, peak_folder, output_folder):
-            log_once(logfile, "step11.atac_mode", "Counting ATAC reads from BAMs with bedtools multicov...")
+            log_once(logfile, "step11.atac_mode", "Counting ATAC reads over peaks with featureCounts...")
             sanity_check_dir(logfile, input_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][0], "step11.atac_bam_sanity")
             sanity_check_dir(logfile, peak_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][1], "step11.atac_peak_sanity")
-
-            bedtools_version = subprocess.check_output(["bedtools", "--version"], stderr=subprocess.STDOUT)
-            log_once(logfile, "step11.bedtools_version", "\n" + bedtools_version.decode("utf-8"), "BEDTOOLS VERSION")
 
             filtered_peak_bed = os.path.join(
                 experiment_dir,
@@ -180,38 +304,24 @@ rule count_reads:
             peak_bed = filtered_peak_bed if os.path.exists(filtered_peak_bed) else os.path.join(peak_folder, "all_groups.merged_peaks.bed")
             log_it(logfile, f"ATAC peak BED used for counting: {peak_bed}")
             selected_samples = samples_after_spp_drop()
-            bam_files = [os.path.join(input_folder, f"{sample}.sorted.dups_marked.filtered.bam") for sample in selected_samples]
-            multicov_output = os.path.join(output_folder, f"{os.path.basename(params.experiment_dir)}.multicov.tmp.txt")
-            multicov_command = (
-                f"bedtools multicov -bed {quote(peak_bed)} -bams {' '.join(quote(path) for path in bam_files)} "
-                f"> {quote(multicov_output)}"
+            count_reads_over_features_with_featurecounts(
+                input_folder=input_folder,
+                peak_bed=peak_bed,
+                output_folder=output_folder,
+                selected_samples=selected_samples,
+                bam_suffix=".sorted.dups_marked.filtered.bam",
+                feature_label="Peak",
             )
-            log_it(logfile, multicov_command, "BEDTOOLS MULTICOV COMMAND")
-            shell(multicov_command)
-
-            final_output = rna_output_path(output_folder)
-            with open(multicov_output, newline="") as source, open(final_output, "w", newline="") as destination:
-                reader = csv.reader(source, delimiter="\t")
-                writer = csv.writer(destination, delimiter="\t", lineterminator="\n")
-                writer.writerow(["Peak", *[sample_id_for_sample(sample) for sample in selected_samples]])
-                for row in reader:
-                    peak_name = f"{row[0]}_{row[1]}_{row[2]}"
-                    writer.writerow([peak_name, *row[3:]])
-
-            os.remove(multicov_output)
 
         def count_reads_chip(input_folder, peak_folder, output_folder, broad_mode):
             if broad_mode == "genebody":
-                log_once(logfile, "step11.chip_mode", "Counting ChIP reads over gene-body features with bedtools multicov...")
+                log_once(logfile, "step11.chip_mode", "Counting ChIP reads over gene-body features with featureCounts...")
             elif broad_mode == "diffuse":
-                log_once(logfile, "step11.chip_mode", "Counting ChIP reads over fixed genomic bins with bedtools multicov...")
+                log_once(logfile, "step11.chip_mode", "Counting ChIP reads over fixed genomic bins with featureCounts...")
             else:
-                log_once(logfile, "step11.chip_mode", "Counting ChIP reads from BAMs with bedtools multicov...")
+                log_once(logfile, "step11.chip_mode", "Counting ChIP reads over peaks with featureCounts...")
             sanity_check_dir(logfile, input_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][0], "step11.chip_bam_sanity")
             sanity_check_dir(logfile, peak_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][1], "step11.chip_peak_sanity")
-
-            bedtools_version = subprocess.check_output(["bedtools", "--version"], stderr=subprocess.STDOUT)
-            log_once(logfile, "step11.bedtools_version", "\n" + bedtools_version.decode("utf-8"), "BEDTOOLS VERSION")
 
             peak_bed = os.path.join(peak_folder, "all_groups.merged_peaks.bed")
             if broad_mode == "genebody":
@@ -221,31 +331,20 @@ rule count_reads:
             else:
                 log_it(logfile, f"ChIP peak BED used for counting: {peak_bed}")
             selected_samples = samples_after_spp_drop()
-            bam_files = [os.path.join(input_folder, f"{sample}.filtered.bam") for sample in selected_samples]
-            multicov_output = os.path.join(output_folder, f"{os.path.basename(params.experiment_dir)}.multicov.tmp.txt")
-            multicov_command = (
-                f"bedtools multicov -bed {quote(peak_bed)} -bams {' '.join(quote(path) for path in bam_files)} "
-                f"> {quote(multicov_output)}"
+            if broad_mode == "genebody":
+                feature_label = "Feature"
+            elif broad_mode == "diffuse":
+                feature_label = "Bin"
+            else:
+                feature_label = "Peak"
+            count_reads_over_features_with_featurecounts(
+                input_folder=input_folder,
+                peak_bed=peak_bed,
+                output_folder=output_folder,
+                selected_samples=selected_samples,
+                bam_suffix=".filtered.bam",
+                feature_label=feature_label,
             )
-            log_it(logfile, multicov_command, "BEDTOOLS MULTICOV COMMAND")
-            shell(multicov_command)
-
-            final_output = rna_output_path(output_folder)
-            with open(multicov_output, newline="") as source, open(final_output, "w", newline="") as destination:
-                reader = csv.reader(source, delimiter="\t")
-                writer = csv.writer(destination, delimiter="\t", lineterminator="\n")
-                if broad_mode == "genebody":
-                    feature_label = "Feature"
-                elif broad_mode == "diffuse":
-                    feature_label = "Bin"
-                else:
-                    feature_label = "Peak"
-                writer.writerow([feature_label, *[sample_id_for_sample(sample) for sample in selected_samples]])
-                for row in reader:
-                    feature_name = f"{row[0]}_{row[1]}_{row[2]}"
-                    writer.writerow([feature_name, *row[3:]])
-
-            os.remove(multicov_output)
 
         try:
             if params.thetype == "RNA":
