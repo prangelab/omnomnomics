@@ -992,7 +992,7 @@ rule analyze_peaks_de:
             def write_motif_summary():
                 with open(motif_summary_path, "w", newline="") as handle:
                     writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-                    writer.writerow(["set_name", "method", "status", "peak_bed", "input_fasta", "output_dir", "motif_database", "reason"])
+                    writer.writerow(["set_name", "method", "status", "peak_bed", "input_fasta", "output_dir", "motif_database", "report_pdf", "reason"])
                     writer.writerows(motif_summary)
 
             required_tools = ["bedtools", "sea"]
@@ -1000,7 +1000,7 @@ rule analyze_peaks_de:
             if missing_tools:
                 reason = "missing required executable(s): " + ", ".join(missing_tools)
                 log_it(logfile, f"Skipping MEME motif analysis in analyze_peaks_de because {reason}.")
-                motif_summary.append(["ALL", "MEME", "SKIP", "", "", "", "", reason])
+                motif_summary.append(["ALL", "MEME", "SKIP", "", "", "", "", "", reason])
                 write_motif_summary()
                 return motif_summary_path
 
@@ -1027,7 +1027,7 @@ rule analyze_peaks_de:
                     "or set post_de_motif_database to a MEME-format motif file"
                 )
                 log_it(logfile, f"Skipping MEME motif analysis in analyze_peaks_de because {reason}.")
-                motif_summary.append(["ALL", "MEME", "SKIP", "", "", "", "", reason])
+                motif_summary.append(["ALL", "MEME", "SKIP", "", "", "", "", "", reason])
                 write_motif_summary()
                 return motif_summary_path
 
@@ -1158,18 +1158,162 @@ rule analyze_peaks_de:
                     raise RuntimeError(f"{cmd[0]} exited with status {completed.returncode}")
                 return completed
 
+            def parse_meme_text_table(table_path):
+                if not os.path.isfile(table_path):
+                    return [], []
+                header = None
+                rows = []
+                with open(table_path, "r", newline="") as handle:
+                    for line in handle:
+                        line = line.rstrip("\n")
+                        if not line.strip() or line.startswith("#"):
+                            continue
+                        fields = line.split("\t")
+                        if header is None:
+                            upper = {field.upper() for field in fields}
+                            if "RANK" in upper and ("ID" in upper or "MOTIF_ID" in upper):
+                                header = fields
+                                continue
+                            return [], []
+                        if len(fields) < len(header):
+                            fields.extend([""] * (len(header) - len(fields)))
+                        rows.append(dict(zip(header, fields)))
+                return header or [], rows
+
+            def count_meme_text_rows(table_path):
+                _header, rows = parse_meme_text_table(table_path)
+                return len(rows)
+
+            def safe_float(value, default=float("nan")):
+                try:
+                    out = float(value)
+                except (TypeError, ValueError):
+                    return default
+                return out if math.isfinite(out) else default
+
+            def render_motif_report(method, set_name, table_path, report_pdf):
+                import matplotlib
+                matplotlib.use("Agg")
+                import matplotlib.pyplot as plt
+
+                header, rows = parse_meme_text_table(table_path)
+                os.makedirs(os.path.dirname(report_pdf), exist_ok=True)
+                if not rows:
+                    fig, ax = plt.subplots(figsize=(8.5, 4.5))
+                    ax.axis("off")
+                    ax.text(
+                        0.5,
+                        0.62,
+                        f"{method} motif enrichment",
+                        ha="center",
+                        va="center",
+                        fontsize=16,
+                        fontweight="bold",
+                    )
+                    ax.text(
+                        0.5,
+                        0.44,
+                        f"{set_name}\nNo enriched motifs reported by {method}.",
+                        ha="center",
+                        va="center",
+                        fontsize=11,
+                    )
+                    fig.savefig(report_pdf, bbox_inches="tight")
+                    plt.close(fig)
+                    return report_pdf
+
+                upper_to_col = {col.upper(): col for col in header}
+                label_col = upper_to_col.get("ALT_ID") or upper_to_col.get("ID") or upper_to_col.get("MOTIF_ID")
+                q_col = (
+                    upper_to_col.get("QVALUE")
+                    or upper_to_col.get("ADJ_PVALUE")
+                    or upper_to_col.get("PVALUE")
+                    or upper_to_col.get("P-VALUE")
+                )
+                effect_col = upper_to_col.get("ENR_RATIO") or upper_to_col.get("SCORE") or upper_to_col.get("TP%")
+                if not label_col or not q_col:
+                    fig, ax = plt.subplots(figsize=(8.5, 4.5))
+                    ax.axis("off")
+                    ax.text(
+                        0.5,
+                        0.5,
+                        f"{method} motif enrichment rows were found, but required plotting columns are missing.",
+                        ha="center",
+                        va="center",
+                        fontsize=11,
+                    )
+                    fig.savefig(report_pdf, bbox_inches="tight")
+                    plt.close(fig)
+                    return report_pdf
+
+                plot_rows = []
+                for row in rows:
+                    q_value = safe_float(row.get(q_col))
+                    if not math.isfinite(q_value) or q_value <= 0:
+                        continue
+                    label = str(row.get(label_col, "")).strip() or "motif"
+                    effect = safe_float(row.get(effect_col), default=float("nan")) if effect_col else float("nan")
+                    plot_rows.append(
+                        {
+                            "label": label,
+                            "q_value": q_value,
+                            "score": -math.log10(q_value),
+                            "effect": effect,
+                        }
+                    )
+                plot_rows = sorted(plot_rows, key=lambda item: item["q_value"])[:15]
+                if not plot_rows:
+                    return render_motif_report(method, set_name, "", report_pdf)
+
+                labels = [item["label"] for item in reversed(plot_rows)]
+                scores = [item["score"] for item in reversed(plot_rows)]
+                colors = ["#4C78A8" if not math.isfinite(item["effect"]) else "#D95F02" for item in reversed(plot_rows)]
+                fig_height = max(4.5, 0.35 * len(labels) + 1.8)
+                fig, ax = plt.subplots(figsize=(9.5, fig_height))
+                ax.barh(labels, scores, color=colors)
+                ax.set_xlabel("-log10(q-value)")
+                ax.set_title(f"{set_name}: top {method} motif enrichments")
+                ax.grid(True, axis="x", color="#dddddd", linewidth=0.8)
+                ax.spines["top"].set_visible(False)
+                ax.spines["right"].set_visible(False)
+                fig.savefig(report_pdf, bbox_inches="tight")
+                plt.close(fig)
+                return report_pdf
+
+            def write_combined_motif_report(motifs_dir, motif_summary_rows):
+                import matplotlib
+                matplotlib.use("Agg")
+                import matplotlib.pyplot as plt
+
+                report_pdf = os.path.join(motifs_dir, "motif_summary.pdf")
+                status_counts = {}
+                for row in motif_summary_rows:
+                    status = row[2] if len(row) > 2 else "NA"
+                    status_counts[status] = status_counts.get(status, 0) + 1
+                labels = sorted(status_counts)
+                values = [status_counts[label] for label in labels]
+                fig, ax = plt.subplots(figsize=(8, 5))
+                ax.bar(labels, values, color="#4C78A8")
+                ax.set_title("Motif analysis summary")
+                ax.set_ylabel("Run count")
+                ax.tick_params(axis="x", rotation=30)
+                ax.grid(True, axis="y", color="#dddddd", linewidth=0.8)
+                fig.savefig(report_pdf, bbox_inches="tight")
+                plt.close(fig)
+                return report_pdf
+
             for index, item in enumerate(set_manifest_rows):
                 if item["set_type"] not in eligible_set_types:
-                    motif_summary.append([item["set_name"], "MEME", "SKIP", item["peak_bed"], "", "", motif_database, "set type is not configured for motif analysis"])
+                    motif_summary.append([item["set_name"], "MEME", "SKIP", item["peak_bed"], "", "", motif_database, "", "set type is not configured for motif analysis"])
                     write_motif_summary()
                     continue
                 if int(item["peak_count"]) < min_motif_peaks:
-                    motif_summary.append([item["set_name"], "MEME", "SKIP", item["peak_bed"], "", "", motif_database, f"fewer than {min_motif_peaks} peaks"])
+                    motif_summary.append([item["set_name"], "MEME", "SKIP", item["peak_bed"], "", "", motif_database, "", f"fewer than {min_motif_peaks} peaks"])
                     write_motif_summary()
                     continue
                 if index not in selected_indices:
                     reason = f"motif set cap reached; retained top {max_motif_sets} highest-priority sets"
-                    motif_summary.append([item["set_name"], "MEME", "SKIP", item["peak_bed"], "", "", motif_database, reason])
+                    motif_summary.append([item["set_name"], "MEME", "SKIP", item["peak_bed"], "", "", motif_database, "", reason])
                     write_motif_summary()
                     continue
                 safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", item["set_name"])
@@ -1186,7 +1330,7 @@ rule analyze_peaks_de:
                     motif_window_bp,
                 )
                 if motif_peak_count < min_motif_peaks:
-                    motif_summary.append([item["set_name"], "MEME", "SKIP", item["peak_bed"], "", out_dir, motif_database, f"fewer than {min_motif_peaks} valid centered windows"])
+                    motif_summary.append([item["set_name"], "MEME", "SKIP", item["peak_bed"], "", out_dir, motif_database, "", f"fewer than {min_motif_peaks} valid centered windows"])
                     write_motif_summary()
                     continue
                 cap_reason = ""
@@ -1229,12 +1373,18 @@ rule analyze_peaks_de:
                     log_it(logfile, f"Running MEME SEA for {item['set_name']}.")
                     run_meme_text_command(sea_cmd, sea_tsv, motif_timeout_seconds, env)
                     if os.path.isfile(sea_tsv):
-                        motif_summary.append([item["set_name"], "SEA", "OK", item["peak_bed"], motif_input_fasta, sea_dir, motif_database, cap_reason])
+                        sea_report_pdf = os.path.join(sea_dir, "motif_enrichment.pdf")
+                        render_motif_report("SEA", item["set_name"], sea_tsv, sea_report_pdf)
+                        sea_status = "OK" if count_meme_text_rows(sea_tsv) > 0 else "NO_MOTIFS"
+                        sea_reason = cap_reason
+                        if sea_status == "NO_MOTIFS":
+                            sea_reason = "; ".join(filter(None, ["SEA produced no enriched motif rows", cap_reason]))
+                        motif_summary.append([item["set_name"], "SEA", sea_status, item["peak_bed"], motif_input_fasta, sea_dir, motif_database, sea_report_pdf, sea_reason])
                     else:
                         reason = "SEA completed but did not produce sea.tsv"
                         if cap_reason:
                             reason = f"{reason}; {cap_reason}"
-                        motif_summary.append([item["set_name"], "SEA", "NO_MOTIFS", item["peak_bed"], motif_input_fasta, sea_dir, motif_database, reason])
+                        motif_summary.append([item["set_name"], "SEA", "NO_MOTIFS", item["peak_bed"], motif_input_fasta, sea_dir, motif_database, "", reason])
 
                     if item["set_type"].startswith("top_de_ranked") and tool_available("ame"):
                         ame_dir = ensure_dir(os.path.join(out_dir, "ame"))
@@ -1252,14 +1402,20 @@ rule analyze_peaks_de:
                         log_it(logfile, f"Running MEME AME ranked enrichment for {item['set_name']}.")
                         run_meme_text_command(ame_cmd, ame_tsv, motif_timeout_seconds, env)
                         if os.path.isfile(ame_tsv):
-                            motif_summary.append([item["set_name"], "AME", "OK", item["peak_bed"], motif_input_fasta, ame_dir, motif_database, cap_reason])
+                            ame_report_pdf = os.path.join(ame_dir, "motif_enrichment.pdf")
+                            render_motif_report("AME", item["set_name"], ame_tsv, ame_report_pdf)
+                            ame_status = "OK" if count_meme_text_rows(ame_tsv) > 0 else "NO_MOTIFS"
+                            ame_reason = cap_reason
+                            if ame_status == "NO_MOTIFS":
+                                ame_reason = "; ".join(filter(None, ["AME produced no enriched motif rows", cap_reason]))
+                            motif_summary.append([item["set_name"], "AME", ame_status, item["peak_bed"], motif_input_fasta, ame_dir, motif_database, ame_report_pdf, ame_reason])
                         else:
                             reason = "AME completed but did not produce ame.tsv"
                             if cap_reason:
                                 reason = f"{reason}; {cap_reason}"
-                            motif_summary.append([item["set_name"], "AME", "NO_MOTIFS", item["peak_bed"], motif_input_fasta, ame_dir, motif_database, reason])
+                            motif_summary.append([item["set_name"], "AME", "NO_MOTIFS", item["peak_bed"], motif_input_fasta, ame_dir, motif_database, "", reason])
                     elif item["set_type"].startswith("top_de_ranked"):
-                        motif_summary.append([item["set_name"], "AME", "SKIP", item["peak_bed"], motif_input_fasta, "", motif_database, "ame executable not found"])
+                        motif_summary.append([item["set_name"], "AME", "SKIP", item["peak_bed"], motif_input_fasta, "", motif_database, "", "ame executable not found"])
                 except subprocess.TimeoutExpired as motif_timeout:
                     if motif_timeout.stdout:
                         output_text = motif_timeout.stdout
@@ -1271,13 +1427,15 @@ rule analyze_peaks_de:
                     if cap_reason:
                         reason = f"{reason}; {cap_reason}"
                     log_it(logfile, f"MEME motif run timed out for {item['set_name']}: {reason}")
-                    motif_summary.append([item["set_name"], "MEME", "TIMEOUT", item["peak_bed"], motif_input_fasta, out_dir, motif_database, reason])
+                    motif_summary.append([item["set_name"], "MEME", "TIMEOUT", item["peak_bed"], motif_input_fasta, out_dir, motif_database, "", reason])
                 except Exception as motif_error:
                     log_it(logfile, f"MEME motif run failed for {item['set_name']}: {motif_error}")
-                    motif_summary.append([item["set_name"], "MEME", "FAIL", item["peak_bed"], motif_input_fasta, out_dir, motif_database, str(motif_error)])
+                    motif_summary.append([item["set_name"], "MEME", "FAIL", item["peak_bed"], motif_input_fasta, out_dir, motif_database, "", str(motif_error)])
                 write_motif_summary()
 
+            combined_report = write_combined_motif_report(motifs_dir, motif_summary)
             write_motif_summary()
+            log_it(logfile, f"Motif summary PDF: {combined_report}")
             log_it(logfile, f"Motif run summary: {motif_summary_path}")
             return motif_summary_path
 
