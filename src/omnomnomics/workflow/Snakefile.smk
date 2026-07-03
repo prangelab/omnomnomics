@@ -1031,6 +1031,11 @@ samples = list(set(samples))
 samples2 = list(set(samples2))
 
 metadata_sample_entry_steps = {
+    master_config.get("mergewig_rule_num"),
+    master_config.get("callpeaks_rule_num"),
+    master_config.get("peakqc_rule_num"),
+    master_config.get("analyzepeaks_rule_num"),
+    master_config.get("countreads_rule_num"),
     master_config.get("de_rule_num"),
     master_config.get("dechrom_rule_num"),
     master_config.get("analyzepeaksde_rule_num"),
