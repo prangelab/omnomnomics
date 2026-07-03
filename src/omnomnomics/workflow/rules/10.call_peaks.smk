@@ -19,6 +19,243 @@ import hashlib
 import concurrent.futures
 from shlex import quote
 
+def idr_split_jobs_enabled():
+    thetype = str(config.get("THETYPE", "")).upper()
+    if thetype == "ATAC":
+        return str(config.get("NARROW_PEAK_STRATEGY", "idr")).strip().lower() == "idr"
+    if thetype == "CHIP":
+        return (
+            str(config.get("BROAD_MODE", "off")).strip().lower() == "off"
+            and str(config.get("NARROW_PEAK_STRATEGY", "idr")).strip().lower() == "idr"
+        )
+    return False
+
+def idr_assay_type():
+    return str(config.get("THETYPE", "")).upper()
+
+def idr_bam_suffix():
+    if idr_assay_type() == "CHIP":
+        return ".filtered.bam"
+    return ".sorted.dups_marked.filtered.bam"
+
+def idr_input_folder():
+    return f"{experiment_dir}/{master_config['input_folders'][master_config['callpeaks_rule_num']-1]}"
+
+def idr_output_folder():
+    return f"{experiment_dir}/{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}"
+
+def idr_root_folder():
+    return os.path.join(idr_output_folder(), f"{idr_assay_type().lower()}_idr_peak_calling")
+
+def idr_mode_value():
+    mode = str(config.get("IDR_MODE", "encode")).strip().lower()
+    return mode if mode in {"basic", "encode"} else "basic"
+
+def idr_pairing_policy_value():
+    policy = str(config.get("IDR_PAIRING_POLICY", "all_pairs")).strip().lower()
+    return policy if policy in {"all_pairs", "anchor_vs_all"} else "all_pairs"
+
+def idr_group_records():
+    grouped = {}
+    for sample in samples2:
+        group_name = sample_type_for_sample(sample)
+        bam_path = os.path.join(idr_input_folder(), f"{sample}{idr_bam_suffix()}")
+        grouped.setdefault(group_name, []).append((sample, bam_path))
+    return {group: sorted(records, key=lambda x: str(x[0])) for group, records in grouped.items()}
+
+def idr_groups():
+    return sorted(idr_group_records())
+
+def idr_group_bams(group):
+    return [bam for _, bam in idr_group_records()[group]]
+
+def idr_group_samples(group):
+    return [sample for sample, _ in idr_group_records()[group]]
+
+def idr_replicate_pairs_for_group(group):
+    records = idr_group_records()[group]
+    if len(records) <= 2:
+        return list(itertools.combinations(records, 2))
+    if idr_pairing_policy_value() == "anchor_vs_all":
+        anchor = records[0]
+        return [(anchor, record) for record in records[1:]]
+    return list(itertools.combinations(records, 2))
+
+def idr_pair_hash(group, rep1_name, rep2_name):
+    pair_tag = f"{group}__{rep1_name}__{rep2_name}"
+    return hashlib.md5(pair_tag.encode("utf-8")).hexdigest()[:12]
+
+def idr_pair_lookup(group, pair_hash_value):
+    for (rep1_name, _), (rep2_name, _) in idr_replicate_pairs_for_group(group):
+        if idr_pair_hash(group, rep1_name, rep2_name) == pair_hash_value:
+            return rep1_name, rep2_name
+    raise ValueError(f"Unknown IDR pair hash for group={group}: {pair_hash_value}")
+
+def idr_macs3_callpeak_command(
+    treatment_bams,
+    outdir,
+    name,
+    control_bam=None,
+):
+    cmd = [
+        "macs3", "callpeak",
+        "-t", *treatment_bams,
+        "--outdir", outdir,
+        "-n", name,
+        "-q", "0.01",
+        "--verbose", "0",
+    ]
+    if idr_assay_type() == "ATAC":
+        cmd.extend(["-f", "BAMPE", "--nomodel", "--shift", "-100", "--extsize", "200"])
+    else:
+        cmd.extend(["-f", "BAM"])
+        if control_bam and control_bam != "NA":
+            cmd.extend(["-c", control_bam])
+    return " ".join(quote(str(x)) for x in cmd)
+
+def idr_count_rows(path):
+    if not os.path.exists(path):
+        return 0
+    count = 0
+    with open(path, "r", encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if line.strip() and not line.startswith("#"):
+                count += 1
+    return count
+
+def idr_row_passes_threshold(row, threshold=0.05):
+    candidate_vals = []
+    for idx in (10, 11):
+        if idx < len(row):
+            value = row[idx].strip()
+            if value in {"", ".", "NA", "nan", "NaN"}:
+                continue
+            try:
+                candidate_vals.append(float(value))
+            except ValueError:
+                continue
+    for numeric in candidate_vals:
+        idr_val = 10.0 ** (-numeric) if numeric > 1.0 else numeric
+        if idr_val <= threshold:
+            return True
+    if len(row) > 4:
+        try:
+            score = float(row[4])
+            if 0.0 <= score <= 1000.0:
+                return 10.0 ** (-(score / 125.0)) <= threshold
+        except ValueError:
+            pass
+    return False
+
+def idr_extract_pass_bed(idr_output_path, pass_bed_path, threshold=0.05):
+    pass_rows = []
+    with open(idr_output_path, "r", encoding="utf-8", errors="replace") as in_handle:
+        for raw_line in in_handle:
+            if not raw_line.strip() or raw_line.startswith("#"):
+                continue
+            row = raw_line.rstrip("\n").split("\t")
+            if len(row) < 3:
+                continue
+            if idr_row_passes_threshold(row, threshold=threshold):
+                pass_rows.append((row[0], int(row[1]), int(row[2])))
+    pass_rows = sorted(set(pass_rows), key=lambda x: (x[0], x[1], x[2]))
+    with open(pass_bed_path, "w", encoding="utf-8") as out_handle:
+        for chrom, start, end in pass_rows:
+            out_handle.write(f"{chrom}\t{start}\t{end}\n")
+    return len(pass_rows)
+
+def idr_write_status(status_path, group, strategy, rep1, rep2, retained_peaks, output_bed, note):
+    with open(status_path, "w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+        writer.writerow(["group", "strategy", "replicate_1", "replicate_2", "idr_threshold", "retained_peaks", "output_bed", "note"])
+        writer.writerow([group, strategy, rep1, rep2, "0.05", retained_peaks, output_bed, note])
+
+def idr_run_comparison(sorted_a, sorted_b, peak_list, idr_output, idr_log, pass_bed, status_path, group, strategy, rep1, rep2):
+    for stale_path in (idr_output, idr_log, f"{idr_output}.png", pass_bed):
+        if os.path.exists(stale_path):
+            os.remove(stale_path)
+    try:
+        min_input_peaks = int(config.get("IDR_MIN_INPUT_PEAKS", 20))
+    except (TypeError, ValueError):
+        min_input_peaks = 20
+    min_input_peaks = max(0, min_input_peaks)
+    input_counts = {
+        "sample_a": idr_count_rows(sorted_a),
+        "sample_b": idr_count_rows(sorted_b),
+        "peak_list": idr_count_rows(peak_list),
+    }
+    too_sparse = {name: count for name, count in input_counts.items() if count < min_input_peaks}
+    if too_sparse:
+        reason = ", ".join(f"{name}={count}" for name, count in too_sparse.items())
+        message = (
+            f"Skipping sparse IDR comparison for {os.path.basename(idr_output)}: "
+            f"{reason}; required >= {min_input_peaks} peaks."
+        )
+        open(idr_output, "w", encoding="utf-8").close()
+        open(pass_bed, "w", encoding="utf-8").close()
+        with open(idr_log, "w", encoding="utf-8") as handle:
+            handle.write(message + "\n")
+        idr_write_status(status_path, group, f"{strategy}_skipped_sparse", rep1, rep2, 0, pass_bed, "too_few_peaks_for_idr")
+        return
+
+    idr_cmd = (
+        f"idr --samples {quote(sorted_a)} {quote(sorted_b)} "
+        f"--peak-list {quote(peak_list)} "
+        f"--input-file-type narrowPeak --rank p.value "
+        f"--output-file {quote(idr_output)} --output-file-type narrowPeak "
+        f"--plot --log-output-file {quote(idr_log)} --soft-idr-threshold 0.05"
+    )
+    result = subprocess.run(
+        idr_cmd,
+        shell=True,
+        executable="/bin/bash",
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        combined_output = "\n".join(part for part in [result.stdout, result.stderr] if part)
+        if os.path.exists(idr_log):
+            try:
+                with open(idr_log, "r", encoding="utf-8", errors="replace") as handle:
+                    combined_output += "\n" + handle.read()
+            except OSError:
+                pass
+        sparse_failure = (
+            "Peak files must contain at least" in combined_output
+            or "post-merge" in combined_output
+        )
+        if sparse_failure:
+            message = (
+                f"Skipping sparse IDR comparison for {os.path.basename(idr_output)} "
+                "after IDR reported too few post-merge peaks."
+            )
+            open(idr_output, "w", encoding="utf-8").close()
+            open(pass_bed, "w", encoding="utf-8").close()
+            with open(idr_log, "a", encoding="utf-8") as handle:
+                handle.write("\n" + message + "\n")
+                if combined_output:
+                    handle.write(combined_output + "\n")
+            idr_write_status(status_path, group, f"{strategy}_skipped_sparse", rep1, rep2, 0, pass_bed, "too_few_post_merge_peaks_for_idr")
+            return
+        raise RuntimeError(f"IDR failed for {os.path.basename(idr_output)} with exit code {result.returncode}.")
+
+    retained = idr_extract_pass_bed(idr_output, pass_bed, threshold=0.05)
+    note = "ok" if retained > 0 else "zero_pass_peaks"
+    idr_write_status(status_path, group, strategy, rep1, rep2, retained, pass_bed, note)
+
+def idr_final_group_beds():
+    if not idr_split_jobs_enabled():
+        return []
+    return [os.path.join(idr_output_folder(), f"{group}.MACS3.optimized.bed") for group in idr_groups()]
+
+def idr_group_summary_paths():
+    if not idr_split_jobs_enabled():
+        return []
+    return [os.path.join(idr_root_folder(), f"{group}.idr_selected_peaks.tsv") for group in idr_groups()]
+
+def idr_selected_summary_path():
+    return os.path.join(idr_root_folder(), "idr_selected_peaks.tsv")
+
 def input_function(wildcards):
     input_folder1 = f"{experiment_dir}/{master_config['input_folders'][master_config['callpeaks_rule_num']-1]}"
     input_files = []
@@ -32,7 +269,344 @@ def input_function(wildcards):
         input_files.append(
             os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "annotation", "genes.gtf")
         )
+    if idr_split_jobs_enabled():
+        input_files.extend(idr_final_group_beds())
+        input_files.append(idr_selected_summary_path())
     return input_files
+
+rule idr_pooled_macs3:
+    input:
+        bams=lambda wildcards: idr_group_bams(wildcards.group)
+    output:
+        narrow=f"{idr_root_folder()}/{{group}}.MACS3.pooled_peaks.narrowPeak",
+        sorted=f"{idr_root_folder()}/{{group}}.MACS3.pooled.sorted.narrowPeak"
+    params:
+        root=lambda wildcards: idr_root_folder(),
+        control=lambda wildcards: config.get("INPUT", "NA")
+    threads:
+        lambda wildcards: Threads_Per_Rule['10']
+    resources:
+        mem_mb=lambda wildcards: Memory_Per_Rule['10'],
+        partition=lambda wildcards: master_config['partition'],
+        runtime=lambda wildcards: Runtime_Per_Rule['10']
+    run:
+        os.makedirs(params.root, exist_ok=True)
+        cmd = idr_macs3_callpeak_command(
+            treatment_bams=list(input.bams),
+            outdir=params.root,
+            name=f"{wildcards.group}.MACS3.pooled",
+            control_bam=params.control,
+        )
+        shell(cmd)
+        shell(f"sort -k8,8nr {quote(output.narrow)} > {quote(output.sorted)}")
+
+rule idr_replicate_macs3:
+    input:
+        bam=lambda wildcards: os.path.join(idr_input_folder(), f"{wildcards.sample}{idr_bam_suffix()}")
+    output:
+        narrow=f"{idr_root_folder()}/{{group}}.{{sample}}.MACS3.rep_peaks.narrowPeak",
+        sorted=f"{idr_root_folder()}/{{group}}.{{sample}}.MACS3.rep.sorted.narrowPeak"
+    params:
+        root=lambda wildcards: idr_root_folder(),
+        control=lambda wildcards: config.get("INPUT", "NA")
+    threads:
+        lambda wildcards: Threads_Per_Rule['10']
+    resources:
+        mem_mb=lambda wildcards: Memory_Per_Rule['10'],
+        partition=lambda wildcards: master_config['partition'],
+        runtime=lambda wildcards: Runtime_Per_Rule['10']
+    run:
+        os.makedirs(params.root, exist_ok=True)
+        cmd = idr_macs3_callpeak_command(
+            treatment_bams=[str(input.bam)],
+            outdir=params.root,
+            name=f"{wildcards.group}.{wildcards.sample}.MACS3.rep",
+            control_bam=params.control,
+        )
+        shell(cmd)
+        shell(f"sort -k8,8nr {quote(output.narrow)} > {quote(output.sorted)}")
+
+rule idr_true_pair:
+    input:
+        pooled=lambda wildcards: os.path.join(idr_root_folder(), f"{wildcards.group}.MACS3.pooled.sorted.narrowPeak"),
+        rep1=lambda wildcards: os.path.join(idr_root_folder(), f"{wildcards.group}.{idr_pair_lookup(wildcards.group, wildcards.pair)[0]}.MACS3.rep.sorted.narrowPeak"),
+        rep2=lambda wildcards: os.path.join(idr_root_folder(), f"{wildcards.group}.{idr_pair_lookup(wildcards.group, wildcards.pair)[1]}.MACS3.rep.sorted.narrowPeak")
+    output:
+        idr=f"{idr_root_folder()}/{{group}}.pair.{{pair}}.idr.narrowPeak",
+        log=f"{idr_root_folder()}/{{group}}.pair.{{pair}}.idr.log",
+        pass_bed=f"{idr_root_folder()}/{{group}}.pair.{{pair}}.idr.pass.bed",
+        status=f"{idr_root_folder()}/{{group}}.pair.{{pair}}.idr.status.tsv"
+    threads:
+        lambda wildcards: Threads_Per_Rule['10']
+    resources:
+        mem_mb=lambda wildcards: Memory_Per_Rule['10'],
+        partition=lambda wildcards: master_config['partition'],
+        runtime=lambda wildcards: Runtime_Per_Rule['10']
+    run:
+        rep1, rep2 = idr_pair_lookup(wildcards.group, wildcards.pair)
+        idr_run_comparison(
+            str(input.rep1), str(input.rep2), str(input.pooled),
+            str(output.idr), str(output.log), str(output.pass_bed), str(output.status),
+            wildcards.group, "true_pair_idr", rep1, rep2,
+        )
+
+rule idr_pooled_pseudorep_split:
+    input:
+        bams=lambda wildcards: idr_group_bams(wildcards.group)
+    output:
+        pooled=f"{idr_root_folder()}/{{group}}.pooled.bam",
+        ps1=f"{idr_root_folder()}/{{group}}.pooled.ps1.bam",
+        ps2=f"{idr_root_folder()}/{{group}}.pooled.ps2.bam"
+    threads:
+        lambda wildcards: Threads_Per_Rule['10']
+    resources:
+        mem_mb=lambda wildcards: Memory_Per_Rule['10'],
+        partition=lambda wildcards: master_config['partition'],
+        runtime=lambda wildcards: Runtime_Per_Rule['10']
+    run:
+        os.makedirs(idr_root_folder(), exist_ok=True)
+        samtools_threads = max(1, min(int(threads), 8))
+        shell(f"samtools merge -@ {samtools_threads} -f {quote(output.pooled)} {' '.join(quote(str(x)) for x in input.bams)}")
+        seed = int(hashlib.md5(f"{wildcards.group}|pooled".encode("utf-8")).hexdigest()[:8], 16) % 1000000
+        shell(
+            f"samtools view -@ {samtools_threads} -b -s {seed}.5 "
+            f"-o {quote(output.ps1)} -U {quote(output.ps2)} {quote(output.pooled)}"
+        )
+
+rule idr_pooled_pseudorep_macs3:
+    input:
+        bam=lambda wildcards: os.path.join(idr_root_folder(), f"{wildcards.group}.pooled.ps{wildcards.ps}.bam")
+    output:
+        narrow=f"{idr_root_folder()}/{{group}}.pooled.ps{{ps}}_peaks.narrowPeak",
+        sorted=f"{idr_root_folder()}/{{group}}.pooled.ps{{ps}}.sorted.narrowPeak"
+    wildcard_constraints:
+        ps="[12]"
+    params:
+        root=lambda wildcards: idr_root_folder(),
+        control=lambda wildcards: config.get("INPUT", "NA")
+    threads:
+        lambda wildcards: Threads_Per_Rule['10']
+    resources:
+        mem_mb=lambda wildcards: Memory_Per_Rule['10'],
+        partition=lambda wildcards: master_config['partition'],
+        runtime=lambda wildcards: Runtime_Per_Rule['10']
+    run:
+        cmd = idr_macs3_callpeak_command(
+            treatment_bams=[str(input.bam)],
+            outdir=params.root,
+            name=f"{wildcards.group}.pooled.ps{wildcards.ps}",
+            control_bam=params.control,
+        )
+        shell(cmd)
+        shell(f"sort -k8,8nr {quote(output.narrow)} > {quote(output.sorted)}")
+
+rule idr_pooled_pseudorep:
+    input:
+        pooled=lambda wildcards: os.path.join(idr_root_folder(), f"{wildcards.group}.MACS3.pooled.sorted.narrowPeak"),
+        ps1=lambda wildcards: os.path.join(idr_root_folder(), f"{wildcards.group}.pooled.ps1.sorted.narrowPeak"),
+        ps2=lambda wildcards: os.path.join(idr_root_folder(), f"{wildcards.group}.pooled.ps2.sorted.narrowPeak")
+    output:
+        idr=f"{idr_root_folder()}/{{group}}.pooled_pseudorep.idr.narrowPeak",
+        log=f"{idr_root_folder()}/{{group}}.pooled_pseudorep.idr.log",
+        pass_bed=f"{idr_root_folder()}/{{group}}.pooled_pseudorep.idr.pass.bed",
+        status=f"{idr_root_folder()}/{{group}}.pooled_pseudorep.idr.status.tsv"
+    threads:
+        lambda wildcards: Threads_Per_Rule['10']
+    resources:
+        mem_mb=lambda wildcards: Memory_Per_Rule['10'],
+        partition=lambda wildcards: master_config['partition'],
+        runtime=lambda wildcards: Runtime_Per_Rule['10']
+    run:
+        idr_run_comparison(
+            str(input.ps1), str(input.ps2), str(input.pooled),
+            str(output.idr), str(output.log), str(output.pass_bed), str(output.status),
+            wildcards.group, "pooled_pseudorep_idr", "ps1", "ps2",
+        )
+
+rule idr_self_pseudorep_split:
+    input:
+        bam=lambda wildcards: os.path.join(idr_input_folder(), f"{wildcards.sample}{idr_bam_suffix()}")
+    output:
+        ps1=f"{idr_root_folder()}/{{group}}.{{sample}}.self.ps1.bam",
+        ps2=f"{idr_root_folder()}/{{group}}.{{sample}}.self.ps2.bam"
+    threads:
+        lambda wildcards: Threads_Per_Rule['10']
+    resources:
+        mem_mb=lambda wildcards: Memory_Per_Rule['10'],
+        partition=lambda wildcards: master_config['partition'],
+        runtime=lambda wildcards: Runtime_Per_Rule['10']
+    run:
+        os.makedirs(idr_root_folder(), exist_ok=True)
+        samtools_threads = max(1, min(int(threads), 8))
+        seed = int(hashlib.md5(f"{wildcards.group}|{wildcards.sample}|self".encode("utf-8")).hexdigest()[:8], 16) % 1000000
+        shell(
+            f"samtools view -@ {samtools_threads} -b -s {seed}.5 "
+            f"-o {quote(output.ps1)} -U {quote(output.ps2)} {quote(input.bam)}"
+        )
+
+rule idr_self_pseudorep_macs3:
+    input:
+        bam=lambda wildcards: os.path.join(idr_root_folder(), f"{wildcards.group}.{wildcards.sample}.self.ps{wildcards.ps}.bam")
+    output:
+        narrow=f"{idr_root_folder()}/{{group}}.{{sample}}.self.ps{{ps}}_peaks.narrowPeak",
+        sorted=f"{idr_root_folder()}/{{group}}.{{sample}}.self.ps{{ps}}.sorted.narrowPeak"
+    wildcard_constraints:
+        ps="[12]"
+    params:
+        root=lambda wildcards: idr_root_folder(),
+        control=lambda wildcards: config.get("INPUT", "NA")
+    threads:
+        lambda wildcards: Threads_Per_Rule['10']
+    resources:
+        mem_mb=lambda wildcards: Memory_Per_Rule['10'],
+        partition=lambda wildcards: master_config['partition'],
+        runtime=lambda wildcards: Runtime_Per_Rule['10']
+    run:
+        cmd = idr_macs3_callpeak_command(
+            treatment_bams=[str(input.bam)],
+            outdir=params.root,
+            name=f"{wildcards.group}.{wildcards.sample}.self.ps{wildcards.ps}",
+            control_bam=params.control,
+        )
+        shell(cmd)
+        shell(f"sort -k8,8nr {quote(output.narrow)} > {quote(output.sorted)}")
+
+rule idr_self_pseudorep:
+    input:
+        pooled=lambda wildcards: os.path.join(idr_root_folder(), f"{wildcards.group}.MACS3.pooled.sorted.narrowPeak"),
+        ps1=lambda wildcards: os.path.join(idr_root_folder(), f"{wildcards.group}.{wildcards.sample}.self.ps1.sorted.narrowPeak"),
+        ps2=lambda wildcards: os.path.join(idr_root_folder(), f"{wildcards.group}.{wildcards.sample}.self.ps2.sorted.narrowPeak")
+    output:
+        idr=f"{idr_root_folder()}/{{group}}.{{sample}}.self_pseudorep.idr.narrowPeak",
+        log=f"{idr_root_folder()}/{{group}}.{{sample}}.self_pseudorep.idr.log",
+        pass_bed=f"{idr_root_folder()}/{{group}}.{{sample}}.self_pseudorep.idr.pass.bed",
+        status=f"{idr_root_folder()}/{{group}}.{{sample}}.self_pseudorep.idr.status.tsv"
+    threads:
+        lambda wildcards: Threads_Per_Rule['10']
+    resources:
+        mem_mb=lambda wildcards: Memory_Per_Rule['10'],
+        partition=lambda wildcards: master_config['partition'],
+        runtime=lambda wildcards: Runtime_Per_Rule['10']
+    run:
+        idr_run_comparison(
+            str(input.ps1), str(input.ps2), str(input.pooled),
+            str(output.idr), str(output.log), str(output.pass_bed), str(output.status),
+            wildcards.group, "self_pseudorep_idr", wildcards.sample, wildcards.sample,
+        )
+
+def idr_group_consensus_inputs(wildcards):
+    group = wildcards.group
+    paths = [os.path.join(idr_root_folder(), f"{group}.MACS3.pooled.sorted.narrowPeak")]
+    for (rep1_name, _), (rep2_name, _) in idr_replicate_pairs_for_group(group):
+        pair = idr_pair_hash(group, rep1_name, rep2_name)
+        paths.append(os.path.join(idr_root_folder(), f"{group}.pair.{pair}.idr.pass.bed"))
+        paths.append(os.path.join(idr_root_folder(), f"{group}.pair.{pair}.idr.status.tsv"))
+    if idr_mode_value() == "encode" and len(idr_group_records()[group]) >= 2:
+        paths.append(os.path.join(idr_root_folder(), f"{group}.pooled_pseudorep.idr.pass.bed"))
+        paths.append(os.path.join(idr_root_folder(), f"{group}.pooled_pseudorep.idr.status.tsv"))
+        for sample in idr_group_samples(group):
+            paths.append(os.path.join(idr_root_folder(), f"{group}.{sample}.self_pseudorep.idr.pass.bed"))
+            paths.append(os.path.join(idr_root_folder(), f"{group}.{sample}.self_pseudorep.idr.status.tsv"))
+    return paths
+
+rule idr_group_consensus:
+    input:
+        idr_group_consensus_inputs
+    output:
+        bed=f"{idr_output_folder()}/{{group}}.MACS3.optimized.bed",
+        summary=f"{idr_root_folder()}/{{group}}.idr_selected_peaks.tsv"
+    threads:
+        lambda wildcards: Threads_Per_Rule['10']
+    resources:
+        mem_mb=lambda wildcards: Memory_Per_Rule['10'],
+        partition=lambda wildcards: master_config['partition'],
+        runtime=lambda wildcards: Runtime_Per_Rule['10']
+    run:
+        os.makedirs(idr_output_folder(), exist_ok=True)
+        os.makedirs(idr_root_folder(), exist_ok=True)
+        group = wildcards.group
+        pooled_sorted = os.path.join(idr_root_folder(), f"{group}.MACS3.pooled.sorted.narrowPeak")
+        pair_pass_beds = []
+        status_paths = []
+        for (rep1_name, _), (rep2_name, _) in idr_replicate_pairs_for_group(group):
+            pair = idr_pair_hash(group, rep1_name, rep2_name)
+            pass_bed = os.path.join(idr_root_folder(), f"{group}.pair.{pair}.idr.pass.bed")
+            if idr_count_rows(pass_bed) > 0:
+                pair_pass_beds.append(pass_bed)
+            status_paths.append(os.path.join(idr_root_folder(), f"{group}.pair.{pair}.idr.status.tsv"))
+        if len(idr_group_records()[group]) < 2:
+            shell(f"cut -f1-3 {quote(pooled_sorted)} | sort -k1,1 -k2,2n -k3,3n > {quote(output.bed)}")
+            consensus_note = "fewer_than_two_replicates"
+            consensus_strategy = "pooled_fallback"
+        elif not pair_pass_beds:
+            shell(f"cut -f1-3 {quote(pooled_sorted)} | sort -k1,1 -k2,2n -k3,3n > {quote(output.bed)}")
+            consensus_note = "all_true_pair_idr_comparisons_skipped"
+            consensus_strategy = "pooled_fallback_no_usable_idr"
+        elif len(pair_pass_beds) == 1:
+            shell(f"cp {quote(pair_pass_beds[0])} {quote(output.bed)}")
+            consensus_note = "ok"
+            consensus_strategy = "consensus_idr"
+        else:
+            pair_fraction = float(config.get("IDR_PAIR_FRACTION", 0.5))
+            min_pairs = max(1, int(math.ceil(pair_fraction * float(len(pair_pass_beds)))))
+            shell(
+                f"bedtools multiinter -i {' '.join(quote(p) for p in pair_pass_beds)} | "
+                f"awk 'BEGIN{{{{OFS=\"\\t\"}}}} $4>={min_pairs} {{{{print $1,$2,$3}}}}' | "
+                f"sort -k1,1 -k2,2n -k3,3n > {quote(output.bed)}"
+            )
+            consensus_note = "ok"
+            consensus_strategy = "consensus_idr"
+        retained_count = idr_count_rows(output.bed)
+
+        if idr_mode_value() == "encode" and len(idr_group_records()[group]) >= 2:
+            status_paths.append(os.path.join(idr_root_folder(), f"{group}.pooled_pseudorep.idr.status.tsv"))
+            for sample in idr_group_samples(group):
+                status_paths.append(os.path.join(idr_root_folder(), f"{group}.{sample}.self_pseudorep.idr.status.tsv"))
+
+        with open(output.summary, "w", newline="", encoding="utf-8") as out_handle:
+            writer = csv.writer(out_handle, delimiter="\t", lineterminator="\n")
+            writer.writerow(["group", "strategy", "replicate_1", "replicate_2", "idr_threshold", "retained_peaks", "output_bed", "note"])
+            for status_path in status_paths:
+                if not os.path.exists(status_path):
+                    continue
+                with open(status_path, "r", encoding="utf-8", errors="replace") as in_handle:
+                    reader = csv.reader(in_handle, delimiter="\t")
+                    header = next(reader, None)
+                    for row in reader:
+                        if row:
+                            writer.writerow(row)
+            pair_fraction = config.get("IDR_PAIR_FRACTION", 0.5)
+            min_pairs = max(1, int(math.ceil(float(pair_fraction) * float(max(1, len(pair_pass_beds))))))
+            writer.writerow([group, consensus_strategy, "all", "all", f"0.05;pair_fraction={pair_fraction};min_pairs={min_pairs}", retained_count, output.bed, consensus_note])
+
+rule idr_selected_summary:
+    input:
+        lambda wildcards: idr_group_summary_paths()
+    output:
+        summary=idr_selected_summary_path()
+    threads:
+        lambda wildcards: Threads_Per_Rule['10']
+    resources:
+        mem_mb=lambda wildcards: Memory_Per_Rule['10'],
+        partition=lambda wildcards: master_config['partition'],
+        runtime=lambda wildcards: Runtime_Per_Rule['10']
+    run:
+        os.makedirs(idr_root_folder(), exist_ok=True)
+        with open(output.summary, "w", newline="", encoding="utf-8") as out_handle:
+            writer = csv.writer(out_handle, delimiter="\t", lineterminator="\n")
+            wrote_header = False
+            for summary_path in input:
+                with open(summary_path, "r", encoding="utf-8", errors="replace") as in_handle:
+                    reader = csv.reader(in_handle, delimiter="\t")
+                    header = next(reader, None)
+                    if header and not wrote_header:
+                        writer.writerow(header)
+                        wrote_header = True
+                    for row in reader:
+                        if row:
+                            writer.writerow(row)
+            if not wrote_header:
+                writer.writerow(["group", "strategy", "replicate_1", "replicate_2", "idr_threshold", "retained_peaks", "output_bed", "note"])
 
 rule call_peaks:
     input:
@@ -1719,12 +2293,27 @@ if (chrom != "" && len != "") print chrom, len;
                 shell(f"""cat {outputfolder}/*.MACS3.optimized.bed | sort -k1,1 -k2,2n -k3,3n | bedtools merge -i - > {outputfolder}/all_groups.merged_peaks.bed """)
                 log_it(logfile, f"Total merged peaks: {subprocess.getoutput(f'wc -l {outputfolder}/all_groups.merged_peaks.bed').strip().split()[0]}")
 
-        call_peaks(
-            logfile,
-            thetype=params.thetype,
-            inputfolder1=params.inputfolder1,
-            outputfolder=params.outputfolder,
-            broad_mode=params.broad_mode,
-            input_sample=params.input_sample,
-        )
+        if idr_split_jobs_enabled():
+            log_it(logfile, f"Narrow peak strategy: idr ({params.thetype}); using Snakemake-split IDR jobs.")
+            log_it(logfile, f"IDR mode: {idr_mode_value()}; pairing_policy={idr_pairing_policy_value()}; groups={', '.join(idr_groups())}")
+            os.makedirs(params.outputfolder, exist_ok=True)
+            final_beds = idr_final_group_beds()
+            if final_beds:
+                shell(
+                    f"cat {' '.join(quote(path) for path in final_beds)} | "
+                    f"sort -k1,1 -k2,2n -k3,3n | bedtools merge -i - > {quote(output.merged_features)}"
+                )
+            else:
+                open(output.merged_features, "w", encoding="utf-8").close()
+            log_it(logfile, f"IDR peak summary: {idr_selected_summary_path()}")
+            log_it(logfile, f"Total merged peaks: {subprocess.getoutput(f'wc -l {quote(output.merged_features)}').strip().split()[0]}")
+        else:
+            call_peaks(
+                logfile,
+                thetype=params.thetype,
+                inputfolder1=params.inputfolder1,
+                outputfolder=params.outputfolder,
+                broad_mode=params.broad_mode,
+                input_sample=params.input_sample,
+            )
         shell(f"""echo "necessity file for callpeaks. can delete this." > {params.outputfolder}/extra_10.tmp""")
