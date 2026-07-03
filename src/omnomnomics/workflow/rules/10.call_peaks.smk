@@ -57,8 +57,16 @@ def idr_pairing_policy_value():
 
 def idr_group_records():
     grouped = {}
-    for sample in samples2:
-        group_name = sample_type_for_sample(sample)
+    planned_samples = [(sample, sample_type_for_sample(sample)) for sample in samples2]
+    if not planned_samples:
+        sample_groups = {}
+        for row in globals().get("derived_metadata_rows", []):
+            sample = str(row.get("sample_id") or row.get("filename_key") or row.get("filename") or "").strip()
+            group_name = str(row.get("sample_type") or "all_samples").strip() or "all_samples"
+            if sample:
+                sample_groups.setdefault(sample, group_name)
+        planned_samples = sorted(sample_groups.items())
+    for sample, group_name in planned_samples:
         bam_path = os.path.join(idr_input_folder(), f"{sample}{idr_bam_suffix()}")
         grouped.setdefault(group_name, []).append((sample, bam_path))
     return {group: sorted(records, key=lambda x: str(x[0])) for group, records in grouped.items()}
