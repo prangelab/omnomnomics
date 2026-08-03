@@ -9,10 +9,10 @@
 - Peak-level quantification and DE results tables.
 - Pre-DE set outputs from `analyze_peaks` (union/shared/unique beds).
 - Peak annotation beds from peak QC (`*.annotated.bed`) for promoter/distal split.
-- Existing per-sample BigWig signal tracks from the BigWig creation stage.
+- Existing per-sample BigWig signal tracks from the BigWig creation stage, unless post-DE signal plotting is explicitly skipped.
 
 ## Outputs
-- `peak_calling/analyze_peaks_de/sets/`
+- `DE_calling/analyze_peaks_de/sets/`
   - `de_significant/*.bed`
   - `de_up/*.bed`
   - `de_down/*.bed`
@@ -20,15 +20,15 @@
   - `de_significant_distal/*.bed`
   - `top_de_ranked*.bed`
   - `unique_from_prede/*.bed` (optional extra layer from step 14)
-- `peak_calling/analyze_peaks_de/signal/`
+- `DE_calling/analyze_peaks_de/signal/`
   - deepTools matrices and heatmaps for DE subsets.
   - matplotlib-rendered profile PDFs built from the deepTools matrices.
   - `signal_runs.tsv` with per-set `OK`, `REUSE`, or `SKIP` status.
-- `peak_calling/analyze_peaks_de/motifs/`
+- `DE_calling/analyze_peaks_de/motifs/`
   - promoter, distal, and top-ranked motif runs per DE subset.
   - optional motif runs for pre-DE unique sets.
   - motif summary table.
-- `peak_calling/analyze_peaks_de/summary/`
+- `DE_calling/analyze_peaks_de/summary/`
   - `set_manifest.tsv`
   - `analyze_peaks_de_report.tsv`
 
@@ -65,10 +65,11 @@
 - Fine-grained motif background matching controls are reserved for a follow-up refinement.
 
 ## Status
-- Implemented as workflow step 16 (`analyze_peaks_de`) for ATAC and ChIP.
+- Implemented as the public ATAC/ChIP post-DE analysis step.
 - Fail-soft behavior:
   - DE set generation and manifests are always attempted.
   - deepTools and MEME motif blocks are skipped with clear logs if executables are unavailable.
   - Post-DE signal plotting does not regenerate BigWigs inside the post-DE worker; missing BigWigs are either scheduled through step 8 or required according to `--post-de-signal-policy`, while `skip` disables signal plotting regardless of BigWig availability.
   - Post-DE signal plotting records per-set outcomes in `signal_runs.tsv`: `OK` for newly computed signal artifacts, `REUSE` for copied equivalent artifacts, and `SKIP` for ineligible or unavailable signal sets.
-  - Motif runs write progress incrementally and record per-set `TIMEOUT`, `FAIL`, `NO_MOTIFS`, `SKIP`, or `OK` statuses.
+  - Motif runs write progress incrementally and record per-set `OK`, `NO_MOTIFS`, `SKIP`, `TIMEOUT`, or `FAIL` statuses.
+  - `NO_MOTIFS` means the motif tool completed but reported no enriched motifs passing the configured threshold; this is a valid report outcome, not a pipeline failure.

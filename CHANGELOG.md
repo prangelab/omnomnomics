@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Added
+- ATAC/ChIP post-DE interpretation reports now write explicit `signal_runs.tsv` and `motif_runs.tsv` status tables covering computed, reused, skipped, no-motif, timeout, and failure outcomes.
+- ChIP `--broad-mode genebody` and `--broad-mode diffuse` documentation for feature definitions, DE behavior, and post-DE interpretation outputs.
+
+### Changed
+- Post-DE profile documentation now reflects the custom matplotlib renderer used to keep legends outside the signal axes.
+- Motif analysis documentation now describes the permanent MEME-format motif database cache under the configured genome assembly root.
+
+### Notes
+- Pre-DE deepTools profile plots may still place legends inside the plot panel; post-DE profile plots use the newer renderer.
+
 ## 0.5.0 - 2026-04-14
 
 ### Added
