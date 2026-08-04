@@ -2187,6 +2187,19 @@ def main():
         allowed_rule_names = []
         companion_allowed_rules = {
             "merge_bam": ["mark_bam_merged"],
+            "call_peaks": [
+                "idr_pooled_macs3",
+                "idr_replicate_macs3",
+                "idr_true_pair",
+                "idr_pooled_pseudorep_split",
+                "idr_pooled_pseudorep_macs3",
+                "idr_pooled_pseudorep",
+                "idr_self_pseudorep_split",
+                "idr_self_pseudorep_macs3",
+                "idr_self_pseudorep",
+                "idr_group_consensus",
+                "idr_selected_summary",
+            ],
         }
         cmd.append("--forcerun")
         for i in mode_steps:
