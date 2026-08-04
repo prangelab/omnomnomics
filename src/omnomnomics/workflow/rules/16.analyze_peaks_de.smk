@@ -770,7 +770,16 @@ rule analyze_peaks_de:
                     "#8c564b",
                 ]
                 fig = plt.figure(figsize=(9.5, 6.5))
-                grid = fig.add_gridspec(nrows=2, ncols=1, height_ratios=[4.8, 1.0], hspace=0.28)
+                grid = fig.add_gridspec(
+                    nrows=2,
+                    ncols=1,
+                    height_ratios=[4.8, 1.0],
+                    hspace=0.28,
+                    left=0.12,
+                    right=0.98,
+                    top=0.91,
+                    bottom=0.08,
+                )
                 ax = fig.add_subplot(grid[0])
                 legend_ax = fig.add_subplot(grid[1])
                 legend_ax.axis("off")
@@ -804,7 +813,7 @@ rule analyze_peaks_de:
                     frameon=False,
                     fontsize=11,
                 )
-                fig.savefig(profile_path, bbox_inches="tight")
+                fig.savefig(profile_path)
                 plt.close(fig)
 
             matrices_dir = ensure_dir(os.path.join(signal_dir, "matrices"))
@@ -1171,7 +1180,7 @@ rule analyze_peaks_de:
                     return default
                 return out if math.isfinite(out) else default
 
-            def render_motif_report(method, set_name, table_path, report_pdf):
+            def render_motif_report(method, set_label, table_path, report_pdf):
                 import matplotlib
                 matplotlib.use("Agg")
                 import matplotlib.pyplot as plt
@@ -1193,7 +1202,7 @@ rule analyze_peaks_de:
                     ax.text(
                         0.5,
                         0.44,
-                        f"{set_name}\nNo enriched motifs reported by {method}.",
+                        f"{set_label}\nNo enriched motifs reported by {method}.",
                         ha="center",
                         va="center",
                         fontsize=11,
@@ -1243,7 +1252,7 @@ rule analyze_peaks_de:
                     )
                 plot_rows = sorted(plot_rows, key=lambda item: item["q_value"])[:15]
                 if not plot_rows:
-                    return render_motif_report(method, set_name, "", report_pdf)
+                    return render_motif_report(method, set_label, "", report_pdf)
 
                 labels = [item["label"] for item in reversed(plot_rows)]
                 scores = [item["score"] for item in reversed(plot_rows)]
@@ -1252,7 +1261,7 @@ rule analyze_peaks_de:
                 fig, ax = plt.subplots(figsize=(9.5, fig_height))
                 ax.barh(labels, scores, color=colors)
                 ax.set_xlabel("-log10(q-value)")
-                ax.set_title(f"{set_name}: top {method} motif enrichments")
+                ax.set_title(f"{set_label}: top {method} motif enrichments")
                 ax.grid(True, axis="x", color="#dddddd", linewidth=0.8)
                 ax.spines["top"].set_visible(False)
                 ax.spines["right"].set_visible(False)
@@ -1354,7 +1363,7 @@ rule analyze_peaks_de:
                     run_meme_text_command(sea_cmd, sea_tsv, motif_timeout_seconds, env)
                     if os.path.isfile(sea_tsv):
                         sea_report_pdf = os.path.join(sea_dir, "motif_enrichment.pdf")
-                        render_motif_report("SEA", item["set_name"], sea_tsv, sea_report_pdf)
+                        render_motif_report("SEA", regions_label_for_set(item), sea_tsv, sea_report_pdf)
                         sea_status = "OK" if count_meme_text_rows(sea_tsv) > 0 else "NO_MOTIFS"
                         sea_reason = cap_reason
                         if sea_status == "NO_MOTIFS":
@@ -1383,7 +1392,7 @@ rule analyze_peaks_de:
                         run_meme_text_command(ame_cmd, ame_tsv, motif_timeout_seconds, env)
                         if os.path.isfile(ame_tsv):
                             ame_report_pdf = os.path.join(ame_dir, "motif_enrichment.pdf")
-                            render_motif_report("AME", item["set_name"], ame_tsv, ame_report_pdf)
+                            render_motif_report("AME", regions_label_for_set(item), ame_tsv, ame_report_pdf)
                             ame_status = "OK" if count_meme_text_rows(ame_tsv) > 0 else "NO_MOTIFS"
                             ame_reason = cap_reason
                             if ame_status == "NO_MOTIFS":

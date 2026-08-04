@@ -174,7 +174,8 @@ is_categorical_grouping_column <- function(df, column_name) {
 metadata_column_signature <- function(df, column_name) {
   values <- as.character(df[[column_name]])
   values[is.na(values) | !nzchar(values)] <- "<NA>"
-  paste(values, collapse = "\r")
+  groups <- match(values, unique(values))
+  paste(groups, collapse = "\r")
 }
 
 metadata_columns_redundant <- function(df, column_a, column_b) {
@@ -1615,17 +1616,9 @@ if (qc_enabled) {
 
   if (distance_plot_enabled) {
     dist_mat <- as.matrix(stats::dist(t(SummarizedExperiment::assay(vst_obj))))
-    label_columns <- informative_annotation_columns
-    label_columns <- label_columns[seq_len(min(3, length(label_columns)))]
-    if (length(label_columns) > 0) {
-      sample_labels <- apply(
-        cbind(sample = rownames(col_data), col_data[, label_columns, drop = FALSE]),
-        1,
-        function(x) paste(x, collapse = " : ")
-      )
-      rownames(dist_mat) <- sample_labels
-      colnames(dist_mat) <- sample_labels
-    }
+    sample_labels <- rownames(col_data)
+    rownames(dist_mat) <- sample_labels
+    colnames(dist_mat) <- sample_labels
     grDevices::pdf(file.path(qc_dir, paste0(top_variable_feature_stem, ".distance_plot.pdf")), width = 10, height = 10)
     pheatmap::pheatmap(dist_mat, main = paste("Sample distance (", feature_label_plural, ")", sep = ""))
     grDevices::dev.off()
@@ -3499,8 +3492,17 @@ for (contrast_cfg in contrast_plan) {
         max_terms = 12,
         jaccard_cutoff = 0.6
       )
-      path_df$term <- factor(path_df$term, levels = rev(unique(path_df$term)))
-      panel_top_paths <- ggplot2::ggplot(path_df, ggplot2::aes(x = term, y = score, fill = source)) +
+      compact_pathway_label <- function(x, max_chars = 46) {
+        x <- as.character(x)
+        vapply(
+          x,
+          function(label) if (nchar(label) > max_chars) paste0(substr(label, 1, max_chars - 3), "...") else label,
+          character(1)
+        )
+      }
+      path_df$term_plot <- make.unique(compact_pathway_label(path_df$term), sep = " ")
+      path_df$term_plot <- factor(path_df$term_plot, levels = rev(unique(path_df$term_plot)))
+      panel_top_paths <- ggplot2::ggplot(path_df, ggplot2::aes(x = term_plot, y = score, fill = source)) +
         ggplot2::geom_col() +
         ggplot2::coord_flip() +
         ggplot2::theme_light() +
