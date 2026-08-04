@@ -2185,12 +2185,16 @@ def main():
     if rerun_selected_steps:
         selected_rule_names = []
         allowed_rule_names = []
+        companion_allowed_rules = {
+            "merge_bam": ["mark_bam_merged"],
+        }
         cmd.append("--forcerun")
         for i in mode_steps:
             routine = config['routines'][i-1]
             rule_name = config[routine][selected_routines[f'selected_routine_{routine}']]
             selected_rule_names.append(rule_name)
             allowed_rule_names.append(rule_name)
+            allowed_rule_names.extend(companion_allowed_rules.get(rule_name, []))
         cmd.extend(selected_rule_names)
         if (
             config.get('analyzepeaksde_rule_num') in mode_steps
