@@ -33,3 +33,6 @@ def test_post_de_profile_and_motif_renderers_use_bounded_labels():
     assert 'fig.savefig(profile_path, bbox_inches="tight")' not in source
     assert 'ax.set_title(f"{set_label}: top {method} motif enrichments")' in source
     assert 'regions_label_for_set(item), ame_tsv' in source
+    assert source.count("def regions_label_for_set(item):") == 1
+    assert source.index("def regions_label_for_set(item):") < source.index("def run_deeptools(")
+    assert source.index("def regions_label_for_set(item):") < source.index("def run_meme_motifs(")

@@ -603,6 +603,34 @@ rule analyze_peaks_de:
                 )
             return out_rows
 
+        def regions_label_for_set(item):
+            set_type = str(item.get("set_type", "features"))
+            label_map = {
+                "all_features": "all peaks",
+                "all_promoter": "promoter peaks",
+                "all_distal": "distal peaks",
+                "all_gene_body": "gene-body peaks",
+                "all_gene_bodies": "gene bodies",
+                "all_bins": "bins",
+                "de_significant": "DE features",
+                "de_up": "DE up features",
+                "de_down": "DE down features",
+                "de_significant_promoter": "DE promoter peaks",
+                "de_significant_distal": "DE distal peaks",
+                "de_significant_domains": "DE domains",
+                "de_up_domains": "DE up domains",
+                "de_down_domains": "DE down domains",
+                "de_significant_promoter_regions": "DE promoter regions",
+                "de_up_promoter_regions": "DE up promoter regions",
+                "de_down_promoter_regions": "DE down promoter regions",
+                "top_de_ranked": "top ranked DE features",
+                "top_de_ranked_promoter": "top ranked promoter peaks",
+                "top_de_ranked_distal": "top ranked distal peaks",
+                "top_de_ranked_promoter_regions": "top ranked promoter regions",
+                "unique_from_prede": "unique pre-DE peaks",
+            }
+            return label_map.get(set_type, set_type.replace("_", " "))
+
         def run_deeptools(set_manifest_rows, signal_dir):
             required = ["computeMatrix", "plotHeatmap"]
             if not all(tool_available(x) for x in required):
@@ -639,34 +667,6 @@ rule analyze_peaks_de:
                     writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
                     writer.writerow(["set_name", "status", "source_bed", "signal_bed", "matrix", "heatmap", "reason"])
                     writer.writerows(signal_summary_rows)
-
-            def regions_label_for_set(item):
-                set_type = str(item.get("set_type", "features"))
-                label_map = {
-                    "all_features": "all peaks",
-                    "all_promoter": "promoter peaks",
-                    "all_distal": "distal peaks",
-                    "all_gene_body": "gene-body peaks",
-                    "all_gene_bodies": "gene bodies",
-                    "all_bins": "bins",
-                    "de_significant": "DE features",
-                    "de_up": "DE up features",
-                    "de_down": "DE down features",
-                    "de_significant_promoter": "DE promoter peaks",
-                    "de_significant_distal": "DE distal peaks",
-                    "de_significant_domains": "DE domains",
-                    "de_up_domains": "DE up domains",
-                    "de_down_domains": "DE down domains",
-                    "de_significant_promoter_regions": "DE promoter regions",
-                    "de_up_promoter_regions": "DE up promoter regions",
-                    "de_down_promoter_regions": "DE down promoter regions",
-                    "top_de_ranked": "top ranked DE features",
-                    "top_de_ranked_promoter": "top ranked promoter peaks",
-                    "top_de_ranked_distal": "top ranked distal peaks",
-                    "top_de_ranked_promoter_regions": "top ranked promoter regions",
-                    "unique_from_prede": "unique pre-DE peaks",
-                }
-                return label_map.get(set_type, set_type.replace("_", " "))
 
             def copy_bed_limit(source_bed, target_bed, limit):
                 copied = 0
