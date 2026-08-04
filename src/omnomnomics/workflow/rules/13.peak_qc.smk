@@ -19,7 +19,7 @@ from omnomnomics.peak_annotation import build_gtf_annotation_sources
 
 def peak_qc_input(_wildcards):
     input_files = [
-        f"{experiment_dir}/{master_config['output_folders'][master_config['callpeaks_rule_num'] - 1]}/extra_{master_config['callpeaks_rule_num']}.tmp"
+        f"{experiment_dir}/{master_config['output_folders'][master_config['callpeaks_rule_num'] - 1]}/all_groups.merged_peaks.bed"
     ]
     input_files.append(
         os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "annotation", "genes.gtf")

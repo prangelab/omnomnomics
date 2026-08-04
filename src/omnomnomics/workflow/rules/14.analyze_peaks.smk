@@ -19,9 +19,6 @@ import tempfile
 def analyze_peaks_input(_wildcards):
     input_files = []
     if config["THETYPE"] in {"ATAC", "CHIP"}:
-        input_files.append(
-            f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num'] - 1]}/extra_{master_config['peakqc_rule_num']}.tmp"
-        )
         if config["THETYPE"] == "ATAC":
             input_files.append(
                 f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num'] - 1]}/peak_qc/peak_annotations/atac.all_groups.merged_peaks.annotated.bed"

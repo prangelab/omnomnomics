@@ -14,6 +14,7 @@ All notable changes to this project are documented in this file.
 - Motif analysis documentation now describes the permanent MEME-format motif database cache under the configured genome assembly root.
 - Peak annotation derives gene spans and strand-aware promoters from transcript or exon records when a GTF has no `gene` features, while retaining alternative transcript start sites.
 - DE summary plots suppress redundant metadata annotations, enrichment discovery includes nested clusterProfiler result directories, and enrichment plot margins accommodate long titles.
+- Chromatin partial reruns enter peak QC and pre-DE analysis through durable peak and annotation BED files instead of disposable completion markers.
 
 ### Notes
 - Pre-DE deepTools profile plots may still place legends inside the plot panel; post-DE profile plots use the newer renderer.
