@@ -288,6 +288,8 @@ def _write_peak_metadata_from_annotation(annotation_bed, output_path):
                 "assigned_genes",
                 "nearest_gene",
                 "distance_to_nearest_gene_bp",
+                "nearest_promoter_gene",
+                "distance_to_nearest_promoter_bp",
                 "width_bp",
             ]
         )
@@ -302,6 +304,8 @@ def _write_peak_metadata_from_annotation(annotation_bed, output_path):
                     row["assigned_genes"],
                     row["nearest_gene"],
                     row["distance_to_nearest_gene_bp"],
+                    row.get("nearest_promoter_gene", row["nearest_gene"]),
+                    row.get("distance_to_nearest_promoter_bp", row["distance_to_nearest_gene_bp"]),
                     row["width_bp"],
                 ]
             )

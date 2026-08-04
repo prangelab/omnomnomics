@@ -276,6 +276,8 @@ rule analyze_peaks:
                         "assigned_genes",
                         "nearest_gene",
                         "distance_to_nearest_gene_bp",
+                        "nearest_promoter_gene",
+                        "distance_to_nearest_promoter_bp",
                         "width_bp",
                     ]
                 )
@@ -290,6 +292,8 @@ rule analyze_peaks:
                             row["assigned_genes"],
                             row["nearest_gene"],
                             row["distance_to_nearest_gene_bp"],
+                            row.get("nearest_promoter_gene", row["nearest_gene"]),
+                            row.get("distance_to_nearest_promoter_bp", row["distance_to_nearest_gene_bp"]),
                             row["width_bp"],
                         ]
                     )

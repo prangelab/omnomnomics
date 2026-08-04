@@ -13,6 +13,7 @@
 
 ## Outputs
 - `peak_calling/analyze_peaks/sets/group_unions/*.union.bed` for peak-like ATAC and narrow/domain ChIP modes.
+- Peak annotations distinguish promoter, exon, intron, and intergenic regions and report both compatibility nearest-gene fields and explicit nearest-promoter gene/distance fields. Transcript-only GTF files are supported by deriving gene spans and strand-aware promoters from transcript records, with exon spans as a final fallback.
 - `peak_calling/analyze_peaks/intersections/unique/*.bed` for peak-like modes with multiple groups.
 - `peak_calling/analyze_peaks/intersections/shared/*.bed` for peak-like modes with multiple groups.
 - gene-body or diffuse-bin metadata and summaries for ChIP `--broad-mode genebody` and `--broad-mode diffuse`.

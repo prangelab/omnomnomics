@@ -18,6 +18,8 @@ import shlex
 import shutil
 import subprocess
 
+from omnomnomics.peak_annotation import promoter_intervals_by_gene
+
 
 def analyze_peaks_de_input(_wildcards):
     input_files = []
@@ -111,16 +113,6 @@ rule analyze_peaks_de:
         def tool_available(executable_name):
             return shutil.which(executable_name) is not None
 
-        def parse_gtf_attributes(attr_string):
-            attrs = {}
-            for item in str(attr_string).strip().split(";"):
-                item = item.strip()
-                if not item or " " not in item:
-                    continue
-                key, value = item.split(" ", 1)
-                attrs[key] = value.strip().strip('"')
-            return attrs
-
         def parse_peak_coord(gene_id):
             text = str(gene_id)
             match = re.match(r"^([^:]+):([0-9]+)-([0-9]+)$", text)
@@ -153,6 +145,15 @@ rule analyze_peaks_de:
                         "genomic_region": str(row.get("genomic_region", "NA")).strip() or "NA",
                         "assigned_genes": str(row.get("assigned_genes", "NA")).strip() or "NA",
                         "nearest_gene": str(row.get("nearest_gene", "NA")).strip() or "NA",
+                        "nearest_promoter_gene": str(
+                            row.get("nearest_promoter_gene", row.get("nearest_gene", "NA"))
+                        ).strip() or "NA",
+                        "distance_to_nearest_promoter_bp": str(
+                            row.get(
+                                "distance_to_nearest_promoter_bp",
+                                row.get("distance_to_nearest_gene_bp", "NA"),
+                            )
+                        ).strip() or "NA",
                         "chrom": str(row.get("chrom", row.get("#chrom", ""))).strip(),
                         "start": str(row.get("start", "")).strip(),
                         "end": str(row.get("end", "")).strip(),
@@ -166,34 +167,13 @@ rule analyze_peaks_de:
                     writer.writerow(row)
 
         def load_promoter_map(gtf_file, promoter_upstream=1000, promoter_downstream=1000):
-            promoter_map = {}
             if not os.path.isfile(gtf_file):
-                return promoter_map
-            with open(gtf_file, "r", encoding="utf-8") as handle:
-                for line in handle:
-                    if not line.strip() or line.startswith("#"):
-                        continue
-                    fields = line.rstrip("\n").split("\t")
-                    if len(fields) < 9 or fields[2] != "gene":
-                        continue
-                    chrom = fields[0]
-                    start = int(fields[3]) - 1
-                    end = int(fields[4])
-                    strand = fields[6]
-                    attrs = parse_gtf_attributes(fields[8])
-                    gene_name = attrs.get("gene_name") or attrs.get("gene_id") or "NA"
-                    gene_id = attrs.get("gene_id") or gene_name
-                    gene_label = f"{gene_name}|{gene_id}"
-                    if strand == "+":
-                        prom_start = max(start - promoter_upstream, 0)
-                        prom_end = max(start + promoter_downstream, 0)
-                    else:
-                        prom_start = max(end - promoter_downstream, 0)
-                        prom_end = max(end + promoter_upstream, 0)
-                    if prom_end <= prom_start:
-                        continue
-                    promoter_map[gene_label] = (chrom, prom_start, prom_end)
-            return promoter_map
+                return {}
+            return promoter_intervals_by_gene(
+                gtf_file,
+                promoter_upstream=promoter_upstream,
+                promoter_downstream=promoter_downstream,
+            )
 
         def feature_rows_from_peak_metadata(peak_region_map):
             rows = []
@@ -301,23 +281,23 @@ rule analyze_peaks_de:
                 for item in top_all:
                     peak_id = item["bed_row"][3]
                     for gene_label in labels_for_feature(item["region_info"]):
-                        promoter_coords = promoter_map.get(gene_label)
-                        if promoter_coords is None:
+                        promoter_intervals = promoter_map.get(gene_label, [])
+                        if not promoter_intervals:
                             continue
-                        prom_chrom, prom_start, prom_end = promoter_coords
-                        promoter_region_rows.append(
-                            [
-                                prom_chrom,
-                                prom_start,
-                                prom_end,
-                                peak_id,
-                                f"{item['lfc']:.6f}",
-                                ".",
-                                item["bed_row"][6],
-                                item["bed_row"][7],
-                                item["bed_row"][8],
-                            ]
-                        )
+                        for prom_chrom, prom_start, prom_end in promoter_intervals:
+                            promoter_region_rows.append(
+                                [
+                                    prom_chrom,
+                                    prom_start,
+                                    prom_end,
+                                    peak_id,
+                                    f"{item['lfc']:.6f}",
+                                    ".",
+                                    item["bed_row"][6],
+                                    item["bed_row"][7],
+                                    item["bed_row"][8],
+                                ]
+                            )
                 top_sets["top_de_ranked_promoter_regions"] = sorted(
                     {tuple(row) for row in promoter_region_rows},
                     key=lambda x: (x[0], x[1], x[2], x[3]),
@@ -405,13 +385,13 @@ rule analyze_peaks_de:
                     if broad_mode == "genebody":
                         promoter_rows_for_feature = []
                         for gene_label in labels_for_feature(region_info):
-                            promoter_coords = promoter_map.get(gene_label)
-                            if promoter_coords is None:
+                            promoter_intervals = promoter_map.get(gene_label, [])
+                            if not promoter_intervals:
                                 continue
-                            prom_chrom, prom_start, prom_end = promoter_coords
-                            promoter_rows_for_feature.append(
-                                [prom_chrom, prom_start, prom_end, peak_id, f"{lfc:.6f}", ".", region, assigned, nearest]
-                            )
+                            for prom_chrom, prom_start, prom_end in promoter_intervals:
+                                promoter_rows_for_feature.append(
+                                    [prom_chrom, prom_start, prom_end, peak_id, f"{lfc:.6f}", ".", region, assigned, nearest]
+                                )
                         rows_promoter_regions.extend(promoter_rows_for_feature)
                         if lfc > 0:
                             rows_up_promoter_regions.extend(promoter_rows_for_feature)

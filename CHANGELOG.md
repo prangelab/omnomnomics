@@ -7,10 +7,13 @@ All notable changes to this project are documented in this file.
 ### Added
 - ATAC/ChIP post-DE interpretation reports now write explicit `signal_runs.tsv` and `motif_runs.tsv` status tables covering computed, reused, skipped, no-motif, timeout, and failure outcomes.
 - ChIP `--broad-mode genebody` and `--broad-mode diffuse` documentation for feature definitions, DE behavior, and post-DE interpretation outputs.
+- Peak annotations and differential-chromatin result tables now include explicit `nearest_promoter_gene` and `distance_to_nearest_promoter_bp` fields.
 
 ### Changed
 - Post-DE profile documentation now reflects the custom matplotlib renderer used to keep legends outside the signal axes.
 - Motif analysis documentation now describes the permanent MEME-format motif database cache under the configured genome assembly root.
+- Peak annotation derives gene spans and strand-aware promoters from transcript or exon records when a GTF has no `gene` features, while retaining alternative transcript start sites.
+- DE summary plots suppress redundant metadata annotations, enrichment discovery includes nested clusterProfiler result directories, and enrichment plot margins accommodate long titles.
 
 ### Notes
 - Pre-DE deepTools profile plots may still place legends inside the plot panel; post-DE profile plots use the newer renderer.

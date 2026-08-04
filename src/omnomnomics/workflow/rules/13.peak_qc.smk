@@ -14,6 +14,8 @@ import subprocess
 import tempfile
 from shlex import quote
 
+from omnomnomics.peak_annotation import build_gtf_annotation_sources
+
 
 def peak_qc_input(_wildcards):
     input_files = [
@@ -149,60 +151,22 @@ rule peak_qc:
 
             return filtered_dir, blacklist_bed, produced, summary_path
 
-        def parse_gtf_attributes(attr_string):
-            attrs = {}
-            for item in attr_string.strip().split(";"):
-                item = item.strip()
-                if not item or " " not in item:
-                    continue
-                key, value = item.split(" ", 1)
-                attrs[key] = value.strip().strip('"')
-            return attrs
-
         def build_gene_annotation_beds(gtf_file, work_dir, promoter_upstream=1000, promoter_downstream=1000):
-            genes_bed = os.path.join(work_dir, "genes.unsorted.bed")
-            exons_bed = os.path.join(work_dir, "exons.unsorted.bed")
-            promoters_bed = os.path.join(work_dir, "promoters.unsorted.bed")
+            source_beds = build_gtf_annotation_sources(
+                gtf_file,
+                work_dir,
+                promoter_upstream=promoter_upstream,
+                promoter_downstream=promoter_downstream,
+            )
             genes_sorted = os.path.join(work_dir, "genes.sorted.bed")
             exons_sorted = os.path.join(work_dir, "exons.sorted.bed")
             promoters_sorted = os.path.join(work_dir, "promoters.sorted.bed")
+            tss_sorted = os.path.join(work_dir, "tss.sorted.bed")
             introns_sorted = os.path.join(work_dir, "introns.sorted.bed")
-
-            with open(gtf_file) as gtf_handle, open(genes_bed, "w") as genes_out, open(exons_bed, "w") as exons_out, open(promoters_bed, "w") as promoter_out:
-                for line in gtf_handle:
-                    if not line.strip() or line.startswith("#"):
-                        continue
-                    fields = line.rstrip("\n").split("\t")
-                    if len(fields) < 9:
-                        continue
-                    chrom, _, feature, start_s, end_s, _, strand, _, attrs_raw = fields
-                    start = int(start_s)
-                    end = int(end_s)
-                    if end <= start:
-                        continue
-                    attrs = parse_gtf_attributes(attrs_raw)
-                    gene_name = attrs.get("gene_name") or attrs.get("gene_id") or "NA"
-                    gene_id = attrs.get("gene_id") or gene_name
-                    gene_label = f"{gene_name}|{gene_id}"
-                    bed_start = max(start - 1, 0)
-                    bed_end = end
-
-                    if feature == "gene":
-                        genes_out.write(f"{chrom}\t{bed_start}\t{bed_end}\t{gene_label}\t0\t{strand}\n")
-                        if strand == "+":
-                            prom_start = max(bed_start - promoter_upstream, 0)
-                            prom_end = max(bed_start + promoter_downstream, 0)
-                        else:
-                            prom_start = max(bed_end - promoter_downstream, 0)
-                            prom_end = max(bed_end + promoter_upstream, 0)
-                        if prom_end > prom_start:
-                            promoter_out.write(f"{chrom}\t{prom_start}\t{prom_end}\t{gene_label}\t0\t{strand}\n")
-                    elif feature == "exon":
-                        exons_out.write(f"{chrom}\t{bed_start}\t{bed_end}\t{gene_label}\t0\t{strand}\n")
-
-            shell(f"sort -k1,1 -k2,2n -k3,3n {quote(genes_bed)} > {quote(genes_sorted)}")
-            shell(f"sort -k1,1 -k2,2n -k3,3n {quote(exons_bed)} > {quote(exons_sorted)}")
-            shell(f"sort -k1,1 -k2,2n -k3,3n {quote(promoters_bed)} > {quote(promoters_sorted)}")
+            shell(f"sort -k1,1 -k2,2n -k3,3n {quote(source_beds['genes'])} > {quote(genes_sorted)}")
+            shell(f"sort -k1,1 -k2,2n -k3,3n {quote(source_beds['exons'])} > {quote(exons_sorted)}")
+            shell(f"sort -k1,1 -k2,2n -k3,3n {quote(source_beds['promoters'])} > {quote(promoters_sorted)}")
+            shell(f"sort -k1,1 -k2,2n -k3,3n {quote(source_beds['tss'])} > {quote(tss_sorted)}")
             shell(
                 f"bedtools subtract -a {quote(genes_sorted)} -b {quote(exons_sorted)} "
                 f"| sort -k1,1 -k2,2n -k3,3n > {quote(introns_sorted)}"
@@ -213,6 +177,7 @@ rule peak_qc:
                 "promoters": promoters_sorted,
                 "exons": exons_sorted,
                 "introns": introns_sorted,
+                "tss": tss_sorted,
             }
 
         def load_peak_records(peak_bed):
@@ -274,9 +239,9 @@ rule peak_qc:
                             region_map.setdefault(peak_id, set()).add(gene_label)
                     overlap_maps[region_name] = region_map
 
-                closest_file = os.path.join(tmpdir, "closest.tsv")
+                closest_file = os.path.join(tmpdir, "closest_promoter.tsv")
                 shell(
-                    f"bedtools closest -a {quote(peaks_indexed)} -b {quote(annotation_beds['genes'])} -d -t first > {quote(closest_file)}"
+                    f"bedtools closest -a {quote(peaks_indexed)} -b {quote(annotation_beds['tss'])} -d -t first > {quote(closest_file)}"
                 )
                 closest_map = {}
                 with open(closest_file) as handle:
@@ -305,6 +270,8 @@ rule peak_qc:
                     "assigned_genes",
                     "nearest_gene",
                     "distance_to_nearest_gene_bp",
+                    "nearest_promoter_gene",
+                    "distance_to_nearest_promoter_bp",
                     "assay",
                     "group",
                     "peak_set",
@@ -320,7 +287,12 @@ rule peak_qc:
                             assigned_region = region
                             assigned_gene_set = genes_here
                             break
-                    nearest_gene, nearest_distance = closest_map.get(peak_id, ("NA", "NA"))
+                    nearest_promoter_gene, nearest_promoter_distance = closest_map.get(peak_id, ("NA", "NA"))
+                    if nearest_promoter_gene in {"", ".", "-1"}:
+                        nearest_promoter_gene = "NA"
+                        nearest_promoter_distance = "NA"
+                    nearest_gene = nearest_promoter_gene
+                    nearest_distance = nearest_promoter_distance
                     if assigned_region != "intergenic":
                         nearest_distance = "0"
                         if assigned_gene_set:
@@ -339,6 +311,8 @@ rule peak_qc:
                         assigned_genes,
                         nearest_gene,
                         nearest_distance,
+                        nearest_promoter_gene,
+                        nearest_promoter_distance,
                         assay,
                         group,
                         peak_set,

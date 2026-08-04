@@ -28,13 +28,18 @@ read_enrichment_tables <- function(contrast_dir) {
   cp_dir <- file.path(contrast_dir, "clusterProfiler")
   cp_tbl <- NULL
   if (dir.exists(cp_dir)) {
-    cp_files <- list.files(cp_dir, pattern = "\\.(ORA|GSEA)\\.tsv$", full.names = TRUE)
+    cp_files <- list.files(
+      cp_dir,
+      pattern = "\\.(ORA|GSEA)\\.tsv$",
+      full.names = TRUE,
+      recursive = TRUE
+    )
     cp_rows <- lapply(cp_files, function(one_file) {
       tab <- tryCatch(utils::read.delim(one_file, stringsAsFactors = FALSE, check.names = FALSE), error = function(e) NULL)
       if (is.null(tab) || !nrow(tab)) {
         return(NULL)
       }
-      tab$source_file <- basename(one_file)
+      tab$source_file <- substring(one_file, nchar(cp_dir) + 2L)
       tab
     })
     cp_tbl <- rowbind_fill(cp_rows)

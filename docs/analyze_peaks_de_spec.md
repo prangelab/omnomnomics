@@ -9,6 +9,7 @@
 - Peak-level quantification and DE results tables.
 - Pre-DE set outputs from `analyze_peaks` (union/shared/unique beds).
 - Peak annotation beds from peak QC (`*.annotated.bed`) for promoter/distal split.
+- Distal peak-to-gene linking uses the explicit nearest-promoter annotation; promoter and gene-body peaks retain their overlap-based gene assignments.
 - Existing per-sample BigWig signal tracks from the BigWig creation stage, unless post-DE signal plotting is explicitly skipped.
 
 ## Outputs

@@ -743,6 +743,17 @@ save_enrichment_plot <- function(plot_obj, out_path, width = 11, height = 8) {
   if (is.null(plot_obj)) {
     return(FALSE)
   }
+  if (!is.null(plot_obj$labels$title) && nzchar(as.character(plot_obj$labels$title))) {
+    plot_obj$labels$title <- paste(strwrap(as.character(plot_obj$labels$title), width = 72), collapse = "\n")
+  }
+  if (!is.null(plot_obj$labels$subtitle) && nzchar(as.character(plot_obj$labels$subtitle))) {
+    plot_obj$labels$subtitle <- paste(strwrap(as.character(plot_obj$labels$subtitle), width = 90), collapse = "\n")
+  }
+  plot_obj <- plot_obj + ggplot2::theme(
+    plot.title = ggplot2::element_text(margin = ggplot2::margin(b = 8)),
+    plot.subtitle = ggplot2::element_text(margin = ggplot2::margin(b = 10)),
+    plot.margin = ggplot2::margin(t = 18, r = 18, b = 18, l = 18)
+  )
   tryCatch({
     ggplot2::ggsave(filename = out_path, plot = plot_obj, width = width, height = height)
     TRUE
@@ -1134,9 +1145,11 @@ annotation_colors_informative <- list()
       palette_name = palette_name_for_column(column_name)
     )
   }
-  informative_annotation_columns <- colnames(annotation_df)[
-    vapply(colnames(annotation_df), function(x) is_informative_column(annotation_df, x), logical(1))
-  ]
+  informative_annotation_columns <- select_nonredundant_metadata_columns(
+    colnames(annotation_df),
+    annotation_df,
+    max_columns = 3
+  )
   if (length(informative_annotation_columns) > 0) {
     annotation_df_informative <- annotation_df[, informative_annotation_columns, drop = FALSE]
     annotation_colors_informative <- annotation_colors[informative_annotation_columns]
@@ -2483,14 +2496,29 @@ for (contrast_cfg in contrast_plan) {
   enrich_df$peak_region <- NA_character_
   enrich_df$assigned_genes <- NA_character_
   enrich_df$nearest_gene <- NA_character_
+  enrich_df$nearest_promoter_gene <- NA_character_
+  enrich_df$distance_to_nearest_promoter_bp <- NA_real_
   enrich_df$linked_gene_symbol <- NA_character_
   enrich_df$link_mode <- "none"
   if (!is.null(peak_data) && nrow(peak_data) > 0) {
     peak_map <- peak_data
     peak_map$feature_id <- rownames(peak_map)
+    if (!("nearest_promoter_gene" %in% colnames(peak_map))) {
+      peak_map$nearest_promoter_gene <- peak_map$nearest_gene
+    }
+    if (!("distance_to_nearest_promoter_bp" %in% colnames(peak_map))) {
+      peak_map$distance_to_nearest_promoter_bp <- peak_map$distance_to_nearest_gene_bp
+    }
     enrich_df <- merge(
       enrich_df,
-      peak_map[, c("feature_id", "genomic_region", "assigned_genes", "nearest_gene"), drop = FALSE],
+      peak_map[, c(
+        "feature_id",
+        "genomic_region",
+        "assigned_genes",
+        "nearest_gene",
+        "nearest_promoter_gene",
+        "distance_to_nearest_promoter_bp"
+      ), drop = FALSE],
       by.x = "gene_id",
       by.y = "feature_id",
       all.x = TRUE,
@@ -2511,10 +2539,34 @@ for (contrast_cfg in contrast_plan) {
     } else {
       NA_character_
     }
+    nearest_promoter_col <- if ("nearest_promoter_gene.y" %in% colnames(enrich_df)) {
+      "nearest_promoter_gene.y"
+    } else if ("nearest_promoter_gene" %in% colnames(enrich_df)) {
+      "nearest_promoter_gene"
+    } else {
+      NA_character_
+    }
+    promoter_distance_col <- if ("distance_to_nearest_promoter_bp.y" %in% colnames(enrich_df)) {
+      "distance_to_nearest_promoter_bp.y"
+    } else if ("distance_to_nearest_promoter_bp" %in% colnames(enrich_df)) {
+      "distance_to_nearest_promoter_bp"
+    } else {
+      NA_character_
+    }
     enrich_df$assigned_genes <- if (!is.na(assigned_col)) as.character(enrich_df[[assigned_col]]) else rep(NA_character_, nrow(enrich_df))
     enrich_df$nearest_gene <- if (!is.na(nearest_col)) as.character(enrich_df[[nearest_col]]) else rep(NA_character_, nrow(enrich_df))
+    enrich_df$nearest_promoter_gene <- if (!is.na(nearest_promoter_col)) as.character(enrich_df[[nearest_promoter_col]]) else enrich_df$nearest_gene
+    enrich_df$distance_to_nearest_promoter_bp <- if (!is.na(promoter_distance_col)) suppressWarnings(as.numeric(enrich_df[[promoter_distance_col]])) else rep(NA_real_, nrow(enrich_df))
     enrich_df$genomic_region <- NULL
-    suffix_cols <- intersect(c("assigned_genes.x", "assigned_genes.y", "nearest_gene.x", "nearest_gene.y"), colnames(enrich_df))
+    suffix_cols <- intersect(
+      c(
+        "assigned_genes.x", "assigned_genes.y",
+        "nearest_gene.x", "nearest_gene.y",
+        "nearest_promoter_gene.x", "nearest_promoter_gene.y",
+        "distance_to_nearest_promoter_bp.x", "distance_to_nearest_promoter_bp.y"
+      ),
+      colnames(enrich_df)
+    )
     if (length(suffix_cols) > 0) {
       enrich_df[, suffix_cols] <- NULL
     }
@@ -2556,7 +2608,7 @@ for (contrast_cfg in contrast_plan) {
     }
 
     assigned_symbol <- vapply(enrich_df$assigned_genes, first_assigned_gene, character(1))
-    nearest_symbol <- vapply(enrich_df$nearest_gene, first_nearest_gene, character(1))
+    nearest_symbol <- vapply(enrich_df$nearest_promoter_gene, first_nearest_gene, character(1))
     enrich_df$linked_gene_symbol <- nearest_symbol
     enrich_df$link_mode <- "nearest"
     promoter_like <- enrich_df$peak_region %in% c("promoter")
@@ -2610,6 +2662,8 @@ for (contrast_cfg in contrast_plan) {
   res_df$peak_region <- enrich_df$peak_region[match(res_df$gene_id, enrich_df$gene_id)]
   res_df$assigned_genes <- enrich_df$assigned_genes[match(res_df$gene_id, enrich_df$gene_id)]
   res_df$nearest_gene <- enrich_df$nearest_gene[match(res_df$gene_id, enrich_df$gene_id)]
+  res_df$nearest_promoter_gene <- enrich_df$nearest_promoter_gene[match(res_df$gene_id, enrich_df$gene_id)]
+  res_df$distance_to_nearest_promoter_bp <- enrich_df$distance_to_nearest_promoter_bp[match(res_df$gene_id, enrich_df$gene_id)]
   res_df$linked_gene_symbol <- enrich_df$linked_gene_symbol[match(res_df$gene_id, enrich_df$gene_id)]
   res_df$link_mode <- enrich_df$link_mode[match(res_df$gene_id, enrich_df$gene_id)]
   missing_feature_labels <- is.na(res_df$feature_label) | !nzchar(res_df$feature_label)
@@ -2625,6 +2679,8 @@ for (contrast_cfg in contrast_plan) {
     "peak_region",
     "assigned_genes",
     "nearest_gene",
+    "nearest_promoter_gene",
+    "distance_to_nearest_promoter_bp",
     "linked_gene_symbol",
     "link_mode",
     "gene_symbol"
@@ -3397,7 +3453,12 @@ for (contrast_cfg in contrast_plan) {
     path_rows <- list()
     cp_dir <- file.path(contrast_dir, "clusterProfiler")
     if (dir.exists(cp_dir)) {
-      cp_tables <- list.files(cp_dir, pattern = "\\.(ORA|GSEA)\\.tsv$", full.names = TRUE)
+      cp_tables <- list.files(
+        cp_dir,
+        pattern = "\\.(ORA|GSEA)\\.tsv$",
+        full.names = TRUE,
+        recursive = TRUE
+      )
       for (tab in cp_tables) {
         tab_df <- tryCatch(utils::read.delim(tab, stringsAsFactors = FALSE, check.names = FALSE), error = function(e) NULL)
         if (is.null(tab_df) || nrow(tab_df) == 0) {

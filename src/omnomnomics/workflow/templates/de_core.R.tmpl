@@ -592,6 +592,17 @@ save_enrichment_plot <- function(plot_obj, out_path, width = 11, height = 8) {
   if (is.null(plot_obj)) {
     return(FALSE)
   }
+  if (!is.null(plot_obj$labels$title) && nzchar(as.character(plot_obj$labels$title))) {
+    plot_obj$labels$title <- paste(strwrap(as.character(plot_obj$labels$title), width = 72), collapse = "\n")
+  }
+  if (!is.null(plot_obj$labels$subtitle) && nzchar(as.character(plot_obj$labels$subtitle))) {
+    plot_obj$labels$subtitle <- paste(strwrap(as.character(plot_obj$labels$subtitle), width = 90), collapse = "\n")
+  }
+  plot_obj <- plot_obj + ggplot2::theme(
+    plot.title = ggplot2::element_text(margin = ggplot2::margin(b = 8)),
+    plot.subtitle = ggplot2::element_text(margin = ggplot2::margin(b = 10)),
+    plot.margin = ggplot2::margin(t = 18, r = 18, b = 18, l = 18)
+  )
   tryCatch({
     ggplot2::ggsave(filename = out_path, plot = plot_obj, width = width, height = height)
     TRUE
@@ -944,9 +955,11 @@ annotation_colors_informative <- list()
       palette_name = palette_name_for_column(column_name)
     )
   }
-  informative_annotation_columns <- colnames(annotation_df)[
-    vapply(colnames(annotation_df), function(x) is_informative_column(annotation_df, x), logical(1))
-  ]
+  informative_annotation_columns <- select_nonredundant_metadata_columns(
+    colnames(annotation_df),
+    annotation_df,
+    max_columns = 3
+  )
   if (length(informative_annotation_columns) > 0) {
     annotation_df_informative <- annotation_df[, informative_annotation_columns, drop = FALSE]
     annotation_colors_informative <- annotation_colors[informative_annotation_columns]
@@ -2770,7 +2783,12 @@ for (contrast_cfg in contrast_plan) {
     path_rows <- list()
     cp_dir <- file.path(contrast_dir, "clusterProfiler")
     if (dir.exists(cp_dir)) {
-      cp_tables <- list.files(cp_dir, pattern = "\\.(ORA|GSEA)\\.tsv$", full.names = TRUE)
+      cp_tables <- list.files(
+        cp_dir,
+        pattern = "\\.(ORA|GSEA)\\.tsv$",
+        full.names = TRUE,
+        recursive = TRUE
+      )
       for (tab in cp_tables) {
         tab_df <- tryCatch(utils::read.delim(tab, stringsAsFactors = FALSE, check.names = FALSE), error = function(e) NULL)
         if (is.null(tab_df) || nrow(tab_df) == 0) {
