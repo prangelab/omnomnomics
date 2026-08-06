@@ -1212,10 +1212,18 @@ rule analyze_peaks_de:
                     return report_pdf
 
                 upper_to_col = {col.upper(): col for col in header}
-                label_col = upper_to_col.get("ALT_ID") or upper_to_col.get("ID") or upper_to_col.get("MOTIF_ID")
+                label_col = (
+                    upper_to_col.get("MOTIF_ALT_ID")
+                    or upper_to_col.get("ALT_ID")
+                    or upper_to_col.get("MOTIF_ID")
+                    or upper_to_col.get("ID")
+                )
+                fallback_label_col = upper_to_col.get("MOTIF_ID") or upper_to_col.get("ID")
                 q_col = (
                     upper_to_col.get("QVALUE")
+                    or upper_to_col.get("Q-VALUE")
                     or upper_to_col.get("ADJ_PVALUE")
+                    or upper_to_col.get("ADJ_P-VALUE")
                     or upper_to_col.get("PVALUE")
                     or upper_to_col.get("P-VALUE")
                 )
@@ -1240,7 +1248,10 @@ rule analyze_peaks_de:
                     q_value = safe_float(row.get(q_col))
                     if not math.isfinite(q_value) or q_value <= 0:
                         continue
-                    label = str(row.get(label_col, "")).strip() or "motif"
+                    label = str(row.get(label_col, "")).strip()
+                    if not label and fallback_label_col:
+                        label = str(row.get(fallback_label_col, "")).strip()
+                    label = label or "motif"
                     effect = safe_float(row.get(effect_col), default=float("nan")) if effect_col else float("nan")
                     plot_rows.append(
                         {

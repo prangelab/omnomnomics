@@ -17,6 +17,7 @@ All notable changes to this project are documented in this file.
 - QC distance plots use sample identifiers, equivalent metadata partitions collapse to one annotation, and combined-summary pathway and motif labels are compacted without altering result tables.
 - Post-DE signal profiles use fixed figure margins so labels and external legends remain inside the PDF canvas.
 - Post-DE signal and motif renderers share region-label formatting at their common workflow scope.
+- AME motif reports recognize MEME's `motif_alt_ID` and `adj_p-value` columns, showing factor names and adjusted significance values.
 - Chromatin partial reruns enter peak QC and pre-DE analysis through durable peak and annotation BED files instead of disposable completion markers.
 
 ### Notes

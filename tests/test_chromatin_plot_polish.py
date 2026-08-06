@@ -36,3 +36,5 @@ def test_post_de_profile_and_motif_renderers_use_bounded_labels():
     assert source.count("def regions_label_for_set(item):") == 1
     assert source.index("def regions_label_for_set(item):") < source.index("def run_deeptools(")
     assert source.index("def regions_label_for_set(item):") < source.index("def run_meme_motifs(")
+    assert 'upper_to_col.get("MOTIF_ALT_ID")' in source
+    assert 'upper_to_col.get("ADJ_P-VALUE")' in source
