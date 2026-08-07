@@ -36,11 +36,13 @@ def analyze_peaks_input(_wildcards):
             input_files.append(
                 f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num'] - 1]}/peak_qc/peak_annotations/chip.all_groups.merged_peaks.annotated.bed"
             )
-            input_files.extend(
-                glob.glob(
-                    f"{experiment_dir}/{master_config['output_folders'][master_config['callpeaks_rule_num'] - 1]}/*.bed"
-                )
+            chip_broad_mode = str(config.get("BROAD_MODE", "off")).strip().lower()
+            chip_peak_folder = (
+                f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num'] - 1]}/peak_qc/filtered_peaks"
+                if chip_broad_mode not in {"genebody", "diffuse"}
+                else f"{experiment_dir}/{master_config['output_folders'][master_config['callpeaks_rule_num'] - 1]}"
             )
+            input_files.extend(glob.glob(f"{chip_peak_folder}/*.bed"))
             input_files.extend(
                 f"{experiment_dir}/{master_config['input_folders'][master_config['analyzepeaks_rule_num'] - 1][0]}/{sample}.filtered.bam"
                 for sample in samples2
@@ -59,7 +61,10 @@ rule analyze_peaks:
         bam_inputfolder=f"{experiment_dir}/{master_config['input_folders'][master_config['analyzepeaks_rule_num'] - 1][0]}",
         peak_inputfolder=(
             f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num'] - 1]}/peak_qc/filtered_peaks"
-            if config["THETYPE"] == "ATAC"
+            if config["THETYPE"] == "ATAC" or (
+                config["THETYPE"] == "CHIP"
+                and str(config.get("BROAD_MODE", "off")).strip().lower() not in {"genebody", "diffuse"}
+            )
             else f"{experiment_dir}/{master_config['output_folders'][master_config['callpeaks_rule_num'] - 1]}"
         ),
         outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num'] - 1]}",

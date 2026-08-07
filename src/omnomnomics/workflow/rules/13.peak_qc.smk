@@ -45,6 +45,7 @@ rule peak_qc:
         union_annotation=f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num'] - 1]}/peak_qc/peak_annotations/{config['THETYPE'].lower()}.all_groups.merged_peaks.annotated.bed"
     params:
         thetype=config["THETYPE"],
+        broad_mode=str(config.get("BROAD_MODE", "off")).strip().lower(),
         spp_gate_mode=str(config.get("SPP_GATE", "warn")).strip().lower(),
         bam_inputfolder=f"{experiment_dir}/{master_config['input_folders'][master_config['peakqc_rule_num'] - 1][0]}",
         peak_outputfolder=f"{experiment_dir}/{master_config['input_folders'][master_config['peakqc_rule_num'] - 1][1]}",
@@ -72,13 +73,13 @@ rule peak_qc:
                 from omnomnomics.genomes import resolve_blacklist_bed
             except ImportError as exc:
                 raise RuntimeError(
-                    "ATAC blacklist filtering requires the omnomnomics genome helper in the active environment."
+                    "Chromatin peak blacklist filtering requires the omnomnomics genome helper in the active environment."
                 ) from exc
 
             try:
                 return str(resolve_blacklist_bed(genome_name, config["GENOME_ASSEMBLY_DIR"]))
             except FileNotFoundError as exc:
-                log_it(logfile, f"ATAC blacklist BED not available for {genome_name}: {exc}")
+                log_it(logfile, f"Chromatin blacklist BED not available for {genome_name}: {exc}")
                 return None
 
         def filter_peak_bed_file(in_bed, out_bed, keep_standard=True, drop_chrm=True, blacklist_bed=None):
@@ -1058,22 +1059,25 @@ rule peak_qc:
             generated_peak_annotation_files = []
             generated_distribution_files = []
             peak_bed_source_folder = params.peak_outputfolder
-            if assay == "ATAC":
+            filter_called_peaks = assay == "ATAC" or (
+                assay == "CHIP" and params.broad_mode not in {"genebody", "diffuse"}
+            )
+            if filter_called_peaks:
                 filtered_dir, blacklist_bed, filtered_peak_beds, filtering_summary = build_filtered_peak_sets(
                     params.peak_outputfolder,
                     params.outputfolder,
                     config["THEGENOME"],
                 )
                 peak_bed_source_folder = filtered_dir
-                log_it(logfile, f"ATAC blacklist BED: {blacklist_bed if blacklist_bed else 'NA'}")
-                log_it(logfile, f"ATAC filtered peak BEDs: {len(filtered_peak_beds)} files in {filtered_dir}")
-                log_it(logfile, f"ATAC peak filtering summary: {filtering_summary}")
+                log_it(logfile, f"{assay} blacklist BED: {blacklist_bed if blacklist_bed else 'NA'}")
+                log_it(logfile, f"{assay} filtered peak BEDs: {len(filtered_peak_beds)} files in {filtered_dir}")
+                log_it(logfile, f"{assay} peak filtering summary: {filtering_summary}")
             with tempfile.TemporaryDirectory(prefix="omnomnomics_gene_anno_") as anno_tmpdir:
                 annotation_beds = build_gene_annotation_beds(params.gtf_file, anno_tmpdir)
                 for group in sorted(grouped_bams):
                     sample_bams = grouped_bams[group]
                     bams = [bam_path for _, bam_path in sample_bams]
-                    if assay == "ATAC":
+                    if filter_called_peaks:
                         preferred = os.path.join(peak_bed_source_folder, f"{group}.MACS3.optimized.bed")
                         fallback = os.path.join(peak_bed_source_folder, f"{group}.MACS3.q-0p01.shiftm100.ext200.group_peaks.bed")
                         candidate_peak_sets = [preferred, fallback]

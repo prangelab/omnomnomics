@@ -324,6 +324,16 @@ rule count_reads:
             sanity_check_dir(logfile, peak_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][1], "step11.chip_peak_sanity")
 
             peak_bed = os.path.join(peak_folder, "all_groups.merged_peaks.bed")
+            if broad_mode not in {"genebody", "diffuse"}:
+                filtered_peak_bed = os.path.join(
+                    experiment_dir,
+                    master_config["output_folders"][master_config["peakqc_rule_num"] - 1],
+                    "peak_qc",
+                    "filtered_peaks",
+                    "all_groups.merged_peaks.bed",
+                )
+                if os.path.exists(filtered_peak_bed):
+                    peak_bed = filtered_peak_bed
             if broad_mode == "genebody":
                 log_it(logfile, f"ChIP gene-body BED used for counting: {peak_bed}")
             elif broad_mode == "diffuse":

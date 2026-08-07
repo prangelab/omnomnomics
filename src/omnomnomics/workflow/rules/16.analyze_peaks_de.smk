@@ -209,14 +209,29 @@ rule analyze_peaks_de:
                 file_stem = "gene_bodies"
             elif params.thetype == "CHIP" and params.broad_mode == "diffuse":
                 file_stem = "bins"
-            candidate_paths = sorted(
-                glob.glob(os.path.join(params.de_outputfolder, "*", "*", f"*.sig_diff_{file_stem}.DESeq2.txt"))
-            )
-            if candidate_paths:
-                return candidate_paths
             return sorted(
                 glob.glob(os.path.join(params.de_outputfolder, "*", "*", f"*.diff_{file_stem}.DESeq2.txt"))
             )
+
+        def load_contrast_thresholds(table_path, contrast_label):
+            analysis_dir = os.path.dirname(os.path.dirname(table_path))
+            summary_path = os.path.join(analysis_dir, "contrast_summary.tsv")
+            if not os.path.isfile(summary_path):
+                raise FileNotFoundError(
+                    f"Contrast summary required for post-DE peak selection was not found: {summary_path}"
+                )
+            with open(summary_path, newline="") as handle:
+                reader = csv.DictReader(handle, delimiter="\t")
+                for row in reader:
+                    if str(row.get("contrast", "")).strip() != contrast_label:
+                        continue
+                    try:
+                        return float(row["alpha"]), float(row["lfc_threshold"])
+                    except (KeyError, TypeError, ValueError) as exc:
+                        raise ValueError(
+                            f"Invalid alpha or lfc_threshold for contrast {contrast_label} in {summary_path}"
+                        ) from exc
+            raise ValueError(f"Contrast {contrast_label} was not found in {summary_path}")
 
         def classify_region(region_text):
             region = str(region_text).strip().lower()
@@ -318,9 +333,9 @@ rule analyze_peaks_de:
                 file_stem = "bins"
             contrast_label = (
                 parts[2]
-                .replace(f".sig_diff_{file_stem}.DESeq2.txt", "")
                 .replace(f".diff_{file_stem}.DESeq2.txt", "")
             )
+            alpha, lfc_threshold = load_contrast_thresholds(table_path, contrast_label)
 
             rows_all = []
             rows_up = []
@@ -351,6 +366,12 @@ rule analyze_peaks_de:
                         lfc = float(lfc_text)
                     except (TypeError, ValueError):
                         lfc = 0.0
+                    try:
+                        padj = float(row.get("padj", "nan"))
+                    except (TypeError, ValueError):
+                        padj = math.nan
+                    if not math.isfinite(padj) or padj >= alpha or abs(lfc) < lfc_threshold:
+                        continue
 
                     region_info = peak_region_map.get(peak_id, {})
                     region = region_info.get("genomic_region", "NA")
@@ -400,9 +421,6 @@ rule analyze_peaks_de:
 
             out_rows = []
             prefix = f"{de_subdir}__{contrast_dir}__{contrast_label}"
-            ranked_source_table = table_path.replace(f".sig_diff_{file_stem}.DESeq2.txt", f".diff_{file_stem}.DESeq2.txt")
-            if not os.path.exists(ranked_source_table):
-                ranked_source_table = table_path
             set_specs = [
                 ("de_significant", rows_all),
                 ("de_up", rows_up),
@@ -411,7 +429,7 @@ rule analyze_peaks_de:
                 ("de_significant_distal", rows_distal),
             ]
             ranked_sets = ranked_rows_from_de_table(
-                ranked_source_table,
+                table_path,
                 peak_region_map,
                 broad_mode,
                 promoter_map,
@@ -1505,7 +1523,7 @@ rule analyze_peaks_de:
                     feature_file_stem = "bins"
                 raise FileNotFoundError(
                     f"No DE {feature_file_stem} result tables found. Expected files like "
-                    f"*.sig_diff_{feature_file_stem}.DESeq2.txt or *.diff_{feature_file_stem}.DESeq2.txt "
+                    f"*.diff_{feature_file_stem}.DESeq2.txt "
                     f"under {params.de_outputfolder}/*/*/"
                 )
 
