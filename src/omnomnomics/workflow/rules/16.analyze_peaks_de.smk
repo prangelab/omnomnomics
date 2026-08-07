@@ -1476,7 +1476,10 @@ rule analyze_peaks_de:
                 "step16.sanity",
             )
 
-            analyze_de_root = ensure_dir(os.path.join(params.outputfolder, "analyze_peaks_de"))
+            analyze_de_root = os.path.join(params.outputfolder, "analyze_peaks_de")
+            if os.path.isdir(analyze_de_root):
+                shutil.rmtree(analyze_de_root)
+            analyze_de_root = ensure_dir(analyze_de_root)
             summary_dir = ensure_dir(os.path.join(analyze_de_root, "summary"))
             sets_dir = ensure_dir(os.path.join(analyze_de_root, "sets"))
             ensure_dir(os.path.join(sets_dir, "all_features"))

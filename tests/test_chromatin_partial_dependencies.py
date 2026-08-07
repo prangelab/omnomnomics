@@ -38,3 +38,14 @@ def test_post_de_sets_apply_recorded_contrast_thresholds():
     assert 'return float(row["alpha"]), float(row["lfc_threshold"])' in source
     assert "padj >= alpha or abs(lfc) < lfc_threshold" in source
     assert "sig_diff_" not in source
+
+
+def test_reruns_clear_pipeline_owned_de_result_directories():
+    templates_dir = RULES_DIR.parent / "templates"
+    rna_template = (templates_dir / "de_core.R.tmpl").read_text()
+    chrom_template = (templates_dir / "de_core_chrom.R.tmpl").read_text()
+    post_de = (RULES_DIR / "16.analyze_peaks_de.smk").read_text()
+
+    assert "unlink(contrast_dir, recursive = TRUE, force = TRUE)" in rna_template
+    assert "unlink(contrast_dir, recursive = TRUE, force = TRUE)" in chrom_template
+    assert "shutil.rmtree(analyze_de_root)" in post_de

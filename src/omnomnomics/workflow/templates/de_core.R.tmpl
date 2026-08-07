@@ -1887,6 +1887,9 @@ for (contrast_cfg in contrast_plan) {
   coefficient_name <- as.character(contrast_cfg$coefficient_name)
   contrast_label <- sanitize_name(as.character(contrast_cfg$label))
   contrast_dir <- file.path(de_dir, contrast_label)
+  if (dir.exists(contrast_dir)) {
+    unlink(contrast_dir, recursive = TRUE, force = TRUE)
+  }
   dir.create(contrast_dir, recursive = TRUE, showWarnings = FALSE)
   positive_direction <- "modeled numerator direction"
   negative_direction <- "opposite direction"
