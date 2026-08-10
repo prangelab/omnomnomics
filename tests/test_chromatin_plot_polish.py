@@ -38,3 +38,13 @@ def test_post_de_profile_and_motif_renderers_use_bounded_labels():
     assert source.index("def regions_label_for_set(item):") < source.index("def run_meme_motifs(")
     assert 'upper_to_col.get("MOTIF_ALT_ID")' in source
     assert 'upper_to_col.get("ADJ_P-VALUE")' in source
+
+
+def test_centered_signal_heatmaps_label_distance_in_kilobases():
+    pre_de = (RULES_DIR / "14.analyze_peaks.smk").read_text()
+    post_de = (RULES_DIR / "16.analyze_peaks_de.smk").read_text()
+
+    assert "--xAxisLabel 'distance from center (kb)'" in pre_de
+    assert "--xAxisLabel 'distance from center (kb)'" in post_de
+    assert "--xAxisLabel 'distance from center (bp)'" not in pre_de
+    assert "--xAxisLabel 'distance from center (bp)'" not in post_de

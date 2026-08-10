@@ -942,7 +942,7 @@ rule analyze_peaks_de:
                     f"--whatToShow 'heatmap and colorbar' --sortRegions descend "
                     f"--regionsLabel {quote(region_label)} "
                     f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
-                    f"--xAxisLabel 'distance from center (bp)' --refPointLabel center"
+                    f"--xAxisLabel 'distance from center (kb)' --refPointLabel center"
                 )
                 try:
                     render_profile_from_matrix(matrix_path, profile_path, region_label, sample_labels)

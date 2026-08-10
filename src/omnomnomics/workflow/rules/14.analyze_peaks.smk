@@ -232,7 +232,7 @@ rule analyze_peaks:
                         f"--whatToShow 'heatmap and colorbar' --sortRegions descend "
                         f"--plotTitle {quote(group_label)} --regionsLabel {quote(group_label)} "
                         f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
-                        f"--xAxisLabel 'distance from center (bp)' --refPointLabel center"
+                        f"--xAxisLabel 'distance from center (kb)' --refPointLabel center"
                     )
                     shell(
                         f"plotProfile -m {quote(matrix_path)} -out {quote(profile_path)} "
