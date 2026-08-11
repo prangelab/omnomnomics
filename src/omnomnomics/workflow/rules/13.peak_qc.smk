@@ -48,6 +48,7 @@ rule peak_qc:
         broad_mode=str(config.get("BROAD_MODE", "off")).strip().lower(),
         spp_gate_mode=str(config.get("SPP_GATE", "warn")).strip().lower(),
         bam_inputfolder=f"{experiment_dir}/{master_config['input_folders'][master_config['peakqc_rule_num'] - 1][0]}",
+        raw_bam_inputfolder=f"{experiment_dir}/BAM",
         peak_outputfolder=f"{experiment_dir}/{master_config['input_folders'][master_config['peakqc_rule_num'] - 1][1]}",
         outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num'] - 1]}",
         gtf_file=os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "annotation", "genes.gtf"),
@@ -710,6 +711,8 @@ rule peak_qc:
                     "assay",
                     "sample",
                     "bam_file",
+                    "complexity_bam_file",
+                    "complexity_bam_stage",
                     "complexity_input_alignments",
                     "complexity_max_alignments",
                     "complexity_sampling_fraction",
@@ -736,6 +739,8 @@ rule peak_qc:
                         row["assay"],
                         row["sample"],
                         row["bam_file"],
+                        row["complexity_bam_file"],
+                        row["complexity_bam_stage"],
                         row["complexity_input_alignments"],
                         row["complexity_max_alignments"],
                         f"{row['complexity_sampling_fraction']:.9f}",
@@ -1007,8 +1012,19 @@ rule peak_qc:
                 bam_path = os.path.join(inputfolder, f"{sample}{bam_suffix}")
                 if not os.path.exists(bam_path):
                     continue
+                raw_bam_path = os.path.join(params.raw_bam_inputfolder, f"{sample}.bam")
+                if os.path.exists(raw_bam_path):
+                    complexity_bam_path = raw_bam_path
+                    complexity_bam_stage = "merged_pre_dedup"
+                else:
+                    complexity_bam_path = bam_path
+                    complexity_bam_stage = "filtered_fallback"
+                    log_it(
+                        logfile,
+                        f"Merged pre-dedup BAM not found for {sample}; library complexity uses filtered BAM fallback.",
+                    )
                 log_it(logfile, f"Calculating library complexity metrics for {sample}...")
-                complexity_metrics = calculate_library_complexity_metrics(bam_path)
+                complexity_metrics = calculate_library_complexity_metrics(complexity_bam_path)
                 log_it(
                     logfile,
                     "Library complexity sampling for "
@@ -1022,6 +1038,8 @@ rule peak_qc:
                     "assay": thetype,
                     "sample": sample_id_for_sample(sample),
                     "bam_file": os.path.basename(bam_path),
+                    "complexity_bam_file": os.path.basename(complexity_bam_path),
+                    "complexity_bam_stage": complexity_bam_stage,
                     **complexity_metrics,
                     **crosscorr_metrics,
                 })

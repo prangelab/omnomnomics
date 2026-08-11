@@ -1465,7 +1465,7 @@ if (!is.na(sample_frip_metrics_path) && file.exists(sample_frip_metrics_path)) {
         ) +
           ggplot2::geom_boxplot(outlier.shape = NA, alpha = 0.25, width = 0.55) +
           ggplot2::geom_jitter(width = 0.12, height = 0, size = 2.5, alpha = 0.85) +
-          ggplot2::facet_wrap(~ peak_set, scales = "free_y") +
+          ggplot2::facet_wrap(~ peak_set, scales = "free", drop = TRUE) +
           ggplot2::theme_light() +
           ggplot2::theme(
             panel.grid = ggplot2::element_blank(),
@@ -1474,7 +1474,7 @@ if (!is.na(sample_frip_metrics_path) && file.exists(sample_frip_metrics_path)) {
           ) +
           ggplot2::xlab(NULL) +
           ggplot2::ylab("Sample FRiP") +
-          ggplot2::ggtitle(paste(feature_label_plural_title, "sample-level FRiP by peak/bin/gene-body set"))
+          ggplot2::ggtitle(paste(feature_label_plural_title, "sample-level FRiP by feature set"))
         ggplot2::ggsave(
           filename = file.path(qc_dir, paste0(feature_file_stem, "_qc.sample_frip.pdf")),
           plot = p_sample_frip,
@@ -2737,7 +2737,7 @@ for (contrast_cfg in contrast_plan) {
       label_df <- label_df[order(label_df$padj, -abs(label_df$log2FoldChange)), , drop = FALSE]
       label_df$feature_label <- res_df$feature_label[match(label_df$gene_id, res_df$gene_id)]
       label_df <- label_df[!is.na(label_df$feature_label) & nzchar(label_df$feature_label), , drop = FALSE]
-      label_df <- head(label_df, max_volcano_labels)
+      label_df <- head(label_df, min(max_volcano_labels, 10L))
       if (nrow(label_df) > 0) {
         p_labels <- p + ggrepel::geom_text_repel(
           data = label_df,

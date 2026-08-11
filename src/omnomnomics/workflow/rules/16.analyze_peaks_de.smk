@@ -623,6 +623,24 @@ rule analyze_peaks_de:
 
         def regions_label_for_set(item):
             set_type = str(item.get("set_type", "features"))
+            if params.thetype == "CHIP" and params.broad_mode == "domain":
+                domain_labels = {
+                    "all_features": "all domains",
+                    "all_promoter": "promoter-overlapping domains",
+                    "all_distal": "distal domains",
+                    "all_gene_body": "gene-body-overlapping domains",
+                    "de_significant": "DE domains",
+                    "de_up": "DE up domains",
+                    "de_down": "DE down domains",
+                    "de_significant_promoter": "DE promoter-overlapping domains",
+                    "de_significant_distal": "DE distal domains",
+                    "top_de_ranked": "top ranked DE domains",
+                    "top_de_ranked_promoter": "top ranked promoter-overlapping domains",
+                    "top_de_ranked_distal": "top ranked distal domains",
+                    "unique_from_prede": "unique pre-DE domains",
+                }
+                if set_type in domain_labels:
+                    return domain_labels[set_type]
             label_map = {
                 "all_features": "all peaks",
                 "all_promoter": "promoter peaks",

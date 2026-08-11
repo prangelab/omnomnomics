@@ -48,3 +48,24 @@ def test_centered_signal_heatmaps_label_distance_in_kilobases():
     assert "--xAxisLabel 'distance from center (kb)'" in post_de
     assert "--xAxisLabel 'distance from center (bp)'" not in pre_de
     assert "--xAxisLabel 'distance from center (bp)'" not in post_de
+
+
+def test_domain_mode_uses_domain_labels_and_readable_chromatin_plots():
+    de_rule = (RULES_DIR / "15.call_DE_chrom.smk").read_text()
+    chrom_template = (TEMPLATES_DIR / "de_core_chrom.R.tmpl").read_text()
+    post_de = (RULES_DIR / "16.analyze_peaks_de.smk").read_text()
+
+    assert 'params.broad_mode == "domain"' in de_rule
+    assert 'feature_label_plural = "domains"' in de_rule
+    assert 'facet_wrap(~ peak_set, scales = "free", drop = TRUE)' in chrom_template
+    assert 'head(label_df, min(max_volcano_labels, 10L))' in chrom_template
+    assert '"de_significant": "DE domains"' in post_de
+
+
+def test_library_complexity_prefers_pre_deduplication_bams():
+    peak_qc = (RULES_DIR / "13.peak_qc.smk").read_text()
+
+    assert 'raw_bam_inputfolder=f"{experiment_dir}/BAM"' in peak_qc
+    assert 'complexity_bam_stage = "merged_pre_dedup"' in peak_qc
+    assert 'complexity_bam_stage = "filtered_fallback"' in peak_qc
+    assert 'calculate_library_complexity_metrics(complexity_bam_path)' in peak_qc

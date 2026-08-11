@@ -503,6 +503,7 @@ rule call_DE_chrom:
 
                 is_chip_genebody = params.thetype == "CHIP" and params.broad_mode == "genebody"
                 is_chip_diffuse = params.thetype == "CHIP" and params.broad_mode == "diffuse"
+                is_chip_domain = params.thetype == "CHIP" and params.broad_mode == "domain"
                 if is_chip_genebody:
                     feature_label_singular = "gene body"
                     feature_label_plural = "gene bodies"
@@ -511,6 +512,10 @@ rule call_DE_chrom:
                     feature_label_singular = "bin"
                     feature_label_plural = "bins"
                     feature_file_stem = "bins"
+                elif is_chip_domain:
+                    feature_label_singular = "domain"
+                    feature_label_plural = "domains"
+                    feature_file_stem = "peaks"
                 else:
                     feature_label_singular = "peak"
                     feature_label_plural = "peaks"
