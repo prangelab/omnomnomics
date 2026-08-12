@@ -20,6 +20,17 @@ def test_pre_de_analysis_enters_through_annotation_not_marker():
     assert "extra_{master_config['peakqc_rule_num']}" not in input_block
 
 
+def test_non_peak_chromatin_de_waits_for_pre_de_completion_marker():
+    source = (RULES_DIR / "15.call_DE_chrom.smk").read_text()
+    dependency_block = source.split(
+        "def _chrom_de_peak_metadata_dependency", 1
+    )[1].split("chrom_de_peak_metadata_file", 1)[0]
+
+    assert '{"genebody", "diffuse"}' in dependency_block
+    assert "extra_{master_config['analyzepeaks_rule_num']}.tmp" in dependency_block
+    assert "return _chrom_de_peak_metadata_file()" not in dependency_block
+
+
 def test_peak_backed_chip_modes_use_filtered_peak_tree_downstream():
     peak_qc = (RULES_DIR / "13.peak_qc.smk").read_text()
     pre_de = (RULES_DIR / "14.analyze_peaks.smk").read_text()
