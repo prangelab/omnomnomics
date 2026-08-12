@@ -31,6 +31,18 @@ def test_non_peak_chromatin_de_waits_for_pre_de_completion_marker():
     assert "return _chrom_de_peak_metadata_file()" not in dependency_block
 
 
+def test_genebody_feature_builder_uses_transcript_aware_gene_spans():
+    source = (RULES_DIR / "10.call_peaks.smk").read_text()
+    builder = source.split("def build_chip_genebody_feature_sets", 1)[1].split(
+        "def pooled_overlap_support_bed", 1
+    )[0]
+
+    assert "build_gtf_annotation_sources" in builder
+    assert 'annotation_sources["genes"]' in builder
+    assert 'fields[2] != "gene"' not in builder
+    assert "if feature_count == 0:" in builder
+
+
 def test_peak_backed_chip_modes_use_filtered_peak_tree_downstream():
     peak_qc = (RULES_DIR / "13.peak_qc.smk").read_text()
     pre_de = (RULES_DIR / "14.analyze_peaks.smk").read_text()

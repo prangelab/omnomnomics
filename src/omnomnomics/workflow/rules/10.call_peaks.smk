@@ -19,6 +19,8 @@ import hashlib
 import concurrent.futures
 from shlex import quote
 
+from omnomnomics.peak_annotation import build_gtf_annotation_sources
+
 def idr_split_jobs_enabled():
     thetype = str(config.get("THETYPE", "")).upper()
     if thetype == "ATAC":
@@ -992,16 +994,6 @@ if (chrom != "" && len != "") print chrom, len;
                     handle.write(f"{chrom}\t{start}\t{end}\n")
             return len(sorted_rows)
 
-        def parse_gtf_attributes(attr_string):
-            attrs = {}
-            for item in str(attr_string).strip().split(";"):
-                item = item.strip()
-                if not item or " " not in item:
-                    continue
-                key, value = item.split(" ", 1)
-                attrs[key] = value.strip().strip('"')
-            return attrs
-
         def chrom_is_standard(chrom_name):
             text = str(chrom_name)
             if text in {"chrX", "chrY"}:
@@ -1018,33 +1010,33 @@ if (chrom != "" && len != "") print chrom, len;
             os.makedirs(feature_root, exist_ok=True)
             union_bed = os.path.join(outputfolder, "all_groups.merged_peaks.bed")
             summary_path = os.path.join(feature_root, "genebody_feature_summary.tsv")
-            gene_body_rows = []
-
-            with open(gtf_file, "r", encoding="utf-8") as handle:
+            annotation_sources = build_gtf_annotation_sources(
+                gtf_file,
+                os.path.join(feature_root, "annotation_sources"),
+            )
+            feature_triplets = []
+            with open(annotation_sources["genes"], "r", encoding="utf-8") as handle:
                 for line in handle:
                     if not line.strip() or line.startswith("#"):
                         continue
                     fields = line.rstrip("\n").split("\t")
-                    if len(fields) < 9 or fields[2] != "gene":
+                    if len(fields) < 3:
                         continue
                     chrom = fields[0]
                     if not chrom_is_standard(chrom) or chrom in {"chrM", "MT", "chrMT"}:
                         continue
-                    start = int(fields[3]) - 1
-                    end = int(fields[4])
+                    start = int(fields[1])
+                    end = int(fields[2])
                     if end <= start:
                         continue
-                    attrs = parse_gtf_attributes(fields[8])
-                    gene_id = attrs.get("gene_id", "NA")
-                    gene_name = attrs.get("gene_name", gene_id)
-                    gene_body_rows.append((chrom, start, end, gene_id, gene_name))
+                    feature_triplets.append((chrom, start, end))
 
-            gene_body_rows = sorted(
-                {(chrom, start, end, gene_id, gene_name) for chrom, start, end, gene_id, gene_name in gene_body_rows},
-                key=lambda x: (x[0], x[1], x[2], x[3], x[4]),
-            )
-            feature_triplets = [(chrom, start, end) for chrom, start, end, _, _ in gene_body_rows]
             feature_count = write_bed_triplets(feature_triplets, union_bed)
+            if feature_count == 0:
+                raise RuntimeError(
+                    "No standard-chromosome gene-body features could be derived from "
+                    f"the genome annotation: {gtf_file}"
+                )
 
             with open(summary_path, "w", newline="", encoding="utf-8") as handle:
                 writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
