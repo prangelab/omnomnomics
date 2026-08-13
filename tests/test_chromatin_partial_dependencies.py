@@ -43,6 +43,34 @@ def test_genebody_feature_builder_uses_transcript_aware_gene_spans():
     assert "if feature_count == 0:" in builder
 
 
+def test_genebody_features_preserve_source_gene_labels():
+    peak_calling = (RULES_DIR / "10.call_peaks.smk").read_text()
+    pre_de = (RULES_DIR / "14.analyze_peaks.smk").read_text()
+
+    builder = peak_calling.split("def build_chip_genebody_feature_sets", 1)[1].split(
+        "def pooled_overlap_support_bed", 1
+    )[0]
+    metadata = pre_de.split("def load_genebody_source_labels", 1)[1].split(
+        "def write_feature_summary", 1
+    )[0]
+
+    assert "feature_labels.setdefault((chrom, start, end), set()).add(label)" in builder
+    assert "','.join(sorted(labels))" in builder
+    assert '"gene_body"' in metadata
+    assert 'row.get("assigned_genes", "")' in metadata
+
+
+def test_genebody_post_de_omits_peak_style_promoter_distal_sets():
+    source = (RULES_DIR / "16.analyze_peaks_de.smk").read_text()
+    de_sets = source.split("def build_de_sets", 1)[1].split(
+        "def copy_optional_unique_sets", 1
+    )[0]
+
+    assert 'if broad_mode != "genebody":' in de_sets
+    assert '("de_significant_promoter_regions", rows_promoter_regions)' in de_sets
+    assert '("top_de_ranked_promoter_regions", ranked_sets.get(' in de_sets
+
+
 def test_peak_backed_chip_modes_use_filtered_peak_tree_downstream():
     peak_qc = (RULES_DIR / "13.peak_qc.smk").read_text()
     pre_de = (RULES_DIR / "14.analyze_peaks.smk").read_text()

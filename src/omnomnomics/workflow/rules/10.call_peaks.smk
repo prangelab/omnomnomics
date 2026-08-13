@@ -1014,13 +1014,13 @@ if (chrom != "" && len != "") print chrom, len;
                 gtf_file,
                 os.path.join(feature_root, "annotation_sources"),
             )
-            feature_triplets = []
+            feature_labels = {}
             with open(annotation_sources["genes"], "r", encoding="utf-8") as handle:
                 for line in handle:
                     if not line.strip() or line.startswith("#"):
                         continue
                     fields = line.rstrip("\n").split("\t")
-                    if len(fields) < 3:
+                    if len(fields) < 4:
                         continue
                     chrom = fields[0]
                     if not chrom_is_standard(chrom) or chrom in {"chrM", "MT", "chrMT"}:
@@ -1029,9 +1029,19 @@ if (chrom != "" && len != "") print chrom, len;
                     end = int(fields[2])
                     if end <= start:
                         continue
-                    feature_triplets.append((chrom, start, end))
+                    label = fields[3].strip()
+                    if not label or label == "NA":
+                        continue
+                    feature_labels.setdefault((chrom, start, end), set()).add(label)
 
-            feature_count = write_bed_triplets(feature_triplets, union_bed)
+            with open(union_bed, "w", encoding="utf-8") as handle:
+                for (chrom, start, end), labels in sorted(
+                    feature_labels.items(), key=lambda item: item[0]
+                ):
+                    handle.write(
+                        f"{chrom}\t{start}\t{end}\t{','.join(sorted(labels))}\n"
+                    )
+            feature_count = len(feature_labels)
             if feature_count == 0:
                 raise RuntimeError(
                     "No standard-chromosome gene-body features could be derived from "

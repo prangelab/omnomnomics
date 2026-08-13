@@ -286,11 +286,14 @@ rule analyze_peaks_de:
             top_all = ranked[:top_n]
             top_promoter = [item for item in ranked if item["region_class"] == "promoter"][:top_n]
             top_distal = [item for item in ranked if item["region_class"] == "distal"][:top_n]
-            top_sets = {
-                "top_de_ranked": [item["bed_row"] for item in top_all],
-                "top_de_ranked_promoter": [item["bed_row"] for item in top_promoter],
-                "top_de_ranked_distal": [item["bed_row"] for item in top_distal],
-            }
+            top_sets = {"top_de_ranked": [item["bed_row"] for item in top_all]}
+            if broad_mode != "genebody":
+                top_sets.update(
+                    {
+                        "top_de_ranked_promoter": [item["bed_row"] for item in top_promoter],
+                        "top_de_ranked_distal": [item["bed_row"] for item in top_distal],
+                    }
+                )
             if broad_mode == "genebody":
                 promoter_region_rows = []
                 for item in top_all:
@@ -425,22 +428,28 @@ rule analyze_peaks_de:
                 ("de_significant", rows_all),
                 ("de_up", rows_up),
                 ("de_down", rows_down),
-                ("de_significant_promoter", rows_promoter),
-                ("de_significant_distal", rows_distal),
             ]
+            if broad_mode != "genebody":
+                set_specs.extend(
+                    [
+                        ("de_significant_promoter", rows_promoter),
+                        ("de_significant_distal", rows_distal),
+                    ]
+                )
             ranked_sets = ranked_rows_from_de_table(
                 table_path,
                 peak_region_map,
                 broad_mode,
                 promoter_map,
             )
-            set_specs.extend(
-                [
-                    ("top_de_ranked", ranked_sets.get("top_de_ranked", [])),
-                    ("top_de_ranked_promoter", ranked_sets.get("top_de_ranked_promoter", [])),
-                    ("top_de_ranked_distal", ranked_sets.get("top_de_ranked_distal", [])),
-                ]
-            )
+            set_specs.append(("top_de_ranked", ranked_sets.get("top_de_ranked", [])))
+            if broad_mode != "genebody":
+                set_specs.extend(
+                    [
+                        ("top_de_ranked_promoter", ranked_sets.get("top_de_ranked_promoter", [])),
+                        ("top_de_ranked_distal", ranked_sets.get("top_de_ranked_distal", [])),
+                    ]
+                )
             if broad_mode == "genebody":
                 set_specs.extend(
                     [
@@ -623,6 +632,20 @@ rule analyze_peaks_de:
 
         def regions_label_for_set(item):
             set_type = str(item.get("set_type", "features"))
+            if params.thetype == "CHIP" and params.broad_mode == "genebody":
+                genebody_labels = {
+                    "all_gene_bodies": "all gene bodies",
+                    "de_significant": "DE gene bodies",
+                    "de_up": "DE up gene bodies",
+                    "de_down": "DE down gene bodies",
+                    "top_de_ranked": "top ranked DE gene bodies",
+                    "de_significant_promoter_regions": "promoters of DE genes",
+                    "de_up_promoter_regions": "promoters of DE up genes",
+                    "de_down_promoter_regions": "promoters of DE down genes",
+                    "top_de_ranked_promoter_regions": "promoters of top ranked DE genes",
+                }
+                if set_type in genebody_labels:
+                    return genebody_labels[set_type]
             if params.thetype == "CHIP" and params.broad_mode == "domain":
                 domain_labels = {
                     "all_features": "all domains",

@@ -300,39 +300,110 @@ rule analyze_peaks:
                         ]
                     )
 
-        def write_genebody_feature_metadata(annotation_bed, summary_dir):
+        def load_genebody_source_labels(feature_bed):
+            source_labels = {}
+            with open(feature_bed, encoding="utf-8") as handle:
+                for line in handle:
+                    if not line.strip() or line.startswith("#"):
+                        continue
+                    fields = line.rstrip("\n").split("\t")
+                    if len(fields) < 4:
+                        raise ValueError(
+                            "Gene-body feature BED must contain source gene labels in column 4: "
+                            f"{feature_bed}"
+                        )
+                    feature_id = f"{fields[0]}_{fields[1]}_{fields[2]}"
+                    labels = {
+                        label.strip()
+                        for label in fields[3].split(",")
+                        if label.strip() and label.strip() != "NA"
+                    }
+                    if not labels:
+                        raise ValueError(f"Gene-body feature has no source gene label: {feature_id}")
+                    source_labels.setdefault(feature_id, set()).update(labels)
+            return source_labels
+
+        def write_genebody_feature_metadata(annotation_bed, feature_bed, summary_dir):
+            annotation_rows = {
+                str(row.get("underscore", "")).strip(): row
+                for row in load_annotation_rows(annotation_bed)
+                if str(row.get("underscore", "")).strip()
+            }
+            source_labels = load_genebody_source_labels(feature_bed)
+            missing_annotations = sorted(set(source_labels) - set(annotation_rows))
+            if missing_annotations:
+                preview = ", ".join(missing_annotations[:5])
+                raise ValueError(
+                    f"Gene-body annotations are missing {len(missing_annotations)} features; first: {preview}"
+                )
             metadata_path = os.path.join(summary_dir, "feature_metadata_for_r.tsv")
-            build_peak_metadata_for_r(annotation_bed, metadata_path)
+            with open(metadata_path, "w", newline="") as out:
+                writer = csv.writer(out, delimiter="\t", lineterminator="\n")
+                writer.writerow(
+                    [
+                        "underscore",
+                        "chrom",
+                        "start",
+                        "end",
+                        "genomic_region",
+                        "assigned_genes",
+                        "nearest_gene",
+                        "distance_to_nearest_gene_bp",
+                        "nearest_promoter_gene",
+                        "distance_to_nearest_promoter_bp",
+                        "width_bp",
+                    ]
+                )
+                for feature_id in sorted(source_labels):
+                    row = annotation_rows[feature_id]
+                    labels = sorted(source_labels[feature_id])
+                    assigned = ",".join(labels)
+                    writer.writerow(
+                        [
+                            feature_id,
+                            row["#chrom"],
+                            row["start"],
+                            row["end"],
+                            "gene_body",
+                            assigned,
+                            labels[0],
+                            0,
+                            assigned,
+                            0,
+                            row["width_bp"],
+                        ]
+                    )
             legacy_metadata_path = os.path.join(summary_dir, "peak_metadata_for_r.tsv")
             shutil.copy2(metadata_path, legacy_metadata_path)
             return metadata_path, legacy_metadata_path
 
-        def write_genebody_summary(annotation_bed, feature_bed, summary_dir):
-            rows = load_annotation_rows(annotation_bed)
+        def write_genebody_summary(metadata_path, feature_bed, summary_dir):
+            with open(metadata_path, newline="") as handle:
+                rows = list(csv.DictReader(handle, delimiter="\t"))
             summary_path = os.path.join(summary_dir, "gene_body_summary.tsv")
-            region_counts = {}
             widths = []
-            assigned_gene_rows = 0
-            nearest_gene_rows = 0
+            source_gene_labels = set()
             for row in rows:
-                region = str(row.get("genomic_region", "NA")).strip() or "NA"
-                region_counts[region] = region_counts.get(region, 0) + 1
                 try:
                     widths.append(int(row.get("width_bp", "0")))
                 except ValueError:
                     pass
-                if str(row.get("assigned_genes", "NA")).strip() not in {"", "NA"}:
-                    assigned_gene_rows += 1
-                if str(row.get("nearest_gene", "NA")).strip() not in {"", "NA"}:
-                    nearest_gene_rows += 1
-            feature_count = int(
-                subprocess.check_output(
-                    f"wc -l {quote(feature_bed)} | awk '{{print $1}}'",
-                    shell=True,
-                    executable="/bin/bash",
-                    text=True,
-                ).strip()
-            )
+                source_gene_labels.update(
+                    label.strip()
+                    for label in str(row.get("assigned_genes", "")).split(",")
+                    if label.strip() and label.strip() != "NA"
+                )
+            with open(feature_bed, encoding="utf-8") as handle:
+                feature_count = sum(
+                    1
+                    for line in handle
+                    if line.strip() and not line.startswith("#")
+                )
+            if feature_count != len(rows):
+                raise ValueError(
+                    "Gene-body metadata row count does not match the feature BED: "
+                    f"{len(rows)} != {feature_count}"
+                )
             widths_sorted = sorted(widths)
             median_width = widths_sorted[len(widths_sorted) // 2] if widths_sorted else 0
             with open(summary_path, "w", newline="") as handle:
@@ -341,10 +412,9 @@ rule analyze_peaks:
                 writer.writerow(["feature_type", "gene_body"])
                 writer.writerow(["feature_count", feature_count])
                 writer.writerow(["median_width_bp", median_width])
-                writer.writerow(["assigned_gene_rows", assigned_gene_rows])
-                writer.writerow(["nearest_gene_rows", nearest_gene_rows])
-                for region_name in sorted(region_counts):
-                    writer.writerow([f"region_count_{region_name}", region_counts[region_name]])
+                writer.writerow(["source_gene_mapped_features", len(rows)])
+                writer.writerow(["source_gene_label_count", len(source_gene_labels)])
+                writer.writerow(["region_count_gene_body", len(rows)])
             return summary_path
 
         def write_feature_summary(annotation_bed, feature_bed, summary_dir, feature_type, summary_name):
@@ -466,8 +536,10 @@ rule analyze_peaks:
                     raise FileNotFoundError(f"Expected gene-body feature BED not found: {feature_bed}")
                 if not os.path.isfile(annotation_bed):
                     raise FileNotFoundError(f"Expected gene-body annotation BED not found: {annotation_bed}")
-                metadata_path, legacy_metadata_path = write_genebody_feature_metadata(annotation_bed, summary_dir)
-                gene_body_summary = write_genebody_summary(annotation_bed, feature_bed, summary_dir)
+                metadata_path, legacy_metadata_path = write_genebody_feature_metadata(
+                    annotation_bed, feature_bed, summary_dir
+                )
+                gene_body_summary = write_genebody_summary(metadata_path, feature_bed, summary_dir)
                 signal_outputs = run_genebody_signal_plots(params.bam_inputfolder, feature_bed, signal_dir)
                 report_path = os.path.join(summary_dir, "analyze_peaks_report.tsv")
                 with open(report_path, "w", newline="") as handle:
