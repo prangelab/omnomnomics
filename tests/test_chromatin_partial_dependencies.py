@@ -71,6 +71,17 @@ def test_genebody_post_de_omits_peak_style_promoter_distal_sets():
     assert '("top_de_ranked_promoter_regions", ranked_sets.get(' in de_sets
 
 
+def test_chromatin_plot_labels_are_readable_for_long_feature_and_sample_names():
+    pre_de = (RULES_DIR / "14.analyze_peaks.smk").read_text()
+    post_de = (RULES_DIR / "16.analyze_peaks_de.smk").read_text()
+    chrom_de = (RULES_DIR.parent / "templates" / "de_core_chrom.R.tmpl").read_text()
+
+    assert "--plotWidth 10 --plotHeight 6" in pre_de
+    assert 're.sub(r"_(rep[0-9]+)$", r"\\n\\1", label)' in post_de
+    assert "ylim = c(0, y_lim * 1.25)" in chrom_de
+    assert "box.padding = 0.6" in chrom_de
+
+
 def test_peak_backed_chip_modes_use_filtered_peak_tree_downstream():
     peak_qc = (RULES_DIR / "13.peak_qc.smk").read_text()
     pre_de = (RULES_DIR / "14.analyze_peaks.smk").read_text()

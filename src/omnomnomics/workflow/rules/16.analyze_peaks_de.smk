@@ -978,11 +978,15 @@ rule analyze_peaks_de:
                     f"-R {quote(signal_bed_path)} -S {' '.join(quote(x) for x in bigwigs)} "
                     f"--missingDataAsZero --binSize 100 --numberOfProcessors {deeptools_threads} -o {quote(matrix_path)}"
                 )
+                heatmap_sample_labels = [
+                    re.sub(r"_(rep[0-9]+)$", r"\n\1", label)
+                    for label in sample_labels
+                ]
                 shell(
                     f"plotHeatmap -m {quote(matrix_path)} -out {quote(heatmap_path)} "
                     f"--whatToShow 'heatmap and colorbar' --sortRegions descend "
                     f"--regionsLabel {quote(region_label)} "
-                    f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
+                    f"--samplesLabel {' '.join(quote(label) for label in heatmap_sample_labels)} "
                     f"--xAxisLabel 'distance from center (kb)' --refPointLabel center"
                 )
                 try:

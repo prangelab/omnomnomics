@@ -508,7 +508,7 @@ rule analyze_peaks:
                     f"--perGroup --plotTitle {quote('All gene bodies')} "
                     f"--regionsLabel {quote('gene bodies')} "
                     f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
-                    f"--startLabel TSS --endLabel TES"
+                    f"--startLabel TSS --endLabel TES --plotWidth 10 --plotHeight 6"
                 )
                 return {
                     "matrix": matrix_path,

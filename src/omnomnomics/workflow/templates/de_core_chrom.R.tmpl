@@ -2739,11 +2739,17 @@ for (contrast_cfg in contrast_plan) {
       label_df <- label_df[!is.na(label_df$feature_label) & nzchar(label_df$feature_label), , drop = FALSE]
       label_df <- head(label_df, min(max_volcano_labels, 10L))
       if (nrow(label_df) > 0) {
-        p_labels <- p + ggrepel::geom_text_repel(
+        p_labels <- p +
+          ggplot2::coord_cartesian(xlim = c(-x_lim, x_lim), ylim = c(0, y_lim * 1.25)) +
+          ggrepel::geom_text_repel(
           data = label_df,
           ggplot2::aes(label = feature_label),
-          size = 3,
-          max.overlaps = max_volcano_labels
+          size = 2.7,
+          box.padding = 0.6,
+          point.padding = 0.25,
+          min.segment.length = 0,
+          max.overlaps = max_volcano_labels,
+          seed = 1
         )
         ggplot2::ggsave(file.path(contrast_dir, paste0(contrast_label, ".volcano_plot_labels.pdf")), p_labels, width = 10, height = 7)
       }
