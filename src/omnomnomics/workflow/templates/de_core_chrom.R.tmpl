@@ -2739,6 +2739,17 @@ for (contrast_cfg in contrast_plan) {
       label_df <- label_df[!is.na(label_df$feature_label) & nzchar(label_df$feature_label), , drop = FALSE]
       label_df <- head(label_df, min(max_volcano_labels, 10L))
       if (nrow(label_df) > 0) {
+        compact_volcano_label <- function(label) {
+          match <- regexec("^(.+)_([0-9]+)_([0-9]+)-[^-]+-(.+)$", label)
+          parts <- regmatches(label, match)[[1]]
+          if (length(parts) != 5L) return(label)
+          paste0(parts[[5]], "\n", parts[[2]], ":", parts[[3]], "-", parts[[4]])
+        }
+        label_df$feature_label <- vapply(
+          label_df$feature_label,
+          compact_volcano_label,
+          character(1)
+        )
         p_labels <- p +
           ggplot2::coord_cartesian(xlim = c(-x_lim, x_lim), ylim = c(0, y_lim * 1.25)) +
           ggrepel::geom_text_repel(

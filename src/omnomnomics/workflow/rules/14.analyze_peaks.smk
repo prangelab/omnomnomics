@@ -8,7 +8,10 @@
 #=============================================
 import csv
 import glob
+import gzip
 import itertools
+import json
+import math
 import os
 import shlex
 import shutil
@@ -503,18 +506,103 @@ rule analyze_peaks:
                     f"--startLabel TSS --endLabel TES --xAxisLabel {quote('gene body scaled to 5 kb')} "
                     f"--heatmapWidth 8 --heatmapHeight 14"
                 )
-                shell(
-                    f"plotProfile -m {quote(matrix_path)} -out {quote(profile_path)} "
-                    f"--perGroup --plotTitle {quote('All gene bodies')} "
-                    f"--regionsLabel {quote('gene bodies')} "
-                    f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
-                    f"--startLabel TSS --endLabel TES --plotWidth 10 --plotHeight 6"
-                )
+                render_scaled_genebody_profile(matrix_path, profile_path, sample_labels)
                 return {
                     "matrix": matrix_path,
                     "heatmap": heatmap_path,
                     "profile": profile_path,
                 }
+
+        def render_scaled_genebody_profile(matrix_path, profile_path, sample_labels):
+            try:
+                import matplotlib
+                matplotlib.use("Agg")
+                import matplotlib.pyplot as plt
+            except Exception as exc:
+                raise RuntimeError(f"matplotlib import failed: {exc}") from exc
+
+            with gzip.open(matrix_path, "rt") as handle:
+                header_line = handle.readline().strip()
+                if not header_line.startswith("@"):
+                    raise RuntimeError("deepTools matrix header is missing")
+                matrix_header = json.loads(header_line[1:])
+                sample_boundaries = [int(value) for value in matrix_header.get("sample_boundaries", [])]
+                if len(sample_boundaries) < 2:
+                    raise RuntimeError("deepTools matrix header lacks sample boundaries")
+                n_samples = len(sample_boundaries) - 1
+                if len(sample_labels) != n_samples:
+                    sample_labels = [str(value) for value in matrix_header.get("sample_labels", [])]
+                if len(sample_labels) != n_samples:
+                    sample_labels = [f"sample_{index + 1}" for index in range(n_samples)]
+                bin_counts = [
+                    sample_boundaries[index + 1] - sample_boundaries[index]
+                    for index in range(n_samples)
+                ]
+                sums = [[0.0] * count for count in bin_counts]
+                counts = [[0] * count for count in bin_counts]
+                for line in handle:
+                    if not line.strip():
+                        continue
+                    values = line.rstrip("\n").split("\t")[6:]
+                    for sample_index in range(n_samples):
+                        start = sample_boundaries[sample_index]
+                        end = sample_boundaries[sample_index + 1]
+                        for bin_index, raw_value in enumerate(values[start:end]):
+                            try:
+                                value = float(raw_value)
+                            except ValueError:
+                                continue
+                            if not math.isfinite(value):
+                                continue
+                            sums[sample_index][bin_index] += value
+                            counts[sample_index][bin_index] += 1
+
+            upstream = int(matrix_header.get("upstream", [1000])[0] or 1000)
+            body = int(matrix_header.get("body", [5000])[0] or 5000)
+            downstream = int(matrix_header.get("downstream", [1000])[0] or 1000)
+            bin_size = int(matrix_header.get("bin size", [50])[0] or 50)
+            total_length = upstream + body + downstream
+            x_values = [
+                (index + 0.5) * bin_size / 1000.0
+                for index in range(bin_counts[0])
+            ]
+            colors = ["#22228f", "#2688ef", "#80ef80", "#ff9418", "#9467bd", "#17becf"]
+            fig = plt.figure(figsize=(10, 7))
+            grid = fig.add_gridspec(
+                2, 1, height_ratios=[5, 1], hspace=0.25,
+                left=0.11, right=0.98, top=0.9, bottom=0.08,
+            )
+            ax = fig.add_subplot(grid[0])
+            legend_ax = fig.add_subplot(grid[1])
+            legend_ax.axis("off")
+            lines = []
+            for sample_index in range(n_samples):
+                profile = [
+                    sums[sample_index][index] / counts[sample_index][index]
+                    if counts[sample_index][index] else float("nan")
+                    for index in range(bin_counts[sample_index])
+                ]
+                line, = ax.plot(
+                    x_values[:len(profile)], profile, linewidth=2.4,
+                    color=colors[sample_index % len(colors)], label=sample_labels[sample_index],
+                )
+                lines.append(line)
+            ax.axvline(upstream / 1000.0, color="#666666", linewidth=1, alpha=0.6)
+            ax.axvline((upstream + body) / 1000.0, color="#666666", linewidth=1, alpha=0.6)
+            ax.set_title("All gene bodies", fontsize=17, pad=12)
+            ax.set_ylabel("normalized signal", fontsize=12)
+            ax.set_xlim(0, total_length / 1000.0)
+            ax.set_xticks([0, upstream / 1000.0, (upstream + body) / 1000.0, total_length / 1000.0])
+            ax.set_xticklabels(["-1 kb", "TSS", "TES", "+1 kb"])
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+            ax.grid(True, axis="y", color="#dddddd", linewidth=0.8)
+            legend_ax.legend(
+                handles=lines, labels=sample_labels, loc="center",
+                ncol=min(2, max(1, len(sample_labels))), frameon=False, fontsize=11,
+            )
+            fig.savefig(profile_path)
+            plt.close(fig)
 
         try:
             if params.thetype not in {"ATAC", "CHIP"}:
