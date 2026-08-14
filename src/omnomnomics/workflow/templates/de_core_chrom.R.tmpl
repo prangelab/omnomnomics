@@ -2743,7 +2743,9 @@ for (contrast_cfg in contrast_plan) {
           match <- regexec("^(.+)_([0-9]+)_([0-9]+)-[^-]+-(.+)$", label)
           parts <- regmatches(label, match)[[1]]
           if (length(parts) != 5L) return(label)
-          paste0(parts[[5]], "\n", parts[[2]], ":", parts[[3]], "-", parts[[4]])
+          start_mb <- formatC(as.numeric(parts[[3]]) / 1e6, format = "f", digits = 2)
+          end_mb <- formatC(as.numeric(parts[[4]]) / 1e6, format = "f", digits = 2)
+          paste0(parts[[5]], "\n", parts[[2]], ":", start_mb, "-", end_mb, " Mb")
         }
         label_df$feature_label <- vapply(
           label_df$feature_label,

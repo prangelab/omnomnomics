@@ -82,6 +82,7 @@ def test_chromatin_plot_labels_are_readable_for_long_feature_and_sample_names():
     assert "ylim = c(0, y_lim * 1.25)" in chrom_de
     assert "box.padding = 0.6" in chrom_de
     assert 'compact_volcano_label <- function(label)' in chrom_de
+    assert '"-", end_mb, " Mb"' in chrom_de
 
 
 def test_peak_backed_chip_modes_use_filtered_peak_tree_downstream():
