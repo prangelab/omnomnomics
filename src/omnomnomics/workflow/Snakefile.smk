@@ -2106,30 +2106,6 @@ onsuccess:
             list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['wig_rule_num']-1]}/*.extra_8.tmp")
             for file in list_of_extra_files:
                 os.remove(file)
-        if 9 in themode:
-            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['mergewig_rule_num']-1]}/extra_9.tmp")
-            for file in list_of_extra_files:
-                os.remove(file)
-        if 10 in themode:
-            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['callpeaks_rule_num']-1]}/extra_10.tmp")
-            for file in list_of_extra_files:
-                os.remove(file)
-        if 11 in themode:
-            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['countreads_rule_num']-1]}/extra_11.tmp")
-            for file in list_of_extra_files:
-                os.remove(file)
-        if 13 in themode:
-            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['peakqc_rule_num']-1]}/extra_{master_config['peakqc_rule_num']}.tmp")
-            for file in list_of_extra_files:
-                os.remove(file)
-        if 14 in themode:
-            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['analyzepeaks_rule_num']-1]}/extra_{master_config['analyzepeaks_rule_num']}.tmp")
-            for file in list_of_extra_files:
-                os.remove(file)
-        if 16 in themode:
-            list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['analyzepeaksde_rule_num']-1]}/extra_{master_config['analyzepeaksde_rule_num']}.tmp")
-            for file in list_of_extra_files:
-                os.remove(file)
         if create_homer_tagdirs:
             list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['homer_tagdir_rule_num']-1]}/*.extra_{master_config['homer_tagdir_rule_num']}.tmp")
             for file in list_of_extra_files:

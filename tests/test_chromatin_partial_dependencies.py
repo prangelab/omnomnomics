@@ -114,3 +114,16 @@ def test_reruns_clear_pipeline_owned_de_result_directories():
     assert "unlink(contrast_dir, recursive = TRUE, force = TRUE)" in rna_template
     assert "unlink(contrast_dir, recursive = TRUE, force = TRUE)" in chrom_template
     assert "shutil.rmtree(analyze_de_root)" in post_de
+
+
+def test_aggregate_completion_markers_survive_successful_runs():
+    snakefile = (RULES_DIR.parent / "Snakefile.smk").read_text()
+    cleanup = snakefile.split("# Clean up tmp files for workflow", 1)[1].split(
+        "# Remove old BAM files with lane info", 1
+    )[0]
+
+    assert "extra_9.tmp" not in cleanup
+    assert "extra_10.tmp" not in cleanup
+    assert "extra_11.tmp" not in cleanup
+    assert "analyzepeaks_rule_num" not in cleanup
+    assert "analyzepeaksde_rule_num" not in cleanup

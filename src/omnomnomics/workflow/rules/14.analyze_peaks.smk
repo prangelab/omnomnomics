@@ -93,7 +93,7 @@ rule analyze_peaks:
 
         def write_tmp_file(outputfolder):
             shell(
-                f"""echo "necessity file for analyze peaks. can delete this." > {quote(os.path.join(outputfolder, f"extra_{master_config['analyzepeaks_rule_num']}.tmp"))}"""
+                f"""echo "completion marker for pre-DE peak analysis" > {quote(os.path.join(outputfolder, f"extra_{master_config['analyzepeaks_rule_num']}.tmp"))}"""
             )
 
         def require_tool(executable_name):
