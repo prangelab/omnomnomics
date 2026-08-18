@@ -27,6 +27,16 @@ def test_combined_summaries_keep_full_terms_outside_compact_plot_labels():
         assert "aes(x = term_plot, y = score, fill = source)" in source
 
 
+def test_de_enrichment_plots_wrap_terms_and_zero_padj_volcanoes_are_finite():
+    for template_name in ("de_core.R.tmpl", "de_core_chrom.R.tmpl"):
+        source = (TEMPLATES_DIR / template_name).read_text()
+        assert 'vdf$neglog10padj <- -log10(pmax(vdf$padj, 1e-300))' in source
+        assert "wrap_enrichment_axis_labels <- function(labels, width = 36)" in source
+        assert "dot_plot <- polish_enrichment_axis(dot_plot)" in source
+        assert "bar_plot <- polish_enrichment_axis(bar_plot)" in source
+        assert "ridge_plot <- polish_enrichment_axis(ridge_plot)" in source
+
+
 def test_post_de_profile_and_motif_renderers_use_bounded_labels():
     source = (RULES_DIR / "16.analyze_peaks_de.smk").read_text()
     assert "fig.savefig(profile_path)" in source

@@ -761,6 +761,23 @@ deduplicate_ranked_vector <- function(gene_stats) {
   sort(collapsed, decreasing = TRUE)
 }
 
+wrap_enrichment_axis_labels <- function(labels, width = 36) {
+  vapply(
+    gsub("_", " ", as.character(labels), fixed = TRUE),
+    function(label) paste(strwrap(label, width = width), collapse = "\n"),
+    character(1)
+  )
+}
+
+polish_enrichment_axis <- function(plot_obj) {
+  if (is.null(plot_obj)) {
+    return(NULL)
+  }
+  plot_obj +
+    ggplot2::scale_y_discrete(labels = wrap_enrichment_axis_labels) +
+    ggplot2::theme(axis.text.y = ggplot2::element_text(size = 8, lineheight = 0.9))
+}
+
 save_enrichment_plot <- function(plot_obj, out_path, width = 11, height = 8) {
   if (is.null(plot_obj)) {
     return(FALSE)
@@ -2727,7 +2744,7 @@ for (contrast_cfg in contrast_plan) {
     vdf <- res_df
     vdf$padj[is.na(vdf$padj)] <- 1
     vdf$log2FoldChange[is.na(vdf$log2FoldChange)] <- 0
-    vdf$neglog10padj <- -log10(vdf$padj)
+    vdf$neglog10padj <- -log10(pmax(vdf$padj, 1e-300))
     vdf$is_sig <- vdf$padj < alpha & abs(vdf$log2FoldChange) >= lfc_for_sig
     if (volcano_auto_axes) {
       x_lim <- max(abs(vdf$log2FoldChange), na.rm = TRUE) * 1.05
@@ -2959,9 +2976,11 @@ for (contrast_cfg in contrast_plan) {
           ggplot2::labs(subtitle = direction_caption),
         error = function(e) NULL
       )
+      dot_plot <- polish_enrichment_axis(dot_plot)
       save_enrichment_plot(
         dot_plot,
-        file.path(output_dir, paste0(contrast_label, ".", set_name, ".", direction_label, ".dotplot.ORA.pdf"))
+        file.path(output_dir, paste0(contrast_label, ".", set_name, ".", direction_label, ".dotplot.ORA.pdf")),
+        height = 10
       )
       bar_plot <- tryCatch(
         clusterProfiler::barplot(ora_obj, showCategory = enrichment_top_terms) +
@@ -2969,9 +2988,11 @@ for (contrast_cfg in contrast_plan) {
           ggplot2::labs(subtitle = direction_caption),
         error = function(e) NULL
       )
+      bar_plot <- polish_enrichment_axis(bar_plot)
       save_enrichment_plot(
         bar_plot,
-        file.path(output_dir, paste0(contrast_label, ".", set_name, ".", direction_label, ".barplot.ORA.pdf"))
+        file.path(output_dir, paste0(contrast_label, ".", set_name, ".", direction_label, ".barplot.ORA.pdf")),
+        height = 10
       )
       enrichment_rows[[length(enrichment_rows) + 1]] <<- data.frame(
         contrast = contrast_label,
@@ -3027,9 +3048,11 @@ for (contrast_cfg in contrast_plan) {
           ggplot2::labs(subtitle = direction_caption),
         error = function(e) NULL
       )
+      dot_plot <- polish_enrichment_axis(dot_plot)
       save_enrichment_plot(
         dot_plot,
-        file.path(output_dir, paste0(contrast_label, ".", set_name, ".dotplot.GSEA.pdf"))
+        file.path(output_dir, paste0(contrast_label, ".", set_name, ".dotplot.GSEA.pdf")),
+        height = 10
       )
       ridge_plot <- tryCatch(
         enrichplot::ridgeplot(gsea_obj, showCategory = enrichment_top_terms) +
@@ -3037,9 +3060,11 @@ for (contrast_cfg in contrast_plan) {
           ggplot2::labs(subtitle = direction_caption),
         error = function(e) NULL
       )
+      ridge_plot <- polish_enrichment_axis(ridge_plot)
       save_enrichment_plot(
         ridge_plot,
-        file.path(output_dir, paste0(contrast_label, ".", set_name, ".ridgeplot.GSEA.pdf"))
+        file.path(output_dir, paste0(contrast_label, ".", set_name, ".ridgeplot.GSEA.pdf")),
+        height = 10
       )
       top_ids <- head(as.character(gsea_tbl$ID), min(10, nrow(gsea_tbl)))
       if (length(top_ids) > 0) {
