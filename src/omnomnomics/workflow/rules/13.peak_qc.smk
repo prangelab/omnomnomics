@@ -42,7 +42,8 @@ rule peak_qc:
         peak_qc_input
     output:
         extra=f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num'] - 1]}/extra_{master_config['peakqc_rule_num']}.tmp",
-        union_annotation=f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num'] - 1]}/peak_qc/peak_annotations/{config['THETYPE'].lower()}.all_groups.merged_peaks.annotated.bed"
+        union_annotation=f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num'] - 1]}/peak_qc/peak_annotations/{config['THETYPE'].lower()}.all_groups.merged_peaks.annotated.bed",
+        metrics=f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num'] - 1]}/peak_qc/{config['THETYPE'].lower()}.peak_qc_metrics.tsv"
     params:
         thetype=config["THETYPE"],
         broad_mode=str(config.get("BROAD_MODE", "off")).strip().lower(),

@@ -31,6 +31,15 @@ def test_non_peak_chromatin_de_waits_for_pre_de_completion_marker():
     assert "return _chrom_de_peak_metadata_file()" not in dependency_block
 
 
+def test_chromatin_de_waits_for_peak_qc_metrics_consumed_by_qc_plots():
+    peak_qc = (RULES_DIR / "13.peak_qc.smk").read_text()
+    chrom_de = (RULES_DIR / "15.call_DE_chrom.smk").read_text()
+
+    assert 'metrics=f"{experiment_dir}/' in peak_qc
+    assert "peak_qc/{config['THETYPE'].lower()}.peak_qc_metrics.tsv" in peak_qc
+    assert "peak_qc_metrics=chrom_de_peak_qc_metrics_file" in chrom_de
+
+
 def test_genebody_feature_builder_uses_transcript_aware_gene_spans():
     source = (RULES_DIR / "10.call_peaks.smk").read_text()
     builder = source.split("def build_chip_genebody_feature_sets", 1)[1].split(

@@ -255,6 +255,16 @@ def _chrom_de_peak_annotation_file():
 chrom_de_peak_annotation_file = _chrom_de_peak_annotation_file()
 
 
+def _chrom_de_peak_qc_metrics_file():
+    return (
+        f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num']-1]}"
+        f"/peak_qc/{config['THETYPE'].lower()}.peak_qc_metrics.tsv"
+    )
+
+
+chrom_de_peak_qc_metrics_file = _chrom_de_peak_qc_metrics_file()
+
+
 def _write_peak_metadata_from_annotation(annotation_bed, output_path):
     expected = {
         "#chrom",
@@ -321,7 +331,8 @@ rule call_DE_chrom:
             if config['THETYPE'] in {"ATAC", "CHIP"}
             else []
         ),
-        peak_metadata_dependency=chrom_de_peak_metadata_dependency
+        peak_metadata_dependency=chrom_de_peak_metadata_dependency,
+        peak_qc_metrics=chrom_de_peak_qc_metrics_file
     output:
         results_zip=f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num']-1]}/{os.path.basename(config['EXPERIMENT_DIR'])}.chrom.results.zip",
         peak_metadata=f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num']-1]}/peak_metadata.tsv"
