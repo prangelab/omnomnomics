@@ -561,13 +561,14 @@ rule peak_qc:
                     f"> {quote(multicov_output)}"
                 )
 
-                peak_count = 0
+                peak_count = len(load_peak_records(peak_bed))
+                merged_interval_count = 0
                 total_peak_bp = 0
                 reads_in_peaks = 0
                 with open(multicov_output, newline="") as handle:
                     reader = csv.reader(handle, delimiter="\t")
                     for row in reader:
-                        peak_count += 1
+                        merged_interval_count += 1
                         total_peak_bp += int(row[2]) - int(row[1])
                         reads_in_peaks += sum(int(value) for value in row[3:])
 
@@ -579,6 +580,7 @@ rule peak_qc:
             frip = (reads_in_peaks / total_aligned_reads) if total_aligned_reads else 0.0
             return {
                 "peak_count": peak_count,
+                "merged_interval_count": merged_interval_count,
                 "total_peak_bp": total_peak_bp,
                 "reads_in_peaks": reads_in_peaks,
                 "total_aligned_reads": total_aligned_reads,
@@ -621,13 +623,14 @@ rule peak_qc:
                     f"> {quote(multicov_output)}"
                 )
 
-                peak_count = 0
+                peak_count = len(load_peak_records(peak_bed))
+                merged_interval_count = 0
                 total_peak_bp = 0
                 reads_by_sample = [0 for _ in frip_inputs]
                 with open(multicov_output, newline="") as handle:
                     reader = csv.reader(handle, delimiter="\t")
                     for row in reader:
-                        peak_count += 1
+                        merged_interval_count += 1
                         total_peak_bp += int(row[2]) - int(row[1])
                         for idx, value in enumerate(row[3:]):
                             reads_by_sample[idx] += int(value)
@@ -642,6 +645,7 @@ rule peak_qc:
                         "sample": entry["sample_name"],
                         "bam_file": entry["bam_file"],
                         "peak_count": peak_count,
+                        "merged_interval_count": merged_interval_count,
                         "total_peak_bp": total_peak_bp,
                         "reads_in_peaks": reads_in_peaks,
                         "total_aligned_reads": total_aligned_reads,
@@ -670,6 +674,7 @@ rule peak_qc:
                     "sample",
                     "bam_file",
                     "peak_count",
+                    "merged_interval_count",
                     "total_peak_bp",
                     "reads_in_peaks",
                     "total_aligned_reads",
@@ -688,6 +693,7 @@ rule peak_qc:
                         row["sample"],
                         row["bam_file"],
                         row["peak_count"],
+                        row["merged_interval_count"],
                         row["total_peak_bp"],
                         row["reads_in_peaks"],
                         row["total_aligned_reads"],
@@ -882,6 +888,7 @@ rule peak_qc:
                     "peak_file",
                     "bam_count",
                     "peak_count",
+                    "merged_interval_count",
                     "total_peak_bp",
                     "reads_in_peaks",
                     "total_aligned_reads",
@@ -899,6 +906,7 @@ rule peak_qc:
                         row["peak_file"],
                         row["bam_count"],
                         row["peak_count"],
+                        row["merged_interval_count"],
                         row["total_peak_bp"],
                         row["reads_in_peaks"],
                         row["total_aligned_reads"],

@@ -79,3 +79,11 @@ def test_library_complexity_prefers_pre_deduplication_bams():
     assert 'complexity_bam_stage = "merged_pre_dedup"' in peak_qc
     assert 'complexity_bam_stage = "filtered_fallback"' in peak_qc
     assert 'calculate_library_complexity_metrics(complexity_bam_path)' in peak_qc
+
+
+def test_peak_qc_reports_input_features_separately_from_merged_intervals():
+    peak_qc = (RULES_DIR / "13.peak_qc.smk").read_text()
+
+    assert peak_qc.count("peak_count = len(load_peak_records(peak_bed))") == 2
+    assert '"merged_interval_count": merged_interval_count' in peak_qc
+    assert peak_qc.count('"merged_interval_count",') >= 2
