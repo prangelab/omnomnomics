@@ -623,6 +623,27 @@ utils::write.table(
 all_gene_ids <- rownames(dds)
 all_gene_ids_no_version <- strip_ensembl_version(all_gene_ids)
 all_gene_symbols <- map_gene_symbols(all_gene_ids, fallback_to_ids = FALSE)
+
+first_metadata_symbol <- function(value) {
+  value <- as.character(value)
+  if (is.na(value) || !nzchar(value) || identical(value, "NA")) {
+    return(NA_character_)
+  }
+  candidates <- trimws(unlist(strsplit(value, "[|,;]", perl = TRUE)))
+  candidates <- candidates[
+    nzchar(candidates) &
+      candidates != "NA" &
+      !grepl("^ENS(?:MUSG|G)[0-9]+$", strip_ensembl_version(candidates))
+  ]
+  if (!length(candidates)) NA_character_ else candidates[[1]]
+}
+
+if (!is.null(peak_data) && "assigned_genes" %in% colnames(peak_data)) {
+  metadata_symbols <- vapply(peak_data$assigned_genes, first_metadata_symbol, character(1))
+  missing_symbols <- is.na(all_gene_symbols) | !nzchar(all_gene_symbols)
+  use_metadata <- missing_symbols & !is.na(metadata_symbols) & nzchar(metadata_symbols)
+  all_gene_symbols[use_metadata] <- metadata_symbols[use_metadata]
+}
 symbol_lookup <- stats::setNames(all_gene_symbols, all_gene_ids)
 symbol_lookup_no_version <- stats::setNames(all_gene_symbols, all_gene_ids_no_version)
 
@@ -2608,7 +2629,7 @@ for (contrast_cfg in contrast_plan) {
     enrich_df$linked_gene_symbol <- nearest_symbol
     enrich_df$link_mode <- "nearest"
     promoter_like <- enrich_df$peak_region %in% c("promoter")
-    gene_body_like <- enrich_df$peak_region %in% c("exon", "intron")
+    gene_body_like <- enrich_df$peak_region %in% c("exon", "intron", "gene_body")
     enrich_df$linked_gene_symbol[promoter_like] <- assigned_symbol[promoter_like]
     enrich_df$link_mode[promoter_like] <- "promoter_assigned"
     enrich_df$linked_gene_symbol[gene_body_like & !is.na(assigned_symbol)] <- assigned_symbol[gene_body_like & !is.na(assigned_symbol)]
@@ -2752,18 +2773,25 @@ for (contrast_cfg in contrast_plan) {
           compact_volcano_label,
           character(1)
         )
+        label_data_y <- max(label_df$neglog10padj[is.finite(label_df$neglog10padj)], na.rm = TRUE)
+        label_y_lim <- max(y_lim * 1.35, label_data_y * 1.35, 1)
         p_labels <- p +
-          ggplot2::coord_cartesian(xlim = c(-x_lim, x_lim), ylim = c(0, y_lim * 1.25)) +
+          ggplot2::coord_cartesian(
+            xlim = c(-x_lim, x_lim),
+            ylim = c(0, label_y_lim),
+            clip = "off"
+          ) +
           ggrepel::geom_text_repel(
-          data = label_df,
-          ggplot2::aes(label = feature_label),
-          size = 2.7,
-          box.padding = 0.6,
-          point.padding = 0.25,
-          min.segment.length = 0,
-          max.overlaps = max_volcano_labels,
-          seed = 1
-        )
+            data = label_df,
+            ggplot2::aes(label = feature_label),
+            size = 2.7,
+            box.padding = 0.6,
+            point.padding = 0.25,
+            min.segment.length = 0,
+            max.overlaps = max_volcano_labels,
+            seed = 1
+          ) +
+          ggplot2::theme(plot.margin = ggplot2::margin(t = 18, r = 12, b = 8, l = 8))
         ggplot2::ggsave(file.path(contrast_dir, paste0(contrast_label, ".volcano_plot_labels.pdf")), p_labels, width = 10, height = 7)
       }
     }
@@ -2892,7 +2920,7 @@ for (contrast_cfg in contrast_plan) {
     split_sets <- list(
       promoter = subset(enrich_df, peak_region %in% c("promoter")),
       distal = subset(enrich_df, peak_region %in% c("intergenic")),
-      gene_body = subset(enrich_df, peak_region %in% c("exon", "intron"))
+      gene_body = subset(enrich_df, peak_region %in% c("exon", "intron", "gene_body"))
     )
 
     run_ora_term2gene <- function(gene_symbols, term2gene_tbl, set_name, direction_label, universe_symbols, output_dir = cp_dir, split_name = "all") {
@@ -3094,7 +3122,7 @@ for (contrast_cfg in contrast_plan) {
     split_sets_cm <- list(
       promoter = subset(enrich_df, peak_region %in% c("promoter")),
       distal = subset(enrich_df, peak_region %in% c("intergenic")),
-      gene_body = subset(enrich_df, peak_region %in% c("exon", "intron"))
+      gene_body = subset(enrich_df, peak_region %in% c("exon", "intron", "gene_body"))
     )
     for (split_name in names(split_sets_cm)) {
       split_df <- split_sets_cm[[split_name]]

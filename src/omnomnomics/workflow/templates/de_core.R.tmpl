@@ -2127,12 +2127,21 @@ for (contrast_cfg in contrast_plan) {
       label_df <- label_df[!is.na(label_df$gene_symbol) & nzchar(label_df$gene_symbol), , drop = FALSE]
       label_df <- head(label_df, max_volcano_labels)
       if (nrow(label_df) > 0) {
-        p_labels <- p + ggrepel::geom_text_repel(
-          data = label_df,
-          ggplot2::aes(label = gene_symbol),
-          size = 3,
-          max.overlaps = max_volcano_labels
-        )
+        label_data_y <- max(label_df$neglog10padj[is.finite(label_df$neglog10padj)], na.rm = TRUE)
+        label_y_lim <- max(y_lim * 1.35, label_data_y * 1.35, 1)
+        p_labels <- p +
+          ggplot2::coord_cartesian(
+            xlim = c(-x_lim, x_lim),
+            ylim = c(0, label_y_lim),
+            clip = "off"
+          ) +
+          ggrepel::geom_text_repel(
+            data = label_df,
+            ggplot2::aes(label = gene_symbol),
+            size = 3,
+            max.overlaps = max_volcano_labels
+          ) +
+          ggplot2::theme(plot.margin = ggplot2::margin(t = 18, r = 12, b = 8, l = 8))
         ggplot2::ggsave(file.path(contrast_dir, paste0(contrast_label, ".volcano_plot_labels.pdf")), p_labels, width = 10, height = 7)
       }
     }

@@ -910,7 +910,7 @@ rule peak_qc:
                     ])
             return qc_table
 
-        def write_peak_qc_summary_pdf(outputfolder, thetype, sample_rows, peak_rows, sample_frip_rows):
+        def write_peak_qc_summary_pdf(outputfolder, thetype, broad_mode, sample_rows, peak_rows, sample_frip_rows):
             if not sample_rows and not peak_rows and not sample_frip_rows:
                 return
 
@@ -923,6 +923,12 @@ rule peak_qc:
 
             qc_dir = ensure_peak_qc_dir(outputfolder)
             pdf_path = os.path.join(qc_dir, f"{thetype.lower()}.peak_qc_summary.pdf")
+            feature_terms = {
+                "genebody": ("gene-body", "Gene bodies"),
+                "domain": ("domain", "Domains"),
+                "diffuse": ("bin", "Bins"),
+            }
+            feature_term, feature_term_plural = feature_terms.get(broad_mode, ("peak", "Peaks"))
 
             plt.style.use("seaborn-v0_8-whitegrid")
             with PdfPages(pdf_path) as pdf:
@@ -932,12 +938,12 @@ rule peak_qc:
                     peak_counts = [float(row["peak_count"]) for row in peak_rows]
                     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
                     axes[0].bar(peak_labels, frip_values, color="#4C78A8")
-                    axes[0].set_title(f"{thetype} peak QC: FRiP")
+                    axes[0].set_title(f"{thetype} {feature_term} QC: FRiP")
                     axes[0].set_ylabel("FRiP")
                     axes[0].tick_params(axis="x", rotation=45, labelsize=9)
                     axes[1].bar(peak_labels, peak_counts, color="#D95F02")
-                    axes[1].set_title(f"{thetype} peak QC: peak count")
-                    axes[1].set_ylabel("Peaks")
+                    axes[1].set_title(f"{thetype} {feature_term} QC: {feature_term} count")
+                    axes[1].set_ylabel(feature_term_plural)
                     axes[1].tick_params(axis="x", rotation=45, labelsize=9)
                     fig.tight_layout()
                     pdf.savefig(fig, bbox_inches="tight")
@@ -956,7 +962,7 @@ rule peak_qc:
                         frip_values = [float(row["frip"]) for row in plot_rows]
                         fig, ax = plt.subplots(1, 1, figsize=(max(8, len(sample_labels) * 0.55), 5))
                         ax.bar(sample_labels, frip_values, color="#4C78A8")
-                        ax.set_title(f"{thetype} sample FRiP: {group} / {peak_set}")
+                        ax.set_title(f"{thetype} {feature_term} sample FRiP: {group} / {peak_set}")
                         ax.set_ylabel("FRiP")
                         ax.set_xlabel("Sample")
                         ax.tick_params(axis="x", rotation=45, labelsize=9)
@@ -1107,15 +1113,21 @@ rule peak_qc:
                         if not os.path.exists(peak_bed):
                             continue
                         metrics = calculate_peak_qc_metrics(peak_bed, bams)
+                        peak_set_name = os.path.basename(peak_bed).replace(".bed", "")
+                        if params.broad_mode == "genebody":
+                            peak_set_name = f"{group}.gene_bodies"
+                        elif params.broad_mode == "domain":
+                            peak_set_name = f"{group}.domains"
+                        elif params.broad_mode == "diffuse":
+                            peak_set_name = f"{group}.bins"
                         peak_qc_rows.append({
                             "assay": assay,
                             "group": group,
-                            "peak_set": os.path.basename(peak_bed).replace(".bed", ""),
+                            "peak_set": peak_set_name,
                             "peak_file": os.path.basename(peak_bed),
                             "bam_count": len(bams),
                             **metrics,
                         })
-                        peak_set_name = os.path.basename(peak_bed).replace(".bed", "")
                         for sample_frip in calculate_sample_frip_metrics(peak_bed, sample_bams):
                             sample_frip_rows.append({
                                 "assay": assay,
@@ -1198,7 +1210,14 @@ rule peak_qc:
                     logfile,
                     "Peak genomic distribution summaries:\n" + "\n".join(generated_distribution_files),
                 )
-            write_peak_qc_summary_pdf(params.outputfolder, assay, sample_qc_rows, peak_qc_rows, sample_frip_rows)
+            write_peak_qc_summary_pdf(
+                params.outputfolder,
+                assay,
+                params.broad_mode,
+                sample_qc_rows,
+                peak_qc_rows,
+                sample_frip_rows,
+            )
             write_tmp_file(params.outputfolder)
             finish_step_sample(master_config["peakqc_rule_num"], "aggregate", "peak_qc", tracking["start_time"], "OK")
         except Exception:

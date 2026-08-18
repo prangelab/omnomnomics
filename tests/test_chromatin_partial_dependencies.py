@@ -79,10 +79,28 @@ def test_chromatin_plot_labels_are_readable_for_long_feature_and_sample_names():
     assert "def render_scaled_genebody_profile" in pre_de
     assert 'ax.set_xticklabels(["-1 kb", "TSS", "TES", "+1 kb"])' in pre_de
     assert 're.sub(r"_(rep[0-9]+)$", r"\\n\\1", label)' in post_de
-    assert "ylim = c(0, y_lim * 1.25)" in chrom_de
+    assert "label_y_lim <- max(y_lim * 1.35, label_data_y * 1.35, 1)" in chrom_de
+    assert 'clip = "off"' in chrom_de
     assert "box.padding = 0.6" in chrom_de
     assert 'compact_volcano_label <- function(label)' in chrom_de
     assert '"-", end_mb, " Mb"' in chrom_de
+
+
+def test_genebody_enrichment_uses_annotation_symbols_and_gene_body_split():
+    chrom_de = (RULES_DIR.parent / "templates" / "de_core_chrom.R.tmpl").read_text()
+
+    assert '"assigned_genes" %in% colnames(peak_data)' in chrom_de
+    assert "all_gene_symbols[use_metadata] <- metadata_symbols[use_metadata]" in chrom_de
+    assert chrom_de.count('peak_region %in% c("exon", "intron", "gene_body")') == 3
+
+
+def test_non_peak_chip_qc_uses_mode_specific_display_terms():
+    peak_qc = (RULES_DIR / "13.peak_qc.smk").read_text()
+
+    assert '"genebody": ("gene-body", "Gene bodies")' in peak_qc
+    assert 'peak_set_name = f"{group}.gene_bodies"' in peak_qc
+    assert 'peak_set_name = f"{group}.domains"' in peak_qc
+    assert 'peak_set_name = f"{group}.bins"' in peak_qc
 
 
 def test_peak_backed_chip_modes_use_filtered_peak_tree_downstream():
