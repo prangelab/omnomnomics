@@ -1280,27 +1280,32 @@ def metadata_required_for_mode(mode_steps):
 
 
 def validate_metadata_sample_roots(derived_rows, expected_sample_roots):
-    expected_roots = sorted(expected_sample_roots)
-    metadata_sample_ids = sorted(
-        {
-            row.get("sample_id", "").strip()
-            for row in derived_rows
-            if row.get("sample_id", "").strip()
-        }
-    )
+    expected_roots = set(expected_sample_roots)
+    metadata_sample_ids = {
+        row.get("sample_id", "").strip()
+        for row in derived_rows
+        if row.get("sample_id", "").strip()
+    }
     if expected_roots == metadata_sample_ids:
         return
 
-    metadata_roots = []
+    metadata_roots = set()
     for row in derived_rows:
         filename_key = row.get("filename_key", "").strip()
         if filename_key:
-            metadata_roots.append(filename_key)
+            metadata_roots.add(filename_key)
             continue
-        metadata_roots.append(normalize_metadata_filename(row["filename"]))
-    metadata_roots = sorted(metadata_roots)
-    missing = sorted(set(expected_roots) - set(metadata_roots))
-    extra = sorted(set(metadata_roots) - set(expected_roots))
+        metadata_roots.add(normalize_metadata_filename(row["filename"]))
+    if expected_roots == metadata_roots:
+        return
+
+    missing = sorted(expected_roots - metadata_sample_ids - metadata_roots)
+    extra = sorted(
+        row.get("filename_key", "").strip() or normalize_metadata_filename(row["filename"])
+        for row in derived_rows
+        if row.get("sample_id", "").strip() not in expected_roots
+        and (row.get("filename_key", "").strip() or normalize_metadata_filename(row["filename"])) not in expected_roots
+    )
     if missing or extra:
         problems = []
         if missing:
