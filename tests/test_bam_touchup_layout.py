@@ -9,8 +9,11 @@ def test_touchup_uses_layout_specific_samtools_pipeline():
     source = RULE.read_text()
 
     assert "paired=config['PAIRED']" in source
+    assert "mem_mb=lambda wildcards, input: touchup_memory_mb(input.bamfile)" in source
+    assert "bam_size_mb * 5" in source
     assert "stage_count = 5 if paired else 3" in source
     assert "stage_threads = max(1, min(8, samcores // stage_count))" in source
+    assert 'markdup_args = "--no-multi-dup -ru"' in source
     assert "if paired:" in source
     assert "samtools collate -O" in source
     assert "samtools fixmate -mu" in source

@@ -12,6 +12,17 @@ import shutil
 import subprocess
 import tempfile
 
+
+def touchup_memory_mb(input_bam):
+    base_memory = Memory_Per_Rule['5']
+    node_memory = master_config['cores_per_node'] * master_config['max_mem_per_core_mb']
+    try:
+        bam_size_mb = os.path.getsize(str(input_bam)) / (1024 * 1024)
+    except OSError:
+        return base_memory
+    return min(node_memory, max(base_memory, int(bam_size_mb * 5)))
+
+
 rule touchup_bam:
     input:
         bamfile=f"{experiment_dir}/{master_config['input_folders'][master_config['touchup_rule_num']-1]}/{{sample5}}.bam",
@@ -28,7 +39,7 @@ rule touchup_bam:
     threads:
         Threads_Per_Rule['5']
     resources:
-        mem_mb = Memory_Per_Rule['5'],
+        mem_mb=lambda wildcards, input: touchup_memory_mb(input.bamfile),
         partition = master_config['partition'],
         runtime = Runtime_Per_Rule['5']
     run:
@@ -63,7 +74,7 @@ rule touchup_bam:
                 local_extra = os.path.join(local_workdir, f"{sample}.extra_5.tmp")
                 min_mapq = 15 if thetype == "RNA" else 30
                 filter_flags = 2820
-                markdup_args = "-ru" if duplicate_handling == "remove" else "-u"
+                markdup_args = "--no-multi-dup -ru" if duplicate_handling == "remove" else "--no-multi-dup -u"
                 stage_count = 5 if paired else 3
                 stage_threads = max(1, min(8, samcores // stage_count))
                 layout = "paired" if paired else "single"
