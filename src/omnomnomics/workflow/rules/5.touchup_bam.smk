@@ -21,6 +21,7 @@ rule touchup_bam:
         f"{experiment_dir}/{master_config['output_folders'][master_config['touchup_rule_num']-1]}/{{sample5}}.extra_5.tmp"
     params:
         thetype=config['THETYPE'],
+        paired=config['PAIRED'],
         duplicate_handling=config['DUPLICATE_HANDLING'],
         inputfolder = f"{experiment_dir}/{master_config['input_folders'][master_config['touchup_rule_num']-1]}",
         outputfolder = f"{experiment_dir}/{master_config['output_folders'][master_config['touchup_rule_num']-1]}"
@@ -40,7 +41,7 @@ rule touchup_bam:
 
         sanity_check_dir(logfile, params.inputfolder, master_config['input_file_types'][master_config['touchup_rule_num']-1])
 
-        def touchup_bam_file(input_file, samcores, thetype, duplicate_handling, sample, outputfolder):
+        def touchup_bam_file(input_file, samcores, thetype, paired, duplicate_handling, sample, outputfolder):
             tracking = begin_step_sample(master_config['touchup_rule_num'], sample, "touchup_bam")
             tmpdir_root = os.environ.get("TMPDIR")
             local_workdir = tempfile.mkdtemp(prefix=f"{sample}.", dir=tmpdir_root if tmpdir_root else None)
@@ -63,33 +64,29 @@ rule touchup_bam:
                 min_mapq = 15 if thetype == "RNA" else 30
                 filter_flags = 2820
                 markdup_args = "-ru" if duplicate_handling == "remove" else "-u"
+                stage_count = 5 if paired else 3
+                stage_threads = max(1, min(8, samcores // stage_count))
+                layout = "paired" if paired else "single"
+                record_step_note(
+                    master_config['touchup_rule_num'],
+                    sample,
+                    f"running_{thetype.lower()}_touchup layout={layout} duplicate_handling={duplicate_handling} "
+                    f"mapq={min_mapq} stage_threads={stage_threads}",
+                )
 
-                if thetype == "RNA":
-                    record_step_note(master_config['touchup_rule_num'], sample, f"running_rna_touchup duplicate_handling={duplicate_handling} mapq={min_mapq}")
+                if paired:
                     command = f"""
-                        samtools collate -O -@ {samcores} {quote(local_input)} {quote(os.path.join(local_workdir, f'collate.{sample}.tmp'))} | \
-                        samtools fixmate -mu -@ {samcores} - - | \
-                        samtools sort -u -@ {samcores} - | \
-                        samtools markdup {markdup_args} -@ {samcores} - - | \
-                        samtools view -@ {samcores} -q {min_mapq} -F {filter_flags} -b -o {quote(local_output)} -
-                    """
-                elif thetype == "ATAC":
-                    record_step_note(master_config['touchup_rule_num'], sample, f"running_atac_touchup duplicate_handling={duplicate_handling} mapq={min_mapq}")
-                    command = f"""
-                        samtools collate -O -@ {samcores} {quote(local_input)} {quote(os.path.join(local_workdir, f'collate.{sample}.tmp'))} | \
-                        samtools fixmate -mu -@ {samcores} - - | \
-                        samtools sort -u -@ {samcores} - | \
-                        samtools markdup {markdup_args} -@ {samcores} - - | \
-                        samtools view -@ {samcores} -q {min_mapq} -F {filter_flags} -b -o {quote(local_output)} -
+                        samtools collate -O -@ {stage_threads} {quote(local_input)} {quote(os.path.join(local_workdir, f'collate.{sample}.tmp'))} | \
+                        samtools fixmate -mu -@ {stage_threads} - - | \
+                        samtools sort -u -@ {stage_threads} - | \
+                        samtools markdup {markdup_args} -@ {stage_threads} - - | \
+                        samtools view -@ {stage_threads} -q {min_mapq} -F {filter_flags} -b -o {quote(local_output)} -
                     """
                 else:
-                    record_step_note(master_config['touchup_rule_num'], sample, f"running_chip_touchup duplicate_handling={duplicate_handling} mapq={min_mapq}")
                     command = f"""
-                        samtools collate -O -@ {samcores} {quote(local_input)} {quote(os.path.join(local_workdir, f'collate.{sample}.tmp'))} | \
-                        samtools fixmate -mu -@ {samcores} - - | \
-                        samtools sort -u -@ {samcores} - | \
-                        samtools markdup {markdup_args} -@ {samcores} - - | \
-                        samtools view -@ {samcores} -q {min_mapq} -F {filter_flags} -b -o {quote(local_output)} -
+                        samtools sort -u -@ {stage_threads} {quote(local_input)} | \
+                        samtools markdup {markdup_args} -@ {stage_threads} - - | \
+                        samtools view -@ {stage_threads} -q {min_mapq} -F {filter_flags} -b -o {quote(local_output)} -
                     """
 
                 command = " ".join(command.split())
@@ -129,4 +126,12 @@ rule touchup_bam:
             finally:
                 shutil.rmtree(local_workdir, ignore_errors=True)
         samcores = threads
-        touchup_bam_file(input.bamfile, samcores, params.thetype, params.duplicate_handling, wildcards.sample5, params.outputfolder)
+        touchup_bam_file(
+            input.bamfile,
+            samcores,
+            params.thetype,
+            params.paired,
+            params.duplicate_handling,
+            wildcards.sample5,
+            params.outputfolder,
+        )
