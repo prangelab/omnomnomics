@@ -17,6 +17,7 @@ metadata_path <- __METADATA_PATH__
 output_root <- __OUTPUT_ROOT__
 qc_dir <- __QC_DIR__
 de_dir <- __DE_DIR__
+genome_version <- __GENOME_VERSION__
 
 design_formula_text <- __DESIGN_FORMULA_TEXT__
 contrast_mode <- __CONTRAST_MODE__
@@ -329,10 +330,19 @@ map_gene_symbols <- function(gene_ids, fallback_to_ids = TRUE) {
   ids_no_version <- strip_ensembl_version(gene_ids)
   symbols <- rep(NA_character_, length(ids_no_version))
 
+  is_ensembl_gene <- grepl("^ENS(?:MUSG|G)[0-9]+$", ids_no_version)
+  is_other_accession <- grepl(
+    "^(ENS(MUST|T)|N[MR]_|X[MR]_|[0-9]+$)",
+    gene_ids
+  )
+  is_symbol_like <- !is_ensembl_gene & !is_other_accession &
+    grepl("^[[:alnum:]][[:alnum:]_.-]*$", gene_ids)
+  symbols[is_symbol_like] <- gene_ids[is_symbol_like]
+
   has_annotationdbi <- requireNamespace("AnnotationDbi", quietly = TRUE)
   if (has_annotationdbi) {
-    is_human <- grepl("^ENSG", ids_no_version)
-    is_mouse <- grepl("^ENSMUSG", ids_no_version)
+    is_human <- grepl("^ENSG[0-9]+$", ids_no_version)
+    is_mouse <- grepl("^ENSMUSG[0-9]+$", ids_no_version)
 
     if (any(is_human) && requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
       mapped <- tryCatch(
@@ -568,6 +578,29 @@ detect_species_from_gene_ids <- function(gene_ids) {
     ))
   }
   list(species_label = "unknown", msig_species = NULL, orgdb = NULL)
+}
+
+detect_species_from_context <- function(gene_ids, genome = NA_character_) {
+  genome_norm <- tolower(as.character(genome))
+  genome_norm <- genome_norm[!is.na(genome_norm) & nzchar(genome_norm)]
+  if (length(genome_norm) > 0) {
+    genome_norm <- genome_norm[[1]]
+    if (grepl("^(grch|hg|human|homo)", genome_norm)) {
+      return(list(
+        species_label = "human",
+        msig_species = "Homo sapiens",
+        orgdb = if (requireNamespace("org.Hs.eg.db", quietly = TRUE)) org.Hs.eg.db::org.Hs.eg.db else NULL
+      ))
+    }
+    if (grepl("^(grcm|mm|mouse|mus)", genome_norm)) {
+      return(list(
+        species_label = "mouse",
+        msig_species = "Mus musculus",
+        orgdb = if (requireNamespace("org.Mm.eg.db", quietly = TRUE)) org.Mm.eg.db::org.Mm.eg.db else NULL
+      ))
+    }
+  }
+  detect_species_from_gene_ids(gene_ids)
 }
 
 is_valid_symbol <- function(x) {
@@ -865,13 +898,13 @@ if (enrichment_enabled && decoupler_enabled && !decoupler_available) {
   message("Decoupler enrichment requested but decoupleR is not available. Skipping decoupler outputs.")
 }
 
-species_info <- detect_species_from_gene_ids(rownames(dds))
+species_info <- detect_species_from_context(rownames(dds), genome_version)
 msig_term2gene <- list()
 if (cp_available && enrichment_enabled && enrichment_cp_enabled) {
   if (!requireNamespace("msigdbr", quietly = TRUE)) {
     message("MSigDB enrichment requested but msigdbr is not available. MSigDB enrichment will be skipped.")
   } else if (is.null(species_info$msig_species)) {
-    message("MSigDB enrichment requested but species detection failed from gene identifiers. MSigDB enrichment will be skipped.")
+    message("MSigDB enrichment requested but species detection failed from genome/gene context. genome_version=", genome_version, ". MSigDB enrichment will be skipped.")
   } else if (!is.list(enrichment_msigdb_sets) || length(enrichment_msigdb_sets) == 0) {
     message("No MSigDB sets configured for clusterProfiler enrichment. Skipping clusterProfiler enrichment.")
   } else {

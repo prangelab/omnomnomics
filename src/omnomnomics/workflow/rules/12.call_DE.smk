@@ -354,6 +354,7 @@ rule call_DE:
                     "__OUTPUT_ROOT__": _r_string(params.outputfolder),
                     "__QC_DIR__": _r_string(qc_dir),
                     "__DE_DIR__": _r_string(de_dir),
+                    "__GENOME_VERSION__": _r_string(str(master_config.get("GENOME_VERSION", "") or config.get("THEGENOME", ""))),
                     "__DESIGN_FORMULA_TEXT__": _r_string(str(resolved_de_config.get("design", {}).get("formula", params.resolved_formula))),
                     "__CONTRAST_MODE__": _r_string(str(contrasts_cfg.get("mode", "auto"))),
                     "__AUTO_PAIRWISE__": _r_bool(contrasts_cfg.get("auto", {}).get("pairwise", True)),
