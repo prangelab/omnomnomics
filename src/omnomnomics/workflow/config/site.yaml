@@ -21,6 +21,7 @@ controller_mem_mb: 8192
 controller_runtime: 1440
 controller_constraint:
 worker_constraint:
+heavy_io_constraint:
 
 # External genome resources
 genome_assembly_dir: "{HOME}/genomes/assemblies"

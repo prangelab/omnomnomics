@@ -12,6 +12,7 @@ import os
 import shlex
 import subprocess
 import shutil
+import tempfile
 
 
 def count_reads_input(_wildcards):
@@ -74,7 +75,12 @@ rule count_reads:
     resources:
         mem_mb=Memory_Per_Rule[str(master_config["countreads_rule_num"])],
         partition=master_config["partition"],
-        runtime=Runtime_Per_Rule[str(master_config["countreads_rule_num"])]
+        runtime=Runtime_Per_Rule[str(master_config["countreads_rule_num"])],
+        worker_constraint=str(
+            master_config.get("heavy_io_constraint")
+            or master_config.get("worker_constraint")
+            or "NA"
+        )
     run:
         tracking = begin_step_sample(master_config["countreads_rule_num"], "aggregate", "count_reads")
         log_once(logfile, "step11.header", "Counting Reads...", f"EXECUTING STEP {master_config['countreads_rule_num']}")
@@ -83,6 +89,28 @@ rule count_reads:
 
         def quote(path):
             return shlex.quote(path)
+
+        def stage_bams_for_counting(bam_files, label):
+            tmpdir_root = os.environ.get("TMPDIR")
+            local_workdir = tempfile.mkdtemp(
+                prefix=f"featurecounts.{label}.",
+                dir=tmpdir_root if tmpdir_root else None,
+            )
+            local_bams = []
+            try:
+                for bam_file in bam_files:
+                    local_bam = os.path.join(local_workdir, os.path.basename(bam_file))
+                    shutil.copy2(bam_file, local_bam)
+                    local_bams.append(local_bam)
+            except Exception:
+                shutil.rmtree(local_workdir, ignore_errors=True)
+                raise
+            record_step_note(
+                master_config["countreads_rule_num"],
+                "aggregate",
+                f"staged_bams={len(local_bams)} scratch_dir={local_workdir}",
+            )
+            return local_workdir, local_bams
 
         def samples_after_spp_drop():
             if params.thetype not in {"ATAC", "CHIP"}:
@@ -212,27 +240,34 @@ rule count_reads:
 
             log_it(logfile, f"Cleaned {feature_label} BED for counting: {cleaned_bed} ({feature_count} intervals)")
             log_it(logfile, f"SAF annotation for featureCounts: {saf_file}")
-            featurecounts_output = os.path.join(output_folder, f"{os.path.basename(params.experiment_dir)}.featureCounts.tmp.txt")
-            paired_flags = "-p --countReadPairs" if params.paired else ""
-            featurecounts_command = (
-                f"featureCounts -T {threads} -F SAF -a {quote(saf_file)} -o {quote(featurecounts_output)} "
-                f"{paired_flags} {' '.join(quote(path) for path in bam_files)}"
-            ).strip()
-            log_it(logfile, featurecounts_command, "FEATURECOUNTS COMMAND")
-            shell(featurecounts_command)
+            local_workdir, local_bams = stage_bams_for_counting(bam_files, feature_label.lower())
+            try:
+                featurecounts_output = os.path.join(
+                    local_workdir,
+                    f"{os.path.basename(params.experiment_dir)}.featureCounts.tmp.txt",
+                )
+                paired_flags = "-p --countReadPairs" if params.paired else ""
+                featurecounts_command = (
+                    f"featureCounts -T {threads} --tmpDir {quote(local_workdir)} -F SAF "
+                    f"-a {quote(saf_file)} -o {quote(featurecounts_output)} "
+                    f"{paired_flags} {' '.join(quote(path) for path in local_bams)}"
+                ).strip()
+                log_it(logfile, featurecounts_command, "FEATURECOUNTS COMMAND")
+                shell(featurecounts_command)
 
-            with open(featurecounts_output, newline="") as source, open(final_output, "w", newline="") as destination:
-                reader = csv.reader((line for line in source if not line.startswith("#")), delimiter="\t")
-                header = next(reader)
-                writer = csv.writer(destination, delimiter="\t", lineterminator="\n")
-                writer.writerow([feature_label, *[sample_id_for_sample(sample) for sample in selected_samples]])
-                for row in reader:
-                    writer.writerow([row[0], *row[6:]])
+                with open(featurecounts_output, newline="") as source, open(final_output, "w", newline="") as destination:
+                    reader = csv.reader((line for line in source if not line.startswith("#")), delimiter="\t")
+                    header = next(reader)
+                    writer = csv.writer(destination, delimiter="\t", lineterminator="\n")
+                    writer.writerow([feature_label, *[sample_id_for_sample(sample) for sample in selected_samples]])
+                    for row in reader:
+                        writer.writerow([row[0], *row[6:]])
 
-            featurecounts_summary = f"{featurecounts_output}.summary"
-            if os.path.exists(featurecounts_summary):
-                os.replace(featurecounts_summary, summary_output)
-            os.remove(featurecounts_output)
+                featurecounts_summary = f"{featurecounts_output}.summary"
+                if os.path.exists(featurecounts_summary):
+                    shutil.copy2(featurecounts_summary, summary_output)
+            finally:
+                shutil.rmtree(local_workdir, ignore_errors=True)
             shutil.copy2(final_output, cache_table)
             if os.path.exists(summary_output):
                 shutil.copy2(summary_output, cache_summary)
@@ -260,34 +295,41 @@ rule count_reads:
             log_once(logfile, "step11.featurecounts_version", "\n" + featurecounts_version.decode("utf-8"), "FEATURECOUNTS VERSION")
 
             bam_files = [os.path.join(input_folder, f"{sample}.sorted.dups_marked.filtered.bam") for sample in samples2]
-            featurecounts_output = os.path.join(output_folder, f"{os.path.basename(params.experiment_dir)}.featureCounts.tmp.txt")
-            paired_flags = "-p --countReadPairs" if paired else ""
-            featurecounts_command = (
-                f"featureCounts -T {threads} -a {quote(gtf_file)} -o {quote(featurecounts_output)} "
-                f"-t exon -g gene_id {paired_flags} {' '.join(quote(path) for path in bam_files)}"
-            ).strip()
-            log_it(logfile, featurecounts_command, "FEATURECOUNTS COMMAND")
-            shell(featurecounts_command)
+            local_workdir, local_bams = stage_bams_for_counting(bam_files, "rna")
+            try:
+                featurecounts_output = os.path.join(
+                    local_workdir,
+                    f"{os.path.basename(params.experiment_dir)}.featureCounts.tmp.txt",
+                )
+                paired_flags = "-p --countReadPairs" if paired else ""
+                featurecounts_command = (
+                    f"featureCounts -T {threads} --tmpDir {quote(local_workdir)} "
+                    f"-a {quote(gtf_file)} -o {quote(featurecounts_output)} "
+                    f"-t exon -g gene_id {paired_flags} {' '.join(quote(path) for path in local_bams)}"
+                ).strip()
+                log_it(logfile, featurecounts_command, "FEATURECOUNTS COMMAND")
+                shell(featurecounts_command)
 
-            final_output = rna_output_path(output_folder)
-            with open(featurecounts_output, newline="") as source, open(final_output, "w", newline="") as destination:
-                reader = csv.reader((line for line in source if not line.startswith("#")), delimiter="\t")
-                header = next(reader)
-                sample_headers = [
-                    sample_id_for_sample(
-                        os.path.basename(path).replace(".sorted.dups_marked.filtered.bam", "")
-                    )
-                    for path in header[6:]
-                ]
-                writer = csv.writer(destination, delimiter="\t", lineterminator="\n")
-                writer.writerow(["Geneid", *sample_headers])
-                for row in reader:
-                    writer.writerow([row[0], *row[6:]])
+                final_output = rna_output_path(output_folder)
+                with open(featurecounts_output, newline="") as source, open(final_output, "w", newline="") as destination:
+                    reader = csv.reader((line for line in source if not line.startswith("#")), delimiter="\t")
+                    header = next(reader)
+                    sample_headers = [
+                        sample_id_for_sample(
+                            os.path.basename(path).replace(".sorted.dups_marked.filtered.bam", "")
+                        )
+                        for path in header[6:]
+                    ]
+                    writer = csv.writer(destination, delimiter="\t", lineterminator="\n")
+                    writer.writerow(["Geneid", *sample_headers])
+                    for row in reader:
+                        writer.writerow([row[0], *row[6:]])
 
-            featurecounts_summary = f"{featurecounts_output}.summary"
-            if os.path.exists(featurecounts_summary):
-                os.replace(featurecounts_summary, rna_featurecounts_summary_path(output_folder))
-            os.remove(featurecounts_output)
+                featurecounts_summary = f"{featurecounts_output}.summary"
+                if os.path.exists(featurecounts_summary):
+                    shutil.copy2(featurecounts_summary, rna_featurecounts_summary_path(output_folder))
+            finally:
+                shutil.rmtree(local_workdir, ignore_errors=True)
 
         def count_reads_atac(input_folder, peak_folder, output_folder):
             log_once(logfile, "step11.atac_mode", "Counting ATAC reads over peaks with featureCounts...")
