@@ -46,3 +46,12 @@ def test_de_templates_support_apeglm_factor_contrasts():
         assert "resolve_factor_coefficient <- function" in source
         assert "shrink_factor_contrast <- function" in source
         assert "direction * coefficient_res$log2FoldChange" in source
+
+
+def test_de_templates_render_zero_cooks_counts_and_compact_heatmap_directions():
+    chrom_template = ROOT / "src" / "omnomnomics" / "workflow" / "templates" / "de_core_chrom.R.tmpl"
+
+    for source in (TEMPLATE.read_text(), chrom_template.read_text()):
+        assert "ggplot2::aes(label = genes_cooks_gt_10)" in source
+        assert "plot.margin = ggplot2::margin" in source
+        assert "direction_short_caption <-" in source

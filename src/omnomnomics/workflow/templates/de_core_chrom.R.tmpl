@@ -1612,9 +1612,15 @@ if (!is.null(cooks_mat)) {
   cooks_bar$sample <- factor(cooks_bar$sample, levels = cooks_bar$sample)
   p_cooks_counts <- ggplot2::ggplot(cooks_bar, ggplot2::aes(x = sample, y = genes_cooks_gt_10)) +
     ggplot2::geom_col(fill = "steelblue") +
+    ggplot2::geom_point(color = "steelblue", size = 2) +
+    ggplot2::geom_text(ggplot2::aes(label = genes_cooks_gt_10), hjust = -0.4, size = 3.5) +
+    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.15))) +
     ggplot2::coord_flip() +
     ggplot2::theme_light() +
-    ggplot2::theme(panel.grid = ggplot2::element_blank()) +
+    ggplot2::theme(
+      panel.grid = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(12, 20, 12, 24)
+    ) +
     ggplot2::xlab("Sample") +
     ggplot2::ylab(paste(feature_label_plural_title, "with Cook's distance > 10")) +
     ggplot2::ggtitle(paste("Cook's distance outlier count per sample (", feature_label_plural, ")", sep = ""))
@@ -1631,7 +1637,10 @@ if (!is.null(cooks_mat)) {
     ggplot2::geom_col(fill = "darkorange3") +
     ggplot2::coord_flip() +
     ggplot2::theme_light() +
-    ggplot2::theme(panel.grid = ggplot2::element_blank()) +
+    ggplot2::theme(
+      panel.grid = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(12, 20, 12, 24)
+    ) +
     ggplot2::xlab("Sample") +
     ggplot2::ylab("99th percentile Cook's distance") +
     ggplot2::ggtitle("Cook's distance q99 per sample")
@@ -2414,6 +2423,11 @@ for (contrast_cfg in contrast_plan) {
     negative_direction <- "opposite coefficient direction"
   }
   direction_caption <- paste0("+: ", positive_direction, " | -: ", negative_direction)
+  direction_short_caption <- if (contrast_type == "factor") {
+    paste0("+: ", numerator, " | -: ", denominator)
+  } else {
+    "+: coefficient direction | -: opposite direction"
+  }
   utils::write.table(
     data.frame(
       contrast = contrast_label,
@@ -3411,7 +3425,7 @@ for (contrast_cfg in contrast_plan) {
           plot_decoupler_heatmap(
             prog_all_mat,
             file.path(dc_dir, paste0(contrast_label, ".", all_feature_file_stem, ".progeny_pathways.pdf")),
-            paste0(contrast_label, " progeny pathway activity\n", direction_caption),
+            paste0(contrast_label, " progeny pathway activity\n", direction_short_caption),
             top_features = decoupler_top_features_heatmap
           )
         }
@@ -3426,7 +3440,7 @@ for (contrast_cfg in contrast_plan) {
           plot_decoupler_bar(
             as.data.frame(prog_deg),
             file.path(dc_dir, paste0(contrast_label, ".", de_feature_file_stem, ".progeny_pathways.pdf")),
-            paste0(contrast_label, " progeny pathway activity (DE ", feature_label_plural, ")\n", direction_caption),
+            paste0(contrast_label, " progeny pathway activity (DE ", feature_label_plural, ")\n", direction_short_caption),
             top_n = decoupler_top_regulators_barplot
           )
           plot_decoupler_detail(
@@ -3480,7 +3494,7 @@ for (contrast_cfg in contrast_plan) {
           plot_decoupler_heatmap(
             tf_all_mat,
             file.path(dc_dir, paste0(contrast_label, ".", all_feature_file_stem, ".TF_network_activity.pdf")),
-            paste0(contrast_label, " TF network activity\n", direction_caption),
+            paste0(contrast_label, " TF network activity\n", direction_short_caption),
             top_features = decoupler_top_features_heatmap
           )
         }
@@ -3495,7 +3509,7 @@ for (contrast_cfg in contrast_plan) {
           plot_decoupler_bar(
             as.data.frame(tf_deg),
             file.path(dc_dir, paste0(contrast_label, ".", de_feature_file_stem, ".TF_network_activity.pdf")),
-            paste0(contrast_label, " TF network activity (DE ", feature_label_plural, ")\n", direction_caption),
+            paste0(contrast_label, " TF network activity (DE ", feature_label_plural, ")\n", direction_short_caption),
             top_n = decoupler_top_regulators_barplot
           )
           plot_decoupler_detail(
