@@ -899,6 +899,24 @@ if (enrichment_enabled && decoupler_enabled && !decoupler_available) {
 }
 
 species_info <- detect_species_from_context(rownames(dds), genome_version)
+
+load_msigdb_collection <- function(species, collection, subcollection = NULL) {
+  supported_args <- names(formals(msigdbr::msigdbr))
+  call_args <- list(species = species)
+  if ("collection" %in% supported_args) {
+    call_args$collection <- collection
+    if (!is.null(subcollection) && nzchar(as.character(subcollection))) {
+      call_args$subcollection <- as.character(subcollection)
+    }
+  } else {
+    call_args$category <- collection
+    if (!is.null(subcollection) && nzchar(as.character(subcollection))) {
+      call_args$subcategory <- as.character(subcollection)
+    }
+  }
+  do.call(msigdbr::msigdbr, call_args)
+}
+
 msig_term2gene <- list()
 if (cp_available && enrichment_enabled && enrichment_cp_enabled) {
   if (!requireNamespace("msigdbr", quietly = TRUE)) {
@@ -916,17 +934,11 @@ if (cp_available && enrichment_enabled && enrichment_cp_enabled) {
         next
       }
       msig_tbl <- tryCatch(
-        {
-          if (is.null(set_subcategory) || is.na(set_subcategory) || !nzchar(as.character(set_subcategory))) {
-            msigdbr::msigdbr(species = species_info$msig_species, category = set_category)
-          } else {
-            msigdbr::msigdbr(
-              species = species_info$msig_species,
-              category = set_category,
-              subcategory = as.character(set_subcategory)
-            )
-          }
-        },
+        load_msigdb_collection(
+          species_info$msig_species,
+          set_category,
+          if (is.null(set_subcategory) || is.na(set_subcategory)) NULL else set_subcategory
+        ),
         error = function(e) {
           message(
             "msigdbr loading failed for set '", set_name, "' (", set_category,
@@ -1757,6 +1769,51 @@ validate_contrast_plan <- function(plan, available_coefficients, metadata_df) {
   plan
 }
 
+resolve_factor_coefficient <- function(factor_name, numerator, denominator, available_coefficients) {
+  normalize_name <- function(x) tolower(gsub("[^[:alnum:]]", "", as.character(x)))
+  available_norm <- normalize_name(available_coefficients)
+  forward <- normalize_name(paste(factor_name, numerator, "vs", denominator, sep = "_"))
+  reverse <- normalize_name(paste(factor_name, denominator, "vs", numerator, sep = "_"))
+  forward_idx <- which(available_norm == forward)
+  if (length(forward_idx) == 1) {
+    return(list(coefficient = available_coefficients[[forward_idx]], reverse = FALSE))
+  }
+  reverse_idx <- which(available_norm == reverse)
+  if (length(reverse_idx) == 1) {
+    return(list(coefficient = available_coefficients[[reverse_idx]], reverse = TRUE))
+  }
+  NULL
+}
+
+shrink_factor_contrast <- function(dds, base_res, factor_name, numerator, denominator, shrink_type) {
+  if (!identical(tolower(shrink_type), "apeglm")) {
+    return(DESeq2::lfcShrink(
+      dds,
+      contrast = c(factor_name, numerator, denominator),
+      type = shrink_type
+    ))
+  }
+  coefficient_match <- resolve_factor_coefficient(
+    factor_name,
+    numerator,
+    denominator,
+    DESeq2::resultsNames(dds)
+  )
+  if (is.null(coefficient_match)) {
+    stop("No single DESeq2 coefficient represents this factor contrast for apeglm shrinkage.")
+  }
+  coefficient_res <- DESeq2::lfcShrink(
+    dds,
+    coef = coefficient_match$coefficient,
+    type = shrink_type
+  )
+  shrunk <- base_res
+  direction <- if (isTRUE(coefficient_match$reverse)) -1 else 1
+  shrunk$log2FoldChange <- direction * coefficient_res$log2FoldChange
+  shrunk$lfcSE <- coefficient_res$lfcSE
+  shrunk
+}
+
 contrast_plan <- validate_contrast_plan(contrast_plan, results_names_tbl$coefficient, col_data)
 
 safe_pkg_version <- function(pkg_name) {
@@ -2000,7 +2057,7 @@ for (contrast_cfg in contrast_plan) {
   if (shrink_enabled) {
     shrunk <- tryCatch(
       if (contrast_type == "factor") {
-        DESeq2::lfcShrink(dds, contrast = c(factor_name, numerator, denominator), type = shrink_type)
+        shrink_factor_contrast(dds, base_res, factor_name, numerator, denominator, shrink_type)
       } else {
         DESeq2::lfcShrink(dds, coef = coefficient_name, type = shrink_type)
       },

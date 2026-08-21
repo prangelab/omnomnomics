@@ -28,3 +28,21 @@ def test_rna_de_preserves_symbol_like_gene_ids():
 
     assert "is_symbol_like <- !is_ensembl_gene & !is_other_accession" in source
     assert "symbols[is_symbol_like] <- gene_ids[is_symbol_like]" in source
+
+
+def test_de_templates_use_version_compatible_msigdbr_arguments():
+    chrom_template = ROOT / "src" / "omnomnomics" / "workflow" / "templates" / "de_core_chrom.R.tmpl"
+
+    for source in (TEMPLATE.read_text(), chrom_template.read_text()):
+        assert "load_msigdb_collection <- function" in source
+        assert '"collection" %in% supported_args' in source
+        assert "call_args$subcollection" in source
+
+
+def test_de_templates_support_apeglm_factor_contrasts():
+    chrom_template = ROOT / "src" / "omnomnomics" / "workflow" / "templates" / "de_core_chrom.R.tmpl"
+
+    for source in (TEMPLATE.read_text(), chrom_template.read_text()):
+        assert "resolve_factor_coefficient <- function" in source
+        assert "shrink_factor_contrast <- function" in source
+        assert "direction * coefficient_res$log2FoldChange" in source
