@@ -166,6 +166,9 @@ rule analyze_peaks_de:
                 for row in rows:
                     writer.writerow(row)
 
+        def deduplicate_rows_preserving_order(rows):
+            return list(dict.fromkeys(tuple(row) for row in rows))
+
         def load_promoter_map(gtf_file, promoter_upstream=1000, promoter_downstream=1000):
             if not os.path.isfile(gtf_file):
                 return {}
@@ -316,9 +319,8 @@ rule analyze_peaks_de:
                                     item["bed_row"][8],
                                 ]
                             )
-                top_sets["top_de_ranked_promoter_regions"] = sorted(
-                    {tuple(row) for row in promoter_region_rows},
-                    key=lambda x: (x[0], x[1], x[2], x[3]),
+                top_sets["top_de_ranked_promoter_regions"] = deduplicate_rows_preserving_order(
+                    promoter_region_rows
                 )
             return top_sets
 
@@ -351,6 +353,7 @@ rule analyze_peaks_de:
             diffuse_rows_all = []
             diffuse_rows_up = []
             diffuse_rows_down = []
+            de_rank_by_peak = {}
 
             with open(table_path, newline="") as handle:
                 reader = csv.DictReader(handle, delimiter="\t")
@@ -381,6 +384,7 @@ rule analyze_peaks_de:
                     assigned = region_info.get("assigned_genes", "NA")
                     nearest = region_info.get("nearest_gene", "NA")
                     row_out = [chrom, start, end, peak_id, f"{lfc:.6f}", ".", region, assigned, nearest]
+                    de_rank_by_peak[peak_id] = (padj, -abs(lfc), chrom, start, end)
                     rows_all.append(row_out)
                     diffuse_row = {
                         "chrom": chrom,
@@ -422,6 +426,24 @@ rule analyze_peaks_de:
                         if lfc < 0:
                             rows_down_promoter_regions.extend(promoter_rows_for_feature)
 
+            def rank_de_rows(rows):
+                return sorted(
+                    rows,
+                    key=lambda bed_row: de_rank_by_peak.get(
+                        bed_row[3],
+                        (math.inf, math.inf, bed_row[0], int(bed_row[1]), int(bed_row[2])),
+                    ),
+                )
+
+            rows_all = rank_de_rows(rows_all)
+            rows_up = rank_de_rows(rows_up)
+            rows_down = rank_de_rows(rows_down)
+            rows_promoter = rank_de_rows(rows_promoter)
+            rows_distal = rank_de_rows(rows_distal)
+            rows_promoter_regions = rank_de_rows(rows_promoter_regions)
+            rows_up_promoter_regions = rank_de_rows(rows_up_promoter_regions)
+            rows_down_promoter_regions = rank_de_rows(rows_down_promoter_regions)
+
             out_rows = []
             prefix = f"{de_subdir}__{contrast_dir}__{contrast_label}"
             set_specs = [
@@ -462,7 +484,7 @@ rule analyze_peaks_de:
             for set_name, set_rows in set_specs:
                 out_path = os.path.join(ensure_dir(os.path.join(sets_dir, set_name)), f"{prefix}.{set_name}.bed")
                 if broad_mode == "genebody" and set_name.endswith("_promoter_regions"):
-                    set_rows = sorted({tuple(row) for row in set_rows}, key=lambda x: (x[0], x[1], x[2], x[3]))
+                    set_rows = deduplicate_rows_preserving_order(set_rows)
                 write_bed_from_rows(set_rows, out_path)
                 out_rows.append(
                     {
@@ -1398,7 +1420,15 @@ rule analyze_peaks_de:
                     continue
                 cap_reason = ""
                 if int(item["peak_count"]) > motif_peak_count:
-                    cap_reason = f"motif input capped at first {motif_peak_count} of {item['peak_count']} peaks"
+                    cap_basis = (
+                        "highest-ranked"
+                        if item["set_type"] != "unique_from_prede"
+                        else "first"
+                    )
+                    cap_reason = (
+                        f"motif input capped at {cap_basis} {motif_peak_count} "
+                        f"of {item['peak_count']} peaks"
+                    )
                 fasta_cmd = [
                     "bedtools",
                     "getfasta",

@@ -955,7 +955,7 @@ rule peak_qc:
                     axes[1].set_ylabel(feature_term_plural)
                     axes[1].tick_params(axis="x", rotation=45, labelsize=9)
                     fig.tight_layout()
-                    pdf.savefig(fig, bbox_inches="tight")
+                    pdf.savefig(fig)
                     plt.close(fig)
 
                 if sample_frip_rows:
@@ -976,7 +976,7 @@ rule peak_qc:
                         ax.set_xlabel("Sample")
                         ax.tick_params(axis="x", rotation=45, labelsize=9)
                         fig.tight_layout()
-                        pdf.savefig(fig, bbox_inches="tight")
+                        pdf.savefig(fig)
                         plt.close(fig)
 
                 if sample_rows:
@@ -998,7 +998,7 @@ rule peak_qc:
                     axes[2].set_ylabel("PBC2")
                     axes[2].tick_params(axis="x", rotation=45, labelsize=9)
                     fig.tight_layout()
-                    pdf.savefig(fig, bbox_inches="tight")
+                    pdf.savefig(fig)
                     plt.close(fig)
 
                     nsc_values = [float(row["nsc"]) for row in sample_rows if row["nsc"] not in ("", "NA")]
@@ -1014,7 +1014,7 @@ rule peak_qc:
                         axes[1].set_ylabel("RSC")
                         axes[1].tick_params(axis="x", rotation=45, labelsize=9)
                         fig.tight_layout()
-                        pdf.savefig(fig, bbox_inches="tight")
+                        pdf.savefig(fig)
                         plt.close(fig)
 
             log_it(logfile, f"Peak QC summary PDF: {pdf_path}")

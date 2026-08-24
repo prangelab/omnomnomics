@@ -58,6 +58,7 @@
    - optionally run on pre-DE unique sets.
    - prioritize promoter/promoter-region sets before distal, unique, and all-peak fallback sets.
    - cap motif set count, peaks per set, centered FASTA window size, per-set runtime, and motif threads via workflow defaults so motif failures remain report-level outcomes.
+   - order capped DE-derived inputs by adjusted P value and then absolute fold change; preserve source order for optional pre-DE unique sets that have no DE statistic.
 
 ## Config notes
 - Current implementation runs with practical defaults and tool-availability checks.

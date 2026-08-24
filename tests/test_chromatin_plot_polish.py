@@ -87,3 +87,29 @@ def test_peak_qc_reports_input_features_separately_from_merged_intervals():
     assert peak_qc.count("peak_count = len(load_peak_records(peak_bed))") == 2
     assert '"merged_interval_count": merged_interval_count' in peak_qc
     assert peak_qc.count('"merged_interval_count",') >= 2
+
+
+def test_peak_qc_multipage_pdf_uses_stable_page_bounds():
+    peak_qc = (RULES_DIR / "13.peak_qc.smk").read_text()
+    summary_block = peak_qc.split("def write_peak_qc_summary_pdf", 1)[1].split(
+        "def write_sample_frip_outputs", 1
+    )[0]
+
+    assert 'pdf.savefig(fig, bbox_inches="tight")' not in summary_block
+    assert summary_block.count("pdf.savefig(fig)") == 4
+
+
+def test_chromatin_boxplots_use_accessibility_axis_label():
+    chrom_template = (TEMPLATES_DIR / "de_core_chrom.R.tmpl").read_text()
+
+    assert 'ggplot2::ylab("VST accessibility")' in chrom_template
+    assert 'ggplot2::ylab("VST expression")' not in chrom_template
+
+
+def test_motif_peak_caps_use_ranked_de_regions():
+    post_de = (RULES_DIR / "16.analyze_peaks_de.smk").read_text()
+
+    assert 'de_rank_by_peak[peak_id] = (padj, -abs(lfc), chrom, start, end)' in post_de
+    assert "rows_promoter = rank_de_rows(rows_promoter)" in post_de
+    assert '"highest-ranked"' in post_de
+    assert "item[\"set_type\"] != \"unique_from_prede\"" in post_de
