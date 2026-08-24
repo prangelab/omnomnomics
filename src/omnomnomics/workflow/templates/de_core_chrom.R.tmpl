@@ -349,10 +349,19 @@ map_gene_symbols <- function(gene_ids, fallback_to_ids = TRUE) {
   ids_no_version <- strip_ensembl_version(gene_ids)
   symbols <- rep(NA_character_, length(ids_no_version))
 
+  is_ensembl_gene <- grepl("^ENS(?:MUSG|G)[0-9]+$", ids_no_version)
+  is_other_accession <- grepl(
+    "^(ENS(MUST|T)|N[MR]_|X[MR]_|[0-9]+$)",
+    gene_ids
+  )
+  is_symbol_like <- !is_ensembl_gene & !is_other_accession &
+    nzchar(gene_ids) & !grepl("[[:space:];,]", gene_ids)
+  symbols[is_symbol_like] <- gene_ids[is_symbol_like]
+
   has_annotationdbi <- requireNamespace("AnnotationDbi", quietly = TRUE)
   if (has_annotationdbi) {
-    is_human <- grepl("^ENSG", ids_no_version)
-    is_mouse <- grepl("^ENSMUSG", ids_no_version)
+    is_human <- grepl("^ENSG[0-9]+$", ids_no_version)
+    is_mouse <- grepl("^ENSMUSG[0-9]+$", ids_no_version)
 
     if (any(is_human) && requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
       mapped <- tryCatch(

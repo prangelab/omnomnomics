@@ -336,7 +336,7 @@ map_gene_symbols <- function(gene_ids, fallback_to_ids = TRUE) {
     gene_ids
   )
   is_symbol_like <- !is_ensembl_gene & !is_other_accession &
-    grepl("^[[:alnum:]][[:alnum:]_.-]*$", gene_ids)
+    nzchar(gene_ids) & !grepl("[[:space:];,]", gene_ids)
   symbols[is_symbol_like] <- gene_ids[is_symbol_like]
 
   has_annotationdbi <- requireNamespace("AnnotationDbi", quietly = TRUE)

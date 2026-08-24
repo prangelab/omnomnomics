@@ -4,6 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RULE = ROOT / "src" / "omnomnomics" / "workflow" / "rules" / "12.call_DE.smk"
 TEMPLATE = ROOT / "src" / "omnomnomics" / "workflow" / "templates" / "de_core.R.tmpl"
+CHROM_TEMPLATE = ROOT / "src" / "omnomnomics" / "workflow" / "templates" / "de_core_chrom.R.tmpl"
 
 
 def test_rna_de_renderer_passes_genome_version():
@@ -23,11 +24,11 @@ def test_rna_de_uses_genome_context_for_species_detection():
     assert "detect_species_from_context(rownames(dds), genome_version)" in source
 
 
-def test_rna_de_preserves_symbol_like_gene_ids():
-    source = TEMPLATE.read_text()
-
-    assert "is_symbol_like <- !is_ensembl_gene & !is_other_accession" in source
-    assert "symbols[is_symbol_like] <- gene_ids[is_symbol_like]" in source
+def test_de_templates_preserve_symbol_like_gene_ids():
+    for source in (TEMPLATE.read_text(), CHROM_TEMPLATE.read_text()):
+        assert "is_symbol_like <- !is_ensembl_gene & !is_other_accession" in source
+        assert '!grepl("[[:space:];,]", gene_ids)' in source
+        assert "symbols[is_symbol_like] <- gene_ids[is_symbol_like]" in source
 
 
 def test_de_templates_use_version_compatible_msigdbr_arguments():
