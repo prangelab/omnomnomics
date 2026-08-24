@@ -29,6 +29,7 @@ def test_de_templates_preserve_symbol_like_gene_ids():
         assert "is_symbol_like <- !is_ensembl_gene & !is_other_accession" in source
         assert '!grepl("[[:space:];,]", gene_ids)' in source
         assert "symbols[is_symbol_like] <- gene_ids[is_symbol_like]" in source
+        assert "unlink(unmapped_gene_ids_file)" in source
 
 
 def test_de_templates_use_version_compatible_msigdbr_arguments():

@@ -1331,14 +1331,17 @@ writeLines(
   paste0("[gene_symbol_mapping] ", mapping_status, " - ", mapping_message),
   con = file.path(qc_dir, "gene_symbol_mapping_status.log")
 )
+unmapped_gene_ids_file <- file.path(qc_dir, "gene_symbol_mapping_unmapped_gene_ids.tsv")
 if (length(unmapped_gene_ids) > 0) {
   utils::write.table(
     data.frame(gene_id = unmapped_gene_ids, stringsAsFactors = FALSE),
-    file = file.path(qc_dir, "gene_symbol_mapping_unmapped_gene_ids.tsv"),
+    file = unmapped_gene_ids_file,
     sep = "\t",
     quote = FALSE,
     row.names = FALSE
   )
+} else if (file.exists(unmapped_gene_ids_file)) {
+  unlink(unmapped_gene_ids_file)
 }
 if (length(palette_assignment_rows) > 0) {
   palette_assignment_table <- do.call(rbind, palette_assignment_rows)
