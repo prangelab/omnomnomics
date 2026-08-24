@@ -35,6 +35,14 @@ def idr_split_jobs_enabled():
 def idr_assay_type():
     return str(config.get("THETYPE", "")).upper()
 
+def atac_is_paired_end():
+    return str(config.get("PAIRED", False)).strip().lower() in {"1", "true", "yes", "y"}
+
+def atac_macs3_format_args():
+    if atac_is_paired_end():
+        return ["-f", "BAMPE"]
+    return ["-f", "BAM", "--nomodel", "--shift", "-100", "--extsize", "200"]
+
 def idr_bam_suffix():
     if idr_assay_type() == "CHIP":
         return ".filtered.bam"
@@ -116,7 +124,7 @@ def idr_macs3_callpeak_command(
         "--verbose", "0",
     ]
     if idr_assay_type() == "ATAC":
-        cmd.extend(["-f", "BAMPE", "--nomodel", "--shift", "-100", "--extsize", "200"])
+        cmd.extend(atac_macs3_format_args())
     else:
         cmd.extend(["-f", "BAM"])
         if control_bam and control_bam != "NA":
@@ -947,7 +955,7 @@ if (chrom != "" && len != "") print chrom, len;
             ]
             assay_label = str(assay_type or "").strip().upper()
             if assay_label == "ATAC":
-                cmd.extend(["-f", "BAMPE"])
+                cmd.extend(atac_macs3_format_args())
             elif assay_label == "CHIP":
                 cmd.extend(["-f", "BAM"])
             if control_bam and control_bam != "NA":
