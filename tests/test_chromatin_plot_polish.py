@@ -97,6 +97,9 @@ def test_peak_qc_multipage_pdf_uses_stable_page_bounds():
 
     assert 'pdf.savefig(fig, bbox_inches="tight")' not in summary_block
     assert summary_block.count("pdf.savefig(fig)") == 4
+    assert "panel_cols = min(2, panel_count)" in summary_block
+    assert "axes_flat = axes.ravel()" in summary_block
+    assert 'fig.suptitle(f"{thetype} {feature_term} sample FRiP by group")' in summary_block
 
 
 def test_chromatin_boxplots_use_accessibility_axis_label():

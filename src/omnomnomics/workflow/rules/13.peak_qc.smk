@@ -960,7 +960,17 @@ rule peak_qc:
 
                 if sample_frip_rows:
                     frip_sets = sorted(set((row["group"], row["peak_set"]) for row in sample_frip_rows))
-                    for group, peak_set in frip_sets:
+                    panel_count = len(frip_sets)
+                    panel_cols = min(2, panel_count)
+                    panel_rows = (panel_count + panel_cols - 1) // panel_cols
+                    fig, axes = plt.subplots(
+                        panel_rows,
+                        panel_cols,
+                        figsize=(7 * panel_cols, 5 * panel_rows),
+                        squeeze=False,
+                    )
+                    axes_flat = axes.ravel()
+                    for panel_index, (group, peak_set) in enumerate(frip_sets):
                         plot_rows = [
                             row for row in sample_frip_rows
                             if row["group"] == group and row["peak_set"] == peak_set
@@ -969,15 +979,18 @@ rule peak_qc:
                             continue
                         sample_labels = [row["sample"] for row in plot_rows]
                         frip_values = [float(row["frip"]) for row in plot_rows]
-                        fig, ax = plt.subplots(1, 1, figsize=(max(8, len(sample_labels) * 0.55), 5))
+                        ax = axes_flat[panel_index]
                         ax.bar(sample_labels, frip_values, color="#4C78A8")
-                        ax.set_title(f"{thetype} {feature_term} sample FRiP: {group} / {peak_set}")
+                        ax.set_title(f"{group}\n{peak_set}", fontsize=10)
                         ax.set_ylabel("FRiP")
                         ax.set_xlabel("Sample")
                         ax.tick_params(axis="x", rotation=45, labelsize=9)
-                        fig.tight_layout()
-                        pdf.savefig(fig)
-                        plt.close(fig)
+                    for unused_ax in axes_flat[panel_count:]:
+                        unused_ax.set_visible(False)
+                    fig.suptitle(f"{thetype} {feature_term} sample FRiP by group")
+                    fig.tight_layout(rect=(0, 0, 1, 0.97))
+                    pdf.savefig(fig)
+                    plt.close(fig)
 
                 if sample_rows:
                     sample_labels = [row["sample"] for row in sample_rows]
