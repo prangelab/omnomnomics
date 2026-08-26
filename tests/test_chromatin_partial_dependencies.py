@@ -52,6 +52,20 @@ def test_genebody_feature_builder_uses_transcript_aware_gene_spans():
     assert "if feature_count == 0:" in builder
 
 
+def test_non_peak_chromatin_modes_accept_ucsc_and_ensembl_chromosome_names():
+    source = (RULES_DIR / "10.call_peaks.smk").read_text()
+    diffuse_builder = source.split("def build_chip_diffuse_bin_feature_sets", 1)[1].split(
+        "def build_gtf_annotation_sources", 1
+    )[0]
+    standard_filter = source.split("def chrom_is_standard", 1)[1].split(
+        "def build_chip_genebody_feature_sets", 1
+    )[0]
+
+    assert r"/^(chr)?([0-9]+|X|Y)$/" in diffuse_builder
+    assert 'if text.startswith("chr"):' in standard_filter
+    assert 'return text in {"X", "Y"} or text.isdigit()' in standard_filter
+
+
 def test_genebody_features_preserve_source_gene_labels():
     peak_calling = (RULES_DIR / "10.call_peaks.smk").read_text()
     pre_de = (RULES_DIR / "14.analyze_peaks.smk").read_text()

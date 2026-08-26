@@ -735,7 +735,7 @@ if (chrom != "" && len != "") print chrom, len;
                 if keep_standard:
                     std_bins = os.path.join(tmpdir, "std_bins.bed")
                     shell(
-                        f"awk 'BEGIN{{{{OFS=\"\\t\"}}}} $1 ~ /^chr([0-9]+|X|Y)$/ {{{{print $0}}}}' {quote(work)} > {quote(std_bins)}"
+                        f"awk 'BEGIN{{{{OFS=\"\\t\"}}}} $1 ~ /^(chr)?([0-9]+|X|Y)$/ {{{{print $0}}}}' {quote(work)} > {quote(std_bins)}"
                     )
                     work = std_bins
                 if drop_chrm:
@@ -1004,11 +1004,9 @@ if (chrom != "" && len != "") print chrom, len;
 
         def chrom_is_standard(chrom_name):
             text = str(chrom_name)
-            if text in {"chrX", "chrY"}:
-                return True
-            if text.startswith("chr") and text[3:].isdigit():
-                return True
-            return False
+            if text.startswith("chr"):
+                text = text[3:]
+            return text in {"X", "Y"} or text.isdigit()
 
         def build_chip_genebody_feature_sets(gtf_file, outputfolder, groups):
             if not os.path.isfile(gtf_file):
