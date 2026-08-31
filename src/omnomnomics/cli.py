@@ -1454,13 +1454,26 @@ def start_log(experiment_dir, run_date, config):
 ##--------------------------------------------------------------------------------------------------------------
 # Reset selected step bookkeeping for a new run
 ##--------------------------------------------------------------------------------------------------------------
+def remove_tree_tolerating_missing(path):
+   def ignore_missing_entry(function, entry_path, exc_info):
+      error = exc_info[1]
+      if isinstance(error, FileNotFoundError):
+         return
+      raise error
+
+   try:
+      shutil.rmtree(path, onerror=ignore_missing_entry)
+   except FileNotFoundError:
+      pass
+
+
 def reset_step_tracking(mode_steps, experiment_dir):
     step_log_dir = os.path.join(experiment_dir, "run_logs", "steps")
     for num in mode_steps:
         step_prefix = f"step{num:02d}"
         step_state_dir = os.path.join(step_log_dir, f".{step_prefix}.state")
         if os.path.isdir(step_state_dir):
-            shutil.rmtree(step_state_dir)
+            remove_tree_tolerating_missing(step_state_dir)
         for suffix in ("summary.tsv", "commands.txt", "notes.txt"):
             step_log_file = os.path.join(step_log_dir, f"{step_prefix}.{suffix}")
             if os.path.exists(step_log_file):
@@ -1523,7 +1536,7 @@ def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
     for num in mode_steps: # Loop over all the to run steps
         for output_path in explicit_outputs.get(num, []):
             if os.path.isdir(output_path):
-                shutil.rmtree(output_path)
+                remove_tree_tolerating_missing(output_path)
             elif os.path.exists(output_path):
                 os.remove(output_path)
         if num == config.get('analyzepeaksde_rule_num'):
@@ -1536,7 +1549,7 @@ def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
                 for file in files:
                     if os.path.exists(file):
                         if filetype == ".hub":
-                            shutil.rmtree(file) # Is actually a hub directory and not a file
+                            remove_tree_tolerating_missing(file) # Is actually a hub directory and not a file
                         else:
                             os.remove(file)
         else:

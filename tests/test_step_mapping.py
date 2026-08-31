@@ -1,8 +1,11 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from omnomnomics.cli import (
     describe_public_steps,
     map_public_to_internal_steps,
+    remove_tree_tolerating_missing,
     resolve_public_mode_steps,
 )
 
@@ -25,6 +28,15 @@ class StepMappingTests(unittest.TestCase):
         self.assertIn("15 (analyze differential peaks post-DE)", description)
         self.assertNotIn("internal", description)
         self.assertNotIn("16", description)
+
+    def test_forced_step_cleanup_tolerates_missing_tree(self):
+        with TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "pipeline-owned-output"
+            remove_tree_tolerating_missing(target)
+            target.mkdir()
+            (target / "result.tsv").write_text("result\n")
+            remove_tree_tolerating_missing(target)
+            self.assertFalse(target.exists())
 
 
 if __name__ == "__main__":
