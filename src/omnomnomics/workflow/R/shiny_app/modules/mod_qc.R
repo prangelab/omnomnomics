@@ -3,7 +3,7 @@ mod_qc_ui <- function(id) {
   shiny::tagList(
     shiny::h3("Shared QC"),
     shiny::fluidRow(
-      shiny::column(3, shiny::numericInput(ns("top_n"), "Top variable genes", value = 1000, min = 100, step = 100)),
+      shiny::column(3, shiny::numericInput(ns("top_n"), "Top variable features", value = 1000, min = 100, step = 100)),
       shiny::column(3, shiny::selectInput(ns("pc_x"), "X axis", choices = c("PC1", "PC2", "PC3"), selected = "PC1")),
       shiny::column(3, shiny::selectInput(ns("pc_y"), "Y axis", choices = c("PC1", "PC2", "PC3"), selected = "PC2")),
       shiny::column(3, shiny::downloadButton(ns("download_pca"), "Download PCA PDF"))
@@ -17,7 +17,7 @@ mod_qc_ui <- function(id) {
     shiny::plotOutput(ns("pca_plot"), height = "560px"),
     shiny::h4("Sample Distance Heatmap"),
     shiny::plotOutput(ns("distance_plot"), height = "620px"),
-    shiny::h4("Top Variable Genes Heatmap"),
+    shiny::h4("Top Variable Features Heatmap"),
     shiny::plotOutput(ns("topvar_heatmap"), height = "700px"),
     shiny::h4("Filtering Summary"),
     shiny::tableOutput(ns("filtering_tbl")),
@@ -242,7 +242,7 @@ mod_qc_server <- function(id, project_index, metadata) {
             ggplot2::theme_light() +
             ggplot2::theme(panel.grid = ggplot2::element_blank()) +
             ggplot2::xlab("Sample") +
-            ggplot2::ylab("Genes with Cook's distance > 10")
+            ggplot2::ylab("Features with Cook's distance > 10")
         })
 
         output$cooks_q99_plot <- shiny::renderPlot({

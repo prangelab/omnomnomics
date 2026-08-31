@@ -3,7 +3,7 @@ mod_heatmap_ui <- function(id) {
   shiny::tagList(
     shiny::h3("Heatmap"),
     shiny::fluidRow(
-      shiny::column(3, shiny::numericInput(ns("top_n"), "Top genes", value = 50, min = 2, step = 1)),
+      shiny::column(3, shiny::numericInput(ns("top_n"), "Top features", value = 50, min = 2, step = 1)),
       shiny::column(3, shiny::checkboxInput(ns("zscore_rows"), "Row z-score", value = TRUE)),
       shiny::column(6, shiny::downloadButton(ns("download_heatmap"), "Download Heatmap PDF"))
     ),
@@ -94,7 +94,7 @@ mod_heatmap_server <- function(id, project_index, selected_contrast, filtered_ta
       if (is.null(hmd$mat) || !nrow(hmd$mat)) {
         return(hmd$reason)
       }
-      paste0("Rendering ", hmd$n_genes, " genes across ", hmd$n_samples, " samples.")
+      paste0("Rendering ", hmd$n_genes, " features across ", hmd$n_samples, " samples.")
     })
 
     output$heatmap_plot <- shiny::renderPlot({

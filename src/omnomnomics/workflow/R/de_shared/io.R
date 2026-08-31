@@ -9,6 +9,24 @@ normalize_existing_dir <- function(path_value, label = "directory") {
   resolved
 }
 
+de_table_suffixes <- c("genes", "peaks", "gene_bodies", "bins")
+
+de_table_pattern <- function() {
+  paste0("\\.diff_(", paste(de_table_suffixes, collapse = "|"), ")\\.DESeq2\\.txt$")
+}
+
+find_contrast_de_table <- function(contrast_dir, contrast_label) {
+  candidates <- file.path(
+    contrast_dir,
+    paste0(contrast_label, ".diff_", de_table_suffixes, ".DESeq2.txt")
+  )
+  existing <- candidates[file.exists(candidates)]
+  if (length(existing) == 0) {
+    return(NA_character_)
+  }
+  existing[[1]]
+}
+
 resolve_de_root <- function(path_value) {
   root <- normalize_existing_dir(path_value, "Input directory")
   if (basename(root) == "DE_calling") {
@@ -46,7 +64,7 @@ list_analysis_dirs <- function(de_root) {
     }
     nested <- list.dirs(one_dir, recursive = FALSE, full.names = TRUE)
     any(vapply(nested, function(candidate) {
-      length(list.files(candidate, pattern = "\\.diff_genes\\.DESeq2\\.txt$", full.names = TRUE)) > 0
+      length(list.files(candidate, pattern = de_table_pattern(), full.names = TRUE)) > 0
     }, logical(1)))
   }, logical(1))
 
@@ -57,6 +75,7 @@ index_contrasts <- function(analysis_dir) {
   analysis_dir <- normalize_existing_dir(analysis_dir, "analysis directory")
   manifest_path <- file.path(analysis_dir, "contrast_plan.tsv")
   contrast_labels <- character(0)
+  manifest_tbl <- NULL
 
   if (file.exists(manifest_path)) {
     manifest_tbl <- utils::read.table(
@@ -77,7 +96,7 @@ index_contrasts <- function(analysis_dir) {
   if (length(contrast_labels) == 0) {
     candidate_dirs <- list.dirs(analysis_dir, recursive = FALSE, full.names = TRUE)
     contrast_labels <- basename(candidate_dirs[vapply(candidate_dirs, function(one_dir) {
-      length(list.files(one_dir, pattern = "\\.diff_genes\\.DESeq2\\.txt$", full.names = TRUE)) > 0
+      length(list.files(one_dir, pattern = de_table_pattern(), full.names = TRUE)) > 0
     }, logical(1))])
   }
 
@@ -98,13 +117,13 @@ index_contrasts <- function(analysis_dir) {
   contrast_labels <- sort(unique(contrast_labels))
   rows <- lapply(contrast_labels, function(label) {
     contrast_dir <- file.path(analysis_dir, label)
-    de_table <- file.path(contrast_dir, paste0(label, ".diff_genes.DESeq2.txt"))
+    de_table <- find_contrast_de_table(contrast_dir, label)
     sig_table <- file.path(contrast_dir, paste0(label, ".sig_only.tsv"))
     combined_plot <- file.path(contrast_dir, paste0(label, ".combined_summary.pdf"))
-    data.frame(
+    row <- data.frame(
       contrast_id = label,
       contrast_dir = contrast_dir,
-      de_table = if (file.exists(de_table)) de_table else NA_character_,
+      de_table = de_table,
       sig_table = if (file.exists(sig_table)) sig_table else NA_character_,
       clusterprofiler_dir = if (dir.exists(file.path(contrast_dir, "clusterProfiler"))) file.path(contrast_dir, "clusterProfiler") else NA_character_,
       decoupler_dir = if (dir.exists(file.path(contrast_dir, "decoupler"))) file.path(contrast_dir, "decoupler") else NA_character_,
@@ -112,6 +131,15 @@ index_contrasts <- function(analysis_dir) {
       combined_summary_plot = if (file.exists(combined_plot)) combined_plot else NA_character_,
       stringsAsFactors = FALSE
     )
+    if (!is.null(manifest_tbl) && "contrast_label" %in% colnames(manifest_tbl)) {
+      manifest_idx <- match(label, as.character(manifest_tbl$contrast_label))
+      if (!is.na(manifest_idx)) {
+        for (column in setdiff(colnames(manifest_tbl), "contrast_label")) {
+          row[[column]] <- manifest_tbl[[column]][[manifest_idx]]
+        }
+      }
+    }
+    row
   })
 
   out <- do.call(rbind, rows)

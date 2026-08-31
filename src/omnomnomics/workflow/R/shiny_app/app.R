@@ -1,7 +1,7 @@
 source("global.R", local = TRUE)
 
 app_ui <- shiny::fluidPage(
-  shiny::titlePanel("omnomnomics DE Explorer"),
+  shiny::titlePanel("omnomnomics Differential Explorer"),
   shiny::fluidRow(
     shiny::column(
       width = 4,

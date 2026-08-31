@@ -6,7 +6,7 @@ mod_de_table_ui <- function(id) {
       shiny::column(3, shiny::numericInput(ns("padj_max"), "padj <=", value = 0.05, min = 0, max = 1, step = 0.001)),
       shiny::column(3, shiny::numericInput(ns("lfc_min"), "|log2FC| >=", value = 1, min = 0, step = 0.1)),
       shiny::column(3, shiny::numericInput(ns("base_mean_min"), "baseMean >=", value = 0, min = 0, step = 1)),
-      shiny::column(3, shiny::textInput(ns("gene_query"), "Gene search", value = ""))
+      shiny::column(3, shiny::textInput(ns("gene_query"), "Feature search", value = ""))
     ),
     shiny::fluidRow(
       shiny::column(6, shiny::downloadButton(ns("download_filtered"), "Download Filtered TSV")),

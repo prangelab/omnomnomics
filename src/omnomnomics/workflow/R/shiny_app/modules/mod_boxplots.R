@@ -1,15 +1,15 @@
 mod_boxplots_ui <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(
-    shiny::h3("Top-Gene Boxplots"),
+    shiny::h3("Feature Boxplots"),
     shiny::fluidRow(
-      shiny::column(3, shiny::numericInput(ns("top_n"), "Top genes", value = 10, min = 1, step = 1)),
-      shiny::column(3, shiny::radioButtons(ns("gene_mode"), "Gene source", choices = c("Top N" = "top_n", "Custom gene" = "custom"), selected = "top_n", inline = TRUE)),
+      shiny::column(3, shiny::numericInput(ns("top_n"), "Top features", value = 10, min = 1, step = 1)),
+      shiny::column(3, shiny::radioButtons(ns("gene_mode"), "Feature source", choices = c("Top N" = "top_n", "Custom feature" = "custom"), selected = "top_n", inline = TRUE)),
       shiny::column(3, shiny::selectInput(ns("group_col"), "Group column", choices = character(0))),
       shiny::column(3, shiny::downloadButton(ns("download_boxplot"), "Download Boxplot PDF"))
     ),
     shiny::verbatimTextOutput(ns("status")),
-    shiny::selectizeInput(ns("gene_pick"), "Gene", choices = character(0), options = list(placeholder = "Select or search a gene")),
+    shiny::selectizeInput(ns("gene_pick"), "Feature", choices = character(0), options = list(placeholder = "Select or search a feature")),
     shiny::plotOutput(ns("boxplot"), height = "520px")
   )
 }
@@ -201,7 +201,7 @@ mod_boxplots_server <- function(id, project_index, selected_contrast, filtered_t
         ggplot2::geom_boxplot(outlier.shape = NA) +
         ggplot2::geom_jitter(width = 0.15, size = 2, alpha = 0.8) +
         ggplot2::xlab(group_col) +
-        ggplot2::ylab("VST expression") +
+        ggplot2::ylab("VST abundance") +
         ggplot2::ggtitle(gene_label) +
         ggplot2::theme_light() +
         ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none")
@@ -226,8 +226,8 @@ mod_boxplots_server <- function(id, project_index, selected_contrast, filtered_t
       filename = function() {
         contrast_obj <- selected_contrast()
         contrast_label <- if (is.null(contrast_obj) || nrow(contrast_obj) == 0) "contrast" else as.character(contrast_obj$contrast_id[[1]])
-            gene <- if (nzchar(input$gene_pick)) input$gene_pick else "gene"
-            paste0(contrast_label, ".", gene, ".boxplot.shiny.pdf")
+        gene <- if (nzchar(input$gene_pick)) input$gene_pick else "feature"
+        paste0(contrast_label, ".", gene, ".boxplot.shiny.pdf")
         },
       content = function(file) {
         df <- boxplot_df()
