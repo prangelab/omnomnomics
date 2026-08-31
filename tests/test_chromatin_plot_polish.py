@@ -60,6 +60,18 @@ def test_centered_signal_heatmaps_label_distance_in_kilobases():
     assert "--xAxisLabel 'distance from center (bp)'" not in post_de
 
 
+def test_post_de_genebody_signal_uses_scaled_gene_body_geometry():
+    post_de = (RULES_DIR / "16.analyze_peaks_de.smk").read_text()
+
+    assert 'params.broad_mode == "genebody"' in post_de
+    assert 'set_type in {"de_significant", "de_up", "de_down", "top_de_ranked"}' in post_de
+    assert '"scale-regions:-1000:+1000:body5000:bin50:skipZeros"' in post_de
+    assert 'f"computeMatrix scale-regions "' in post_de
+    assert 'f"--regionBodyLength 5000 --skipZeros --binSize 50 "' in post_de
+    assert 'scaled_gene_body = body > 0' in post_de
+    assert 'ax.set_xticklabels([f"-{upstream / 1000.0:.0f} kb", "TSS", "TES", f"+{downstream / 1000.0:.0f} kb"])' in post_de
+
+
 def test_domain_mode_uses_domain_labels_and_readable_chromatin_plots():
     de_rule = (RULES_DIR / "15.call_DE_chrom.smk").read_text()
     chrom_template = (TEMPLATES_DIR / "de_core_chrom.R.tmpl").read_text()

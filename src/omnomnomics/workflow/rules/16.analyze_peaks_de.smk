@@ -826,10 +826,15 @@ rule analyze_peaks_de:
                                 counts[sample_index][bin_index] += 1
 
                 upstream = int(matrix_header.get("upstream", [1000])[0] or 1000)
+                body = int(matrix_header.get("body", [0])[0] or 0)
                 downstream = int(matrix_header.get("downstream", [1000])[0] or 1000)
                 bin_size = int(matrix_header.get("bin size", [100])[0] or 100)
                 n_bins = bin_counts[0]
-                x_values = [(-upstream + (index + 0.5) * bin_size) / 1000.0 for index in range(n_bins)]
+                scaled_gene_body = body > 0
+                if scaled_gene_body:
+                    x_values = [(index + 0.5) * bin_size / 1000.0 for index in range(n_bins)]
+                else:
+                    x_values = [(-upstream + (index + 0.5) * bin_size) / 1000.0 for index in range(n_bins)]
                 profiles = []
                 for sample_index in range(n_samples):
                     sample_profile = []
@@ -876,13 +881,22 @@ rule analyze_peaks_de:
                     )
                     lines.append(line)
 
-                ax.axvline(0, color="#555555", linewidth=1.0, alpha=0.6)
                 ax.set_title(region_label, fontsize=16, pad=12)
-                ax.set_xlabel("distance from center (kb)", fontsize=12)
                 ax.set_ylabel("normalized signal", fontsize=12)
-                ax.set_xlim(-upstream / 1000.0, downstream / 1000.0)
-                ax.set_xticks([-upstream / 1000.0, 0, downstream / 1000.0])
-                ax.set_xticklabels([f"-{upstream / 1000.0:.1f}", "center", f"{downstream / 1000.0:.1f}"])
+                if scaled_gene_body:
+                    total_length = upstream + body + downstream
+                    ax.axvline(upstream / 1000.0, color="#555555", linewidth=1.0, alpha=0.6)
+                    ax.axvline((upstream + body) / 1000.0, color="#555555", linewidth=1.0, alpha=0.6)
+                    ax.set_xlabel("gene body scaled to 5 kb", fontsize=12)
+                    ax.set_xlim(0, total_length / 1000.0)
+                    ax.set_xticks([0, upstream / 1000.0, (upstream + body) / 1000.0, total_length / 1000.0])
+                    ax.set_xticklabels([f"-{upstream / 1000.0:.0f} kb", "TSS", "TES", f"+{downstream / 1000.0:.0f} kb"])
+                else:
+                    ax.axvline(0, color="#555555", linewidth=1.0, alpha=0.6)
+                    ax.set_xlabel("distance from center (kb)", fontsize=12)
+                    ax.set_xlim(-upstream / 1000.0, downstream / 1000.0)
+                    ax.set_xticks([-upstream / 1000.0, 0, downstream / 1000.0])
+                    ax.set_xticklabels([f"-{upstream / 1000.0:.1f}", "center", f"{downstream / 1000.0:.1f}"])
                 ax.spines["top"].set_visible(False)
                 ax.spines["right"].set_visible(False)
                 ax.grid(True, axis="y", color="#dddddd", linewidth=0.8)
@@ -973,15 +987,25 @@ rule analyze_peaks_de:
                 matrix_path = os.path.join(matrices_dir, f"{safe_name}.matrix.gz")
                 heatmap_path = os.path.join(heatmaps_dir, f"{safe_name}.heatmap.pdf")
                 profile_path = os.path.join(profiles_dir, f"{safe_name}.profile.pdf")
+                scale_gene_bodies = (
+                    params.thetype == "CHIP"
+                    and params.broad_mode == "genebody"
+                    and set_type in {"de_significant", "de_up", "de_down", "top_de_ranked"}
+                )
                 cap_reason = ""
                 if int(item["peak_count"]) > signal_region_count:
                     cap_reason = f"signal input capped at first {signal_region_count} of {item['peak_count']} regions"
+                matrix_strategy = (
+                    "scale-regions:-1000:+1000:body5000:bin50:skipZeros"
+                    if scale_gene_bodies
+                    else "reference-point:center:-1000:+1000:bin100:missingDataAsZero"
+                )
                 signal_signature = (
                     file_sha256(signal_bed_path),
                     tuple(bigwigs),
                     tuple(sample_labels),
                     region_label,
-                    "reference-point:center:-1000:+1000:bin100:missingDataAsZero",
+                    matrix_strategy,
                 )
                 cached = signal_artifact_cache.get(signal_signature)
                 if cached:
@@ -995,33 +1019,52 @@ rule analyze_peaks_de:
                         [item["set_name"], "REUSE", bed_path, signal_bed_path, matrix_path, heatmap_path, "; ".join(reason_parts)]
                     )
                     continue
-                shell(
-                    f"computeMatrix reference-point --referencePoint center -b 1000 -a 1000 "
-                    f"-R {quote(signal_bed_path)} -S {' '.join(quote(x) for x in bigwigs)} "
-                    f"--missingDataAsZero --binSize 100 --numberOfProcessors {deeptools_threads} -o {quote(matrix_path)}"
-                )
+                if scale_gene_bodies:
+                    shell(
+                        f"computeMatrix scale-regions "
+                        f"-R {quote(signal_bed_path)} -S {' '.join(quote(x) for x in bigwigs)} "
+                        f"--beforeRegionStartLength 1000 --afterRegionStartLength 1000 "
+                        f"--regionBodyLength 5000 --skipZeros --binSize 50 "
+                        f"--numberOfProcessors {deeptools_threads} -o {quote(matrix_path)}"
+                    )
+                else:
+                    shell(
+                        f"computeMatrix reference-point --referencePoint center -b 1000 -a 1000 "
+                        f"-R {quote(signal_bed_path)} -S {' '.join(quote(x) for x in bigwigs)} "
+                        f"--missingDataAsZero --binSize 100 --numberOfProcessors {deeptools_threads} -o {quote(matrix_path)}"
+                    )
                 heatmap_sample_labels = [
                     re.sub(r"_(rep[0-9]+)$", r"\n\1", label)
                     for label in sample_labels
                 ]
-                shell(
-                    f"plotHeatmap -m {quote(matrix_path)} -out {quote(heatmap_path)} "
-                    f"--whatToShow 'heatmap and colorbar' --sortRegions descend "
-                    f"--regionsLabel {quote(region_label)} "
-                    f"--samplesLabel {' '.join(quote(label) for label in heatmap_sample_labels)} "
-                    f"--xAxisLabel 'distance from center (kb)' --refPointLabel center"
-                )
+                if scale_gene_bodies:
+                    shell(
+                        f"plotHeatmap -m {quote(matrix_path)} -out {quote(heatmap_path)} "
+                        f"--whatToShow 'heatmap and colorbar' --sortRegions descend "
+                        f"--regionsLabel {quote(region_label)} "
+                        f"--samplesLabel {' '.join(quote(label) for label in heatmap_sample_labels)} "
+                        f"--startLabel TSS --endLabel TES --xAxisLabel 'gene body scaled to 5 kb'"
+                    )
+                else:
+                    shell(
+                        f"plotHeatmap -m {quote(matrix_path)} -out {quote(heatmap_path)} "
+                        f"--whatToShow 'heatmap and colorbar' --sortRegions descend "
+                        f"--regionsLabel {quote(region_label)} "
+                        f"--samplesLabel {' '.join(quote(label) for label in heatmap_sample_labels)} "
+                        f"--xAxisLabel 'distance from center (kb)' --refPointLabel center"
+                    )
                 try:
                     render_profile_from_matrix(matrix_path, profile_path, region_label, sample_labels)
                 except Exception as exc:
                     if not tool_available("plotProfile"):
                         raise RuntimeError(f"Custom profile rendering failed for {item['set_name']}, and plotProfile is not available: {exc}") from exc
                     log_it(logfile, f"Custom profile rendering failed for {item['set_name']}: {exc}. Falling back to deepTools plotProfile.")
+                    profile_labels = "--startLabel TSS --endLabel TES" if scale_gene_bodies else "--refPointLabel center"
                     shell(
                         f"plotProfile -m {quote(matrix_path)} -out {quote(profile_path)} "
                         f"--perGroup --regionsLabel {quote(region_label)} "
                         f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
-                        f"--refPointLabel center "
+                        f"{profile_labels} "
                         f"--yAxisLabel 'normalized signal' --legendLocation upper-right "
                         f"--plotWidth 10 --plotHeight 6"
                     )
