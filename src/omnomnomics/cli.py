@@ -28,6 +28,7 @@ import json
 from pathlib import Path
 from datetime import date, datetime
 
+from omnomnomics import __version__
 from omnomnomics.de_config import DEConfigError, resolve_de_config
 from omnomnomics.genomes import genomes_main
 from omnomnomics.helpers import create_track_color_table_main, display_track_color_table_main
@@ -213,6 +214,7 @@ Assay workflow commands:
   omnomnomics chip  ...   Run ChIP-seq workflow
 
 Utility commands:
+  omnomnomics --version                 Show the installed version
   omnomnomics monitor                   Monitor latest run log
   omnomnomics de-app                    Launch DE Shiny app
   omnomnomics genomes ...               Genome helper subcommands
@@ -1582,6 +1584,9 @@ def main():
         print_top_level_help(exit_code=1)
     if len(sys.argv) > 1 and sys.argv[1] in {"-h", "--help"}:
         print_top_level_help(exit_code=0)
+    if len(sys.argv) > 1 and sys.argv[1] in {"-V", "--version"}:
+        print(f"omnomnomics {__version__}")
+        return
 
     forwarded_argv = None
     assay = None

@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "omnomnomics"
-version = "0.5.0"
+version = "0.6.0"
 description = "Installable Snakemake application for modular RNA-seq, ATAC-seq, and ChIP-seq processing on HPC systems."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
-  { name = "Koen Prange", email = "info@prangelab.org" }
+  { name = "Koen H. Prange", email = "info@prangelab.org" }
 ]
 dependencies = [
   "genomepy>=0.16",
@@ -21,6 +21,11 @@ dependencies = [
 
 [project.scripts]
 omnomnomics = "omnomnomics.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/prangelab/omnomnomics"
+Repository = "https://github.com/prangelab/omnomnomics"
+Issues = "https://github.com/prangelab/omnomnomics/issues"
 
 [tool.setuptools]
 include-package-data = true

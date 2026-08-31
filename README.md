@@ -7,7 +7,7 @@
 
 </div>
 
-_Omnomnomics is an A-Z processing NGS pipeline of RNA-, ChIP-, or ATAC-seq data. Trim FASTQ files, run FASTQC, map to different genomes, and post-process the the BAM files with many different options._
+_Omnomnomics is an A-Z processing NGS pipeline for RNA-, ChIP-, and ATAC-seq data. It trims FASTQ files, runs FastQC, aligns reads, performs assay-aware downstream analysis, and records the resulting workflow provenance._
 
 ## Quickstart:
 In a rush? Once the environment is installed, you should be able to run:
@@ -23,6 +23,7 @@ For more information about how to use Omnomnomics, see the usage section down be
 
 Packaged helper verbs are also available:
 ```bash
+omnomnomics --version
 omnomnomics genomes --help
 omnomnomics create-track-color-table -h
 omnomnomics display-track-color-table -h
@@ -134,54 +135,26 @@ omnomnomics rna -i path/to/your/experiment_dir -g genome_to_use
 
 ## Directory Structures
 ```
-OMNOM_HOME
+INSTALLATION
 |
-|- bin
-     |- color_data_for_hubs
-		|- all color tables...
-     |- homer
-	   |- configureHomer.pl
-	     |- scripts 
-	  	    |- createTrackColorTable.sh  (helper to build track color tables)
-	  	    |- displayTrackColorTable.sh (helper to preview track color tables)
-      |- config.yaml (master config file for user defined variables)
-	    
-|- genomes
-      |- assemblies
-      	   |- <assembly_name>
-      	        |- fasta/genome.fa
-      	        |- annotation/genes.gtf
-      	        |- star/
-      	        |- hisat2/
-      	        |- aux/
-           |- motif_databases/
-|- rules
-     |- 1.trim_skewer.smk
-     |- 2.fastqc.smk
-     |- 3.align_reads_hisat2.smk
-     |- 3.align_reads_STAR.smk
-     |- 3.align_reads_STAR_TE.smk
-     |- 4.merge_lanes_and_clean_names.smk
-     |- 5.touchup_bam.smk
-     |- 6.index_bam.smk
-     |- 7.bam_stats.smk
-     |- 8.create_wiggles.smk
-     |- 9.merge_wiggles.smk
-     |- 10.call_peaks.smk
-     |- 11.count_reads.smk
-     |- 12.call_DE.smk
-     |- 13.peak_qc.smk
-     |- 14.analyze_peaks.smk
-     |- 15.call_DE_chrom.smk
-     |- 16.analyze_peaks_de.smk
-     |- 13.make_HOMER_tagDIR.smk   (optional export rule triggered by --create-homer-tagdirs; not part of the public numbered workflow)
-|- slurm_profile
-	|- config.yaml (slurm config file)
-|- src
-    |- omnomnomics
-        |- cli.py
-        |- workflow
-            |- Snakefile.smk
+|- environment.yml
+|- environment.idr.yml
+|- environment.spp.yml
+|- scripts/
+|- src/omnomnomics/
+     |- cli.py
+     |- workflow/ (packaged configuration, rules, templates, R code, and Slurm profile)
+
+REFERENCE_ROOT
+|
+|- assemblies
+     |- <assembly_name>
+          |- fasta/genome.fa
+          |- annotation/genes.gtf
+          |- star/
+          |- hisat2/
+          |- aux/
+|- motif_databases/
 
 
 

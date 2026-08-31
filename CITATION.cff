@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use omnomnomics, please cite the archived software release and the accompanying publication."
+title: "omnomnomics"
+type: software
+version: 0.6.0
+authors:
+  - family-names: Prange
+    given-names: Koen H.
+repository-code: "https://github.com/prangelab/omnomnomics"
+url: "https://github.com/prangelab/omnomnomics"
+license: MIT
+keywords:
+  - RNA-seq
+  - ATAC-seq
+  - ChIP-seq
+  - Snakemake
+  - high-performance computing
