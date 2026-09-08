@@ -21,9 +21,11 @@ dependencies = [
 
 [project.scripts]
 omnomnomics = "omnomnomics.cli:main"
+omnomnomics-de-app = "omnomnomics.de_app:main"
 
 [project.urls]
 Homepage = "https://github.com/prangelab/omnomnomics"
+Documentation = "https://prangelab.org/omnomnomics/"
 Repository = "https://github.com/prangelab/omnomnomics"
 Issues = "https://github.com/prangelab/omnomnomics/issues"
 

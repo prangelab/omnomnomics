@@ -29,6 +29,7 @@ dependencies:
   - r-dplyr
   - r-tidyr
   - r-tibble
+  - r-shiny
   - genomepy>=0.16
   - snakemake>=7.25,<8
   - multiqc

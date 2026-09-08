@@ -11,6 +11,7 @@ All notable changes to this project are documented in this file.
 - Explicit biological- and technical-replicate handling with independent processing before BAM-level technical-replicate merging.
 - Metadata-driven chromatin differential analysis with peak/region/gene annotations, assay-aware QC, enrichment, motif analysis, and signal profiles.
 - Packaged Differential Explorer support for gene, peak, gene-body, and bin result trees.
+- Added Shiny to the main environment and a lightweight `omnomnomics-explorer` environment with a standalone `omnomnomics-de-app` launcher for local result inspection.
 - ATAC/ChIP SPP, FRiP, and library-complexity QC with configurable deterministic subsampling caps.
 - Genome helper support for normalized genomepy installations, direct HISAT2/STAR index construction, blacklist retrieval, and persistent motif-database caching.
 - Assay-specific public stage maps that hide internal workflow rule numbering.

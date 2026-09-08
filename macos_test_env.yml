@@ -5,6 +5,7 @@ channels:
   - defaults
 dependencies:
   - python=3.11
+  - pytest=8.4.2
   - pip
   - pyyaml
   - pysam

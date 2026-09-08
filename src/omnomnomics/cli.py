@@ -29,6 +29,7 @@ from pathlib import Path
 from datetime import date, datetime
 
 from omnomnomics import __version__
+from omnomnomics.de_app import main as de_app_main
 from omnomnomics.de_config import DEConfigError, resolve_de_config
 from omnomnomics.genomes import genomes_main
 from omnomnomics.helpers import create_track_color_table_main, display_track_color_table_main
@@ -180,29 +181,6 @@ def parse_monitor_arguments(argv):
    return args
 
 
-def parse_de_app_arguments(argv):
-   parser = argparse.ArgumentParser(
-       description="Launch the omnomnomics DE Shiny app.",
-       allow_abbrev=False,
-   )
-   parser.add_argument(
-       "-i",
-       "--project-dir",
-       default=".",
-       help="Project directory or DE_calling directory to pre-load in the app. Default: current directory",
-   )
-   parser.add_argument("--host", default="127.0.0.1", help="Host interface for Shiny. Default: 127.0.0.1")
-   parser.add_argument("--port", type=int, default=3838, help="Port for Shiny. Default: 3838")
-   parser.add_argument(
-       "--no-browser",
-       action="store_true",
-       help="Do not auto-open a browser window.",
-   )
-   args, unknown = parser.parse_known_args(argv)
-   if unknown:
-       parser.error(f"Unrecognized arguments: {' '.join(unknown)}")
-   return args
-
 
 def print_top_level_help(exit_code=0):
    help_text = """
@@ -216,7 +194,7 @@ Assay workflow commands:
 Utility commands:
   omnomnomics --version                 Show the installed version
   omnomnomics monitor                   Monitor latest run log
-  omnomnomics de-app                    Launch DE Shiny app
+  omnomnomics de-app                    Launch the Differential Explorer
   omnomnomics genomes ...               Genome helper subcommands
   omnomnomics create-track-color-table  Build custom track color table
   omnomnomics display-track-color-table Preview an existing track color table
@@ -561,35 +539,6 @@ def monitor_main(argv):
                print("Monitor stopped.")
                return
 
-
-def de_app_main(argv):
-   args = parse_de_app_arguments(argv)
-   app_dir = WORKFLOW_ROOT / "R" / "shiny_app"
-   app_entry = app_dir / "app.R"
-   if not app_entry.is_file():
-       print(f"Shiny app entry file '{app_entry}' does not exist. Aborting...", file=sys.stderr)
-       sys.exit(1)
-
-   project_dir = str(Path(args.project_dir).expanduser().resolve())
-   env = os.environ.copy()
-   env["OMNOMNOMICS_DE_APP_PROJECT"] = project_dir
-
-   launch_browser = "FALSE" if args.no_browser else "TRUE"
-   app_dir_r = json.dumps(str(app_dir))
-   host_r = json.dumps(str(args.host))
-   r_expr = (
-       f"shiny::runApp({app_dir_r}, "
-       f"host={host_r}, "
-       f"port={int(args.port)}, "
-       f"launch.browser={launch_browser})"
-   )
-   cmd = ["Rscript", "-e", r_expr]
-   try:
-       completed = subprocess.run(cmd, env=env)
-   except FileNotFoundError:
-       print("Rscript was not found in PATH. Activate an environment with R installed and retry.", file=sys.stderr)
-       sys.exit(1)
-   sys.exit(completed.returncode)
 
 def parse_arguments(argv=None):
    #Parse command-line arguments
@@ -1602,8 +1551,7 @@ def main():
         monitor_main(sys.argv[2:])
         return
     if len(sys.argv) > 1 and sys.argv[1] == "de-app":
-        de_app_main(sys.argv[2:])
-        return
+        sys.exit(de_app_main(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "create-track-color-table":
         original_argv = sys.argv[:]
         try:

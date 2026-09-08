@@ -1,4 +1,4 @@
-required_packages <- c("shiny")
+required_packages <- c("shiny", "ggplot2", "pheatmap")
 missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
 if (length(missing_packages) > 0) {
   stop("Missing required R packages for DE explorer app: ", paste(missing_packages, collapse = ", "))
