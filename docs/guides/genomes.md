@@ -1,7 +1,8 @@
 # Genomes and annotations
 
-Reference assemblies are managed outside the code checkout. Omnomnomics uses a
-normalized assembly layout:
+Omnomnomics stores installed genome resources in a dedicated reference
+directory, separate from the software installation and individual experiment
+directories. Each assembly uses a normalized layout:
 
 ```text
 REFERENCE_ROOT/

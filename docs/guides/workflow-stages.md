@@ -18,7 +18,7 @@ Step 5 runs `samtools collate`, `fixmate`, `sort`, `markdup`, and `view`.
 Duplicates are kept by default for RNA and removed by default for ATAC and ChIP.
 Use `--keep-duplicates` or `--remove-duplicates` to override the assay default.
 
-## RNA public stages
+## RNA follow-up steps
 
 | Step | Stage |
 | --- | --- |
@@ -26,7 +26,7 @@ Use `--keep-duplicates` or `--remove-duplicates` to override the assay default.
 | 11 | Create count table |
 | 12 | Differential expression |
 
-## ATAC and ChIP public stages
+## ATAC and ChIP follow-up steps
 
 | Step | Stage |
 | --- | --- |
@@ -37,12 +37,13 @@ Use `--keep-duplicates` or `--remove-duplicates` to override the assay default.
 | 14 | Differential chromatin analysis |
 | 15 | Post-DE peak interpretation |
 
-Public stage numbers are stable user interfaces. They are translated to the
-appropriate internal Snakemake rules for each assay.
+These assay-specific step numbers are the stable user interface used by `-j`,
+the monitor, and the run logs. Omnomnomics maps them to the required Snakemake
+rules for each assay.
 
 ## Selecting stages
 
-`-j auto` and `-j all` select the full public assay workflow. Ranges and comma-
+`-j auto` and `-j all` select the full assay workflow. Ranges and comma-
 separated selections are accepted:
 
 ```bash

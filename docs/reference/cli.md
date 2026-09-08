@@ -20,7 +20,7 @@ omnomnomics genomes --help
 | `-j`, `--mode` | `auto`, `all`, a range, or a comma-separated selection |
 | `-m`, `--metadata` | tabular metadata whose first column is `filename` |
 | `-T`, `--trim-tool` | `skewer` or `fastp`; default is Skewer |
-| `-M`, `--map-tool` | HISAT2, STAR, or STAR-TE where supported |
+| `-M`, `--map-tool` | RNA mapper: HISAT2, STAR, or the lab-specific, multimapping-permissive STAR-TE preset |
 | `--dry-run` | validate and construct the DAG without submission |
 | `--rerun-selected-steps` | delete and recompute selected stage outputs |
 | `--site-config` | override the discovered user site configuration |

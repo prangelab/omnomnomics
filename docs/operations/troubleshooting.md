@@ -40,16 +40,6 @@ Check the project compute budget and site submission pacing. On Snellius:
 budget-overview -p rome
 ```
 
-## Missing HOMER genome
-
-Optional HOMER export requires separately installed HOMER genome data:
-
-```bash
-configureHomer.pl -install hg38
-```
-
-Common aliases are `GRCh38`/`GRCh38.p14` to `hg38` and `GRCm39` to `mm39`.
-
 ## Finding the actual error
 
 The final controller lines often only report that a worker failed. Find the rule

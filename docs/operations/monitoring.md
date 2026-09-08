@@ -6,7 +6,7 @@ Start the terminal monitor with:
 omnomnomics monitor -i EXPERIMENT
 ```
 
-The step table uses public assay step numbers and distinguishes running,
+The step table uses the assay step numbers accepted by `-j` and distinguishes running,
 pending/waiting, completed, and failed work. A later step can run for one sample
 while an earlier step is still completing other samples because Snakemake
 schedules dependencies per output, not as global barriers.

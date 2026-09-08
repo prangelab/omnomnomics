@@ -40,10 +40,7 @@ nav:
       - CLI reference: reference/cli.md
       - Outputs: reference/outputs.md
       - Changelog: changelog.md
-  - Development:
       - Contributing: contributing.md
-      - Pre-DE peak analysis specification: analyze_peaks_pre_de_spec.md
-      - Post-DE peak analysis specification: analyze_peaks_de_spec.md
 
 extra_css:
   - stylesheets/extra.css

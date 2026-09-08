@@ -307,14 +307,14 @@ Post-processing steps:
 8:	Create BigWigs
 9:	Merge Bigwigs and trackhubs by experimental group. Optional, will even in 'auto' mode only be run if the -E flag is set. See below.
 
-Assay dependent follow-up steps use assay-specific public numbering:
+Assay-dependent follow-up steps use assay-specific numbering:
 
-RNA public steps:
+RNA follow-up steps:
 10:	Create trackhubs
 11:	Create count table
 12:	Call DE genes (DESeq2)
 
-ATAC public steps:
+ATAC follow-up steps:
 10:	Call peaks
 11:	Peak QC
 12:	Analyze peaks (pre-DE)
@@ -322,7 +322,7 @@ ATAC public steps:
 14:	Call differential chromatin regions
 15:	Analyze differential peaks (post-DE)
 
-ChIP public steps:
+ChIP follow-up steps:
 10:	Call peaks
 11:	Peak QC
 12:	Analyze peaks (pre-DE)
@@ -336,7 +336,7 @@ Optional export:
 
 
 Auto mode:
-		By default runs the whole public pipeline. i.e., sets mode to 'all'
+		By default runs the whole assay pipeline. i.e., sets mode to 'all'
 		Will detect an aborted run (e.g. cancelled by user using scancel or requeued by slurm due to resouce constraints)
 		If an aborted run is detected, 'auto' mode will restart the run after the last succesfully completed step.
 		Optional HOMER tag directory export is not part of the numbered pipeline. Add `--create-homer-tagdirs` if you want it.
@@ -357,7 +357,7 @@ Some job mode examples:
 					Input is the 'FASTQ' folder inside your <EXPERIMENT_DIR>, which contains the .fastq.gz files you want analysed.
 	-j 1,3,5,6,10-12:	Trim the reads, map, touch up, create index, and run the assay dependent follow-up. Skip QC, merging, and BigWigs.
 					Input is the 'FASTQ' folder inside your <EXPERIMENT_DIR>, which contains the .fastq.gz files you want analysed.
-	-j 1-12 --create-homer-tagdirs:	Run the full public RNA pipeline and also export optional HOMER tag directories.
+	-j 1-12 --create-homer-tagdirs:	Run the full RNA pipeline and also export optional HOMER tag directories.
 					Input is the 'FASTQ' folder inside your <EXPERIMENT_DIR>, which contains the .fastq.gz files you want analysed.
 ```
 
@@ -522,7 +522,7 @@ Utility commands:
   `omnomnomics display-track-color-table`
 
 ### DE quick notes
-- RNA DE is public step 12 and requires RNA count-table input from step 11 plus a metadata table (`-m`).
+- RNA DE is step 12 and requires RNA count-table input from step 11 plus a metadata table (`-m`).
 - Use `--de-columns` and `--de-block` for automatic grouped design generation, or `--de-config <yaml>` for explicit control.
 - `--de-config` can be repeated to run multiple DE analyses sequentially in one step-12 run.
 - With repeated `--de-config`, each YAML must set a unique `io.out_dir`. Global `--de-out-dir` is rejected in that mode.

@@ -46,7 +46,7 @@ the rule jobs, so do not submit the command through a second `sbatch` wrapper.
 omnomnomics monitor -i /path/to/experiment
 ```
 
-The monitor reports public step states and recent pipeline log lines. Rule-level
+The monitor reports workflow step states and recent pipeline log lines. Rule-level
 errors are written under `slurm_logs/<rule>/`.
 
 ## Resume or rerun

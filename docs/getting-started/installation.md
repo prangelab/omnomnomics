@@ -67,5 +67,8 @@ The search order is:
 3. `~/.config/omnomnomics/site.yaml`
 4. the packaged site defaults
 
-See [Configuration](../operations/configuration.md) before using the pipeline on
-a cluster other than Snellius.
+The packaged cluster defaults target the
+[SURF Snellius national supercomputer](https://servicedesk.surf.nl/wiki/spaces/WIKI/pages/30660184/Snellius).
+Before running on another HPC system, review
+[Configuration](../operations/configuration.md) and provide a site configuration
+for that environment.
