@@ -1,0 +1,60 @@
+site_name: omnomnomics
+site_description: Modular RNA-seq, ATAC-seq, and ChIP-seq processing on HPC systems
+site_url: https://prangelab.org/omnomnomics/
+repo_url: https://github.com/prangelab/omnomnomics
+repo_name: prangelab/omnomnomics
+edit_uri: edit/main/docs/
+
+theme:
+  name: readthedocs
+  highlightjs: true
+  hljs_languages:
+    - bash
+    - yaml
+    - r
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+      - Project layout: getting-started/project-layout.md
+  - User Guide:
+      - Workflow stages: guides/workflow-stages.md
+      - Metadata and sample identity: guides/metadata.md
+      - Genomes and annotations: guides/genomes.md
+      - Track hubs: guides/track-hubs.md
+      - Differential analysis: guides/differential-analysis.md
+      - Differential Explorer: guides/differential-explorer.md
+  - Assays:
+      - RNA-seq: assays/rna.md
+      - ATAC-seq: assays/atac.md
+      - ChIP-seq: assays/chip.md
+  - Operations:
+      - Slurm execution: operations/slurm.md
+      - Storage and retention: operations/storage.md
+      - Configuration: operations/configuration.md
+      - Monitoring and logs: operations/monitoring.md
+      - Troubleshooting: operations/troubleshooting.md
+  - Reference:
+      - CLI reference: reference/cli.md
+      - Outputs: reference/outputs.md
+      - Changelog: changelog.md
+  - Development:
+      - Contributing: contributing.md
+      - Pre-DE peak analysis specification: analyze_peaks_pre_de_spec.md
+      - Post-DE peak analysis specification: analyze_peaks_de_spec.md
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - fenced_code
+  - tables
+  - toc:
+      permalink: true
+
+strict: true

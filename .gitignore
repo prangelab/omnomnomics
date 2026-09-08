@@ -4,6 +4,7 @@
 # Python packaging and build artifacts
 /build/
 /dist/
+/site/
 /*.egg-info/
 /src/*.egg-info/
 __pycache__/
@@ -25,6 +26,7 @@ __pycache__/
 /AGENTS.md
 /DESIGNGOALS.md
 /MANUSCRIPT/
+/validation_figures/
 
 # macOS cruft
 .DS_Store

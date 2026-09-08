@@ -72,6 +72,18 @@ CI coverage may remain limited for some time, so local verification and focused 
 - Do not describe unfinished or experimental features as stable defaults
 - Keep `DESIGNGOALS.md` aligned with major design decisions during active redesign work
 
+Build the documentation locally before opening a pull request:
+
+```bash
+python -m pip install --requirement docs/requirements.txt
+cp CHANGELOG.md docs/changelog.md
+cp contributing.md docs/contributing.md
+mkdocs build --strict
+```
+
+The documentation workflow repeats these steps and deploys the `main` branch to
+GitHub Pages. Pull requests run the same strict build without deploying.
+
 ---
 
 ## Scope and stability

@@ -9,6 +9,10 @@
 
 _Omnomnomics is an A-Z processing NGS pipeline for RNA-, ChIP-, and ATAC-seq data. It trims FASTQ files, runs FastQC, aligns reads, performs assay-aware downstream analysis, and records the resulting workflow provenance._
 
+**Documentation:** [prangelab.org/omnomnomics](https://prangelab.org/omnomnomics/)
+
+**Source and issues:** [github.com/prangelab/omnomnomics](https://github.com/prangelab/omnomnomics)
+
 ## Quickstart:
 In a rush? Once the environment is installed, you should be able to run:
 ```
@@ -48,7 +52,20 @@ micromamba activate omnomnomics
 pip install -e .
 ```
 
-The main environment includes the MEME Suite tools used by post-DE peak motif analysis. IDR and SPP use small companion environments because their dependency stacks conflict with the main Python/R analysis environment.
+The main environment includes Shiny for the Differential Explorer and the MEME Suite tools used by post-DE peak motif analysis. IDR and SPP use small companion environments because their dependency stacks conflict with the main Python/R analysis environment.
+
+### Lightweight Differential Explorer Environment
+
+To inspect completed differential-analysis results on a workstation without installing the complete HPC workflow environment, create the dedicated Explorer environment and install only the packaged application code:
+
+```bash
+micromamba env create -f environment.explorer.yml
+micromamba activate omnomnomics-explorer
+python -m pip install --no-deps --no-build-isolation .
+omnomnomics-de-app --project-dir /path/to/project_or_DE_calling
+```
+
+The standalone `omnomnomics-de-app` launcher imports only Python standard-library modules and starts the packaged Shiny application. The Explorer environment contains R, Shiny, ggplot2, and pheatmap; it does not contain aligners, peak callers, Snakemake, or Slurm tooling. Recreate it from the `environment.explorer.yml` supplied with the same omnomnomics release as the analyzed project.
 
 ### IDR Companion Environment
 
@@ -138,6 +155,7 @@ omnomnomics rna -i path/to/your/experiment_dir -g genome_to_use
 INSTALLATION
 |
 |- environment.yml
+|- environment.explorer.yml
 |- environment.idr.yml
 |- environment.spp.yml
 |- scripts/
@@ -489,7 +507,7 @@ Practical combinations:
 Utility commands:
 - Monitor the latest run log interactively:
   `omnomnomics monitor -i <EXPERIMENT_DIR>`
-- Launch the DE Shiny app for a local project copy:
+- Launch the Differential Explorer for a local project copy:
   `omnomnomics de-app --project-dir /path/to/project_or_DE_calling`
 - Search remote genome assemblies:
   `omnomnomics genomes list --species human`
@@ -511,8 +529,9 @@ Utility commands:
 - Use `--de-out-dir <name>` to separate result trees when testing multiple DE settings.
 - Step-12 QC outputs are shared at `DE_calling/qc/` and are not nested under `--de-out-dir`.
 - Step 12 writes two scripts into `DE_calling/`:
-  - `DE_analysis.rendered.R`: exact run reproduction with the resolved settings.
-  - `DE_analysis.customization_guide.R`: same runnable script plus documented customization recipes.
+  - `DE_analysis.rendered.R`: the complete executable R differential-analysis code with resolved inputs and settings, including import, filtering, DESeq2 design and model fitting, contrasts, QC, result tables, plots, and applicable enrichment.
+  - `DE_analysis.customization_guide.R`: the same runnable analysis plus documented recipes for changing inputs, designs, contrasts, filtering, and output settings.
+- The rendered script can be rerun directly in its original project environment or used as a transparent starting point for a customized DE analysis. ATAC/ChIP motif calling and signal profiling remain separate post-DE workflow outputs.
 - Explicit contrasts in `de_config` support:
   - Factor contrasts: `[factor, numerator, denominator]`
   - Coefficient contrasts: `{contrast_type: coefficient, coefficient_name: "...", label: "..."}`
@@ -606,9 +625,9 @@ Common step-12 config errors:
 - `Explicit contrast dict contrast_type must be 'factor' or 'coefficient'.`  
   Fix: use `contrast_type: factor` for standard factor-level contrasts or `contrast_type: coefficient` for coefficient tests.
 
-### Run the DE app locally (recommended workflow)
+### Run the Differential Explorer locally (recommended workflow)
 
-The DE app is intended for interactive local use after step 12 finished on HPC.
+The Differential Explorer is the packaged Shiny interface for interactive use after differential analysis has finished on HPC.
 
 Typical workflow:
 1. Run step 12 on HPC.
@@ -622,7 +641,9 @@ Minimum required local data:
 
 Launch options:
 
-- Preferred (installed CLI):
+- Preferred with the lightweight Explorer environment:
+  `omnomnomics-de-app --project-dir /path/to/project_or_DE_calling`
+- Full omnomnomics environment:
   `omnomnomics de-app --project-dir /path/to/project_or_DE_calling`
 
 - Optional flags:
@@ -637,8 +658,8 @@ Launch options:
   `R -e "shiny::runApp('src/omnomnomics/workflow/R/shiny_app')"`
 
 Notes:
-- Local and HPC environments can be different. You only need the step-12 outputs locally; raw FASTQ/BAM data are not required for app use.
-- Running the app directly on HPC via SSH tunneling can work, but is cluster-specific and not the default supported workflow.
+- Local and HPC environments can be different. You only need the `DE_calling` outputs locally; raw FASTQ and BAM data are not required for the Explorer.
+- The Explorer can run on an HPC compute node and be reached through SSH port forwarding, but scheduler allocation and tunneling are site-specific. Copying `DE_calling` to a workstation and using `environment.explorer.yml` is the default supported workflow.
 
 Step 12 YAML mini-templates:
 
