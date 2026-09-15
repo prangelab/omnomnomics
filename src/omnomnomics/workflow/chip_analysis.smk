@@ -27,7 +27,8 @@ chip_filtered_dir = f"{experiment_dir}/{master_config['output_folders'][master_c
 chip_region_bed = f"{chip_peak_dir}/chip_testing/regions.bed"
 chip_region_manifest = f"{chip_peak_dir}/chip_testing/regions.tsv"
 chip_testing_metadata = f"{chip_count_dir}/chip_testing_metadata.tsv"
-chip_count_selection_spec = f"{experiment_dir}/run_configs/chip_count_selection.json"
+chip_spp_drop_file = f"{chip_filtered_dir}/peak_qc/spp_qc/dropped_samples.tsv"
+chip_count_selection_spec = f"{experiment_dir}/run_configs/chip_count_selection.unused.json"
 chip_custom_bed = str(config.get("CHIP_REGIONS_BED", "NA"))
 chip_analytical_samples = list(samples2)
 chip_fragment_samples = sorted(set(chip_analytical_samples) | set(chip_control_sets.ids(chip_analytical_samples)))
@@ -116,8 +117,12 @@ if chip_analysis_enabled:
     caller_spec = {"controls": control_spec, "groups": {sample: sample_type_for_sample(sample) for sample in sorted(chip_analytical_samples)}, "settings": {key: config.get(key) for key in sorted(set(caller_keys))}}
     caller_content = json.dumps(caller_spec, sort_keys=True, indent=2) + "\n"
     chip_peak_calls_spec = f"{experiment_dir}/run_configs/chip_peak_calls.{hashlib.sha256(caller_content.encode()).hexdigest()[:16]}.json"
-    count_content = json.dumps({"regions": chip_regions_spec, "enrichment_min_input": config.get("CHIP_ENRICHMENT_MIN_INPUT", 5), "spp_gate": config.get("SPP_GATE", "warn")}, sort_keys=True, indent=2) + "\n"
-    chip_count_settings_spec = f"{experiment_dir}/run_configs/chip_count_settings.{hashlib.sha256(count_content.encode()).hexdigest()[:16]}.json"
+    spp_gate = str(config.get("SPP_GATE", "warn")).strip().lower()
+    spp_drop_sha256 = sha256_file(chip_spp_drop_file) if spp_gate == "drop" and os.path.isfile(chip_spp_drop_file) else None
+    count_content = json.dumps({"regions": chip_regions_spec, "enrichment_min_input": config.get("CHIP_ENRICHMENT_MIN_INPUT", 5), "spp_gate": spp_gate, "spp_drop_sha256": spp_drop_sha256}, sort_keys=True, indent=2) + "\n"
+    count_digest = hashlib.sha256(count_content.encode()).hexdigest()[:16]
+    chip_count_settings_spec = f"{experiment_dir}/run_configs/chip_count_settings.{count_digest}.json"
+    chip_count_selection_spec = f"{experiment_dir}/run_configs/chip_count_selection.{count_digest}.json"
     if not is_worker_job:
         write_stable_text(chip_controls_spec, content)
         write_stable_text(chip_regions_spec, region_content)
@@ -186,9 +191,8 @@ def chip_count_outputs():
 def chip_count_selection():
     selected = list(chip_analytical_samples)
     dropped = set()
-    drop_file = f"{chip_filtered_dir}/peak_qc/spp_qc/dropped_samples.tsv"
-    if str(config.get("SPP_GATE", "warn")).strip().lower() == "drop" and os.path.isfile(drop_file):
-        with open(drop_file) as handle:
+    if str(config.get("SPP_GATE", "warn")).strip().lower() == "drop" and os.path.isfile(chip_spp_drop_file):
+        with open(chip_spp_drop_file) as handle:
             dropped = {row["sample_id"] for row in csv.DictReader(handle, delimiter="\t")}
         selected = [sample for sample in selected if sample_id_for_sample(sample) not in dropped]
     return selected, sorted(dropped)
@@ -197,9 +201,8 @@ def chip_count_selection_inputs(_wildcards):
     inputs = [chip_controls_spec, chip_count_settings_spec]
     if master_config["peakqc_rule_num"] in themode:
         inputs.append(f"{chip_filtered_dir}/extra_{master_config['peakqc_rule_num']}.tmp")
-    drop_file = f"{chip_filtered_dir}/peak_qc/spp_qc/dropped_samples.tsv"
-    if str(config.get("SPP_GATE", "warn")).strip().lower() == "drop" and os.path.isfile(drop_file):
-        inputs.append(drop_file)
+    if str(config.get("SPP_GATE", "warn")).strip().lower() == "drop" and os.path.isfile(chip_spp_drop_file):
+        inputs.append(chip_spp_drop_file)
     return inputs
 
 rule chip_count_selection_manifest:
@@ -237,7 +240,7 @@ def chip_count_run(table, threads):
     write_tsv(chip_count_outputs()[1], ["underscore", "sample_id", "input_ids", "chip_count", "input_count", "chip_depth", "input_depth", "chip_cpm", "input_cpm", "fold_enrichment", "log2_fold_enrichment", "reliability"], enrichment_rows(regions, selected, chip_control_sets, counts, depths, int(config.get("CHIP_ENRICHMENT_MIN_INPUT", 5))))
     write_tsv(chip_count_outputs()[2], ["sample_id", "role", "mapped_fragments", "read_layout"], [[sample, "chip" if sample in selected else "input", depths[sample], "PE" if libraries[sample]["paired"] else "SE"] for sample in sorted(libraries)])
     provenance = {"regions_sha256": sha256_file(chip_region_bed), "region_spec": region_spec, "featurecounts_version": version, "libraries": libraries, "controls": {sample: list(chip_control_sets.ids([sample])) for sample in selected}, "legacy_input": chip_control_sets.legacy, "enrichment_min_input_count": int(config.get("CHIP_ENRICHMENT_MIN_INPUT", 5)), "enrichment_scale": "mapped-fragment CPM; depth-weighted pooled input; no pseudocount", "counting": "unique feature assignment; SE aligned reads; PE proper same-contig fragments", "de_input": "raw ChIP counts; no input subtraction or division", "eligibility_filter": "MACS joint discovery or supplied coordinates; no overlap eligibility gate"}
-    provenance.update({"project_root": experiment_dir, "spp_gate": config.get("SPP_GATE", "warn"), "spp_excluded_samples": dropped})
+    provenance.update({"project_root": experiment_dir, "spp_gate": str(config.get("SPP_GATE", "warn")).strip().lower(), "spp_drop_sha256": spp_drop_sha256, "spp_excluded_samples": dropped})
     write_stable_text(chip_count_outputs()[3], json.dumps(provenance, indent=2, sort_keys=True) + "\n")
     for source, destination in zip((chip_region_bed, chip_region_manifest, chip_region_manifest + ".source.json"), chip_count_outputs()[4:]):
         shutil.copy2(source, destination)

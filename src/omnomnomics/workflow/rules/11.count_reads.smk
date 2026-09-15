@@ -18,23 +18,32 @@ import tempfile
 def count_reads_input(_wildcards):
     if config["THETYPE"] == "CHIP":
         table = f"{chip_count_dir}/{os.path.basename(experiment_dir)}.raw_read_quant.table.txt"
-        if master_config["countreads_rule_num"] not in themode and all(os.path.isfile(path) for path in [table, *chip_count_outputs()]):
+        archived_mismatch = False
+        archived_outputs_exist = all(os.path.isfile(path) for path in [table, *chip_count_outputs()])
+        if archived_outputs_exist:
             with open(chip_count_outputs()[3]) as handle:
                 previous = json.load(handle)
             with open(table) as handle:
                 archived_samples = next(csv.reader(handle, delimiter="\t"))[1:]
             selected, _dropped = chip_count_selection()
-            if (not region_specs_match(previous.get("region_spec", {}), region_spec, experiment_dir, previous.get("project_root"))
-                    or previous.get("enrichment_min_input_count") != config.get("CHIP_ENRICHMENT_MIN_INPUT", 5)
-                    or archived_samples != selected):
+            archived_mismatch = (
+                not region_specs_match(previous.get("region_spec", {}), region_spec, experiment_dir, previous.get("project_root"))
+                or previous.get("enrichment_min_input_count") != config.get("CHIP_ENRICHMENT_MIN_INPUT", 5)
+                or previous.get("spp_gate") != str(config.get("SPP_GATE", "warn")).strip().lower()
+                or previous.get("spp_drop_sha256") != spp_drop_sha256
+                or archived_samples != selected
+            )
+        if master_config["countreads_rule_num"] not in themode and archived_outputs_exist:
+            if archived_mismatch:
                 raise ValueError("The ChIP region/control/enrichment settings or QC sample selection differ from the archived counts. Include public step 13 to refresh counts and summaries before differential analysis.")
             return []
+        if archived_mismatch and not is_worker_job:
+            os.utime(chip_count_settings_spec, None)
         inputs = [chip_region_bed, chip_controls_spec, chip_count_settings_spec, chip_count_selection_spec, *[chip_bam(sample) for sample in chip_fragment_samples]]
         if master_config["peakqc_rule_num"] in themode:
             inputs.append(f"{chip_peak_dir}/extra_{master_config['peakqc_rule_num']}.tmp")
-        drop_file = f"{chip_filtered_dir}/peak_qc/spp_qc/dropped_samples.tsv"
-        if str(config.get("SPP_GATE", "warn")).strip().lower() == "drop" and os.path.isfile(drop_file):
-            inputs.append(drop_file)
+        if str(config.get("SPP_GATE", "warn")).strip().lower() == "drop" and os.path.isfile(chip_spp_drop_file):
+            inputs.append(chip_spp_drop_file)
         return inputs
     input_files = []
     if config["THETYPE"] == "RNA":
