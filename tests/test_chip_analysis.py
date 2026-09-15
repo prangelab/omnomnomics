@@ -112,6 +112,13 @@ class AnalysisWorkflowTests(fixtures.LibraryFixture):
         self.assertEqual(bam_fragments(self.project / "filtered_BAM/b.filtered.bam", output, True), 2)
         self.assertEqual(output.read_text().splitlines(), ["chr1\t100\t170", "chr1\t180\t250"])
 
+    def test_full_chromatin_analysis_dag_connects_peak_qc_to_counts(self):
+        config = self.cli_config(self.rows(), "10-13")
+        dag = self.run_workflow(config)
+        self.assertIn("rule peak_qc:", dag)
+        self.assertIn("rule chip_count_selection_manifest:", dag)
+        self.assertIn("rule count_reads:", dag)
+
     def large_fixture(self):
         length = 100000
         genome = self.assembly / "test"

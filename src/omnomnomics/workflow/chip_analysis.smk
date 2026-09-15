@@ -200,7 +200,7 @@ def chip_count_selection():
 def chip_count_selection_inputs(_wildcards):
     inputs = [chip_controls_spec, chip_count_settings_spec]
     if master_config["peakqc_rule_num"] in themode:
-        inputs.append(f"{chip_filtered_dir}/extra_{master_config['peakqc_rule_num']}.tmp")
+        inputs.append(f"{chip_peak_dir}/extra_{master_config['peakqc_rule_num']}.tmp")
     if str(config.get("SPP_GATE", "warn")).strip().lower() == "drop" and os.path.isfile(chip_spp_drop_file):
         inputs.append(chip_spp_drop_file)
     return inputs
