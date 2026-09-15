@@ -5,6 +5,7 @@ import gzip
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -356,6 +357,27 @@ class SnakemakePreprocessingTests(LibraryFixture):
         self.assertIn("rule run_fastp_se:", output)
         self.assertIn("rule run_fastp:", output)
         self.assertIn("rule run_fastqc_se:", output)
+
+    def test_hisat2_preserves_reference_contig_names(self):
+        if not shutil.which("hisat2-build"):
+            self.skipTest("hisat2-build is not available")
+        genome = self.assembly / "test"
+        fasta = genome / "fasta/genome.fa"
+        fasta.write_text(">1\n" + "ACGT" * 250 + "\n")
+        (genome / "fasta/genome.fa.fai").write_text("1\t1000\t3\t1000\t1001\n")
+        index_dir = genome / "hisat2"
+        index_dir.mkdir()
+        subprocess.run(
+            ["hisat2-build", str(fasta), str(index_dir / "test")],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        self.fastq("a")
+        config = self.cli_config([row("a", "chip", read_layout="SE")], "1-3")
+        self.run_workflow(config, dry_run=False)
+        with pysam.AlignmentFile(str(self.project / "BAM/a.bam"), "rb") as bam:
+            self.assertEqual(bam.references, ("1",))
 
     def test_existing_rna_and_atac_bam_entry_dags(self):
         self.bam("a.bam")

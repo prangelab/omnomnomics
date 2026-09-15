@@ -74,7 +74,7 @@ rule run_hisat2:
                         if keepunpaired:
                             hisat2_command = f"""
                             hisat2 -p {threads} -x {genome_path} \
-                            -1 {local_fastq1} -2 {local_fastq2} --mm --add-chrname --new-summary --dta-cufflinks \
+                            -1 {local_fastq1} -2 {local_fastq2} --mm --new-summary --dta-cufflinks \
                             --summary-file "{local_stats}" \
                             --un-gz "{outputfolder}/{sample}.unpaired.unaligned.bam" --al-gz "{outputfolder}/{sample}.unpaired.aligned.bam" \
                             | samtools view -b - 1> "{local_bam}"
@@ -82,7 +82,7 @@ rule run_hisat2:
                         else:
                             hisat2_command = f"""
                             hisat2 -p {threads} -x {genome_path} \
-                            -1 {local_fastq1} -2 {local_fastq2} --mm --add-chrname --new-summary --dta-cufflinks \
+                            -1 {local_fastq1} -2 {local_fastq2} --mm --new-summary --dta-cufflinks \
                             --summary-file "{local_stats}" \
                             | samtools view -b - 1> "{local_bam}"
                             """
@@ -98,7 +98,7 @@ rule run_hisat2:
                         local_stats = os.path.join(local_workdir, f"{sample}.HISAT2_stats.txt")
                         hisat2_command = f"""
                         hisat2 -p {threads} -x {genome_path} \
-                        -U {local_fastq1} --mm --add-chrname --new-summary --dta-cufflinks \
+                        -U {local_fastq1} --mm --new-summary --dta-cufflinks \
                         --summary-file "{local_stats}" \
                         | samtools view -b - 1> "{local_bam}"
                         """
@@ -119,7 +119,7 @@ rule run_hisat2:
                         if keepunpaired:
                             hisat2_command = f"""
                             hisat2 -p {threads} -x {genome_path} \
-                            -1 {local_fastq1} -2 {local_fastq2} --mm --add-chrname --new-summary --no-spliced-alignment \
+                            -1 {local_fastq1} -2 {local_fastq2} --mm --new-summary --no-spliced-alignment \
                             --un-gz "BAM/{sample}.unpaired.unaligned.bam" --al-gz "BAM/{sample}.unpaired.aligned.bam"\
                             --summary-file "{local_stats}" \
                             | samtools view -b - 1> "{local_bam}"
@@ -127,7 +127,7 @@ rule run_hisat2:
                         else:
                             hisat2_command = f"""
                             hisat2 -p {threads} -x {genome_path} \
-                            -1 {local_fastq1} -2 {local_fastq2} --mm --add-chrname --new-summary --no-spliced-alignment \
+                            -1 {local_fastq1} -2 {local_fastq2} --mm --new-summary --no-spliced-alignment \
                             --summary-file "{local_stats}" \
                             | samtools view -b - 1> "{local_bam}"
                             """
@@ -143,7 +143,7 @@ rule run_hisat2:
                         local_stats = os.path.join(local_workdir, f"{sample}.HISAT2_stats.txt")
                         hisat2_command = f"""
                         hisat2 -p {threads} -x {genome_path} \
-                        -U {local_fastq1} --mm --add-chrname --new-summary --no-spliced-alignment \
+                        -U {local_fastq1} --mm --new-summary --no-spliced-alignment \
                         --summary-file "{local_stats}" \
                         | samtools view -b - 1> "{local_bam}"
                         """
