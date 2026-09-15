@@ -1,17 +1,29 @@
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import inspect
 from pathlib import Path
 import traceback
 
+from suite_tiers import test_paths
+
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Run standalone regression functions.")
+    parser.add_argument(
+        "--tier",
+        choices=("lightweight", "bioinformatics", "all"),
+        default="all",
+    )
+    args = parser.parse_args()
+
     tests_dir = Path(__file__).resolve().parent
     failures: list[tuple[str, str, str]] = []
     total = 0
 
-    for path in sorted(tests_dir.glob("test_*.py")):
+    paths = test_paths(tests_dir, args.tier)
+    for path in paths:
         spec = importlib.util.spec_from_file_location(path.stem, path)
         if spec is None or spec.loader is None:
             failures.append((path.name, "import", "Could not create an import specification."))
@@ -32,7 +44,10 @@ def main() -> int:
             except Exception:
                 failures.append((path.name, name, traceback.format_exc()))
 
-    print(f"Standalone regression functions: {total}; failures: {len(failures)}")
+    print(
+        f"Test tier: {args.tier}; modules: {len(paths)}; "
+        f"standalone regression functions: {total}; failures: {len(failures)}"
+    )
     for path, name, detail in failures:
         print(f"FAIL {path}::{name}\n{detail}")
     return 1 if failures else 0

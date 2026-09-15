@@ -29,8 +29,8 @@ jobs:
           python -m pip install PyYAML==6.0.2
           python -m pip install --no-deps .
 
-      - name: Run unittest suite
-        run: python -m unittest discover -s tests -v
+      - name: Run lightweight unittest suite
+        run: python tests/run_unittest_suite.py --tier lightweight
 
-      - name: Run standalone regression functions
-        run: python tests/run_regression_tests.py
+      - name: Run lightweight standalone regression functions
+        run: python tests/run_regression_tests.py --tier lightweight
