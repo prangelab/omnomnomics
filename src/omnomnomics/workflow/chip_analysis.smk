@@ -27,6 +27,7 @@ chip_filtered_dir = f"{experiment_dir}/{master_config['output_folders'][master_c
 chip_region_bed = f"{chip_peak_dir}/chip_testing/regions.bed"
 chip_region_manifest = f"{chip_peak_dir}/chip_testing/regions.tsv"
 chip_testing_metadata = f"{chip_count_dir}/chip_testing_metadata.tsv"
+chip_count_selection_spec = f"{experiment_dir}/run_configs/chip_count_selection.json"
 chip_custom_bed = str(config.get("CHIP_REGIONS_BED", "NA"))
 chip_analytical_samples = list(samples2)
 chip_fragment_samples = sorted(set(chip_analytical_samples) | set(chip_control_sets.ids(chip_analytical_samples)))
@@ -191,6 +192,25 @@ def chip_count_selection():
             dropped = {row["sample_id"] for row in csv.DictReader(handle, delimiter="\t")}
         selected = [sample for sample in selected if sample_id_for_sample(sample) not in dropped]
     return selected, sorted(dropped)
+
+def chip_count_selection_inputs(_wildcards):
+    inputs = [chip_controls_spec, chip_count_settings_spec]
+    if master_config["peakqc_rule_num"] in themode:
+        inputs.append(f"{chip_filtered_dir}/extra_{master_config['peakqc_rule_num']}.tmp")
+    drop_file = f"{chip_filtered_dir}/peak_qc/spp_qc/dropped_samples.tsv"
+    if str(config.get("SPP_GATE", "warn")).strip().lower() == "drop" and os.path.isfile(drop_file):
+        inputs.append(drop_file)
+    return inputs
+
+rule chip_count_selection_manifest:
+    input: chip_count_selection_inputs
+    output: chip_count_selection_spec
+    run:
+        selected, dropped = chip_count_selection()
+        write_stable_text(
+            output[0],
+            json.dumps({"samples": selected, "dropped": dropped}, sort_keys=True) + "\n",
+        )
 
 def chip_count_run(table, threads):
     reference = reference_lengths(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"])

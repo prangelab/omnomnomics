@@ -29,11 +29,7 @@ def count_reads_input(_wildcards):
                     or archived_samples != selected):
                 raise ValueError("The ChIP region/control/enrichment settings or QC sample selection differ from the archived counts. Include public step 13 to refresh counts and summaries before differential analysis.")
             return []
-        selection_spec = f"{experiment_dir}/run_configs/chip_count_selection.json"
-        if not is_worker_job:
-            selected, _dropped = chip_count_selection()
-            write_stable_text(selection_spec, json.dumps({"samples": selected}, sort_keys=True) + "\n")
-        inputs = [chip_region_bed, chip_controls_spec, chip_count_settings_spec, selection_spec, *[chip_bam(sample) for sample in chip_fragment_samples]]
+        inputs = [chip_region_bed, chip_controls_spec, chip_count_settings_spec, chip_count_selection_spec, *[chip_bam(sample) for sample in chip_fragment_samples]]
         if master_config["peakqc_rule_num"] in themode:
             inputs.append(f"{chip_peak_dir}/extra_{master_config['peakqc_rule_num']}.tmp")
         drop_file = f"{chip_filtered_dir}/peak_qc/spp_qc/dropped_samples.tsv"

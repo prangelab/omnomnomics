@@ -2305,7 +2305,7 @@ def main():
                 "idr_group_consensus",
                 "idr_selected_summary",
             ],
-            "count_reads": ["chip_fragments", "chip_testing_regions"],
+            "count_reads": ["chip_fragments", "chip_testing_regions", "chip_count_selection_manifest"],
             "create_wiggles": ["chip_fragments", "chip_input_track"],
             "call_DE_chrom": ["chip_testing_metadata"],
         }

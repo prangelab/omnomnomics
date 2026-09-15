@@ -326,7 +326,15 @@ class SnakemakePreprocessingTests(LibraryFixture):
             command.append("--dry-run")
         if "--forcerun" in self.dispatch_command:
             command.extend(self.dispatch_command[self.dispatch_command.index("--forcerun"):])
-        result = subprocess.run(command, cwd=self.project, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120)
+        result = subprocess.run(
+            command,
+            cwd=self.project,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=int(os.environ.get("OMNOM_TEST_TIMEOUT", "120")),
+        )
         self.assertEqual(result.returncode, 0, result.stdout[-14000:])
         return result.stdout
 
