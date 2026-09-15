@@ -24,15 +24,17 @@ def touchup_memory_mb(input_bam):
 
 
 rule touchup_bam:
+    wildcard_constraints:
+        sample5=library_runtime.pattern(5) if library_runtime else r".+"
     input:
-        bamfile=f"{experiment_dir}/{master_config['input_folders'][master_config['touchup_rule_num']-1]}/{{sample5}}.bam",
-        extrafile = f"{experiment_dir}/{master_config['input_folders'][master_config['touchup_rule_num']-1]}/{{sample5}}.extra_4.tmp" if 4 in themode else []
+        bamfile=lambda wildcards: preparation_bam_input(wildcards.sample5),
+        extrafile=lambda wildcards: preparation_merge_marker(wildcards.sample5)
     output:
         f"{experiment_dir}/{master_config['output_folders'][master_config['touchup_rule_num']-1]}/{{sample5}}.sorted.dups_marked.filtered.bam" if config['THETYPE'] != "CHIP" else f"{experiment_dir}/{master_config['output_folders'][master_config['touchup_rule_num']-1]}/{{sample5}}.filtered.bam",
         f"{experiment_dir}/{master_config['output_folders'][master_config['touchup_rule_num']-1]}/{{sample5}}.extra_5.tmp"
     params:
         thetype=config['THETYPE'],
-        paired=config['PAIRED'],
+        paired=lambda wildcards: sample_is_paired(wildcards.sample5),
         duplicate_handling=config['DUPLICATE_HANDLING'],
         inputfolder = f"{experiment_dir}/{master_config['input_folders'][master_config['touchup_rule_num']-1]}",
         outputfolder = f"{experiment_dir}/{master_config['output_folders'][master_config['touchup_rule_num']-1]}"

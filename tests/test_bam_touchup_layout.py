@@ -8,7 +8,7 @@ RULE = ROOT / "src" / "omnomnomics" / "workflow" / "rules" / "5.touchup_bam.smk"
 def test_touchup_uses_layout_specific_samtools_pipeline():
     source = RULE.read_text()
 
-    assert "paired=config['PAIRED']" in source
+    assert "paired=lambda wildcards: sample_is_paired(wildcards.sample5)" in source
     assert "mem_mb=lambda wildcards, input: touchup_memory_mb(input.bamfile)" in source
     assert "bam_size_mb * 5" in source
     assert "stage_count = 5 if paired else 3" in source

@@ -1,0 +1,11 @@
+test_default_de_design_ignores_inputs_and_role_column (test_chip_review_regressions.DefaultDesignTests.test_default_de_design_ignores_inputs_and_role_column) ... ok
+test_legacy_control_identity_avoids_all_library_names (test_chip_review_regressions.RegionSpecTests.test_legacy_control_identity_avoids_all_library_names) ... ok
+test_project_relocation_and_old_archive_migration (test_chip_review_regressions.RegionSpecTests.test_project_relocation_and_old_archive_migration) ... ok
+test_chip_named_legacy_input_keeps_its_own_counts (test_chip_review_regressions.ReviewWorkflowTests.test_chip_named_legacy_input_keeps_its_own_counts) ... ok
+test_de_only_after_relocation_reuses_counts_and_checks_changed_bed (test_chip_review_regressions.ReviewWorkflowTests.test_de_only_after_relocation_reuses_counts_and_checks_changed_bed) ... ok
+test_spp_drop_to_none_restores_samples_and_de_rejects_old_exclusions (test_chip_review_regressions.ReviewWorkflowTests.test_spp_drop_to_none_restores_samples_and_de_rejects_old_exclusions) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 54.166s
+
+OK

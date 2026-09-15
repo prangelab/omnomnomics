@@ -20,15 +20,14 @@ def test_pre_de_analysis_enters_through_annotation_not_marker():
     assert "extra_{master_config['peakqc_rule_num']}" not in input_block
 
 
-def test_non_peak_chromatin_de_waits_for_pre_de_completion_marker():
+def test_chip_de_enters_through_its_testing_catalogue_metadata():
     source = (RULES_DIR / "15.call_DE_chrom.smk").read_text()
     dependency_block = source.split(
         "def _chrom_de_peak_metadata_dependency", 1
     )[1].split("chrom_de_peak_metadata_file", 1)[0]
 
-    assert '{"genebody", "diffuse"}' in dependency_block
-    assert "extra_{master_config['analyzepeaks_rule_num']}.tmp" in dependency_block
-    assert "return _chrom_de_peak_metadata_file()" not in dependency_block
+    assert 'if config[\'THETYPE\'] == "CHIP":\n        return chip_testing_metadata' in dependency_block
+    assert "extra_{master_config['analyzepeaks_rule_num']}.tmp" not in dependency_block
 
 
 def test_chromatin_de_waits_for_peak_qc_metrics_consumed_by_qc_plots():
@@ -126,15 +125,16 @@ def test_non_peak_chip_qc_uses_mode_specific_display_terms():
     assert 'peak_set_name = f"{group}.bins"' in peak_qc
 
 
-def test_peak_backed_chip_modes_use_filtered_peak_tree_downstream():
+def test_chip_group_qc_and_de_testing_catalogues_are_separate():
     peak_qc = (RULES_DIR / "13.peak_qc.smk").read_text()
     pre_de = (RULES_DIR / "14.analyze_peaks.smk").read_text()
     counting = (RULES_DIR / "11.count_reads.smk").read_text()
 
     assert 'assay == "CHIP" and params.broad_mode not in {"genebody", "diffuse"}' in peak_qc
     assert 'chip_broad_mode not in {"genebody", "diffuse"}' in pre_de
-    assert 'if broad_mode not in {"genebody", "diffuse"}' in counting
-    assert '"peak_qc",\n                    "filtered_peaks"' in counting
+    chip_inputs = counting.split('if config["THETYPE"] == "CHIP":', 1)[1].split('input_files = []', 1)[0]
+    assert "chip_region_bed" in chip_inputs
+    assert "filtered_peaks" not in chip_inputs
 
 
 def test_post_de_sets_apply_recorded_contrast_thresholds():

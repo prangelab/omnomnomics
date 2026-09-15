@@ -1,0 +1,8 @@
+scenario	seed	candidates	true_changed_candidates	significant	true_significant	false_significant	realized_FDP	reference	input_use
+null	0	80	0	1	0	1	1.0	DESeq2 poscounts median reference over discovered regions	joint discovery only
+null	1	80	0	1	0	1	1.0	DESeq2 poscounts median reference over discovered regions	joint discovery only
+null	2	80	0	0	0	0	0	DESeq2 poscounts median reference over discovered regions	joint discovery only
+null	3	80	0	0	0	0	0	DESeq2 poscounts median reference over discovered regions	joint discovery only
+null	4	80	0	0	0	0	0	DESeq2 poscounts median reference over discovered regions	joint discovery only
+sparse_loss	101	80	12	14	12	2	0.14285714285714285	DESeq2 poscounts median reference over discovered regions	joint discovery only
+global_loss	102	80	80	0	0	0	0	DESeq2 poscounts median reference over discovered regions	joint discovery only

@@ -23,6 +23,13 @@ homer_tagdir_rule_num: 17
 #Define the maximum public step index
 max_step: 16
 retention_policy: "all"
+input_match: null
+chip_regions_bed: null
+chip_joint_peak_q: 0.1
+chip_enrichment_min_input: 5
+chip_input_tracks: fold_enrichment
+chip_se_fragment_length: 200
+chip_effective_genome_size: null
 max_project_size: "NA"
 broad_mode: "off"
 chip_broad_qvalue: 0.05

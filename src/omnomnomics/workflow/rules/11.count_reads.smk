@@ -16,6 +16,30 @@ import tempfile
 
 
 def count_reads_input(_wildcards):
+    if config["THETYPE"] == "CHIP":
+        table = f"{chip_count_dir}/{os.path.basename(experiment_dir)}.raw_read_quant.table.txt"
+        if master_config["countreads_rule_num"] not in themode and all(os.path.isfile(path) for path in [table, *chip_count_outputs()]):
+            with open(chip_count_outputs()[3]) as handle:
+                previous = json.load(handle)
+            with open(table) as handle:
+                archived_samples = next(csv.reader(handle, delimiter="\t"))[1:]
+            selected, _dropped = chip_count_selection()
+            if (not region_specs_match(previous.get("region_spec", {}), region_spec, experiment_dir, previous.get("project_root"))
+                    or previous.get("enrichment_min_input_count") != config.get("CHIP_ENRICHMENT_MIN_INPUT", 5)
+                    or archived_samples != selected):
+                raise ValueError("The ChIP region/control/enrichment settings or QC sample selection differ from the archived counts. Include public step 13 to refresh counts and summaries before differential analysis.")
+            return []
+        selection_spec = f"{experiment_dir}/run_configs/chip_count_selection.json"
+        if not is_worker_job:
+            selected, _dropped = chip_count_selection()
+            write_stable_text(selection_spec, json.dumps({"samples": selected}, sort_keys=True) + "\n")
+        inputs = [chip_region_bed, chip_controls_spec, chip_count_settings_spec, selection_spec, *[chip_bam(sample) for sample in chip_fragment_samples]]
+        if master_config["peakqc_rule_num"] in themode:
+            inputs.append(f"{chip_peak_dir}/extra_{master_config['peakqc_rule_num']}.tmp")
+        drop_file = f"{chip_filtered_dir}/peak_qc/spp_qc/dropped_samples.tsv"
+        if str(config.get("SPP_GATE", "warn")).strip().lower() == "drop" and os.path.isfile(drop_file):
+            inputs.append(drop_file)
+        return inputs
     input_files = []
     if config["THETYPE"] == "RNA":
         input_files.extend(
@@ -59,6 +83,7 @@ rule count_reads:
         else (
             f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num']-1]}/{os.path.basename(config['EXPERIMENT_DIR'])}.raw_read_quant.table.txt",
             f"{experiment_dir}/{master_config['output_folders'][master_config['countreads_rule_num']-1]}/extra_11.tmp",
+            *(chip_count_outputs() if config["THETYPE"] == "CHIP" else []),
         )
     params:
         thetype=config["THETYPE"],
@@ -86,6 +111,17 @@ rule count_reads:
         log_once(logfile, "step11.header", "Counting Reads...", f"EXECUTING STEP {master_config['countreads_rule_num']}")
         log_once(logfile, "step11.inputfolder", f"Input folder: {params.bam_input_folder} and also {params.peak_input_folder} for ATAC data")
         log_once(logfile, "step11.outputfolder", f"Output folder: {params.outputfolder}")
+        if params.thetype == "CHIP":
+            try:
+                chip_count_run(output[0], threads)
+                write_stable_text(output[1], "ChIP counting completed.\n")
+                for path in output:
+                    os.utime(path, None)
+                finish_step_sample(master_config["countreads_rule_num"], "aggregate", "count_reads", tracking["start_time"], "OK")
+            except Exception:
+                finish_step_sample(master_config["countreads_rule_num"], "aggregate", "count_reads", tracking["start_time"], "FAILED")
+                raise
+            return
 
         def quote(path):
             return shlex.quote(path)
@@ -355,56 +391,11 @@ rule count_reads:
                 feature_label="Peak",
             )
 
-        def count_reads_chip(input_folder, peak_folder, output_folder, broad_mode):
-            if broad_mode == "genebody":
-                log_once(logfile, "step11.chip_mode", "Counting ChIP reads over gene-body features with featureCounts...")
-            elif broad_mode == "diffuse":
-                log_once(logfile, "step11.chip_mode", "Counting ChIP reads over fixed genomic bins with featureCounts...")
-            else:
-                log_once(logfile, "step11.chip_mode", "Counting ChIP reads over peaks with featureCounts...")
-            sanity_check_dir(logfile, input_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][0], "step11.chip_bam_sanity")
-            sanity_check_dir(logfile, peak_folder, master_config["input_file_types"][master_config["countreads_rule_num"] - 1][1], "step11.chip_peak_sanity")
-
-            peak_bed = os.path.join(peak_folder, "all_groups.merged_peaks.bed")
-            if broad_mode not in {"genebody", "diffuse"}:
-                filtered_peak_bed = os.path.join(
-                    experiment_dir,
-                    master_config["output_folders"][master_config["peakqc_rule_num"] - 1],
-                    "peak_qc",
-                    "filtered_peaks",
-                    "all_groups.merged_peaks.bed",
-                )
-                if os.path.exists(filtered_peak_bed):
-                    peak_bed = filtered_peak_bed
-            if broad_mode == "genebody":
-                log_it(logfile, f"ChIP gene-body BED used for counting: {peak_bed}")
-            elif broad_mode == "diffuse":
-                log_it(logfile, f"ChIP diffuse bin BED used for counting: {peak_bed}")
-            else:
-                log_it(logfile, f"ChIP peak BED used for counting: {peak_bed}")
-            selected_samples = samples_after_spp_drop()
-            if broad_mode == "genebody":
-                feature_label = "Feature"
-            elif broad_mode == "diffuse":
-                feature_label = "Bin"
-            else:
-                feature_label = "Peak"
-            count_reads_over_features_with_featurecounts(
-                input_folder=input_folder,
-                peak_bed=peak_bed,
-                output_folder=output_folder,
-                selected_samples=selected_samples,
-                bam_suffix=".filtered.bam",
-                feature_label=feature_label,
-            )
-
         try:
             if params.thetype == "RNA":
                 count_reads_rna(params.bam_input_folder, params.outputfolder, params.gtf_file, params.paired)
             elif params.thetype == "ATAC":
                 count_reads_atac(params.bam_input_folder, params.peak_input_folder, params.outputfolder)
-            elif params.thetype == "CHIP":
-                count_reads_chip(params.bam_input_folder, params.peak_input_folder, params.outputfolder, params.broad_mode)
             else:
                 log_once(logfile, "step11.chip_note", "For ChIP experiments, first determine optimal peak caller settings and quantify peaks with your chosen downstream workflow before continuing.")
 

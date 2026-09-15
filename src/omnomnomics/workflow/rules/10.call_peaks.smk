@@ -115,6 +115,8 @@ def idr_macs3_callpeak_command(
     name,
     control_bam=None,
 ):
+    if idr_assay_type() == "CHIP":
+        treatment_bams, controls = chip_macs_inputs(treatment_bams)
     cmd = [
         "macs3", "callpeak",
         "-t", *treatment_bams,
@@ -126,9 +128,9 @@ def idr_macs3_callpeak_command(
     if idr_assay_type() == "ATAC":
         cmd.extend(atac_macs3_format_args())
     else:
-        cmd.extend(["-f", "BAM"])
-        if control_bam and control_bam != "NA":
-            cmd.extend(["-c", control_bam])
+        cmd.extend(["-f", "BEDPE", "--keep-dup", "all", "-g", str(chip_genome_size)])
+        if controls:
+            cmd.extend(["-c", *controls])
     return " ".join(quote(str(x)) for x in cmd)
 
 def idr_count_rows(path):
@@ -290,11 +292,18 @@ def input_function(wildcards):
     if idr_split_jobs_enabled():
         input_files.extend(idr_final_group_beds())
         input_files.append(idr_selected_summary_path())
+    if chip_analysis_enabled:
+        if str(config.get("BROAD_MODE", "off")) in {"genebody", "diffuse"}:
+            input_files.append(chip_peak_calls_spec)
+        else:
+            input_files.extend(chip_peak_dependencies(samples2))
+            input_files.extend(chip_fragment_path(sample) for sample in samples2)
     return input_files
 
 rule idr_pooled_macs3:
     input:
-        bams=lambda wildcards: idr_group_bams(wildcards.group)
+        bams=lambda wildcards: idr_group_bams(wildcards.group),
+        controls=lambda wildcards: chip_peak_dependencies(idr_group_samples(wildcards.group)) + ([chip_fragment_path(sample) for sample in idr_group_samples(wildcards.group)] if chip_analysis_enabled else [])
     output:
         narrow=f"{idr_root_folder()}/{{group}}.MACS3.pooled_peaks.narrowPeak",
         sorted=f"{idr_root_folder()}/{{group}}.MACS3.pooled.sorted.narrowPeak"
@@ -320,7 +329,8 @@ rule idr_pooled_macs3:
 
 rule idr_replicate_macs3:
     input:
-        bam=lambda wildcards: os.path.join(idr_input_folder(), f"{wildcards.sample}{idr_bam_suffix()}")
+        bam=lambda wildcards: os.path.join(idr_input_folder(), f"{wildcards.sample}{idr_bam_suffix()}"),
+        controls=lambda wildcards: chip_peak_dependencies([wildcards.sample]) + ([chip_fragment_path(wildcards.sample)] if chip_analysis_enabled else [])
     output:
         narrow=f"{idr_root_folder()}/{{group}}.{{sample}}.MACS3.rep_peaks.narrowPeak",
         sorted=f"{idr_root_folder()}/{{group}}.{{sample}}.MACS3.rep.sorted.narrowPeak"
@@ -393,7 +403,8 @@ rule idr_pooled_pseudorep_split:
 
 rule idr_pooled_pseudorep_macs3:
     input:
-        bam=lambda wildcards: os.path.join(idr_root_folder(), f"{wildcards.group}.pooled.ps{wildcards.ps}.bam")
+        bam=lambda wildcards: os.path.join(idr_root_folder(), f"{wildcards.group}.pooled.ps{wildcards.ps}.bam"),
+        controls=lambda wildcards: chip_peak_dependencies(idr_group_samples(wildcards.group))
     output:
         narrow=f"{idr_root_folder()}/{{group}}.pooled.ps{{ps}}_peaks.narrowPeak",
         sorted=f"{idr_root_folder()}/{{group}}.pooled.ps{{ps}}.sorted.narrowPeak"
@@ -409,6 +420,7 @@ rule idr_pooled_pseudorep_macs3:
         partition=lambda wildcards: master_config['partition'],
         runtime=lambda wildcards: Runtime_Per_Rule['10']
     run:
+        chip_register_alias(input.bam, idr_group_bams(wildcards.group))
         cmd = idr_macs3_callpeak_command(
             treatment_bams=[str(input.bam)],
             outdir=params.root,
@@ -464,7 +476,8 @@ rule idr_self_pseudorep_split:
 
 rule idr_self_pseudorep_macs3:
     input:
-        bam=lambda wildcards: os.path.join(idr_root_folder(), f"{wildcards.group}.{wildcards.sample}.self.ps{wildcards.ps}.bam")
+        bam=lambda wildcards: os.path.join(idr_root_folder(), f"{wildcards.group}.{wildcards.sample}.self.ps{wildcards.ps}.bam"),
+        controls=lambda wildcards: chip_peak_dependencies([wildcards.sample])
     output:
         narrow=f"{idr_root_folder()}/{{group}}.{{sample}}.self.ps{{ps}}_peaks.narrowPeak",
         sorted=f"{idr_root_folder()}/{{group}}.{{sample}}.self.ps{{ps}}.sorted.narrowPeak"
@@ -480,6 +493,7 @@ rule idr_self_pseudorep_macs3:
         partition=lambda wildcards: master_config['partition'],
         runtime=lambda wildcards: Runtime_Per_Rule['10']
     run:
+        chip_register_alias(input.bam, [os.path.join(idr_input_folder(), f"{wildcards.sample}{idr_bam_suffix()}")])
         cmd = idr_macs3_callpeak_command(
             treatment_bams=[str(input.bam)],
             outdir=params.root,
@@ -953,11 +967,17 @@ if (chrom != "" && len != "") print chrom, len;
                 "-q", str(qvalue),
                 "--verbose", "0",
             ]
-            assay_label = str(assay_type or "").strip().upper()
+            assay_label = str(assay_type or params.thetype).strip().upper()
+            if assay_label == "CHIP":
+                treatment_bams, control_paths = chip_macs_inputs(treatment_bams)
+                cmd[cmd.index("-t") + 1:cmd.index("--outdir")] = treatment_bams
             if assay_label == "ATAC":
                 cmd.extend(atac_macs3_format_args())
             elif assay_label == "CHIP":
-                cmd.extend(["-f", "BAM"])
+                cmd.extend(["-f", "BEDPE", "--keep-dup", "all", "-g", str(chip_genome_size)])
+                if control_paths:
+                    cmd.extend(["-c", *control_paths])
+                control_bam = None
             if control_bam and control_bam != "NA":
                 cmd.extend(["-c", control_bam])
             if broad_mode:
@@ -966,7 +986,7 @@ if (chrom != "" && len != "") print chrom, len;
                     cmd.extend(["--min-length", str(int(broad_min_length))])
                 if broad_max_gap not in (None, "", "NA"):
                     cmd.extend(["--max-gap", str(int(broad_max_gap))])
-            if shift is not None and extsize is not None:
+            if assay_label != "CHIP" and shift is not None and extsize is not None:
                 cmd.extend(["--nomodel", "--shift", str(int(shift)), "--extsize", str(int(extsize))])
             return " ".join(quote(str(x)) for x in cmd)
 
@@ -979,6 +999,8 @@ if (chrom != "" && len != "") print chrom, len;
                 f"samtools view -@ {samtools_threads} -b -s {seed}.5 "
                 f"-o {quote(bam1)} -U {quote(bam2)} {quote(input_bam)}"
             )
+            chip_register_alias(bam1, [input_bam])
+            chip_register_alias(bam2, [input_bam])
             return bam1, bam2
 
         def read_bed_triplets(bed_path):
@@ -1146,6 +1168,7 @@ if (chrom != "" && len != "") print chrom, len;
 
                     pooled_merge_bam = os.path.join(group_tmp, f"{group}.pooled.bam")
                     shell(f"samtools merge -f {quote(pooled_merge_bam)} {' '.join(quote(x) for x in group_bams)}")
+                    chip_register_alias(pooled_merge_bam, group_bams)
                     pooled_seed = int(hashlib.md5(f"{group}|broad|pooled".encode("utf-8")).hexdigest()[:8], 16)
                     ps1_bam, ps2_bam = make_deterministic_pseudorep_bams(pooled_merge_bam, group_tmp, f"{group}.broad.pooled", pooled_seed)
                     pseudorep_beds = []
@@ -1577,6 +1600,7 @@ if (chrom != "" && len != "") print chrom, len;
                     if idr_mode == "encode":
                         pooled_bam = os.path.join(group_tmp, f"{group}.pooled.bam")
                         shell(f"samtools merge -f {quote(pooled_bam)} {' '.join(quote(x) for x in group_bams)}")
+                        chip_register_alias(pooled_bam, group_bams)
                         pooled_seed = int(hashlib.md5(f"{group}|pooled".encode("utf-8")).hexdigest()[:8], 16)
                         ps1_bam, ps2_bam = make_pseudorep_bams(pooled_bam, f"{group}.pooled", pooled_seed)
                         pooled_ps = []
@@ -1780,6 +1804,7 @@ if (chrom != "" && len != "") print chrom, len;
                             ("q0p001.shiftm100.ext200", "0.001", -100, 200),
                         ]
 
+                    candidate_grid = [(name, q, shift, size) for name, q, shift, size in candidate_grid if shift is None]
                     blacklist_bed = maybe_resolve_blacklist_bed(config["THEGENOME"], outputfolder, "step10_chip_narrow")
                     optimization_dir = os.path.join(outputfolder, "chip_narrow_peak_call_optimization")
                     os.makedirs(optimization_dir, exist_ok=True)

@@ -882,7 +882,7 @@ rule analyze_peaks_de:
                     lines.append(line)
 
                 ax.set_title(region_label, fontsize=16, pad=12)
-                ax.set_ylabel("normalized signal", fontsize=12)
+                ax.set_ylabel("mean coverage signal (descriptive)" if params.thetype == "CHIP" else "normalized signal", fontsize=12)
                 if scaled_gene_body:
                     total_length = upstream + body + downstream
                     ax.axvline(upstream / 1000.0, color="#555555", linewidth=1.0, alpha=0.6)
@@ -1060,12 +1060,13 @@ rule analyze_peaks_de:
                         raise RuntimeError(f"Custom profile rendering failed for {item['set_name']}, and plotProfile is not available: {exc}") from exc
                     log_it(logfile, f"Custom profile rendering failed for {item['set_name']}: {exc}. Falling back to deepTools plotProfile.")
                     profile_labels = "--startLabel TSS --endLabel TES" if scale_gene_bodies else "--refPointLabel center"
+                    signal_label = "mean coverage signal (descriptive)" if params.thetype == "CHIP" else "normalized signal"
                     shell(
                         f"plotProfile -m {quote(matrix_path)} -out {quote(profile_path)} "
                         f"--perGroup --regionsLabel {quote(region_label)} "
                         f"--samplesLabel {' '.join(quote(label) for label in sample_labels)} "
                         f"{profile_labels} "
-                        f"--yAxisLabel 'normalized signal' --legendLocation upper-right "
+                        f"--yAxisLabel {quote(signal_label)} --legendLocation upper-right "
                         f"--plotWidth 10 --plotHeight 6"
                     )
                 signal_artifact_cache[signal_signature] = {
@@ -1706,6 +1707,9 @@ rule analyze_peaks_de:
                 )
                 writer.writerow(["set_manifest", set_manifest_path])
                 writer.writerow(["signal_dir", signal_dir])
+                if params.thetype == "CHIP":
+                    writer.writerow(["profile_inference", "descriptive mean across regions; each line is a library; no treatment test on loci/bins"])
+                    writer.writerow(["profile_tracks", "ordinary coverage tracks; input-relative tracks are separate visualization outputs"])
                 writer.writerow(["motifs_dir", motifs_dir])
                 writer.writerow(["motif_runs", motif_summary_path or "NA"])
                 writer.writerow(["peak_metadata_path", peak_metadata_path])

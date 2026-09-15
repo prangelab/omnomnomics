@@ -33,6 +33,11 @@ from omnomnomics.de_app import main as de_app_main
 from omnomnomics.de_config import DEConfigError, resolve_de_config
 from omnomnomics.genomes import genomes_main
 from omnomnomics.helpers import create_track_color_table_main, display_track_color_table_main
+from omnomnomics.storage import capture_source_protection, remove_generated_path
+from omnomnomics.chip_inputs import resolve_chip_inputs, validate_preparation_scope
+from omnomnomics.chip_analysis import read_regions
+from omnomnomics.library_manifest import reference_lengths
+from omnomnomics.library_manifest import build_library_manifest, load_manifest, save_library_manifest, validate_protected_targets, write_stable_text
 from omnomnomics.metadata import (
     MetadataError,
     derive_metadata_rows,
@@ -371,8 +376,10 @@ def load_step_monitor_rows(experiment_dir):
    if not step_log_dir.is_dir():
        return []
    lane_total, merged_total = collect_monitor_sample_totals(experiment_dir)
+   plan_path = step_log_dir / "plan.json"
+   planned_totals = json.loads(plan_path.read_text()) if plan_path.exists() else {}
 
-   step_nums = set()
+   step_nums = {int(step) for step in planned_totals}
    for summary_path in step_log_dir.glob("step*.summary.tsv"):
        match = re.search(r"step(\d+)\.summary\.tsv$", summary_path.name)
        if match:
@@ -408,7 +415,7 @@ def load_step_monitor_rows(experiment_dir):
                        status = row.get("status", "")
                        if status == "RUNNING":
                            running += 1
-                       elif status == "OK":
+                       elif status in {"OK", "REUSED"}:
                            completed += 1
                        elif status == "FAIL":
                            failed += 1
@@ -427,7 +434,9 @@ def load_step_monitor_rows(experiment_dir):
        else:
            state = "PENDING"
            state_color = ANSI_HEADER
-       if step_num in {1, 2, 3}:
+       if str(step_num) in planned_totals:
+           total = planned_totals[str(step_num)]
+       elif step_num in {1, 2, 3}:
            total = lane_total
        elif step_num in {4, 5, 6, 7, 8, 13}:
            total = merged_total
@@ -562,6 +571,12 @@ def parse_arguments(argv=None):
    parser.add_argument('--de-enable-custom-modules', action='store_true', help='Enable optional custom module enrichment (phase 3) in step 12. Requires a GMT file from --de-custom-modules-gmt or de_config enrichment.custom_modules.gmt_file.')
    parser.add_argument('--de-custom-modules-gmt', help='Path to a custom GMT file for optional custom module enrichment in step 12.')
    parser.add_argument('-I', '--input', help='Input BAM file used for ChIP peak calling with MACS3. \n \t Default: do not use input')
+   parser.add_argument('--input-match', help='Metadata columns that match ChIP libraries to role=input libraries; comma-separated names or 1-based indices.')
+   parser.add_argument('--chip-regions-bed', help='Non-overlapping BED regions for ChIP differential analysis; bypasses joint region discovery.')
+   parser.add_argument('--chip-joint-peak-q', type=float, help='MACS q-value for permissive joint ChIP testing-region discovery. Default: 0.1')
+   parser.add_argument('--chip-input-tracks', choices=['none', 'fold_enrichment', 'log2_ratio', 'qpois'], help='Additional ChIP/input track from MACS background or direct CPM ratio. Default: fold_enrichment when inputs are available.')
+   parser.add_argument('--chip-se-fragment-length', type=int, help='Inferred fragment length for single-end ChIP/input MACS pileups. Default: 200 bp')
+   parser.add_argument('--chip-effective-genome-size', type=float, help='Effective genome size for all ChIP MACS calls. Default: total selected reference length (an approximation)')
    parser.add_argument('-m', '--metadata', help='Tabular metadata file. The first column must be named filename. Metadata drives sample naming, peak grouping, trackhub grouping, and DE design.')
    parser.add_argument('--broad-mode', choices=['off', 'domain', 'genebody', 'diffuse'], help='ChIP broad-mark handling mode. off keeps the narrow/TF-like path, domain uses MACS3 broad domains, genebody will use gene-body features, and diffuse will use tiled windows. Default: off')
    parser.add_argument('--chip-broad-qvalue', type=float, help='Relaxed MACS3 q-value used for ChIP broad domain mode pooled/replicate/pseudoreplicate calls. Default: 0.05')
@@ -605,7 +620,7 @@ def parse_arguments(argv=None):
    parser.add_argument('-k', '--keepunpaired', action='store_true', help='Keep unpaired or not in HISAT2')
    parser.add_argument('--dry-run', action='store_true', help='Validate the workflow and build the Snakemake DAG without executing jobs')
    parser.add_argument('--site-config', help='Optional path to a site-specific config YAML. Default: $XDG_CONFIG_HOME/omnomnomics/site.yaml or ~/.config/omnomnomics/site.yaml, then packaged site config')
-   parser.add_argument('--retention-policy', choices=['all', 'pruned', 'minimal'], help='Post-run output retention policy. all keeps everything, pruned keeps FASTQ plus reusable downstream outputs, minimal keeps FASTQ plus only the requested terminal outputs. Default: all')
+   parser.add_argument('--retention-policy', choices=['all', 'pruned', 'minimal'], help='Post-run output retention policy. all keeps everything, pruned keeps source inputs plus reusable downstream outputs, minimal keeps source inputs plus the requested terminal outputs. Default: all')
    parser.add_argument('--max-project-size', help='Soft project-size cap such as 200G or 800GB. Omnomnomics may delete safe intermediates and skip BigWig or trackhub creation when the cap would be exceeded.')
 
    args, unknown = parser.parse_known_args(argv)
@@ -1158,7 +1173,7 @@ def describe_public_steps(assay_type, public_steps):
 ##---------------------------------------------------------------------------------------------------------------
 ## Set some parameters
 ##---------------------------------------------------------------------------------------------------------------
-def validate_input_files(the_type, config, mode_range_min, experiment_dir):
+def validate_input_files(the_type, config, mode_range_min, experiment_dir, excluded_paths=()):
     print("Validating input files...")
 
     # Check permissions on experiment dir
@@ -1187,8 +1202,9 @@ def validate_input_files(the_type, config, mode_range_min, experiment_dir):
         input_folder_mod_range_min = input_folder_mod_range_min[0]
 
 
-    if os.path.isdir(f"{experiment_dir}/{input_folder_mod_range_min}"):
-        num_files = len(glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}"))
+    excluded = {str(Path(path).resolve()) for path in excluded_paths if path and path != "NA"}
+    input_files = [path for path in glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}") if str(Path(path).resolve()) not in excluded]
+    num_files = len(input_files)
 
 
     # Sanity check file number
@@ -1197,7 +1213,6 @@ def validate_input_files(the_type, config, mode_range_min, experiment_dir):
         sys.exit(1)
 
     # Check if input files are readable
-    input_files = glob.glob(f"{experiment_dir}/{input_folder_mod_range_min}/*{input_file_type_mod_range_min}")
     if not os.access(input_files[0], os.R_OK):
         print(f"Permission error! {input_file_type_mod_range_min} files in {experiment_dir}/{input_folder_mod_range_min} are not readable! Aborting...", file=sys.stderr)
         sys.exit(1)
@@ -1212,7 +1227,7 @@ def normalize_field_selection_name(filename, file_type):
     _ = file_type
     return normalize_metadata_filename(filename)
 
-def merged_sample_roots_for_mode(experiment_dir, input_folder, input_file_type):
+def merged_sample_roots_for_mode(experiment_dir, input_folder, input_file_type, excluded_paths=()):
     if input_file_type not in FASTQ_EXTENSIONS and input_file_type not in (".trimmed.fastq.gz", ".trimmed.fastq", ".trimmed.fq.gz", ".trimmed.fq"):
         files = glob.glob(f"{experiment_dir}/{input_folder}/*{input_file_type}")
     else:
@@ -1220,6 +1235,8 @@ def merged_sample_roots_for_mode(experiment_dir, input_folder, input_file_type):
         for extension in FASTQ_EXTENSIONS if input_file_type in FASTQ_EXTENSIONS else (input_file_type,):
             files.extend(glob.glob(f"{experiment_dir}/{input_folder}/*{extension}"))
 
+    excluded = {str(Path(path).resolve()) for path in excluded_paths if path and path != "NA"}
+    files = [path for path in files if str(Path(path).resolve()) not in excluded]
     normalized_files = sorted(
         set(normalize_field_selection_name(file_path, input_file_type) for file_path in files)
     )
@@ -1335,11 +1352,8 @@ def setup_runtime_parameters(num_pairs, experiment_dir):
     print("Setup runtime parameters...")
 
     # Make directories for slurm logs, run logs, run configs and MultiQC in experiment directory
-    subprocess.run(f"mkdir -p {experiment_dir}/slurm_logs", shell=True, check=True)
-    subprocess.run(f"mkdir -p {experiment_dir}/slurm_logs/controller", shell=True, check=True)
-    subprocess.run(f"mkdir -p {experiment_dir}/run_logs", shell=True, check=True)
-    subprocess.run(f"mkdir -p {experiment_dir}/run_configs", shell=True, check=True)
-    subprocess.run(f"mkdir -p {experiment_dir}/MultiQC", shell=True, check=True)
+    for folder in ("slurm_logs/controller", "run_logs", "run_configs", "MultiQC"):
+        (Path(experiment_dir) / folder).mkdir(parents=True, exist_ok=True)
 
     # Node has 512GiB memory. Keep some margin, use 500 GiB ~ 500 000 MiB. Set Java heap initial size (Xms) to half of the max heap (THEMEM) we calculate per file
     the_mem = 500000 // num_pairs
@@ -1433,8 +1447,15 @@ def reset_step_tracking(mode_steps, experiment_dir):
 ##--------------------------------------------------------------------------------------------------------------
 # Remove already present outputs of rules that you want to run
 ##--------------------------------------------------------------------------------------------------------------
-def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
+def delete_outputs_to_be_updated(mode_steps, config, experiment_dir, protected_sources=None):
     print("FORCING RECOMPUTATION OF SELECTED STEP OUTPUTS")
+    if protected_sources is None:
+        _, protected_sources = capture_source_protection(experiment_dir, config)
+
+    def remove_output(path):
+        if not remove_generated_path(path, protected_sources):
+            print(f"Preserving source input during recomputation cleanup: {path}")
+
     explicit_outputs = {
         config.get('mergewig_rule_num'): [
             os.path.join(
@@ -1486,10 +1507,8 @@ def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
     }
     for num in mode_steps: # Loop over all the to run steps
         for output_path in explicit_outputs.get(num, []):
-            if os.path.isdir(output_path):
-                remove_tree_tolerating_missing(output_path)
-            elif os.path.exists(output_path):
-                os.remove(output_path)
+            if os.path.lexists(output_path):
+                remove_output(output_path)
         if num == config.get('analyzepeaksde_rule_num'):
             continue
         outputfolder = config['output_folders'][num-1]
@@ -1499,32 +1518,27 @@ def delete_outputs_to_be_updated(mode_steps, config, experiment_dir):
                 files = glob.glob(f"{experiment_dir}/{outputfolder}/*{filetype}")
                 for file in files:
                     if os.path.exists(file):
-                        if filetype == ".hub":
-                            remove_tree_tolerating_missing(file) # Is actually a hub directory and not a file
-                        else:
-                            os.remove(file)
+                        remove_output(file)
         else:
             files = glob.glob(f"{experiment_dir}/{outputfolder}/*{output_filetype}")
             for file in files:
                 if os.path.exists(file):
                     if num == 4 and output_filetype == ".bam" and re.search(r'L0\d+', os.path.basename(file)):
                         continue
-                    elif num == 9:
-                        shutil.rmtree(file) # Is actually a hub directory and not a file
                     else:
-                        os.remove(file)
+                        remove_output(file)
         if num == 1:
             trim_metric_files = glob.glob(f"{experiment_dir}/{outputfolder}/*.trim_metrics.tsv")
             for file in trim_metric_files:
                 if os.path.exists(file):
-                    os.remove(file)
+                    remove_output(file)
     if config.get('create_homer_tagdirs', False):
         homer_outputfolder = config['output_folders'][config['homer_tagdir_rule_num'] - 1]
         homer_output_filetype = config['output_file_types'][config['homer_tagdir_rule_num'] - 1]
         files = glob.glob(f"{experiment_dir}/{homer_outputfolder}/*{homer_output_filetype}")
         for file in files:
             if os.path.exists(file):
-                os.remove(file)
+                remove_output(file)
 ##--------------------------------------------------------------------------------------------------------------
 # Main function
 ##--------------------------------------------------------------------------------------------------------------
@@ -1645,7 +1659,44 @@ def main():
     if 'chip_diffuse_exclude_chrm' in config and not args.chip_diffuse_keep_chrm:
         chip_diffuse_exclude_chrm = bool(config.get('chip_diffuse_exclude_chrm', True))
     INPUT = args.input if args.input else config.get('input',"NA")
+    if INPUT != "NA":
+        INPUT = str(Path(INPUT).resolve())
     metadata = args.metadata if args.metadata else config.get('metadata', "NA")
+    input_match = args.input_match if args.input_match is not None else config.get('input_match')
+    chip_regions_bed = args.chip_regions_bed or config.get('chip_regions_bed') or "NA"
+    chip_joint_peak_q = args.chip_joint_peak_q if args.chip_joint_peak_q is not None else config.get('chip_joint_peak_q', 0.1)
+    chip_input_tracks = args.chip_input_tracks or config.get('chip_input_tracks') or 'fold_enrichment'
+    chip_se_fragment_length = args.chip_se_fragment_length if args.chip_se_fragment_length is not None else config.get('chip_se_fragment_length', 200)
+    chip_effective_genome_size = args.chip_effective_genome_size if args.chip_effective_genome_size is not None else config.get('chip_effective_genome_size')
+    chip_enrichment_min_input = config.get('chip_enrichment_min_input', 5)
+    try:
+        chip_joint_peak_q = float(chip_joint_peak_q)
+        chip_se_fragment_length = int(chip_se_fragment_length)
+        chip_enrichment_min_input = int(chip_enrichment_min_input)
+        if chip_enrichment_min_input < 1:
+            raise MetadataError("chip_enrichment_min_input must be at least one.")
+        if chip_input_tracks not in {'none', 'fold_enrichment', 'log2_ratio', 'qpois'}:
+            raise MetadataError("chip_input_tracks must be none, fold_enrichment, log2_ratio or qpois.")
+        if chip_effective_genome_size is not None:
+            chip_effective_genome_size = float(chip_effective_genome_size)
+            if not math.isfinite(chip_effective_genome_size) or chip_effective_genome_size <= 0:
+                raise MetadataError("--chip-effective-genome-size requires a finite positive ChIP genome size.")
+            if args.chip_effective_genome_size is not None and the_type != "CHIP":
+                raise MetadataError("--chip-effective-genome-size requires ChIP.")
+        if chip_se_fragment_length <= 0:
+            raise MetadataError("--chip-se-fragment-length must be positive.")
+        if not 0 < chip_joint_peak_q <= 1:
+            raise MetadataError("--chip-joint-peak-q must be greater than zero and at most one.")
+        if chip_regions_bed != "NA":
+            if the_type != "CHIP" or broad_mode in {"genebody", "diffuse"}:
+                raise MetadataError("--chip-regions-bed requires ChIP peak/domain mode; it cannot be combined with gene-body or diffuse mode.")
+            chip_regions_bed = str(Path(chip_regions_bed).resolve())
+            read_regions(chip_regions_bed, reference_lengths(config['genome_assembly_dir'], genome))
+        if args.chip_joint_peak_q is not None and the_type != "CHIP":
+            raise MetadataError("--chip-joint-peak-q requires ChIP.")
+    except (MetadataError, OSError, ValueError, TypeError, OverflowError) as exc:
+        print(f"{exc} Aborting...", file=sys.stderr)
+        sys.exit(1)
     col_table = resolve_config_path(args.col_table, workflow_root) if args.col_table else resolve_config_path(config.get('color_table', f"{workflow_root}/bin/color_data_for_hubs/gray.tint.color.table"), workflow_root)
     color_data_folder = resolve_config_path(args.color_data_folder, workflow_root) if args.color_data_folder else resolve_config_path(config.get('color_data_folder', f"{workflow_root}/bin/color_data_for_hubs"), workflow_root)
     overlay = args.overlay if args.overlay else config.get('overlay', "transparentOverlay")
@@ -1863,26 +1914,93 @@ def main():
             return
     print(f"SELECTED PUBLIC STEPS = {describe_public_steps(the_type, public_mode_steps)}")
 
+    prederived_metadata = None
+    library_manifest = None
+    previous_library_manifest = None
+    library_manifest_file = "NA"
+    input_associations_file = "NA"
+    try:
+        if input_match and (the_type != "CHIP" or metadata == "NA"):
+            raise MetadataError("--input-match requires a ChIP run with metadata (-m).")
+        if metadata != "NA":
+            if not sample_name:
+                raise MetadataError("--sample-name is required when metadata is supplied.")
+            metadata_fieldnames, metadata_rows = read_metadata_table(metadata)
+            derived_fieldnames, derived_rows, selector_map = derive_metadata_rows(
+                metadata_fieldnames, metadata_rows, sample_name, sample_type, sample_color,
+            )
+            prederived_metadata = (derived_fieldnames, derived_rows, selector_map)
+            if the_type == "CHIP" and ("role" in metadata_fieldnames or input_match):
+                resolved_inputs = resolve_chip_inputs(metadata_fieldnames, derived_rows, input_match, INPUT)
+                if any(step > 7 for step in mode_steps) and not any(library['role'] == 'chip' for library in resolved_inputs['libraries']):
+                    raise MetadataError("ChIP analytical stages require at least one role=chip library.")
+                validate_preparation_scope(mode_steps, create_homer_tagdirs)
+                manifest_config = dict(config, map_tool=map_tool)
+                previous_library_manifest = load_manifest(Path(experiment_dir) / "run_configs/library_manifest.json")
+                library_manifest = build_library_manifest(
+                    experiment_dir, resolved_inputs, mode_steps, genome, config['genome_assembly_dir'], manifest_config,
+                    previous=previous_library_manifest,
+                )
+    except (MetadataError, ValueError) as exc:
+        print(f"{exc} Aborting...", file=sys.stderr)
+        sys.exit(1)
+
+    original_sources = [path for library in (library_manifest or {}).get("libraries", []) for path in library["original_sources"]]
+    known_generated = (previous_library_manifest or {}).get("generated_paths", [])
+    source_protection_file, protected_sources = capture_source_protection(
+        experiment_dir, config, additional_sources=(INPUT, metadata, chip_regions_bed, *original_sources), generated_paths=known_generated,
+    )
+    if library_manifest:
+        try:
+            validate_protected_targets(library_manifest, protected_sources)
+        except MetadataError as exc:
+            print(f"{exc} Aborting...", file=sys.stderr)
+            sys.exit(1)
+
     # Reset selected step bookkeeping for the new run
     reset_step_tracking(mode_steps, experiment_dir)
+    plan_path = Path(experiment_dir) / "run_logs/steps/plan.json"
+    if library_manifest:
+        write_stable_text(plan_path, json.dumps({step: len(jobs) for step, jobs in library_manifest["work"].items()}, sort_keys=True))
+    else:
+        plan_path.unlink(missing_ok=True)
 
     # Optionally force recomputation of selected step outputs
-    if rerun_selected_steps:
-        delete_outputs_to_be_updated(mode_steps, config, experiment_dir)
+    if library_manifest:
+        library_manifest_file, input_associations_file = save_library_manifest(experiment_dir, run_date, library_manifest)
+        if rerun_selected_steps and not dry_run:
+            for jobs in library_manifest["work"].values():
+                for outputs in jobs.values():
+                    for path in outputs:
+                        if not remove_generated_path(path, protected_sources):
+                            print(f"Preserving source input during recomputation cleanup: {path}")
+    elif rerun_selected_steps and not dry_run:
+        delete_outputs_to_be_updated(mode_steps, config, experiment_dir, protected_sources)
     else:
         print("REUSING EXISTING OUTPUTS WHEN POSSIBLE")
 
     #checking input files
-    num_files, num_pairs, paired, input_folder_mod_range_min, input_file_type_mod_range_min = validate_input_files(the_type, config, min(mode_steps),experiment_dir)
+    if library_manifest:
+        libraries = library_manifest["libraries"]
+        num_files = len({path for library in libraries for path in library["source_paths"]})
+        num_pairs = sum(max(1, len(library["units"])) for library in libraries)
+        paired = any(library["paired"] for library in libraries)
+        input_folder_mod_range_min, input_file_type_mod_range_min = "metadata", "mixed"
+        print(f"Resolved {len(libraries)} libraries; {len(library_manifest['associations'])} ChIP/input associations.")
+        if library_manifest["unassigned_inputs"]:
+            print("Unassigned input libraries (prepared independently): " + ", ".join(library_manifest["unassigned_inputs"]))
+    else:
+        num_files, num_pairs, paired, input_folder_mod_range_min, input_file_type_mod_range_min = validate_input_files(the_type, config, min(mode_steps), experiment_dir, excluded_paths=(INPUT,) if the_type == "CHIP" else ())
     fastp_adapter_mode_requested, fastp_adapter_mode, fastp_adapter_sequence, fastp_adapter_sequence_r2 = resolve_fastp_adapter_settings(
         args,
         config,
         the_type,
-        paired,
+        any(unit["paired"] for library in library_manifest["libraries"] for unit in library["units"] if unit["source_type"] == "fastq") if library_manifest else paired,
     )
 
-    metadata_required = metadata_required_for_mode(mode_steps)
+    metadata_required = metadata_required_for_mode(mode_steps) or metadata != "NA"
     derived_metadata_path = "NA"
+    experiment_metadata_path = "NA"
     resolved_de_formula = "NA"
     de_design_mode = "NA"
     sample_name_columns = []
@@ -1914,21 +2032,16 @@ def main():
         try:
             run_configs_dir = os.path.join(experiment_dir, "run_configs")
             os.makedirs(run_configs_dir, exist_ok=True)
-            metadata_fieldnames, metadata_rows = read_metadata_table(metadata)
-            derived_fieldnames, derived_rows, selector_map = derive_metadata_rows(
-                metadata_fieldnames,
-                metadata_rows,
-                sample_name_selector=sample_name,
-                sample_type_selector=sample_type,
-                sample_color_selector=sample_color,
-            )
+            derived_fieldnames, derived_rows, selector_map = prederived_metadata
             metadata_sample_id_steps = {
                 config.get('de_rule_num'),
                 config.get('dechrom_rule_num'),
                 config.get('analyzepeaksde_rule_num'),
             }
             metadata_sample_id_steps = {step for step in metadata_sample_id_steps if isinstance(step, int)}
-            if metadata_sample_id_steps and min(mode_steps) in metadata_sample_id_steps:
+            if library_manifest:
+                pass
+            elif metadata_sample_id_steps and min(mode_steps) in metadata_sample_id_steps:
                 count_table_path = os.path.join(
                     experiment_dir,
                     config['output_folders'][config['countreads_rule_num'] - 1],
@@ -1944,6 +2057,7 @@ def main():
                     experiment_dir,
                     input_folder_mod_range_min,
                     input_file_type_mod_range_min,
+                    excluded_paths=(INPUT,) if the_type == "CHIP" else (),
                 )
                 validate_metadata_sample_roots(derived_rows, expected_sample_roots)
             sample_name_columns = selector_map["sample_name_columns"]
@@ -1959,6 +2073,7 @@ def main():
                     de_columns,
                     de_block,
                     bool(de_interactions),
+                    default_rows=[row for row in derived_rows if row["role"] == "chip"] if library_manifest else None,
                 )
                 de_design_mode = str(de_context["mode"])
                 de_columns_resolved = list(de_context["de_columns"])
@@ -2019,6 +2134,9 @@ def main():
                 f"omnomnomics.run.{run_date}.metadata_derived.tsv",
             )
             write_metadata_table(derived_metadata_path, derived_fieldnames, derived_rows)
+            if library_manifest:
+                experiment_metadata_path = os.path.join(run_configs_dir, f"omnomnomics.run.{run_date}.metadata_experiments.tsv")
+                write_metadata_table(experiment_metadata_path, derived_fieldnames, [row for row in derived_rows if row["role"] == "chip"])
 
             if 12 in mode_steps:
                 validation_message = validate_deseq_design_full_rank(
@@ -2053,6 +2171,16 @@ def main():
         'INPUT_FOLDER': input_folder_mod_range_min,
         'INPUT_FILE_TYPE': input_file_type_mod_range_min,
         'INPUT': INPUT,
+        'CHIP_REGIONS_BED': chip_regions_bed,
+        'CHIP_JOINT_PEAK_Q': chip_joint_peak_q,
+        'CHIP_INPUT_TRACKS': chip_input_tracks,
+        'CHIP_SE_FRAGMENT_LENGTH': chip_se_fragment_length,
+        'CHIP_EFFECTIVE_GENOME_SIZE': chip_effective_genome_size,
+        'CHIP_ENRICHMENT_MIN_INPUT': chip_enrichment_min_input,
+        'SOURCE_PROTECTION_FILE': source_protection_file,
+        'PROTECTED_SOURCE_PATHS': protected_sources,
+        'LIBRARY_MANIFEST_FILE': library_manifest_file,
+        'INPUT_ASSOCIATIONS_FILE': input_associations_file,
         'BROAD_MODE': broad_mode,
         'CHIP_BROAD_QVALUE': chip_broad_qvalue,
         'CHIP_BROAD_CUTOFF': chip_broad_cutoff,
@@ -2100,6 +2228,7 @@ def main():
         'DE_CONFIG_RESOLVED_LIST_JSON': json.dumps(resolved_de_configs, sort_keys=True) if resolved_de_configs else "[]",
         'MYMETADATA': metadata,
         'DERIVED_METADATA_FILE': derived_metadata_path,
+        'EXPERIMENT_METADATA_FILE': experiment_metadata_path,
         'METADATA_REQUIRED': metadata_required,
         'SAMPLE_NAME_SELECTOR': sample_name,
         'SAMPLE_TYPE_SELECTOR': sample_type,
@@ -2157,8 +2286,13 @@ def main():
         selected_rule_names = []
         allowed_rule_names = []
         companion_allowed_rules = {
+            "run_fastp": ["run_fastp_se"],
+            "run_skewer": ["run_skewer_se"],
+            "run_fastqc": ["run_fastqc_se"],
             "merge_bam": ["mark_bam_merged"],
             "call_peaks": [
+                "chip_fragments",
+                "chip_testing_regions",
                 "idr_pooled_macs3",
                 "idr_replicate_macs3",
                 "idr_true_pair",
@@ -2171,6 +2305,9 @@ def main():
                 "idr_group_consensus",
                 "idr_selected_summary",
             ],
+            "count_reads": ["chip_fragments", "chip_testing_regions"],
+            "create_wiggles": ["chip_fragments", "chip_input_track"],
+            "call_DE_chrom": ["chip_testing_metadata"],
         }
         cmd.append("--forcerun")
         for i in mode_steps:
@@ -2178,7 +2315,12 @@ def main():
             rule_name = config[routine][selected_routines[f'selected_routine_{routine}']]
             selected_rule_names.append(rule_name)
             allowed_rule_names.append(rule_name)
-            allowed_rule_names.extend(companion_allowed_rules.get(rule_name, []))
+            companions = [name for name in companion_allowed_rules.get(rule_name, []) if the_type == "CHIP" or not name.startswith("chip_")]
+            allowed_rule_names.extend(name for name in companions if library_manifest or not name.endswith("_se"))
+            if library_manifest:
+                selected_rule_names.extend(name for name in companions if name.endswith("_se"))
+        if library_manifest:
+            allowed_rule_names.append("import_filtered_bam")
         cmd.extend(selected_rule_names)
         if (
             config.get('analyzepeaksde_rule_num') in mode_steps

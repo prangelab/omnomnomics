@@ -1,0 +1,7 @@
+................................................Running hisat2-build: hisat2-build -p 16 /var/folders/fx/5ss8k_fx439d2f2vh0hp9qpc0000gn/T/tmp485rvuap/genome.fa /var/folders/fx/5ss8k_fx439d2f2vh0hp9qpc0000gn/T/tmp485rvuap/hisat2/hg38
+..Running STAR genomeGenerate: STAR --runThreadN 16 --runMode genomeGenerate --genomeDir /var/folders/fx/5ss8k_fx439d2f2vh0hp9qpc0000gn/T/tmppkx3sy0r/star --genomeFastaFiles /var/folders/fx/5ss8k_fx439d2f2vh0hp9qpc0000gn/T/tmppkx3sy0r/genome.fa --genomeSAindexNbases 1 --sjdbGTFfile /var/folders/fx/5ss8k_fx439d2f2vh0hp9qpc0000gn/T/tmppkx3sy0r/genes.gtf --sjdbOverhang 100
+............................
+----------------------------------------------------------------------
+Ran 78 tests in 363.768s
+
+OK

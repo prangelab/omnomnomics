@@ -20,6 +20,7 @@ de_dir <- __DE_DIR__
 peak_metadata_path <- __PEAK_METADATA_PATH__
 peak_id_column <- __PEAK_ID_COLUMN__
 assay_lower <- __ASSAY_LOWER__
+chip_reuse_model <- __CHIP_REUSE_MODEL__
 genome_version <- __GENOME_VERSION__
 feature_label_singular <- __FEATURE_LABEL_SINGULAR__
 feature_label_plural <- __FEATURE_LABEL_PLURAL__
@@ -496,7 +497,11 @@ if (filtering_enabled && filtering_method == "min_count_samples") {
       warning("min_samples_mode='per_group' requested but de_group is missing; falling back to fixed min_samples.")
     }
   }
-  keep <- keep & (rowSums(count_matrix >= filtering_min_count) >= min_samples_use)
+  if (identical(toupper(assay_lower), "CHIP")) {
+    keep <- keep & (rowSums(count_matrix) >= filtering_min_count)
+  } else {
+    keep <- keep & (rowSums(count_matrix >= filtering_min_count) >= min_samples_use)
+  }
   keep <- keep & (rowSums(count_matrix) >= atac_filter_min_total_count)
 
   count_matrix <- count_matrix[keep, , drop = FALSE]
@@ -611,13 +616,41 @@ if (isTRUE(latent_enabled) && length(design_terms_effective) == 0) {
   }
 }
 message(latent_message)
-dds <- DESeq2::DESeqDataSetFromMatrix(
-  countData = count_matrix,
-  colData = col_data,
-  design = design_formula
-)
-dds <- DESeq2::DESeq(dds, fitType = deseq_fit_type, sfType = deseq_sf_type, parallel = deseq_parallel)
-vst_obj <- DESeq2::vst(dds, blind = vst_blind)
+if (identical(toupper(assay_lower), "CHIP")) {
+  model_matrix <- stats::model.matrix(design_formula, col_data)
+  if (qr(model_matrix)$rank >= nrow(model_matrix)) {
+    stop("ChIP differential analysis requires biological replication and residual degrees of freedom in the design.")
+  }
+  message("ChIP DE uses raw counts with between-ChIP normalization (", deseq_sf_type,
+          "); estimates are relative abundance, without input subtraction or absolute calibration.")
+}
+model_payload <- list(counts = count_matrix, metadata = col_data, formula = design_formula_effective_text,
+                      fit = deseq_fit_type, sf = deseq_sf_type, parallel = deseq_parallel,
+                      vst_blind = vst_blind, R_version = R.version.string,
+                      DESeq2_version = as.character(utils::packageVersion("DESeq2")))
+dir.create(qc_dir, recursive = TRUE, showWarnings = FALSE)
+model_cache_path <- file.path(qc_dir, "chip_model_cache.rds")
+model_cache <- if (identical(assay_lower, "chip") && chip_reuse_model && file.exists(model_cache_path)) {
+  tryCatch(readRDS(model_cache_path), error = function(e) NULL)
+} else {
+  NULL
+}
+if (!is.null(model_cache) && identical(model_cache$payload, model_payload)) {
+  dds <- model_cache$dds
+  vst_obj <- model_cache$vst
+  message("Reused ChIP count model; annotations do not affect statistical fitting.")
+} else {
+  dds <- DESeq2::DESeqDataSetFromMatrix(countData = count_matrix, colData = col_data, design = design_formula)
+  dds <- DESeq2::DESeq(dds, fitType = deseq_fit_type, sfType = deseq_sf_type, parallel = deseq_parallel)
+  vst_obj <- if (sum(rowMeans(DESeq2::counts(dds, normalized = TRUE)) > 5) >= 1000) {
+    DESeq2::vst(dds, blind = vst_blind)
+  } else {
+    DESeq2::varianceStabilizingTransformation(dds, blind = vst_blind)
+  }
+  if (identical(assay_lower, "chip")) {
+    saveRDS(list(payload = model_payload, dds = dds, vst = vst_obj), model_cache_path)
+  }
+}
 results_names_tbl <- data.frame(
   coefficient = DESeq2::resultsNames(dds),
   stringsAsFactors = FALSE
@@ -1293,7 +1326,7 @@ if (length(palette_rows) > 0) {
 
 filter_summary <- data.frame(
   filtering_enabled = filtering_enabled,
-  filtering_method = filtering_method,
+  filtering_method = if (identical(assay_lower, "chip")) "aggregate_total_count" else filtering_method,
   min_count = filtering_min_count,
   min_samples = filtering_min_samples,
   genes_before = genes_before_filter,
@@ -2546,16 +2579,6 @@ for (contrast_cfg in contrast_plan) {
   )
   contrast_testing_summaries[[length(contrast_testing_summaries) + 1]] <- testing_summary
 
-  if (write_full_results) {
-    utils::write.table(
-      res_df,
-      file = file.path(contrast_dir, paste0(contrast_label, ".diff_", feature_file_stem, ".DESeq2.txt")),
-      sep = "\t",
-      quote = FALSE,
-      row.names = FALSE
-    )
-  }
-
   ranked_exports <- list()
   rank_lfc <- build_rank_table(res_df, "log2FoldChange")
   if (!is.null(rank_lfc) && nrow(rank_lfc) > 1) {
@@ -2783,6 +2806,24 @@ for (contrast_cfg in contrast_plan) {
   res_df$distance_to_nearest_promoter_bp <- enrich_df$distance_to_nearest_promoter_bp[match(res_df$gene_id, enrich_df$gene_id)]
   res_df$linked_gene_symbol <- enrich_df$linked_gene_symbol[match(res_df$gene_id, enrich_df$gene_id)]
   res_df$link_mode <- enrich_df$link_mode[match(res_df$gene_id, enrich_df$gene_id)]
+  if (!is.null(peak_data)) {
+    support_columns <- grep("^support_|\\.overlap_(bp|fraction)$|\\.support_(method|note)$|^original_name$", colnames(peak_data), value = TRUE)
+    for (column in support_columns) {
+      res_df[[column]] <- peak_data[[column]][match(res_df$gene_id, rownames(peak_data))]
+    }
+    if (all(c("support_groups", "support_unassessed_groups") %in% colnames(res_df)) && contrast_type == "factor" && "sample_type" %in% colnames(col_data)) {
+      numerator_groups <- unique(as.character(col_data$sample_type[as.character(col_data[[factor_name]]) == numerator]))
+      denominator_groups <- unique(as.character(col_data$sample_type[as.character(col_data[[factor_name]]) == denominator]))
+      res_df$contrast_peak_support <- vapply(seq_len(nrow(res_df)), function(i) {
+        supported <- strsplit(as.character(res_df$support_groups[i]), ";", fixed = TRUE)[[1]]
+        unassessed <- strsplit(as.character(res_df$support_unassessed_groups[i]), ";", fixed = TRUE)[[1]]
+        if (any(c(numerator_groups, denominator_groups) %in% unassessed)) return("unassessed")
+        in_numerator <- any(numerator_groups %in% supported)
+        in_denominator <- any(denominator_groups %in% supported)
+        if (in_numerator && in_denominator) "both" else if (in_numerator) "numerator_only" else if (in_denominator) "denominator_only" else "joint_only"
+      }, character(1))
+    }
+  }
   missing_feature_labels <- is.na(res_df$feature_label) | !nzchar(res_df$feature_label)
   res_df$feature_label[missing_feature_labels] <- res_df$gene_id[missing_feature_labels]
   missing_peak_region <- is.na(res_df$peak_region) | !nzchar(res_df$peak_region)
@@ -2805,6 +2846,16 @@ for (contrast_cfg in contrast_plan) {
   table_front_cols <- table_front_cols[table_front_cols %in% colnames(res_df)]
   res_df <- res_df[, c(table_front_cols, setdiff(colnames(res_df), table_front_cols)), drop = FALSE]
   sig_df <- subset(res_df, !is.na(padj) & padj < alpha & abs(log2FoldChange) >= lfc_for_sig)
+
+  if (write_full_results) {
+    utils::write.table(
+      res_df,
+      file = file.path(contrast_dir, paste0(contrast_label, ".diff_", feature_file_stem, ".DESeq2.txt")),
+      sep = "\t",
+      quote = FALSE,
+      row.names = FALSE
+    )
+  }
 
   if (write_sig_only) {
     utils::write.table(

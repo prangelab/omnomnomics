@@ -214,28 +214,21 @@ def _build_de_customization_guide(
 
 
 def _chrom_de_peak_metadata_file():
+    if config['THETYPE'] == "CHIP":
+        return chip_testing_metadata
     if config['THETYPE'] == "ATAC":
         return f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num']-1]}/analyze_peaks/summary/peak_metadata_for_r.tsv"
-    if config['THETYPE'] == "CHIP":
-        if str(config.get("BROAD_MODE", "off")).strip().lower() in {"genebody", "diffuse"}:
-            return f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num']-1]}/analyze_peaks/summary/feature_metadata_for_r.tsv"
-        return f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num']-1]}/peak_qc/peak_annotations/chip.all_groups.merged_peaks.annotated.bed"
     return "NA"
 
 
 def _chrom_de_peak_metadata_dependency():
+    if config['THETYPE'] == "CHIP":
+        return chip_testing_metadata
     if config['THETYPE'] == "ATAC":
         return (
             f"{experiment_dir}/{master_config['output_folders'][master_config['peakqc_rule_num']-1]}"
             f"/peak_qc/peak_annotations/{config['THETYPE'].lower()}.all_groups.merged_peaks.annotated.bed"
         )
-    if config['THETYPE'] == "CHIP":
-        if str(config.get("BROAD_MODE", "off")).strip().lower() in {"genebody", "diffuse"}:
-            return (
-                f"{experiment_dir}/{master_config['output_folders'][master_config['analyzepeaks_rule_num']-1]}"
-                f"/extra_{master_config['analyzepeaks_rule_num']}.tmp"
-            )
-        return _chrom_de_peak_metadata_file()
     return []
 
 
@@ -332,7 +325,7 @@ rule call_DE_chrom:
             else []
         ),
         peak_metadata_dependency=chrom_de_peak_metadata_dependency,
-        peak_qc_metrics=chrom_de_peak_qc_metrics_file
+        peak_qc_metrics=chrom_de_peak_qc_metrics_file if config['THETYPE'] != "CHIP" else []
     output:
         results_zip=f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num']-1]}/{os.path.basename(config['EXPERIMENT_DIR'])}.chrom.results.zip",
         peak_metadata=f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num']-1]}/peak_metadata.tsv"
@@ -433,6 +426,9 @@ rule call_DE_chrom:
                 _write_peak_metadata_from_annotation(peak_metadata_source, peak_metadata_copy)
             else:
                 shutil.copy2(peak_metadata_source, peak_metadata_copy)
+            peak_metadata_provenance = peak_metadata_copy + ".source.json"
+            if params.thetype == "CHIP":
+                shutil.copy2(peak_metadata_source + ".source.json", peak_metadata_provenance)
             if params.thetype == "CHIP" and params.broad_mode in {"genebody", "diffuse"}:
                 feature_metadata_copy = os.path.join(params.outputfolder, "feature_metadata.tsv")
                 shutil.copy2(peak_metadata_source, feature_metadata_copy)
@@ -538,6 +534,7 @@ rule call_DE_chrom:
                 de_feature_file_stem = f"DE_{feature_file_stem}"
 
                 template_values = {
+                    "__CHIP_REUSE_MODEL__": _r_bool(not config.get("RERUN_SELECTED_STEPS", False)),
                     "__COUNTS_PATH__": _r_string(input.counts_table),
                     "__METADATA_PATH__": _r_string(metadata_copy),
                     "__OUTPUT_ROOT__": _r_string(params.outputfolder),
@@ -669,6 +666,8 @@ rule call_DE_chrom:
             with zipfile.ZipFile(output.results_zip, "w", compression=zipfile.ZIP_DEFLATED) as archive:
                 archive.write(metadata_copy, arcname=os.path.basename(metadata_copy))
                 archive.write(peak_metadata_copy, arcname=os.path.basename(peak_metadata_copy))
+                if params.thetype == "CHIP":
+                    archive.write(peak_metadata_provenance, arcname=os.path.basename(peak_metadata_provenance))
                 if params.thetype == "CHIP" and params.broad_mode in {"genebody", "diffuse"}:
                     feature_metadata_copy = os.path.join(params.outputfolder, "feature_metadata.tsv")
                     if os.path.isfile(feature_metadata_copy):

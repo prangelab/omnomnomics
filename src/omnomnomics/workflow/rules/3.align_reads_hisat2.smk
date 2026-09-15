@@ -14,10 +14,10 @@ import tempfile
 
 rule run_hisat2:
     wildcard_constraints:
-        sample3=lane_sample_wildcard_pattern
+        sample3=preparation_pattern(3)
     input:
-        trimmed_fastq1= f"{experiment_dir}/{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample3}}_R1.trimmed.fastq.gz" if config["PAIRED"] else f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample3}}.trimmed.fastq.gz",
-        trimmed_fastq2= f"{experiment_dir}/{master_config['input_folders'][master_config['map_rule_num']-1]}/{{sample3}}_R2.trimmed.fastq.gz" if config['PAIRED'] else []
+        trimmed_fastq1=lambda wildcards: preparation_trimmed_input(wildcards.sample3, 1),
+        trimmed_fastq2=lambda wildcards: preparation_trimmed_input(wildcards.sample3, 2)
     output:
         bam=f"{experiment_dir}/{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample3}}.bam",
         stats=f"{experiment_dir}/{master_config['output_folders'][master_config['map_rule_num']-1]}/{{sample3}}.HISAT2_stats.txt",
@@ -63,7 +63,7 @@ rule run_hisat2:
 
             try:
                 if seq_type == "RNA":
-                    if config["PAIRED"]:
+                    if sample_is_paired(sample):
                         record_step_note(master_config['map_rule_num'], sample, "running_hisat2_paired_end_rna")
                         MYNAME = os.path.basename(fastq1)
                         record_step_note(master_config['map_rule_num'], sample, f"launching {MYNAME}")
@@ -108,7 +108,7 @@ rule run_hisat2:
                         shell(f'cp {quote(local_bam)} {quote(os.path.join(outputfolder, f"{sample}.bam"))}')
                         shell(f'cp {quote(local_stats)} {quote(os.path.join(outputfolder, f"{sample}.HISAT2_stats.txt"))}')
                 else: #if ChIP- or ATAC data
-                    if config["PAIRED"]:
+                    if sample_is_paired(sample):
                         record_step_note(master_config['map_rule_num'], sample, "running_hisat2_paired_end_chip_or_atac")
                         MYNAME = os.path.basename(fastq1)
                         record_step_note(master_config['map_rule_num'], sample, f"launching {MYNAME}")

@@ -383,8 +383,8 @@ Some job mode examples:
                                     3. packaged site config
     --retention-policy:   Post-run output retention policy.
                                     all: keep all pipeline outputs
-                                    pruned: keep FASTQ plus reusable downstream outputs
-                                    minimal: keep FASTQ plus only the requested terminal outputs
+                                    pruned: keep source inputs plus reusable downstream outputs
+                                    minimal: keep source inputs plus the requested terminal outputs
                                     Default: all
     --max-project-size:   Soft project-size cap such as 200G or 800GB.
                                     Omnomnomics may delete safe intermediates and skip BigWig or trackhub creation if the cap would otherwise be exceeded.
@@ -494,7 +494,7 @@ Some job mode examples:
 
 By default, _Omnomnomics_ lets Snakemake reuse existing outputs that are already up to date. If you want to explicitly recompute the selected steps with the current settings, add `--rerun-selected-steps`.
 
-The optional `--retention-policy` flag controls which large intermediate folders are retained after a successful run. `all` keeps the current behavior. `pruned` removes obvious bulk intermediates such as `trimmed_FASTQ` and `BAM` while retaining reusable downstream outputs such as `filtered_BAM`. `minimal` keeps only `FASTQ` plus the requested terminal output branches, for example `merged_hubs` and `DE_calling` for an RNA run that finishes at steps 9 and 11.
+The optional `--retention-policy` flag controls which large intermediate folders are retained after a successful run. `all` keeps all outputs. `pruned` removes eligible bulk intermediates while retaining reusable downstream outputs such as `filtered_BAM`. `minimal` keeps source inputs plus the requested terminal output branches, for example `merged_hubs` and `DE_calling` for an RNA run that finishes at steps 9 and 11. The earliest available sequence files for each sample are protected: a BAM-only project keeps its original BAMs, and a filtered-BAM-only project keeps its filtered BAMs. Protection is recorded in `run_configs/source_protection.json` before cleanup and persists across reruns. Directories containing protected source files are retained under both retention policies and the size guard; lane cleanup and forced-output cleanup also preserve the source files.
 
 The optional `--max-project-size` flag adds a soft storage guard for space-heavy RNA outputs. When the configured cap would be exceeded, _Omnomnomics_ first attempts stage-safe cleanup of intermediates. Cleanup is guarded by step completion markers so that required upstream data are not deleted while dependent rules are still running. Before deleting `trimmed_FASTQ` or `BAM`, the pipeline caches lightweight flow-QC metric files (`*.trim_metrics.tsv` and mapper `*_stats.txt`) under `run_logs/flow_qc_cache` so downstream reporting can still read them. If the project would still exceed the cap, the pipeline logs a warning and skips BigWig or trackhub creation (steps 8 and 9) instead of failing on quota, while still allowing other requested branches such as read counting to continue.
 
@@ -836,3 +836,14 @@ Adjust the environment path, partition, wall time, and genome name to match your
 For the optional HOMER export, `omnomnomics` translates common Ensembl/GenBank assembly names to HOMER aliases where needed:
 - `GRCh38` and `GRCh38.p14` use HOMER genome `hg38`
 - `GRCm39` uses HOMER genome `mm39`
+
+### ChIP inputs on `input_dev`
+
+Declare ChIP and input libraries in one metadata file using `role=chip` /
+`role=input`, and match them with `--input-match`. Preparation supports mixed
+FASTQ/BAM sources and SE/PE layouts while preserving original sources. Matched
+inputs feed peak calling, permissive joint discovery, regional enrichment and
+configurable input-relative tracks. DE uses raw ChIP counts on joint q=0.1
+regions or a supplied `--chip-regions-bed`, with existing peak support retained
+as annotation. See the [metadata guide](docs/guides/metadata.md#chip-input-libraries)
+for examples and the [ChIP guide](docs/assays/chip.md) for normalization limits.

@@ -10,6 +10,8 @@ import os
 import shlex
 import subprocess
 rule index_bam:
+    wildcard_constraints:
+        sample=library_runtime.pattern(6) if library_runtime else r".+"
     input:
         filtered_BAM= f"{experiment_dir}/{master_config['input_folders'][master_config['index_rule_num']-1]}/{{sample}}.sorted.dups_marked.filtered.bam" if config['THETYPE'] != "CHIP" else f"{experiment_dir}/{master_config['output_folders'][master_config['index_rule_num']-1]}/{{sample}}.filtered.bam",
     output:

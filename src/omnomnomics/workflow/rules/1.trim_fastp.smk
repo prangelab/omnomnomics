@@ -17,11 +17,11 @@ import time
 
 rule run_fastp:
     wildcard_constraints:
-        sample=lane_sample_wildcard_pattern
+        sample=preparation_pattern(1, rule_layout_paired)
     input:
         fastq1=lambda wildcards: resolve_fastq_input(
             wildcards.sample,
-            "R1" if config["PAIRED"] else "SE",
+            "R1" if rule_layout_paired else "SE",
             master_config['input_folders'][master_config['trim_rule_num'] - 1],
         ),
         fastq2=(
@@ -30,16 +30,16 @@ rule run_fastp:
                 "R2",
                 master_config['input_folders'][master_config['trim_rule_num'] - 1],
             )
-        ) if config["PAIRED"] else []
+        ) if rule_layout_paired else []
     output:
-        trimmed_fastq1=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.trimmed.fastq.gz" if config["PAIRED"] else f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}.trimmed.fastq.gz",
-        trimmed_fastq2=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.trimmed.fastq.gz" if config["PAIRED"] else [],
+        trimmed_fastq1=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.trimmed.fastq.gz" if rule_layout_paired else f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}.trimmed.fastq.gz",
+        trimmed_fastq2=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.trimmed.fastq.gz" if rule_layout_paired else [],
         trim_metrics=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}.trim_metrics.tsv"
     params:
         seq_type=config["THETYPE"],
         inputfolder=f"{experiment_dir}/{master_config['input_folders'][master_config['trim_rule_num']-1]}",
         outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}",
-        adapter_mode=config.get("FASTP_ADAPTER_MODE", "overlap"),
+        adapter_mode=lambda wildcards: ("auto_detect" if not sample_is_paired(wildcards.sample) and config.get("FASTP_ADAPTER_MODE", "overlap") == "overlap" else config.get("FASTP_ADAPTER_MODE", "overlap")),
         adapter_sequence=config.get("FASTP_ADAPTER_SEQUENCE", ""),
         adapter_sequence_r2=config.get("FASTP_ADAPTER_SEQUENCE_R2", "")
     threads:

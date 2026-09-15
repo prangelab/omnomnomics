@@ -14,7 +14,8 @@ RNA_MINUS_TRACK_COLOR = "0,0,255"
 
 rule merge_wiggles:
     input:
-        extra_file=expand(f"{experiment_dir}/{master_config['input_folders'][master_config['mergewig_rule_num']-1]}/{{sample}}.extra_8.tmp", sample=samples2) if 8 in themode else []
+        extra_file=expand(f"{experiment_dir}/{master_config['input_folders'][master_config['mergewig_rule_num']-1]}/{{sample}}.extra_8.tmp", sample=samples2) if 8 in themode else [],
+        input_relative=([chip_input_track_path(sample) for sample in samples2 if chip_control_sets.ids([sample])] if config['THETYPE'] == "CHIP" and chip_track_mode != "none" and 8 in themode and max_project_size_bytes <= 0 else [])
     output:
         f"{experiment_dir}/{master_config['output_folders'][master_config['mergewig_rule_num']-1]}/extra_9.tmp"
     params:
@@ -51,6 +52,8 @@ rule merge_wiggles:
             os.path.getsize(os.path.join(params.inputfolder, bw_name))
             for bw_name in bw_files_for_step
         )
+        if params.thetype == "CHIP" and chip_track_mode != "none":
+            estimated_copy_bytes += sum(os.path.getsize(chip_input_track_path(sample)) for sample in samples2 if os.path.isfile(chip_input_track_path(sample)))
         if evaluate_space_heavy_step(
             logfile,
             master_config['mergewig_rule_num'],
@@ -150,6 +153,8 @@ rule merge_wiggles:
 
             bw_files = [bw for bw in os.listdir(input_folder) if bw.endswith(".bw")]
             sample_roots = sorted(set(sample_root_from_bw(bw, thetype) for bw in bw_files))
+            if library_runtime:
+                sample_roots = [sample for sample in sample_roots if sample in samples2]
             hubtypes = sorted(set(sample_type_for_sample(sample_root) for sample_root in sample_roots))
 
             ctabletracker = 0
@@ -247,6 +252,23 @@ rule merge_wiggles:
                         )
                         shutil.copyfile(bw_path, os.path.join(genome_folder, bw))
 
+                if thetype == "CHIP" and chip_track_mode != "none":
+                    relative_tracks = [(sample, chip_input_track_path(sample)) for sample in sample_tracks if os.path.isfile(chip_input_track_path(sample))]
+                    if relative_tracks:
+                        relative_name = f"{superhub}.input_relative.{chip_track_mode}.{appendix}"
+                        relative_folder = os.path.join(output_folder, relative_name)
+                        relative_genome = os.path.join(relative_folder, genome)
+                        if os.path.isdir(relative_folder):
+                            shutil.rmtree(relative_folder)
+                        ensure_hub_structure(relative_folder, relative_genome, relative_name, genome, hub_mail, overlay)
+                        for sample, path in relative_tracks:
+                            name = sample_id_for_sample(sample)
+                            filename = os.path.basename(path)
+                            append_track(os.path.join(relative_genome, "trackDb.txt"), f"{name}.{chip_track_mode}", filename, f"{name} {chip_track_mode}", f"{name} input-relative {chip_track_mode}; visualization scale recorded in provenance", relative_name, category_to_color[sample_color_for_sample(sample)])
+                            shutil.copyfile(path, os.path.join(relative_genome, filename))
+                            provenance = path[:-3] + ".json"
+                            if os.path.isfile(provenance):
+                                shutil.copyfile(provenance, os.path.join(relative_genome, os.path.basename(provenance)))
                 ctabletracker += 1
 
             shell(f"""echo "necessity file for merge wiggle. can delete this." > {output_folder}/extra_9.tmp""")

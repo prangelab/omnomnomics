@@ -26,7 +26,7 @@ Not every assay or selected stage range creates every directory.
 | --- | --- |
 | `FASTQ` | original compressed reads; retained by all retention policies |
 | `trimmed_FASTQ` | adapter-trimmed reads and trim metrics |
-| `BAM` | aligner output, lane-merged BAMs, and mapper statistics |
+| `BAM` | supplied aligned BAMs, aligner output, lane-merged BAMs, and mapper statistics |
 | `filtered_BAM` | sorted, filtered BAMs, indexes, and BAM QC |
 | `BigWigs` | per-sample browser signal tracks |
 | `merged_hubs` | grouped UCSC track hubs |
@@ -38,3 +38,9 @@ Not every assay or selected stage range creates every directory.
 
 The reference root is separate from experiment data. A normalized assembly has
 `fasta/genome.fa`, `annotation/genes.gtf`, aligner index directories, and `aux/`.
+
+For metadata-declared ChIP preparation, both experiment and input FASTQs belong
+in `FASTQ/`; externally supplied BAMs belong in `BAM/`. The earliest available
+source for each library is retained under every retention policy. Resolved
+library and input-association manifests are written to `run_configs/`. See the
+[metadata guide](../guides/metadata.md#chip-input-libraries).

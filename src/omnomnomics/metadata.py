@@ -23,7 +23,7 @@ FASTQ_EXTENSIONS = (
 )
 BIGWIG_EXTENSIONS = (".plus.bw", ".minus.bw", ".bw")
 OTHER_EXTENSIONS = (".bam", ".bai")
-FASTQ_READ_SUFFIX_RE = re.compile(r"(?:_R[12]|_[12]_[0-9]{3})$")
+FASTQ_READ_SUFFIX_RE = re.compile(r"_(?:R)?[12](?:_[0-9]{3})?$")
 LANE_SUFFIX_RE = re.compile(r"_L00[0-9]$")
 
 
@@ -123,6 +123,19 @@ def normalize_metadata_filename(filename_value: str) -> str:
     normalized = normalized.replace(".sorted.dups_marked", "")
     normalized = LANE_SUFFIX_RE.sub("", normalized)
     return normalized
+
+
+def fastq_unit_identity(filename_value: str) -> tuple[str, str]:
+    name = Path(filename_value).name
+    extension = next((suffix for suffix in FASTQ_EXTENSIONS if name.endswith(suffix)), None)
+    if extension is None:
+        raise MetadataError(f"Unsupported FASTQ filename: {name}")
+    stem = name[:-len(extension)]
+    match = FASTQ_READ_SUFFIX_RE.search(stem)
+    if match is None:
+        return stem, "SE"
+    read = re.match(r"_(?:R)?([12])", match.group()).group(1)
+    return stem[:match.start()], f"R{read}"
 
 
 def join_metadata_values(row: dict[str, str], column_names: list[str]) -> str:
@@ -249,6 +262,7 @@ def resolve_de_metadata(
     de_columns_selector: str | None,
     de_block_selector: str | None,
     de_interactions: bool,
+    default_rows: list[dict[str, str]] | None = None,
 ) -> tuple[list[str], list[dict[str, str]], str, dict[str, str | list[str]]]:
     resolved_formula = (de_formula or "").strip()
     de_columns = parse_column_selector(de_columns_selector, derived_fieldnames)
@@ -306,7 +320,7 @@ def resolve_de_metadata(
             "de_block": unique_terms(de_block),
         }
 
-    default_column = choose_default_de_column(original_fieldnames, derived_rows)
+    default_column = choose_default_de_column(original_fieldnames, derived_rows if default_rows is None else default_rows)
     resolved_formula = f"~ {default_column}"
     return derived_fieldnames, derived_rows, resolved_formula, {
         "mode": "default_last_column",

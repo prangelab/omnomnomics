@@ -15,11 +15,11 @@ import tempfile
 
 rule run_skewer:
     wildcard_constraints:
-        sample=lane_sample_wildcard_pattern
+        sample=preparation_pattern(1, rule_layout_paired)
     input:
         fastq1=lambda wildcards: resolve_fastq_input(
             wildcards.sample,
-            "R1" if config["PAIRED"] else "SE",
+            "R1" if rule_layout_paired else "SE",
             master_config['input_folders'][master_config['trim_rule_num'] - 1],
         ),
         fastq2=(
@@ -28,10 +28,10 @@ rule run_skewer:
                 "R2",
                 master_config['input_folders'][master_config['trim_rule_num'] - 1],
             )
-        ) if config["PAIRED"] else []
+        ) if rule_layout_paired else []
     output:
-        trimmed_fastq1=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.trimmed.fastq.gz" if config["PAIRED"] else f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}.trimmed.fastq.gz",
-        trimmed_fastq2=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.trimmed.fastq.gz" if config["PAIRED"] else [],
+        trimmed_fastq1=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R1.trimmed.fastq.gz" if rule_layout_paired else f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}.trimmed.fastq.gz",
+        trimmed_fastq2=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}_R2.trimmed.fastq.gz" if rule_layout_paired else [],
         trim_metrics=f"{experiment_dir}/{master_config['output_folders'][master_config['trim_rule_num']-1]}/{{sample}}.trim_metrics.tsv"
     params:
         seq_type=config["THETYPE"],
@@ -59,7 +59,7 @@ rule run_skewer:
             sanity_check_dir(logfile, inputfolder,  master_config['input_file_types'][master_config['trim_rule_num']-1], "step1.sanity")
 
             if seq_type == "ATAC":
-                adapter_option = "-x CTGTCTCTTATACACATCT -y AGATGTGTATAAGAGACAG" if config["PAIRED"] else "-x CTGTCTCTTATACACATCT"
+                adapter_option = "-x CTGTCTCTTATACACATCT -y AGATGTGTATAAGAGACAG" if sample_is_paired(sample) else "-x CTGTCTCTTATACACATCT"
             else:
                 adapter_option = ""
 

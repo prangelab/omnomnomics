@@ -30,11 +30,17 @@ DISCORDANT_FILTER = UNMAP | MATE_UNMAP | PROPER_PAIR | SECONDARY | SUPPLEMENTARY
 
 
 rule bam_stats:
+    wildcard_constraints:
+        sample=library_runtime.pattern(7) if library_runtime else r".+"
     input:
         pre_filter_bam=lambda wildcards: (
+            preparation_bam_input(wildcards.sample)
+            if library_runtime and library_runtime.library(wildcards.sample)["entry_stage"] < 6
+            else (
             f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/{wildcards.sample}.bam"
             if os.path.exists(f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/{wildcards.sample}.bam")
             else []
+            )
         ),
         filtered_BAM=lambda wildcards: (
             f"{experiment_dir}/{master_config['input_folders'][master_config['stats_rule_num']-1]}/{wildcards.sample}.sorted.dups_marked.filtered.bam"
@@ -62,7 +68,7 @@ rule bam_stats:
         prefilterfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}",
         outputfolder=f"{experiment_dir}/{master_config['output_folders'][master_config['stats_rule_num']-1]}",
         duplicate_handling=config["DUPLICATE_HANDLING"],
-        paired=config["PAIRED"]
+        paired=lambda wildcards: sample_is_paired(wildcards.sample)
     threads:
         Threads_Per_Rule['7']
     resources:
@@ -146,6 +152,8 @@ rule bam_stats:
 
         with open(outfile, "w", newline="") as handle:
             handle.write(f"# sample\t{wildcards.sample}\n")
+            if library_runtime:
+                handle.write(f"# role\t{library_runtime.role(wildcards.sample)}\n")
             handle.write(f"# paired_end\t{str(bool(params.paired)).lower()}\n")
             handle.write(f"# duplicate_handling\t{params.duplicate_handling}\n")
             handle.write(f"# pre_filter_bam_present\t{str(bool(pre_filter_bam)).lower()}\n")

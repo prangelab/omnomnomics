@@ -1,0 +1,97 @@
+{
+  "discovery": "pipeline BEDPE fragments, inferred SE extension 200bp, joint MACS q=0.1",
+  "filter": "aggregate raw ChIP count >= 10; DESeq2 default independent filtering",
+  "limitations": "Small pilot, not a general FDR calibration. Single-end aligned counts; simplified rounded gamma abundance/read placement (not a negative-binomial count generator); uniform input; global loss illustrates reference dependence. Large biological and unequal-depth/background benchmarks remain separate review work.",
+  "normalization": "DESeq2 poscounts, local dispersion fit; pilot choices are not a new default",
+  "results": [
+    {
+      "candidates": 80,
+      "false_significant": 1,
+      "input_use": "joint discovery only",
+      "realized_FDP": 1.0,
+      "reference": "DESeq2 poscounts median reference over discovered regions",
+      "scenario": "null",
+      "seed": 0,
+      "significant": 1,
+      "true_changed_candidates": 0,
+      "true_significant": 0
+    },
+    {
+      "candidates": 80,
+      "false_significant": 1,
+      "input_use": "joint discovery only",
+      "realized_FDP": 1.0,
+      "reference": "DESeq2 poscounts median reference over discovered regions",
+      "scenario": "null",
+      "seed": 1,
+      "significant": 1,
+      "true_changed_candidates": 0,
+      "true_significant": 0
+    },
+    {
+      "candidates": 80,
+      "false_significant": 0,
+      "input_use": "joint discovery only",
+      "realized_FDP": 0,
+      "reference": "DESeq2 poscounts median reference over discovered regions",
+      "scenario": "null",
+      "seed": 2,
+      "significant": 0,
+      "true_changed_candidates": 0,
+      "true_significant": 0
+    },
+    {
+      "candidates": 80,
+      "false_significant": 0,
+      "input_use": "joint discovery only",
+      "realized_FDP": 0,
+      "reference": "DESeq2 poscounts median reference over discovered regions",
+      "scenario": "null",
+      "seed": 3,
+      "significant": 0,
+      "true_changed_candidates": 0,
+      "true_significant": 0
+    },
+    {
+      "candidates": 80,
+      "false_significant": 0,
+      "input_use": "joint discovery only",
+      "realized_FDP": 0,
+      "reference": "DESeq2 poscounts median reference over discovered regions",
+      "scenario": "null",
+      "seed": 4,
+      "significant": 0,
+      "true_changed_candidates": 0,
+      "true_significant": 0
+    },
+    {
+      "candidates": 80,
+      "false_significant": 2,
+      "input_use": "joint discovery only",
+      "realized_FDP": 0.14285714285714285,
+      "reference": "DESeq2 poscounts median reference over discovered regions",
+      "scenario": "sparse_loss",
+      "seed": 101,
+      "significant": 14,
+      "true_changed_candidates": 12,
+      "true_significant": 12
+    },
+    {
+      "candidates": 80,
+      "false_significant": 0,
+      "input_use": "joint discovery only",
+      "realized_FDP": 0,
+      "reference": "DESeq2 poscounts median reference over discovered regions",
+      "scenario": "global_loss",
+      "seed": 102,
+      "significant": 0,
+      "true_changed_candidates": 80,
+      "true_significant": 0
+    }
+  ],
+  "versions": {
+    "Rscript": "Rscript (R) version 4.4.1 (2024-06-14)",
+    "macs3": "macs3 3.0.4",
+    "samtools": "samtools 1.23.1"
+  }
+}

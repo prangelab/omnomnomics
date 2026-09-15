@@ -34,7 +34,14 @@ omnomnomics genomes --help
 
 | Option | Purpose |
 | --- | --- |
-| `--sample-name` | columns used to derive unique sample IDs |
+| `--sample-name` | columns used to derive unique sample IDs; required whenever metadata is supplied |
+| `--input-match` | ChIP input matching columns; requires role metadata, used in preparation and analytical control resolution |
+| `-I`, `--input` | legacy single shared ChIP control BAM; cannot be combined with metadata roles |
+| `--chip-regions-bed` | protected custom non-overlapping ChIP testing BED; bypasses joint discovery |
+| `--chip-joint-peak-q` | permissive joint testing-region MACS q threshold; default 0.1 |
+| `--chip-se-fragment-length` | inferred SE fragment extension for ChIP MACS calls; default 200 bp |
+| `--chip-effective-genome-size` | effective size used consistently by ChIP MACS calls; default approximate total reference length |
+| `--chip-input-tracks` | `fold_enrichment` (default), `log2_ratio`, `qpois`, or `none`; visualization only |
 | `--sample-type` | columns used to group peaks and hubs |
 | `--sample-color` | columns used to derive palette categories |
 | `--de-columns` | biological variables in an automatic DE design |

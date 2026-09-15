@@ -20,6 +20,11 @@ import random
 import re
 import hashlib
 import shlex
+import json
+from omnomnomics.storage import remove_generated_path
+from omnomnomics.library_manifest import load_manifest, write_stable_text
+from omnomnomics.preprocessing import LibraryRuntime
+from omnomnomics.chip_inputs import validate_preparation_scope
 
 
 # Load the configuration file from command line arguments
@@ -147,6 +152,8 @@ def maybe_log_tool_event(heading, message):
 
 
 def expected_sample_count_for_step(step_num):
+    if globals().get("library_runtime") and step_num <= 7:
+        return len(library_runtime.work.get(str(step_num), {}))
     if step_num in {1, 2, 3}:
         return len(lane_samples)
     if step_num in {4, 5, 6, 7, 8, 13}:
@@ -189,6 +196,7 @@ def append_locked_text(path, text):
 def update_step_summary_row(summary_tsv, row):
     fieldnames = [
         "sample",
+        "role",
         "job_id",
         "status",
         "start_time",
@@ -307,6 +315,7 @@ def finish_step_sample(step_num, sample, rule_log_subdir, start_time, status):
             "sample": sample,
             "job_id": os.environ.get("SLURM_JOB_ID", "NA"),
             "status": status,
+            "role": library_runtime.role(sample) if globals().get("library_runtime") and sample != "aggregate" else "",
             "start_time": start_time,
             "end_time": end_time,
             "elapsed_seconds": elapsed_seconds,
@@ -325,11 +334,13 @@ def finish_step_sample(step_num, sample, rule_log_subdir, start_time, status):
                 f"last sample finished ({sample}); {completed}/{expected} OK, {failed}/{expected} failed",
                 f"STEP {step_num} STATUS",
             )
-            evaluate_post_step_size_cleanup(logfile, step_num)
+            if failed == 0:
+                evaluate_post_step_size_cleanup(logfile, step_num)
         except FileExistsError:
             pass
 
 onstart:
+    initialize_library_progress()
     # Upon start, log the start time of the pipeline
     global start_time
     start_time = time.time()
@@ -347,6 +358,8 @@ onerror:
 
 # Function for sanity check on directory
 def sanity_check_dir(logfile, input_directory, file_ext, marker_name=None):
+    if globals().get("library_runtime"):
+        return
     #check if input directiory exists
     if not os.path.isdir(input_directory):
         log_it(logfile, f"{file_ext} files should be contained in a {input_directory} folder inside your <EXPERIMENT_DIR> ({experiment_dir})! Aborting...", "ERROR")
@@ -427,9 +440,63 @@ for runtime_key in ("default_runtime", "controller_runtime", "rule_runtime"):
 
 themode = config['THEMODE']
 retention_policy = str(config.get("RETENTION_POLICY", "all")).lower()
+protected_source_paths = config.get("PROTECTED_SOURCE_PATHS")
 max_project_size_raw = str(config.get("MAX_PROJECT_SIZE", "NA"))
 max_project_size_bytes = int(config.get("MAX_PROJECT_SIZE_BYTES", 0) or 0)
 derived_metadata_file = str(config.get("DERIVED_METADATA_FILE", "NA"))
+library_manifest = load_manifest(config.get("LIBRARY_MANIFEST_FILE"))
+library_runtime = LibraryRuntime(library_manifest) if library_manifest else None
+if library_runtime:
+    validate_preparation_scope(themode, config.get("CREATE_HOMER_TAGDIRS", False))
+rule_layout_paired = True if library_runtime else config["PAIRED"]
+
+
+def initialize_library_progress():
+    if not library_runtime or is_worker_job:
+        return
+    dag = getattr(workflow, "dag", None) or getattr(getattr(workflow, "scheduler", None), "dag", None)
+    if dag is None:
+        return
+    needed = {os.path.abspath(str(path)) for job in dag.needrun_jobs() for path in job.output}
+    for step, jobs in library_runtime.work.items():
+        paths = ensure_step_tracking_dirs(int(step))
+        for sample, outputs in jobs.items():
+            if all(os.path.isfile(path) and os.path.abspath(path) not in needed for path in outputs):
+                open(os.path.join(paths["completed_dir"], sample), "a").close()
+                update_step_summary_row(paths["summary_tsv"], {"sample": sample, "role": library_runtime.role(sample), "status": "REUSED"})
+        if len(os.listdir(paths["completed_dir"])) == len(jobs) and not os.listdir(paths["failed_dir"]):
+            open(paths["finished_marker"], "a").close()
+
+
+def sample_is_paired(sample):
+    return library_runtime.paired(sample) if library_runtime else config["PAIRED"]
+
+
+def preparation_pattern(step, paired=None):
+    return library_runtime.pattern(step, paired) if library_runtime else lane_sample_wildcard_pattern
+
+
+def preparation_trimmed_input(sample, read):
+    if library_runtime:
+        return library_runtime.trimmed(sample, read)
+    if read == 2 and not config["PAIRED"]:
+        return []
+    suffix = f"_R{read}" if config["PAIRED"] else ""
+    return f"{experiment_dir}/{master_config['output_folders'][0]}/{sample}{suffix}.trimmed.fastq.gz"
+
+
+def preparation_bam_input(sample):
+    return library_runtime.bam(sample) if library_runtime else f"{experiment_dir}/{master_config['input_folders'][master_config['touchup_rule_num']-1]}/{sample}.bam"
+
+
+def preparation_merge_marker(sample):
+    if library_runtime:
+        return library_runtime.merge_marker(sample)
+    return f"{experiment_dir}/{master_config['input_folders'][master_config['touchup_rule_num']-1]}/{sample}.extra_4.tmp" if 4 in themode else []
+
+
+def preparation_unit_bam(unit):
+    return library_runtime.units[unit]["bam"] if library_runtime else f"{experiment_dir}/{master_config['input_folders'][master_config['merge_rule_num']-1]}/{unit}.bam"
 
 
 def load_derived_metadata_rows(metadata_path):
@@ -495,6 +562,8 @@ technical_replicate_mode = any(
 
 
 def merged_sample_name(sample_name):
+    if library_runtime and (sample_name in library_runtime.units or sample_name in library_runtime.libraries):
+        return library_runtime.library(sample_name)["runtime_id"]
     normalized_name = normalize_metadata_sample_key(sample_name)
     if not technical_replicate_mode:
         return normalized_name
@@ -506,6 +575,11 @@ def merged_sample_name(sample_name):
 
 
 def metadata_row_for_sample(sample_name):
+    if library_runtime and (sample_name in library_runtime.units or sample_name in library_runtime.libraries):
+        unit = library_runtime.units.get(sample_name)
+        if unit and unit["filename_key"] in derived_metadata_by_filename:
+            return derived_metadata_by_filename[unit["filename_key"]]
+        return library_runtime.library(sample_name)["metadata"]
     normalized_name = normalize_metadata_sample_key(sample_name)
     row = derived_metadata_by_filename.get(normalized_name)
     if row is not None:
@@ -531,6 +605,33 @@ def sample_type_for_sample(sample_name):
 
 def sample_color_for_sample(sample_name):
     return metadata_value_for_sample(sample_name, "sample_color", sample_type_for_sample(sample_name))
+
+def cleanup_generated_output(path):
+    if globals().get("library_runtime") and not library_cleanup_ready(path):
+        log_it(logfile, f"Preserving {path}: selected preprocessing consumers have not all succeeded.", "SOURCE PROTECTION")
+        return False
+    removed = remove_generated_path(path, protected_source_paths)
+    if not removed:
+        reason = "source input protection" if protected_source_paths is not None else "missing source protection snapshot"
+        log_it(logfile, f"Preserving {path}: {reason}.", "SOURCE PROTECTION")
+    return removed
+
+
+def library_cleanup_ready(path):
+    basename = os.path.basename(os.path.normpath(path))
+    folders = library_manifest["folders"]
+    relevant = {"trim": (1, 2, 3, 4), "bam": (3, 4, 5, 7)}
+    for folder, steps in relevant.items():
+        if basename != os.path.basename(folders[folder]):
+            continue
+        for step in steps:
+            if str(step) not in library_runtime.work:
+                continue
+            paths = ensure_step_tracking_dirs(step)
+            if os.listdir(paths["failed_dir"]) or not os.path.exists(paths["finished_marker"]):
+                return False
+    return True
+
 
 def format_bytes(num_bytes):
     units = ["B", "KB", "MB", "GB", "TB"]
@@ -609,8 +710,8 @@ def safe_cleanup_for_size_limit(logfile, delete_partial_hubs=False):
         if folder_name == master_config['output_folders'][master_config['mergewig_rule_num'] - 1] and not delete_partial_hubs:
             continue
         cache_flow_qc_metrics_from_folder(folder_name, logfile)
-        shutil.rmtree(folder_path)
-        log_it(logfile, f"Deleted intermediate output folder to respect max project size: {folder_path}", "SIZE GUARD")
+        if cleanup_generated_output(folder_path):
+            log_it(logfile, f"Deleted intermediate output folder to respect max project size: {folder_path}", "SIZE GUARD")
 
 def evaluate_post_step_size_cleanup(logfile, step_num):
     if max_project_size_bytes <= 0:
@@ -622,7 +723,7 @@ def evaluate_post_step_size_cleanup(logfile, step_num):
     cleanup_targets = []
     if step_num == master_config['merge_rule_num']:
         cleanup_targets = [trim_folder]
-    elif step_num == master_config['touchup_rule_num']:
+    elif step_num == master_config['touchup_rule_num'] or (globals().get("library_runtime") and step_num == master_config['stats_rule_num']):
         cleanup_targets = [trim_folder, bam_folder]
     else:
         return
@@ -661,13 +762,13 @@ def evaluate_post_step_size_cleanup(logfile, step_num):
             if not os.path.isdir(folder_path):
                 continue
             cache_flow_qc_metrics_from_folder(folder_name, logfile)
-            shutil.rmtree(folder_path)
-            deleted_any = True
-            log_it(
-                logfile,
-                f"Deleted post-step intermediate folder due to max project size: {folder_path}",
-                "SIZE GUARD",
-            )
+            if cleanup_generated_output(folder_path):
+                deleted_any = True
+                log_it(
+                    logfile,
+                    f"Deleted post-step intermediate folder due to max project size: {folder_path}",
+                    "SIZE GUARD",
+                )
 
         updated_size = project_size_bytes()
         if deleted_any:
@@ -798,11 +899,11 @@ def cache_flow_qc_metrics_from_folder(folder_name, logfile):
 def terminal_output_dirs(themode, thetype):
     keep_dirs = set()
 
-    if 13 in themode:
+    if master_config['homer_tagdir_rule_num'] in themode:
         keep_dirs.add(master_config['output_folders'][master_config['homer_tagdir_rule_num'] - 1])
-    if 10 in themode and thetype != "RNA":
+    if any(step in themode for step in (10, 13, 14)) and thetype != "RNA":
         keep_dirs.add(master_config['output_folders'][master_config['callpeaks_rule_num'] - 1])
-    if 11 in themode or 12 in themode:
+    if any(step in themode for step in (11, 12, 15, 16)):
         keep_dirs.add(master_config['output_folders'][master_config['countreads_rule_num'] - 1])
 
     if 9 in themode:
@@ -871,8 +972,8 @@ def apply_retention_policy(logfile, retention_policy, themode, thetype):
         if not os.path.exists(folder_path):
             continue
         cache_flow_qc_metrics_from_folder(folder_name, logfile)
-        shutil.rmtree(folder_path)
-        log_it(logfile, f"Deleted intermediate output folder: {folder_path}")
+        if cleanup_generated_output(folder_path):
+            log_it(logfile, f"Deleted intermediate output folder: {folder_path}")
 
 ##---------------------------------------------------------------------------------------------------------------
 ## Final housekeeping
@@ -906,6 +1007,9 @@ if not is_worker_job:
     log_it(logfile, f"Map tool: {config['THEMAPTOOL']}")
     log_it(logfile, f"Duplicate handling: {config['DUPLICATE_HANDLING']}")
     log_it(logfile, f"Retention policy: {retention_policy}")
+    log_it(logfile, f"Source protection manifest: {config.get('SOURCE_PROTECTION_FILE', 'unavailable')}")
+    if protected_source_paths is not None:
+        log_it(logfile, "Protected source paths: " + ", ".join(protected_source_paths))
     log_it(logfile, f"Max project size: {max_project_size_raw}")
     log_it(logfile, f"Post-DE signal policy: {config.get('POST_DE_SIGNAL_POLICY', 'auto')}")
 
@@ -957,6 +1061,10 @@ if isinstance(input_folder, list):
 
 input_pattern = os.path.join(input_folder, f"*{input_file_type}")
 input_files = glob.glob(input_pattern)
+if config['THETYPE'] == "CHIP" and config.get("INPUT", "NA") != "NA":
+    input_files = [path for path in input_files if os.path.abspath(path) != os.path.abspath(config["INPUT"])]
+if library_runtime:
+    input_files = []
 if technical_replicate_mode and input_file_type == ".bam":
     input_files = [
         file_path
@@ -1003,6 +1111,8 @@ def fastq_candidate_names(sample, read_label):
 
 
 def resolve_fastq_input(sample, read_label, input_subdir):
+    if library_runtime:
+        return library_runtime.raw(sample, 2 if read_label == "R2" else 1)
     input_dir = os.path.join(experiment_dir, input_subdir)
     matches = []
     for candidate in fastq_candidate_names(sample, read_label):
@@ -1104,6 +1214,8 @@ merged_sample_wildcard_pattern = "|".join(re.escape(sample_name) for sample_name
 
 
 def lane_samples_for_merged_sample(sample_name):
+    if library_runtime:
+        return library_runtime.mapped_units(sample_name)
     return sorted(
         lane_sample
         for lane_sample in lane_samples
@@ -1112,6 +1224,8 @@ def lane_samples_for_merged_sample(sample_name):
 
 
 def input_units_for_merged_sample(sample_name):
+    if library_runtime:
+        return library_runtime.input_units(sample_name)
     return sorted(
         sample_root
         for sample_root in samples
@@ -1144,7 +1258,28 @@ merge_bam_passthrough_wildcard_pattern = (
 )
 
 
-if config['PAIRED'] == 1 and THEMODERANGEMIN < 4: 
+preprocessing_samples = samples2
+input_samples = []
+if library_runtime:
+    samples = sorted(library_runtime.units)
+    preprocessing_samples = sorted(library_runtime.libraries)
+    samples2 = [sample for sample in preprocessing_samples if library_runtime.role(sample) == "chip"]
+    input_samples = [sample for sample in preprocessing_samples if library_runtime.role(sample) == "input"]
+    lane_samples = sorted({sample for step in (1, 2, 3) for sample in library_runtime.work.get(str(step), {})})
+    lane_sample_wildcard_pattern = "|".join(re.escape(sample) for sample in lane_samples) or r"$.^"
+    merge_bam_output_samples = [sample for sample in library_runtime.work.get("4", {}) if library_runtime.libraries[sample].get("merge_output")]
+    merge_bam_passthrough_samples = [sample for sample in library_runtime.work.get("4", {}) if sample not in merge_bam_output_samples]
+    merge_bam_output_wildcard_pattern = "|".join(re.escape(sample) for sample in merge_bam_output_samples) or r"$.^"
+    merge_bam_passthrough_wildcard_pattern = "|".join(re.escape(sample) for sample in merge_bam_passthrough_samples) or r"$.^"
+    if not is_worker_job:
+        step_plan = {step: len(jobs) for step, jobs in library_runtime.work.items()}
+        step_plan.update({str(step): expected_sample_count_for_step(step) for step in themode if step > 7})
+        write_stable_text(os.path.join(step_log_dir, "plan.json"), json.dumps(step_plan, sort_keys=True))
+        log_it(logfile, f"Libraries: {len(samples2)} ChIP, {len(input_samples)} input. Associations: {config['INPUT_ASSOCIATIONS_FILE']}", "INPUT LIBRARIES")
+
+if library_runtime:
+    num_samples = len(preprocessing_samples)
+elif config['PAIRED'] == 1 and THEMODERANGEMIN < 4:
     num_samples = len(samples) / 2
 else: 
     num_samples = len(samples)
@@ -1289,13 +1424,18 @@ def check_and_include_rules(logfile, omnom_home, experiment_dir):
 
 valid_smk_files = check_and_include_rules(logfile, workflow_root, experiment_dir)
 # Include snake rules in the main Snakefile
+include: os.path.join(workflow_root, "chip_analysis.smk")
 for smk_file in valid_smk_files:
     include: smk_file
 
 ##--------------------------------------------------------------------------------------------------------------
 # Execute the desired rules
 ##--------------------------------------------------------------------------------------------------------------
-for rule_num in themode:
+if library_runtime:
+    include: os.path.join(workflow_root, "chip_preparation.smk")
+    all_outputs = library_runtime.targets()
+
+for rule_num in ([step for step in themode if step > 7] if library_runtime else themode):
 
     output_folder = master_config['output_folders'][rule_num-1]
     output_file_type =  master_config['output_file_types'][rule_num-1]
@@ -1354,12 +1494,18 @@ for rule_num in themode:
             all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.filtered.bam.qc_summary.svg", sample = samples2)
     if rule_num == 8:
         all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.extra_8.tmp",  sample = samples2)
+        if config['THETYPE'] == "CHIP" and config.get('CHIP_INPUT_TRACKS', 'fold_enrichment') != 'none' and max_project_size_bytes <= 0:
+            all_outputs.extend(chip_input_track_path(sample) for sample in samples2 if chip_control_sets.ids([sample]))
+        elif config['THETYPE'] == "CHIP" and config.get('CHIP_INPUT_TRACKS', 'fold_enrichment') != 'none' and any(chip_control_sets.ids([sample]) for sample in samples2):
+            log_once(logfile, "chip_tracks.size_cap", "Optional input-relative track generation omitted because a project-size cap is configured.", "SIZE GUARD")
         if config['THETYPE'] != "RNA" and max_project_size_bytes <= 0:
             all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.bw", sample=samples2)
     if rule_num == 9:
         all_outputs.append( f"{experiment_dir}/{output_folder}/extra_9.tmp")
     if rule_num == 10:
         all_outputs.append( f"{experiment_dir}/{output_folder}/extra_10.tmp")
+        if config['THETYPE'] == "CHIP":
+            all_outputs.extend([chip_region_bed, chip_region_manifest])
     if rule_num == 11:
         all_outputs.append(f"{experiment_dir}/{output_folder}/{os.path.basename(config['EXPERIMENT_DIR'])}.raw_read_quant.table.txt")
         if config['THETYPE'] == "RNA":
@@ -1560,7 +1706,7 @@ onsuccess:
                             "unit": "percent",
                             "value": round((post_duplicate_reads / post_mapped_reads) * 100, 4),
                         })
-                    if config["PAIRED"]:
+                    if sample_is_paired(sample_name):
                         post_duplicate_pairs = metrics.get(("post_filter", "duplicate_flagged_primary_pairs"))
                         post_mapped_pairs = metrics.get(("post_filter", "mapped_primary_pairs"))
                         if post_duplicate_pairs is not None and post_mapped_pairs not in (None, 0):
@@ -1615,7 +1761,7 @@ onsuccess:
                 rows = []
                 mapper_parser = parse_hisat2_mapper_stats if config['THEMAPTOOL'] == "hisat2" else parse_star_mapper_stats
 
-                for sample_name in samples2:
+                for sample_name in preprocessing_samples:
                     lane_samples = sample2_to_lane_samples.get(sample_name, [sample_name])
                     raw_read_total = 0
                     trimmed_read_total = 0
@@ -2061,7 +2207,7 @@ onsuccess:
                         target = os.path.join(archive_dir, f"{timestamp}.{os.path.basename(path)}")
                     shutil.move(path, target)
 
-            stats_tsv_paths = [sample_qc_stats_path(sample_name) for sample_name in samples2]
+            stats_tsv_paths = [sample_qc_stats_path(sample_name) for sample_name in preprocessing_samples]
             existing_stats_tsvs = [path for path in stats_tsv_paths if os.path.exists(path)]
             if existing_stats_tsvs:
                 log_it(logfile, "Generating experiment-level alignment QC summary...", "ALIGNMENT QC SUMMARY")
@@ -2090,15 +2236,15 @@ onsuccess:
         #---------------------------------------------------------------------------------------------------------------
         # Clean up tmp files for workflow
         #---------------------------------------------------------------------------------------------------------------
-        if 3 in themode:
+        if 3 in themode and not library_runtime:
             list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['merge_rule_num']-1]}/*.extra_3.tmp")
             for file in list_of_extra_files:
                 os.remove(file)
-        if 4 in themode:
+        if 4 in themode and not library_runtime:
             list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['merge_rule_num']-1]}/*.extra_4.tmp")
             for file in list_of_extra_files:
                 os.remove(file)
-        if 5 in themode:
+        if 5 in themode and not library_runtime:
             list_of_extra_files = glob.glob(f"{master_config['output_folders'][master_config['touchup_rule_num']-1]}/*.extra_5.tmp")
             for file in list_of_extra_files:
                 os.remove(file)
@@ -2115,9 +2261,9 @@ onsuccess:
         # Remove old BAM files with lane info
         #---------------------------------------------------------------------------------------------------------------
         ## Note that I had to do that here since if I do it before completion rule_all would error that not all of it input files are present
-        if 4 in themode:
+        if 4 in themode and not library_runtime:
             for bam_file in glob.glob(f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/*_L00*.bam"):
-                os.remove(bam_file)
+                cleanup_generated_output(bam_file)
 
         apply_retention_policy(logfile, retention_policy, themode, config['THETYPE'])
 

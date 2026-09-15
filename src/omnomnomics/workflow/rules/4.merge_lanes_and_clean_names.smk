@@ -22,7 +22,7 @@ rule merge_bam:
             for lane_sample in lane_samples_for_merged_sample(wildcards.sample4)
         ] if 3 in themode else [],
         bam_files=lambda wildcards: [
-            f"{experiment_dir}/{master_config['input_folders'][master_config['merge_rule_num']-1]}/{input_unit}.bam"
+            preparation_unit_bam(input_unit)
             for input_unit in input_units_for_merged_sample(wildcards.sample4)
         ]
     output:
@@ -149,7 +149,7 @@ rule mark_bam_merged:
             f"{experiment_dir}/{master_config['input_folders'][master_config['merge_rule_num']-1]}/{lane_sample}.extra_3.tmp"
             for lane_sample in lane_samples_for_merged_sample(wildcards.sample4)
         ] if 3 in themode else [],
-        bam_file=f"{experiment_dir}/{master_config['input_folders'][master_config['merge_rule_num']-1]}/{{sample4}}.bam"
+        bam_file=lambda wildcards: preparation_bam_input(wildcards.sample4)
     output:
         extra=f"{experiment_dir}/{master_config['output_folders'][master_config['merge_rule_num']-1]}/{{sample4}}.extra_4.tmp"
     params:

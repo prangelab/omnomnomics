@@ -38,6 +38,8 @@ where = ["src"]
 [tool.setuptools.package-data]
 omnomnomics = [
   "workflow/Snakefile.smk",
+  "workflow/chip_preparation.smk",
+  "workflow/chip_analysis.smk",
   "workflow/config/*.yaml",
   "workflow/templates/*.R.tmpl",
   "workflow/R/de_shared/*.R",
