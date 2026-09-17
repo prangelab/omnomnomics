@@ -374,7 +374,11 @@ class SnakemakePreprocessingTests(LibraryFixture):
             stderr=subprocess.DEVNULL,
         )
         self.fastq("a")
-        config = self.cli_config([row("a", "chip", read_layout="SE")], "1-3")
+        self.fastq("b")
+        config = self.cli_config(
+            [row("a", "chip", read_layout="SE"), row("b", "input", read_layout="SE")],
+            "1-3",
+        )
         self.run_workflow(config, dry_run=False)
         with pysam.AlignmentFile(str(self.project / "BAM/a.bam"), "rb") as bam:
             self.assertEqual(bam.references, ("1",))
