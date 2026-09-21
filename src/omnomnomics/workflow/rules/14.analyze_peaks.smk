@@ -106,6 +106,10 @@ rule analyze_peaks:
             os.makedirs(path, exist_ok=True)
             return path
 
+        def bed_has_records(path):
+            with open(path) as handle:
+                return any(line.strip() and not line.startswith("#") for line in handle)
+
         def load_annotation_rows(annotation_bed):
             with open(annotation_bed, newline="") as handle:
                 reader = csv.DictReader(handle, delimiter="\t")
@@ -193,6 +197,19 @@ rule analyze_peaks:
                 writer.writerows(matrix_rows)
 
         def run_signal_plots(bam_inputfolder, union_paths, signal_dir, assay_type):
+            plot_regions = []
+            for group, region_bed in sorted(union_paths.items()):
+                if bed_has_records(region_bed):
+                    plot_regions.append((group, region_bed))
+                else:
+                    log_it(
+                        logfile,
+                        f"No regions found for {group}; skipping deepTools signal plots for this set.",
+                    )
+            if not plot_regions:
+                log_it(logfile, "No non-empty region sets found. Skipping deepTools signal plots.")
+                return
+
             require_tool("bamCoverage")
             require_tool("computeMatrix")
             require_tool("plotHeatmap")
@@ -220,7 +237,7 @@ rule analyze_peaks:
                     log_it(logfile, "No BAM files found for deepTools signal plotting. Skipping signal plots.")
                     return
 
-                for group, region_bed in sorted(union_paths.items()):
+                for group, region_bed in plot_regions:
                     group_label = group.replace("_", " ")
                     matrix_path = os.path.join(matrices_dir, f"{group}.matrix.gz")
                     heatmap_path = os.path.join(heatmaps_dir, f"{group}.heatmap.pdf")
