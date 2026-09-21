@@ -547,6 +547,8 @@ rule idr_group_consensus:
     output:
         bed=f"{idr_output_folder()}/{{group}}.MACS3.optimized.bed",
         summary=f"{idr_root_folder()}/{{group}}.idr_selected_peaks.tsv"
+    wildcard_constraints:
+        group="[^/]+"
     threads:
         lambda wildcards: Threads_Per_Rule['10']
     resources:
