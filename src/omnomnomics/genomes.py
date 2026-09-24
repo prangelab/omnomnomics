@@ -11,6 +11,8 @@ from pathlib import Path
 
 import yaml
 
+from omnomnomics.chromosomes import normalize_external_bed, read_reference_fai
+
 
 def check_config_file_header(config_file_path, expected_header):
     with open(config_file_path, "r") as config_file:
@@ -327,6 +329,10 @@ def blacklist_aux_path(assembly_root, assembly_name):
     return Path(assembly_root) / assembly_name / "aux" / f"{assembly_name}.blacklist.bed"
 
 
+def reference_blacklist_path(assembly_root, assembly_name):
+    return Path(assembly_root) / assembly_name / "aux" / f"{assembly_name}.blacklist.reference.bed"
+
+
 def find_cached_blacklist_bed(assembly_root, assembly_name):
     assembly_dir = Path(assembly_root) / assembly_name
     aux_dir = assembly_dir / "aux"
@@ -334,7 +340,11 @@ def find_cached_blacklist_bed(assembly_root, assembly_name):
         blacklist_aux_path(assembly_root, assembly_name),
         aux_dir / f"{assembly_name}.blacklist.bed.gz",
     ]
-    candidates.extend(find_blacklist_beds(aux_dir))
+    candidates.extend(
+        path for path in find_blacklist_beds(aux_dir)
+        if path != reference_blacklist_path(assembly_root, assembly_name)
+        and not path.name.endswith(".source.json")
+    )
     for candidate in candidates:
         if candidate.is_file():
             return candidate
@@ -357,6 +367,45 @@ def copy_blacklist_bed(src, dst):
     else:
         shutil.copy2(src, dst)
     return dst
+
+
+def reference_native_blacklist(assembly_root, assembly_name):
+    source = find_cached_blacklist_bed(assembly_root, assembly_name)
+    if source is None:
+        raise FileNotFoundError(f"No cached blacklist BED for {assembly_name}")
+    fai = Path(assembly_root) / assembly_name / "fasta" / "genome.fa.fai"
+    if not fai.is_file():
+        raise FileNotFoundError(f"No FASTA index for {assembly_name}: {fai}")
+    output, _provenance = normalize_external_bed(
+        source, reference_blacklist_path(assembly_root, assembly_name), fai,
+        assembly=assembly_name,
+        unknown_policy="skip",
+    )
+    return output
+
+
+def validate_installed_intervals(fai_path, sizes_path, gtf_path=None):
+    reference = read_reference_fai(fai_path)
+    sizes = {}
+    with open(sizes_path, encoding="utf-8") as handle:
+        for number, line in enumerate(handle, 1):
+            fields = line.split()
+            if len(fields) < 2 or fields[0] in sizes:
+                raise ValueError(f"Invalid chromosome-sizes row at {sizes_path}:{number}")
+            sizes[fields[0]] = int(fields[1])
+    if sizes != reference:
+        raise ValueError(f"Chromosome sizes do not match the FASTA index: {sizes_path}")
+    if gtf_path and Path(gtf_path).is_file():
+        matching_genes = 0
+        with open(gtf_path, encoding="utf-8") as handle:
+            for line in handle:
+                if line.startswith("#"):
+                    continue
+                fields = line.split("\t", 3)
+                if len(fields) >= 3 and fields[2] == "gene" and fields[0] in reference:
+                    matching_genes += 1
+        if matching_genes == 0:
+            raise ValueError(f"Gene annotation has no gene records on reference contigs: {gtf_path}")
 
 
 def meme_motif_database_dir(assembly_root):
@@ -524,7 +573,7 @@ def configure_genomepy_reference_plugins(genomepy, cache_blacklist=True):
         genomepy.manage_plugins("enable", ["blacklist"])
 
 
-def resolve_blacklist_bed(assembly_name, assembly_root, provider="UCSC", threads=1, force=False):
+def resolve_blacklist_bed(assembly_name, assembly_root, provider="UCSC", threads=1, force=False, download_if_missing=True):
     assembly_root = Path(assembly_root)
     assembly_dir = assembly_root / assembly_name
     if not assembly_dir.is_dir():
@@ -532,7 +581,9 @@ def resolve_blacklist_bed(assembly_name, assembly_root, provider="UCSC", threads
 
     cached = find_cached_blacklist_bed(assembly_root, assembly_name)
     if cached and not force:
-        return cached
+        return reference_native_blacklist(assembly_root, assembly_name)
+    if not download_if_missing:
+        raise FileNotFoundError(f"No cached blacklist BED for {assembly_name}")
 
     genomepy = load_genomepy()
     provider_assembly = UCSC_BLACKLIST_ASSEMBLY_ALIASES.get(assembly_name, assembly_name)
@@ -541,9 +592,9 @@ def resolve_blacklist_bed(assembly_name, assembly_root, provider="UCSC", threads
     tmp_genome_dir = tmp_root / local_name
     tmp_candidates = find_blacklist_beds(tmp_genome_dir)
     if tmp_candidates and not force:
-        cached_path = copy_blacklist_bed(tmp_candidates[0], blacklist_aux_path(assembly_root, assembly_name))
+        copy_blacklist_bed(tmp_candidates[0], blacklist_aux_path(assembly_root, assembly_name))
         shutil.rmtree(tmp_genome_dir)
-        return cached_path
+        return reference_native_blacklist(assembly_root, assembly_name)
 
     tmp_root.mkdir(parents=True, exist_ok=True)
     configure_genomepy_reference_plugins(genomepy, cache_blacklist=True)
@@ -563,10 +614,10 @@ def resolve_blacklist_bed(assembly_name, assembly_root, provider="UCSC", threads
             f"No blacklist BED found after genomepy install for '{assembly_name}' in {tmp_genome_dir}."
         )
 
-    cached_path = copy_blacklist_bed(candidates[0], blacklist_aux_path(assembly_root, assembly_name))
+    copy_blacklist_bed(candidates[0], blacklist_aux_path(assembly_root, assembly_name))
     if tmp_genome_dir.exists():
         shutil.rmtree(tmp_genome_dir)
-    return cached_path
+    return reference_native_blacklist(assembly_root, assembly_name)
 
 
 def parse_gtf_attributes(attribute_text):
@@ -780,11 +831,19 @@ def normalize_genome_install(genome, assembly_name, assembly_root, force, indexe
 
     if getattr(genome, "annotation_gtf_file", None):
         copy_annotation(genome.annotation_gtf_file, annotation_dir / "genes.gtf")
+    validate_installed_intervals(
+        fasta_dir / "genome.fa.fai",
+        aux_dir / f"{assembly_name}_chrom_sizes.2_column",
+        annotation_dir / "genes.gtf",
+    )
+    if (annotation_dir / "genes.gtf").is_file():
         create_gene_bed_files(annotation_dir / "genes.gtf", assembly_name, aux_dir)
 
     install_root = genome_install_root(genome)
     if cache_blacklist:
         cache_blacklist_from_install(install_root, assembly_root, assembly_name)
+        if find_cached_blacklist_bed(assembly_root, assembly_name):
+            reference_native_blacklist(assembly_root, assembly_name)
 
     if "star" in indexers:
         star_source = find_star_dir(install_root)

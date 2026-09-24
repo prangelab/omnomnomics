@@ -15,6 +15,17 @@ import tempfile
 from shlex import quote
 
 from omnomnomics.peak_annotation import build_gtf_annotation_sources
+from omnomnomics.chromosomes import filter_primary_bed, read_reference_fai
+
+
+def peak_qc_blacklist():
+    from omnomnomics.genomes import resolve_blacklist_bed
+    try:
+        return str(resolve_blacklist_bed(
+            config["THEGENOME"], config["GENOME_ASSEMBLY_DIR"], download_if_missing=False,
+        ))
+    except FileNotFoundError:
+        return None
 
 
 def peak_qc_input(_wildcards):
@@ -24,6 +35,16 @@ def peak_qc_input(_wildcards):
     input_files.append(
         os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "annotation", "genes.gtf")
     )
+    input_files.append(
+        os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "fasta", "genome.fa.fai")
+    )
+    if config["THETYPE"] == "ATAC" or (
+        config["THETYPE"] == "CHIP"
+        and str(config.get("BROAD_MODE", "off")).lower() not in {"genebody", "diffuse"}
+    ):
+        blacklist = peak_qc_blacklist()
+        if blacklist:
+            input_files.append(blacklist)
     if config["THETYPE"] == "ATAC":
         input_files.extend(
             f"{experiment_dir}/{master_config['input_folders'][master_config['peakqc_rule_num'] - 1][0]}/{sample}.sorted.dups_marked.filtered.bam"
@@ -64,6 +85,9 @@ rule peak_qc:
         log_once(logfile, "step13.header", "Calculating peak-level QC metrics (FRiP and library QC)...", f"EXECUTING STEP {master_config['peakqc_rule_num']}")
         log_once(logfile, "step13.inputfolder", f"Input folders: {params.bam_inputfolder} and {params.peak_outputfolder}")
         log_once(logfile, "step13.outputfolder", f"Output folder: {params.outputfolder}")
+        reference_contigs = read_reference_fai(
+            os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "fasta", "genome.fa.fai")
+        )
 
         def ensure_peak_qc_dir(outputfolder):
             qc_dir = os.path.join(outputfolder, "peak_qc")
@@ -71,28 +95,24 @@ rule peak_qc:
             return qc_dir
 
         def resolve_encode_blacklist(genome_name, outputfolder):
-            try:
-                from omnomnomics.genomes import resolve_blacklist_bed
-            except ImportError as exc:
-                raise RuntimeError(
-                    "Chromatin peak blacklist filtering requires the omnomnomics genome helper in the active environment."
-                ) from exc
-
-            try:
-                return str(resolve_blacklist_bed(genome_name, config["GENOME_ASSEMBLY_DIR"]))
-            except FileNotFoundError as exc:
-                log_it(logfile, f"Chromatin blacklist BED not available for {genome_name}: {exc}")
-                return None
+            blacklist = peak_qc_blacklist()
+            if blacklist is None:
+                log_it(logfile, f"Chromatin blacklist BED not available for {genome_name}")
+            return blacklist
 
         def filter_peak_bed_file(in_bed, out_bed, keep_standard=True, drop_chrm=True, blacklist_bed=None):
             work = in_bed
+            source_n = 0
+            primary_n = 0
             with tempfile.TemporaryDirectory(prefix="omnomnomics_peak_filter_") as tmpdir:
                 if keep_standard:
                     std_bed = os.path.join(tmpdir, "std.bed")
-                    shell(
-                        f"awk 'BEGIN{{{{OFS=\"\\t\"}}}} $1 ~ /^chr([0-9]+|X|Y)$/ {{{{print $0}}}}' {quote(work)} > {quote(std_bed)}"
-                    )
+                    source_n, primary_n = filter_primary_bed(work, std_bed, reference_contigs)
                     work = std_bed
+                else:
+                    with open(work, encoding="utf-8") as source_handle:
+                        source_n = sum(1 for line in source_handle if line.strip())
+                    primary_n = source_n
                 if drop_chrm:
                     chrm_bed = os.path.join(tmpdir, "nochrm.bed")
                     shell(
@@ -106,6 +126,9 @@ rule peak_qc:
                     )
                     work = no_blacklist_bed
                 shell(f"sort -k1,1 -k2,2n -k3,3n {quote(work)} > {quote(out_bed)}")
+            with open(out_bed, encoding="utf-8") as filtered_handle:
+                filtered_n = sum(1 for _ in filtered_handle)
+            return source_n, primary_n, filtered_n
 
         def build_filtered_peak_sets(peak_outputfolder, outputfolder, genome_name):
             filtered_dir = os.path.join(ensure_peak_qc_dir(outputfolder), "filtered_peaks")
@@ -117,9 +140,10 @@ rule peak_qc:
                 raise FileNotFoundError(f"No peak BED files found in {peak_outputfolder}")
 
             produced = []
+            counts = {}
             for src in source_peak_beds:
                 dst = os.path.join(filtered_dir, os.path.basename(src))
-                filter_peak_bed_file(
+                counts[src] = filter_peak_bed_file(
                     in_bed=src,
                     out_bed=dst,
                     keep_standard=True,
@@ -131,26 +155,11 @@ rule peak_qc:
             summary_path = os.path.join(filtered_dir, "peak_filtering_summary.tsv")
             with open(summary_path, "w", newline="") as handle:
                 writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-                writer.writerow(["source_bed", "filtered_bed", "source_n", "filtered_n"])
+                writer.writerow(["source_bed", "filtered_bed", "source_n", "filtered_n", "primary_n", "blacklist_removed_n"])
                 for src in source_peak_beds:
                     dst = os.path.join(filtered_dir, os.path.basename(src))
-                    source_n = int(
-                        subprocess.check_output(
-                            f"wc -l {quote(src)} | awk '{{print $1}}'",
-                            shell=True,
-                            executable="/bin/bash",
-                            text=True,
-                        ).strip()
-                    )
-                    filtered_n = int(
-                        subprocess.check_output(
-                            f"wc -l {quote(dst)} | awk '{{print $1}}'",
-                            shell=True,
-                            executable="/bin/bash",
-                            text=True,
-                        ).strip()
-                    )
-                    writer.writerow([src, dst, source_n, filtered_n])
+                    source_n, primary_n, filtered_n = counts[src]
+                    writer.writerow([src, dst, source_n, filtered_n, primary_n, primary_n - filtered_n])
 
             return filtered_dir, blacklist_bed, produced, summary_path
 

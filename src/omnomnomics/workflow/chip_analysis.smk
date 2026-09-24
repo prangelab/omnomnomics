@@ -7,6 +7,7 @@ from omnomnomics.chip_analysis import (
     support_annotations, write_regions, write_tsv,
 )
 from omnomnomics.library_manifest import reference_lengths, inspect_bam
+from omnomnomics.chromosomes import ALIAS_VERSION
 from shlex import quote
 from pathlib import Path
 import csv
@@ -30,6 +31,7 @@ chip_testing_metadata = f"{chip_count_dir}/chip_testing_metadata.tsv"
 chip_spp_drop_file = f"{chip_filtered_dir}/peak_qc/spp_qc/dropped_samples.tsv"
 chip_count_selection_spec = f"{experiment_dir}/run_configs/chip_count_selection.unused.json"
 chip_custom_bed = str(config.get("CHIP_REGIONS_BED", "NA"))
+chip_reference_fai = os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "fasta", "genome.fa.fai")
 chip_analytical_samples = list(samples2)
 chip_fragment_samples = sorted(set(chip_analytical_samples) | set(chip_control_sets.ids(chip_analytical_samples)))
 chip_parent_aliases = {}
@@ -110,6 +112,9 @@ if chip_analysis_enabled:
     content = json.dumps(control_spec, sort_keys=True, indent=2) + "\n"
     chip_controls_spec = f"{experiment_dir}/run_configs/chip_controls.{hashlib.sha256(content.encode()).hexdigest()[:16]}.json"
     region_spec = {"controls": control_spec, "genome": config["THEGENOME"], "mode": config.get("BROAD_MODE", "off"), "q": config.get("CHIP_JOINT_PEAK_Q", 0.1), "bed": chip_custom_bed, "bed_sha256": sha256_file(chip_custom_bed) if chip_custom_bed != "NA" else None}
+    if chip_custom_bed != "NA":
+        region_spec["reference_fai_sha256"] = sha256_file(chip_reference_fai)
+        region_spec["chromosome_alias_version"] = ALIAS_VERSION
     region_content = json.dumps(region_spec, sort_keys=True, indent=2) + "\n"
     chip_regions_spec = f"{experiment_dir}/run_configs/chip_regions.{hashlib.sha256(region_content.encode()).hexdigest()[:16]}.json"
     caller_keys = [key for key in config if key.startswith("IDR_") or key.startswith("CHIP_BROAD_")]
@@ -164,6 +169,7 @@ rule chip_testing_regions:
     run:
         reference = reference_lengths(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"])
         mode = str(config.get("BROAD_MODE", "off"))
+        chromosome_mapping = None
         if chip_custom_bed != "NA":
             source = chip_custom_bed
         elif mode in {"genebody", "diffuse"}:
@@ -179,8 +185,18 @@ rule chip_testing_regions:
             log_it(logfile, subprocess.check_output(["macs3", "--version"], text=True).strip(), "MACS VERSION")
             subprocess.run(command, check=True)
             source = os.path.join(os.path.dirname(output.bed), "joint_peaks.broadPeak" if mode == "domain" else "joint_peaks.narrowPeak")
-        regions = read_regions(source, reference, allow_empty=chip_custom_bed == "NA", allow_overlaps=mode == "genebody")
-        write_regions(regions, output.bed, output.manifest, source, config["THEGENOME"])
+        if chip_custom_bed != "NA":
+            regions, chromosome_mapping = read_regions(
+                source, reference, allow_overlaps=mode == "genebody",
+                allow_aliases=True, return_mapping=True,
+            )
+        else:
+            regions = read_regions(source, reference, allow_empty=True, allow_overlaps=mode == "genebody")
+        write_regions(
+            regions, output.bed, output.manifest, source, config["THEGENOME"],
+            chromosome_mapping=chromosome_mapping,
+            reference_fai_sha256=sha256_file(chip_reference_fai) if chromosome_mapping is not None else None,
+        )
         for path in output:
             Path(path).touch()
         log_it(logfile, f"Testing regions: {len(regions)}; source={source}; discovery q={config.get('CHIP_JOINT_PEAK_Q', 0.1)}. Peak overlap is annotation only.", "CHIP TESTING REGIONS")

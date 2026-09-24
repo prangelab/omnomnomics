@@ -14,6 +14,7 @@ import tempfile
 
 from omnomnomics.library_manifest import write_stable_text
 from omnomnomics.metadata import MetadataError
+from omnomnomics.chromosomes import ALIAS_VERSION, ChromosomeNameError, resolve_chromosome
 
 
 def sha256_file(path):
@@ -98,9 +99,11 @@ def region_specs_match(archived, current, project_root, archived_root=None):
     return identity(archived, archived_root) == identity(current, project_root)
 
 
-def read_regions(path, reference, allow_empty=False, allow_overlaps=False):
+def read_regions(path, reference, allow_empty=False, allow_overlaps=False, allow_aliases=False, return_mapping=False):
     """Validate BED coordinates; retain names and reject overlapping features."""
     regions = []
+    mapping = {}
+    reverse = {}
     with open(path, encoding="utf-8") as handle:
         for number, line in enumerate(handle, 1):
             if not line.strip() or line.startswith(("#", "track ", "browser ")):
@@ -110,6 +113,20 @@ def read_regions(path, reference, allow_empty=False, allow_overlaps=False):
                 chrom, start, end = fields[0], int(fields[1]), int(fields[2])
             except (IndexError, ValueError) as exc:
                 raise MetadataError(f"Invalid BED record at {path}:{number}; use tab-separated BED coordinates.") from exc
+            if allow_aliases:
+                try:
+                    target = resolve_chromosome(chrom, reference)
+                except ChromosomeNameError as exc:
+                    raise MetadataError(f"{path}:{number}: {exc}") from exc
+                if target is None:
+                    raise MetadataError(f"Unknown BED contig at {path}:{number}: {chrom}")
+                previous = reverse.setdefault(target, chrom)
+                if previous != chrom:
+                    raise MetadataError(
+                        f"BED contigs {previous} and {chrom} both map to reference contig {target}"
+                    )
+                mapping[chrom] = target
+                chrom = target
             if chrom not in reference or not 0 <= start < end <= reference[chrom]:
                 raise MetadataError(f"BED coordinate outside the selected reference at {path}:{number}: {chrom}:{start}-{end}")
             regions.append((chrom, start, end, fields[3] if len(fields) > 3 else ""))
@@ -119,18 +136,25 @@ def read_regions(path, reference, allow_empty=False, allow_overlaps=False):
             raise MetadataError(f"Duplicate or overlapping BED regions in {path}: {previous[:3]} and {current[:3]}. Supply non-overlapping features.")
     if not regions and not allow_empty:
         raise MetadataError(f"No regions found in BED: {path}")
-    return regions
+    return (regions, mapping) if return_mapping else regions
 
 
 def region_id(region):
     return f"{region[0]}_{region[1]}_{region[2]}"
 
 
-def write_regions(regions, bed, manifest, source, genome):
+def write_regions(regions, bed, manifest, source, genome, chromosome_mapping=None, reference_fai_sha256=None):
     write_stable_text(bed, "".join(f"{chrom}\t{start}\t{end}\t{region_id((chrom, start, end))}\n" for chrom, start, end, _ in regions))
     rows = [[region_id(row), row[0], row[1], row[2], row[3], row[2] - row[1]] for row in regions]
     write_tsv(manifest, ["underscore", "chrom", "start", "end", "original_name", "width_bp"], rows)
-    write_stable_text(str(manifest) + ".source.json", json.dumps({"source": str(source), "source_sha256": sha256_file(source), "genome": genome, "coordinate_system": "BED zero-based half-open", "regions": len(regions)}, indent=2, sort_keys=True) + "\n")
+    provenance = {"source": str(source), "source_sha256": sha256_file(source), "genome": genome, "coordinate_system": "BED zero-based half-open", "regions": len(regions)}
+    if chromosome_mapping is not None:
+        provenance.update({
+            "chromosome_mapping": dict(sorted(chromosome_mapping.items())),
+            "reference_fai_sha256": reference_fai_sha256,
+            "alias_version": ALIAS_VERSION,
+        })
+    write_stable_text(str(manifest) + ".source.json", json.dumps(provenance, indent=2, sort_keys=True) + "\n")
 
 
 def write_tsv(path, header, rows):

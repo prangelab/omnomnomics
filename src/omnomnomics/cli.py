@@ -1691,7 +1691,10 @@ def main():
             if the_type != "CHIP" or broad_mode in {"genebody", "diffuse"}:
                 raise MetadataError("--chip-regions-bed requires ChIP peak/domain mode; it cannot be combined with gene-body or diffuse mode.")
             chip_regions_bed = str(Path(chip_regions_bed).resolve())
-            read_regions(chip_regions_bed, reference_lengths(config['genome_assembly_dir'], genome))
+            read_regions(
+                chip_regions_bed, reference_lengths(config['genome_assembly_dir'], genome),
+                allow_aliases=True,
+            )
         if args.chip_joint_peak_q is not None and the_type != "CHIP":
             raise MetadataError("--chip-joint-peak-q requires ChIP.")
     except (MetadataError, OSError, ValueError, TypeError, OverflowError) as exc:

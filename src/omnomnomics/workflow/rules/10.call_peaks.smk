@@ -276,6 +276,15 @@ def idr_group_summary_paths():
 def idr_selected_summary_path():
     return os.path.join(idr_root_folder(), "idr_selected_peaks.tsv")
 
+def call_peaks_blacklist():
+    from omnomnomics.genomes import resolve_blacklist_bed
+    try:
+        return str(resolve_blacklist_bed(
+            config["THEGENOME"], config["GENOME_ASSEMBLY_DIR"], download_if_missing=False,
+        ))
+    except FileNotFoundError:
+        return None
+
 def input_function(wildcards):
     input_folder1 = f"{experiment_dir}/{master_config['input_folders'][master_config['callpeaks_rule_num']-1]}"
     input_files = []
@@ -289,6 +298,22 @@ def input_function(wildcards):
         input_files.append(
             os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "annotation", "genes.gtf")
         )
+    uses_blacklist = config['THETYPE'] == "ATAC" or (
+        config['THETYPE'] == "CHIP" and (
+            str(config.get("BROAD_MODE", "off")).lower() == "diffuse"
+            or (
+                str(config.get("BROAD_MODE", "off")).lower() == "off"
+                and str(config.get("NARROW_PEAK_STRATEGY", "idr")).lower() == "macs3"
+            )
+        )
+    )
+    if uses_blacklist:
+        input_files.append(
+            os.path.join(config["GENOME_ASSEMBLY_DIR"], config["THEGENOME"], "fasta", "genome.fa.fai")
+        )
+        blacklist = call_peaks_blacklist()
+        if blacklist:
+            input_files.append(blacklist)
     if idr_split_jobs_enabled():
         input_files.extend(idr_final_group_beds())
         input_files.append(idr_selected_summary_path())
@@ -710,12 +735,7 @@ rule call_peaks:
             return grouped_bams
 
         def maybe_resolve_blacklist_bed(genome_name, outdir, cache_label):
-            try:
-                from omnomnomics.genomes import resolve_blacklist_bed
-
-                return str(resolve_blacklist_bed(genome_name, config["GENOME_ASSEMBLY_DIR"]))
-            except Exception:
-                return None
+            return call_peaks_blacklist()
 
         def build_chip_diffuse_bin_feature_sets(
             reference_bam,
