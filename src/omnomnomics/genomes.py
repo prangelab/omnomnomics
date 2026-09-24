@@ -11,7 +11,7 @@ from pathlib import Path
 
 import yaml
 
-from omnomnomics.chromosomes import normalize_external_bed, read_reference_fai
+from omnomnomics.chromosomes import is_primary_name, normalize_external_bed, read_reference_fai
 
 
 def check_config_file_header(config_file_path, expected_header):
@@ -397,13 +397,21 @@ def validate_installed_intervals(fai_path, sizes_path, gtf_path=None):
         raise ValueError(f"Chromosome sizes do not match the FASTA index: {sizes_path}")
     if gtf_path and Path(gtf_path).is_file():
         matching_genes = 0
+        unmatched_primary = set()
         with open(gtf_path, encoding="utf-8") as handle:
             for line in handle:
                 if line.startswith("#"):
                     continue
                 fields = line.split("\t", 3)
-                if len(fields) >= 3 and fields[2] == "gene" and fields[0] in reference:
-                    matching_genes += 1
+                if len(fields) >= 3 and fields[2] == "gene":
+                    if fields[0] in reference:
+                        matching_genes += 1
+                    elif is_primary_name(fields[0]):
+                        unmatched_primary.add(fields[0])
+        if unmatched_primary:
+            raise ValueError(
+                f"Primary gene-annotation contigs are absent from the FASTA index: {', '.join(sorted(unmatched_primary))}"
+            )
         if matching_genes == 0:
             raise ValueError(f"Gene annotation has no gene records on reference contigs: {gtf_path}")
 

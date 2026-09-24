@@ -100,3 +100,7 @@ class ChromosomeNameTests(unittest.TestCase):
         sizes.write_text("chr1\t100\n")
         with self.assertRaisesRegex(ValueError, "do not match"):
             validate_installed_intervals(fai, sizes, gtf)
+        sizes.write_text("1\t100\n")
+        gtf.write_text('chr1\tsource\tgene\t10\t20\t.\t+\t.\tgene_id "a";\n')
+        with self.assertRaisesRegex(ValueError, "Primary gene-annotation contigs"):
+            validate_installed_intervals(fai, sizes, gtf)
