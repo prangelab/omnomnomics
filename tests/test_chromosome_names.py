@@ -51,6 +51,11 @@ class ChromosomeNameTests(unittest.TestCase):
                 source.write_text(f"{source_name}\t30\t40\n")
                 resolve_blacklist_bed("test", assembly.parent, download_if_missing=False)
                 self.assertEqual(result.read_text(), f"{reference_name}\t30\t40\n")
+                prior_reference_sha = json.loads(Path(f"{result}.source.json").read_text())["reference_fai_sha256"]
+                (assembly / "fasta/genome.fa.fai").write_text(f"{reference_name}\t101\t0\t101\t102\n")
+                resolve_blacklist_bed("test", assembly.parent, download_if_missing=False)
+                current_reference_sha = json.loads(Path(f"{result}.source.json").read_text())["reference_fai_sha256"]
+                self.assertNotEqual(current_reference_sha, prior_reference_sha)
 
     def test_blacklist_rejects_collisions_and_zero_usable_intervals(self):
         fai, source = self.root / "genome.fa.fai", self.root / "source.bed"

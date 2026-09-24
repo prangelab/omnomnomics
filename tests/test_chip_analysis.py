@@ -82,7 +82,7 @@ class AnalysisWorkflowTests(fixtures.LibraryFixture):
     def test_custom_bed_counting_mixed_layout_and_reuse(self):
         rows = self.rows(paired_input=True)
         bed = self.project / "custom.bed"
-        bed.write_text("chr1\t100\t250\tregion_a\nchr1\t500\t600\tregion_b\n")
+        bed.write_text("1\t100\t250\tregion_a\n1\t500\t600\tregion_b\n")
         before = {path: path.read_bytes() for path in (bed, self.project / "filtered_BAM/a.filtered.bam", self.project / "filtered_BAM/b.filtered.bam")}
         config = self.cli_config(rows, "13", extra=("--chip-regions-bed", str(bed)))
         dag = self.run_workflow(config)
@@ -96,11 +96,14 @@ class AnalysisWorkflowTests(fixtures.LibraryFixture):
         with (count_dir / "chip_input_counts.tsv").open() as handle:
             inputs = list(csv.reader(handle, delimiter="\t"))
         self.assertEqual(inputs, [["Peak", "b"], ["chr1_100_250", "2"], ["chr1_500_600", "0"]])
+        with (count_dir / "chip_testing_regions.source.json").open() as handle:
+            provenance = json.load(handle)
+        self.assertEqual(provenance["chromosome_mapping"], {"1": "chr1"})
         again = self.run_workflow(config, dry_run=False)
         self.assertIn("Nothing to be done", again)
         for path, content in before.items():
             self.assertEqual(path.read_bytes(), content)
-        bed.write_text("chr1\t500\t600\tchanged\n")
+        bed.write_text("1\t500\t600\tchanged\n")
         changed = self.cli_config(rows, "13", extra=("--chip-regions-bed", str(bed)))
         dag = self.run_workflow(changed)
         self.assertIn("chip_testing_regions", dag)
