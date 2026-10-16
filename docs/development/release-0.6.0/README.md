@@ -8,6 +8,7 @@ not a declaration that 0.6.0 has passed every acceptance check.
 - Established analysis source: `5bffbd83d5c3e979d7ec69edc8637663223c8cd1`.
 - Initial exact-lock commit: `3b84a7b3acccae9ed186c0aa587ded0566b9a722`.
 - Initial artifact-test source: `04f4c53a75856f430c053b7f1b2ff690165942bf`.
+- Accepted installation/artifact candidate: `e332fb03a00123d2b7a1a82927c1922894d32d05`.
 - Runtime work root: `/scratch-shared/kprange/omnomtest/release_060_20261016`.
 - Inventory job: `28136339`; constrained dependency-solve job: `28136688`.
   Both completed. Micromamba version: 2.3.3.
@@ -39,15 +40,15 @@ See the [upstream package record](https://bioconductor.org/packages/sva/).
 
 | Check | Evidence/status |
 |---|---|
-| Exact dependency solves | All four succeeded, job 28136688 |
-| New prefixes and fresh package caches | Array 28137199 completed all four exact Conda inventories, but main failed runtime acceptance; corrected clean main/Explorer reconstruction pending |
+| Exact dependency solves | Initial job 28136688 and corrected constrained job 28143746 succeeded |
+| New prefixes and fresh package caches | Corrected main and Explorer passed exact inventories, R namespace loads and pip checks in array 28144176; unchanged IDR/SPP verified and executed |
 | Existing analysis environments retained | Creation uses separate scratch prefixes and cache roots; no updates to the established environments |
-| Installed wheel assets and CLI | Job 28137628 built wheel/sdist and passed installed asset/CLI checks before failing the R runtime check; corrected artifact attempt pending |
-| Source-distribution installation | Not reached in failed job 28137628; separate Python venv will inherit only the reconstructed main dependency environment |
-| R namespaces, helper wrappers and Explorer loading | Helpers passed in 28137628; main R failed because annotation payload hooks ran before their dependencies; full repeat required |
-| Complete unittest and standalone regression runners | Pending corrected artifact attempt; temporary-path standalone tests are executed rather than silently skipped |
-| Small real-tool workflow checks | Included in the bioinformatics unittest tier; pending |
-| Three full written tutorial routes | Not submitted; checksummed FASTQ restoration job 28137955 is running; reference restoration remains pending |
+| Installed wheel assets and CLI | Passed job 28144271, including byte-for-byte verification of 3,998 bundled workflow assets |
+| Source-distribution installation | Passed job 28144271 in a separate Python venv inheriting only the fresh main dependency environment |
+| R namespaces, helper wrappers and Explorer loading | Passed job 28144271; IDR 2.0.4.2, SPP 1.16.0, main R, Shiny discovery and lightweight Explorer verified |
+| Complete unittest and standalone regression runners | Passed job 28144271: 109 unittest cases, none skipped, and 49 standalone functions with zero failures |
+| Small real-tool workflow checks | Bioinformatics unittest tier passed within job 28144271 |
+| Three full written tutorial routes | Not submitted; all 24 frozen FASTQs restored and checksummed in 28137955; reference installation and command audit in progress |
 | Final release/tag/archive | Not created; depends on successful validation of the final source and locks |
 
 The installed-package smoke check runs outside the checkout, verifies that
@@ -109,3 +110,36 @@ Large environments, package caches and tutorial analysis data remain on
 scratch. Archive compact logs, checksums, manifests and reports locally before
 the 14-day scratch lifetime expires. Selective test duration is not a
 full-pipeline performance measurement.
+
+## Accepted artifacts and next gate
+
+Corrected artifact/regression job 28144271 completed successfully. Wheel SHA-256:
+`f81eb3707e5e4e871ca0126b0c9f4c49f79b79ca770a9f5ebc314723d2bd6468`. Source-distribution SHA-256:
+`756ebd2011693083865cdbe83d5f438de13507d818a6a18b3cc5487e95e4fd57`. Both artifacts and compact reports
+are archived locally under `MANUSCRIPT/release_validation/20261016/attempt_e332fb0/`.
+
+Reference preparation first stopped before any reference download because the
+preparatory tutorial audit treated a normalized contrast mapping as a list.
+The audit now verifies its factor, numerator and denominator explicitly. This
+was a tutorial-audit script correction, not a change to the accepted package.
+Reference/command-audit acceptance and the three full tutorial routes remain
+required before the final release.
+
+## UCSC annotation compatibility gate
+
+Real reference preparation 28152153 found a source defect after the successful
+software gates above: genomepy's UCSC mm39 annotation contains transcript/exon
+records with `gene_id`, but no explicit `gene` records. Its provider README
+identifies the actual annotation table as `ncbiRefSeq`, despite the requested
+`refGene` style. The installer previously rejected this valid GTF and would
+produce empty gene BEDs from it. The three dependent tutorial launchers
+28152268/28152269/28152271 were canceled without starting controllers.
+
+The correction accepts gene-associated transcript/exon GTFs and derives gene
+BED bounds from their gene_id spans, separately for each contig and strand.
+Existing explicit gene features take precedence. The original GTF, identifiers
+and chromosome names are retained. Reference-size, primary-contig, coordinate
+and missing-gene-identifier checks remain enforced. This source change requires
+new installed artifacts and the full regression suite before reference retry
+or tutorial execution. The e332fb0 artifact acceptance above does not establish
+acceptance of the corrected candidate.

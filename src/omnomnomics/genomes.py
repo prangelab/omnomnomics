@@ -398,22 +398,19 @@ def validate_installed_intervals(fai_path, sizes_path, gtf_path=None):
     if gtf_path and Path(gtf_path).is_file():
         matching_genes = 0
         unmatched_primary = set()
-        with open(gtf_path, encoding="utf-8") as handle:
-            for line in handle:
-                if line.startswith("#"):
-                    continue
-                fields = line.split("\t", 3)
-                if len(fields) >= 3 and fields[2] == "gene":
-                    if fields[0] in reference:
-                        matching_genes += 1
-                    elif is_primary_name(fields[0]):
-                        unmatched_primary.add(fields[0])
+        for chrom, start, end, *_ in annotation_gene_intervals(gtf_path):
+            if chrom in reference:
+                if end > reference[chrom]:
+                    raise ValueError(f"Gene annotation interval exceeds reference contig {chrom}: {gtf_path}")
+                matching_genes += 1
+            elif is_primary_name(chrom):
+                unmatched_primary.add(chrom)
         if unmatched_primary:
             raise ValueError(
                 f"Primary gene-annotation contigs are absent from the FASTA index: {', '.join(sorted(unmatched_primary))}"
             )
         if matching_genes == 0:
-            raise ValueError(f"Gene annotation has no gene records on reference contigs: {gtf_path}")
+            raise ValueError(f"Gene annotation has no gene-associated records on reference contigs: {gtf_path}")
 
 
 def meme_motif_database_dir(assembly_root):
@@ -641,16 +638,17 @@ def parse_gtf_attributes(attribute_text):
     return attributes
 
 
-def create_gene_bed_files(gtf_file, assembly_name, aux_dir):
-    detailed_rows = []
-    legacy_rows = []
-
-    with open(gtf_file, "r") as handle:
-        for line in handle:
+def annotation_gene_intervals(gtf_file):
+    """Use explicit genes or gene_id spans from transcript/exon-only GTFs."""
+    explicit = []
+    explicit_keys = set()
+    inferred = {}
+    with open(gtf_file, encoding="utf-8") as handle:
+        for number, line in enumerate(handle, 1):
             if not line or line.startswith("#"):
                 continue
             fields = line.rstrip("\n").split("\t")
-            if len(fields) < 9 or fields[2] != "gene":
+            if len(fields) < 9 or fields[2] not in {"gene", "transcript", "exon"}:
                 continue
 
             chrom = fields[0]
@@ -658,7 +656,7 @@ def create_gene_bed_files(gtf_file, assembly_name, aux_dir):
             end = int(fields[4])
             strand = fields[6]
             attributes = parse_gtf_attributes(fields[8])
-            gene_id = attributes.get("gene_id") or attributes.get("ID")
+            gene_id = attributes.get("gene_id") or (attributes.get("ID") if fields[2] == "gene" else None)
             gene_symbol = (
                 attributes.get("gene_name")
                 or attributes.get("gene_symbol")
@@ -668,10 +666,25 @@ def create_gene_bed_files(gtf_file, assembly_name, aux_dir):
 
             if not gene_id:
                 continue
+            if start < 0 or end <= start:
+                raise ValueError(f"Invalid gene annotation interval at {gtf_file}:{number}")
+            row = (chrom, start, end, gene_id, "0", strand, gene_symbol)
+            key = (chrom, strand, gene_id)
+            if fields[2] == "gene":
+                explicit.append(row)
+                explicit_keys.add(key)
+            elif key not in inferred:
+                inferred[key] = row
+            else:
+                previous = inferred[key]
+                inferred[key] = (chrom, min(start, previous[1]), max(end, previous[2]),
+                                 gene_id, "0", strand, previous[6])
+    return explicit + [row for key, row in inferred.items() if key not in explicit_keys]
 
-            detailed_rows.append((chrom, start, end, gene_id, "0", strand, gene_symbol))
-            legacy_rows.append((chrom, start, end, gene_id, "0", strand))
 
+def create_gene_bed_files(gtf_file, assembly_name, aux_dir):
+    detailed_rows = annotation_gene_intervals(gtf_file)
+    legacy_rows = [row[:6] for row in detailed_rows]
     detailed_rows.sort(key=lambda row: (row[0], row[1], row[2], row[3]))
     legacy_rows.sort(key=lambda row: (row[0], row[1], row[2], row[3]))
 
