@@ -37,6 +37,14 @@ The packaged `color_data_for_hubs` directory is intended as a read-only source o
 
 ## Installation
 
+For repeatable Linux x86-64 installations, the 0.6.0 candidate now provides
+complete environment locks and scripts that verify the installed packages.
+These locks are undergoing release validation. See the
+[locked installation instructions](docs/getting-started/installation.md#locked-linux-environments)
+and [lock provenance](locks/README.md). The ordinary YAML route below resolves
+dependencies again and is intended for development rather than exact release
+reconstruction.
+
 Clone the repository:
 
 ```bash
@@ -75,7 +83,7 @@ Default narrow ATAC/ChIP peak calling uses IDR. Bioconda IDR currently requires 
 bash scripts/install_idr_helper.sh
 ```
 
-The helper creates or updates `omnomnomics-idr` from `environment.idr.yml`, then installs an `idr` wrapper into the main `omnomnomics` environment. After this, users should continue activating only the main environment:
+The helper creates `omnomnomics-idr` from the Linux release lock, or verifies that an existing environment matches it, then installs an `idr` wrapper into the main `omnomnomics` environment. It stops on an inventory mismatch without updating the environment. After this, users should continue activating only the main environment:
 
 ```bash
 micromamba activate omnomnomics
@@ -91,7 +99,7 @@ ATAC/ChIP peak QC can report strand cross-correlation metrics (`NSC` and `RSC`) 
 bash scripts/install_spp_helper.sh
 ```
 
-The helper creates or updates `omnomnomics-spp` from `environment.spp.yml`, then installs a `run_spp.R` wrapper into the main `omnomnomics` environment. Users should still activate only the main environment during normal runs:
+The helper creates `omnomnomics-spp` from the Linux release lock, or verifies that an existing environment matches it, then installs a `run_spp.R` wrapper into the main `omnomnomics` environment. It stops on an inventory mismatch without updating the environment. Users should still activate only the main environment during normal runs:
 
 ```bash
 micromamba activate omnomnomics
