@@ -4,6 +4,7 @@ import argparse
 import importlib.util
 import inspect
 from pathlib import Path
+import tempfile
 import traceback
 
 from suite_tiers import test_paths
@@ -36,11 +37,19 @@ def main() -> int:
             continue
 
         for name, function in inspect.getmembers(module, inspect.isfunction):
-            if not name.startswith("test_") or inspect.signature(function).parameters:
+            if not name.startswith("test_"):
                 continue
             total += 1
             try:
-                function()
+                parameters = inspect.signature(function).parameters
+                unsupported = set(parameters) - {"tmp_path"}
+                if unsupported:
+                    raise ValueError(f"Unsupported test parameters: {sorted(unsupported)}")
+                if "tmp_path" in parameters:
+                    with tempfile.TemporaryDirectory(prefix="omnom_regression_") as temporary:
+                        function(tmp_path=Path(temporary))
+                else:
+                    function()
             except Exception:
                 failures.append((path.name, name, traceback.format_exc()))
 
