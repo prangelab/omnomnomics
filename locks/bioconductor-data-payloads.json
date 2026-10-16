@@ -1,0 +1,29 @@
+{
+  "metadata_package": "bioconductor-data-packages",
+  "metadata_version": "20260207",
+  "metadata_sha256": "70c26e502544fbef134525ce3afb2b9a633d6783994ec72dc7d20e585e4e719d",
+  "publisher": "Bioconductor; redistributed through the Bioconda data-package installer",
+  "payloads": [
+    {
+      "package": "org.Mm.eg.db",
+      "version": "3.22.0",
+      "filename": "org.Mm.eg.db_3.22.0.tar.gz",
+      "md5": "cc19f63b25a7a8018e46f71e42e2f83f",
+      "source": "https://bioconductor.org/packages/3.22/data/annotation/src/contrib/org.Mm.eg.db_3.22.0.tar.gz"
+    },
+    {
+      "package": "org.Hs.eg.db",
+      "version": "3.22.0",
+      "filename": "org.Hs.eg.db_3.22.0.tar.gz",
+      "md5": "e80cac6ec018a95aea4f7530350e80a2",
+      "source": "https://bioconductor.org/packages/3.22/data/annotation/src/contrib/org.Hs.eg.db_3.22.0.tar.gz"
+    },
+    {
+      "package": "GO.db",
+      "version": "3.22.0",
+      "filename": "GO.db_3.22.0.tar.gz",
+      "md5": "5ae5557afa56227c4c9c145907b1f585",
+      "source": "https://bioconductor.org/packages/3.22/data/annotation/src/contrib/GO.db_3.22.0.tar.gz"
+    }
+  ]
+}

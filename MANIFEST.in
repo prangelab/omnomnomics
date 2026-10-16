@@ -1,5 +1,5 @@
 include environment*.yml
 recursive-include locks *.yml *.txt *.json *.tsv SHA256SUMS README.md
-recursive-include scripts *.sh *.py
+recursive-include scripts *.sh *.py *.R
 recursive-include tests *.py *.R
 global-exclude __pycache__ *.py[cod] .DS_Store

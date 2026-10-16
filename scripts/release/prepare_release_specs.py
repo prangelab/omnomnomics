@@ -24,6 +24,8 @@ def main():
     parser.add_argument("--repository", type=Path, required=True)
     parser.add_argument("--inventory", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--replace-package", action="append", default=[],
+                        help="Re-solve a reviewed package while retaining pins on its dependency closure")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     summary = {}
@@ -46,7 +48,8 @@ def main():
                 continue
             selected.add(package)
             pending.extend(dependency_name(spec) for spec in by_name[package]["depends"])
-        pins = [f"{package}=={by_name[package]['version']}={by_name[package]['build']}" for package in sorted(selected)]
+        pins = [f"{package}=={by_name[package]['version']}={by_name[package]['build']}"
+                for package in sorted(selected) if package not in args.replace_package]
         (args.output / f"{name}.txt").write_text("\n".join([*roots, *pins]) + "\n")
         summary[name] = {"manifest": manifest, "direct_requirements": roots,
                          "pinned_closure": len(selected), "missing_from_original": sorted(missing)}

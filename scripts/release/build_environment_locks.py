@@ -39,7 +39,8 @@ def checked_records(plan):
             name = dependency.split()[0]
             if not name.startswith("__") and name not in names:
                 raise ValueError(f"Missing dependency {name} of {record['name']}")
-    return sorted(records, key=lambda r: r["name"])
+    # Link hooks require their dependencies to be installed first.
+    return records
 
 
 def yaml_lock(records, source, source_hash):

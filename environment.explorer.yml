@@ -4,6 +4,7 @@ channels:
 dependencies:
   - python=3.11
   - pip
+  - pyyaml>=6.0
   - setuptools>=61
   - wheel
   - r-base>=4.3

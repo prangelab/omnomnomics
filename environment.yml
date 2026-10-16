@@ -32,7 +32,10 @@ dependencies:
   - r-shiny
   - genomepy>=0.16
   - snakemake>=7.25,<8
-  - multiqc
+  - multiqc=1.35
+  - polars=1.39.3
+  - polars-runtime-compat=1.39.3
+  - pyarrow
   - fastqc
   - fastp
   - skewer

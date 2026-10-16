@@ -12,6 +12,21 @@ archive URLs, MD5 and SHA-256 checksums in Mamba's unified lock format. The
 `.explicit.txt` files provide the equivalent platform-specific explicit
 specifications; `.packages.json` files support post-install verification.
 
+The initial clean-install attempt exposed an ordering defect in lock
+serialization: sorting packages alphabetically ran Bioconductor data hooks
+before their dependencies were linked. Corrected locks preserve the solver's
+installation order. An exact Conda inventory alone is insufficient evidence of
+a functional environment; creation also checks R namespaces, helper execution
+and Python dependency consistency. Initial installation reports remain failed
+runtime acceptance until the corrected clean reconstruction passes.
+
+Bioconda's annotation packages install separate, versioned Bioconductor data
+payloads through a package hook. `bioconductor-data-payloads.json` records their
+canonical sources, exact versions and MD5 values from the SHA-256-pinned
+Bioconda metadata package. The upstream hook verifies the payload checksum
+before invoking R installation. Runtime namespace checks catch a missing
+payload even when Conda has already recorded its wrapper package as installed.
+
 The candidate locks were solved against the project manifests while pinning
 the dependency closure from the established Snellius environments wherever
 available. Unrelated installed packages were excluded. The main environment
@@ -34,7 +49,7 @@ bash scripts/create_locked_environment.sh main /absolute/path/to/new/main
 Replace `main` with `idr`, `spp`, or `explorer` for another component. The
 script rejects existing prefixes, checks the lock-file checksums, creates the
 locked environment without site configuration overrides, and verifies the
-installed Conda records. It does not update an existing environment, install
+installed Conda records, required R namespaces and Python dependencies. It does not update an existing environment, install
 Omnomnomics, or connect helper wrappers automatically.
 
 Regeneration uses `scripts/release/prepare_release_specs.py` for constrained

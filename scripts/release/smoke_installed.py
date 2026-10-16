@@ -3,6 +3,7 @@
 
 import argparse
 import hashlib
+import importlib
 import importlib.metadata
 import json
 from pathlib import Path
@@ -13,9 +14,10 @@ import zipfile
 
 
 def command(args, **kwargs):
-    result = subprocess.run(args, check=True, text=True, stdout=subprocess.PIPE,
+    result = subprocess.run(args, check=False, text=True, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, timeout=120, **kwargs)
     print(result.stdout, end="", flush=True)
+    result.check_returncode()
     return result.stdout
 
 
@@ -39,8 +41,15 @@ def main():
                "wheel_sha256": hashlib.sha256(args.wheel.read_bytes()).hexdigest(),
                "verified_workflow_assets": len(assets)}
     command([str(Path(sys.prefix) / "bin/omnomnomics-de-app"), "--help"])
+    command([str(Path(sys.prefix) / "bin/omnomnomics"), "--version"])
     if not args.explorer:
-        command([str(Path(sys.prefix) / "bin/omnomnomics"), "--version"])
+        from packaging.requirements import Requirement
+        for specification in importlib.metadata.requires("omnomnomics") or []:
+            requirement = Requirement(specification)
+            if requirement.marker is None or requirement.marker.evaluate({"extra": "pipeline"}):
+                assert requirement.specifier.contains(importlib.metadata.version(requirement.name)), specification
+        for module in ["yaml", "genomepy", "pysam", "deeptools"]:
+            importlib.import_module(module)
         for assay in ["rna", "chip", "atac"]:
             command([str(Path(sys.prefix) / "bin/omnomnomics"), assay, "--help"])
         required = ["snakemake", "fastqc", "fastp", "skewer", "hisat2", "hisat2-build", "STAR",
@@ -53,7 +62,7 @@ def main():
         command(["macs3", "--version"])
         command(["idr", "--version"])
         libraries = ["DESeq2", "apeglm", "AnnotationDbi", "org.Mm.eg.db", "org.Hs.eg.db",
-                     "clusterProfiler", "enrichplot", "fgsea", "sva", "decoupler", "OmnipathR",
+                     "clusterProfiler", "enrichplot", "fgsea", "sva", "decoupleR", "OmnipathR",
                      "msigdbr", "ggplot2", "pheatmap", "shiny"]
     else:
         libraries = ["shiny", "ggplot2", "pheatmap"]

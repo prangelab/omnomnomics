@@ -27,3 +27,12 @@ test -x "$micromamba_bin"
 "$micromamba_bin" --no-rc create --yes --prefix "$prefix" --file "$lock_dir/$name-lock.yml"
 "$prefix/bin/python" "$repo/scripts/release/verify_environment.py" \
   --prefix "$prefix" --packages "$lock_dir/$name.packages.json"
+if [[ "$component" == idr ]]; then
+  "$prefix/bin/idr" --version
+else
+  OMNOM_VALIDATE_PREFIX="$prefix" OMNOM_VALIDATE_COMPONENT="$component" \
+    "$prefix/bin/Rscript" --vanilla "$repo/scripts/release/verify_runtime.R"
+fi
+if [[ "$component" == main || "$component" == explorer ]]; then
+  "$prefix/bin/python" -m pip check
+fi

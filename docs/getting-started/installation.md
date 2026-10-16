@@ -22,7 +22,8 @@ bash scripts/link_locked_helpers.sh "$OMNOM_ENV_ROOT/main" \
 ```
 
 The creation script verifies the lock checksums, refuses to modify an existing
-prefix, and checks the complete installed Conda inventory. Helper linking also
+prefix, checks the complete installed Conda inventory, loads required R
+namespaces and verifies Python dependency consistency. Helper linking also
 verifies all three inventories. Normal pipeline runs activate only the main
 environment. The full pipeline requires Slurm; the environment locks alone do
 not configure the cluster or install reference data.
@@ -31,6 +32,14 @@ The locks are platform-specific and do not establish macOS or Windows support.
 The ordinary YAML specifications below are useful for development and other
 platform investigations, but re-solving them does not reproduce the locked
 release environment.
+
+The Python package keeps PyYAML as a core requirement so its CLI and Explorer
+can run in the small environment. The `pipeline` extra declares genomepy,
+pysam and deepTools. They are already present in the main Conda environment;
+the Explorer does not require those workflow dependencies. For Python-only
+development installation outside the managed environment, select
+`python -m pip install '.[pipeline]'`; this does not supply the external HPC
+tools or replace the supported Conda environment.
 
 ## Main environment
 

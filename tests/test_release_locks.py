@@ -3,12 +3,14 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPOSITORY / "scripts/release"))
 from build_environment_locks import checked_records
 from inventory_environments import inventory
+from prepare_release_specs import main as prepare_specs
 from verify_environment import verify
 
 
@@ -32,6 +34,34 @@ class ReleaseLockTests(unittest.TestCase):
                 checked_records({"success": True, "actions": {"LINK": [record | updates]}})
         with self.assertRaises(ValueError):
             checked_records({"success": False})
+
+    def test_lock_preserves_solver_order_for_install_hooks(self):
+        dependency = self.record() | {"name": "z_dependency", "depends": []}
+        dependent = self.record() | {"name": "a_dependent", "depends": ["z_dependency >=1"]}
+        plan = {"success": True, "actions": {"LINK": [dependency, dependent]}}
+        self.assertEqual([r["name"] for r in checked_records(plan)], ["z_dependency", "a_dependent"])
+
+    def test_replacing_package_keeps_unchanged_dependency_pins(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repository = root / "repository"
+            repository.mkdir()
+            for suffix in ["", ".idr", ".spp", ".explorer"]:
+                (repository / f"environment{suffix}.yml").write_text("dependencies:\n  - example=2\n")
+            for name in ["omnomnomics", "omnomnomics-idr", "omnomnomics-spp"]:
+                directory = root / "inventory" / name
+                directory.mkdir(parents=True)
+                records = [self.record() | {"depends": ["dependency >=1"]},
+                           self.record() | {"name": "dependency", "depends": []}]
+                (directory / "conda-records.json").write_text(json.dumps(records))
+            with patch.object(sys, "argv", ["prepare_release_specs.py", "--repository", str(repository),
+                                           "--inventory", str(root / "inventory"),
+                                           "--output", str(root / "specs"), "--replace-package", "example"]):
+                prepare_specs()
+            specifications = (root / "specs/main.txt").read_text().splitlines()
+            self.assertIn("example=2", specifications)
+            self.assertIn("dependency==1.0=0", specifications)
+            self.assertNotIn("example==1.0=0", specifications)
 
     def test_post_install_check_rejects_changed_archives_and_extra_packages(self):
         with tempfile.TemporaryDirectory() as temporary:
