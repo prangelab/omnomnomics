@@ -8,7 +8,7 @@ not a declaration that 0.6.0 has passed every acceptance check.
 - Established analysis source: `5bffbd83d5c3e979d7ec69edc8637663223c8cd1`.
 - Initial exact-lock commit: `3b84a7b3acccae9ed186c0aa587ded0566b9a722`.
 - Initial artifact-test source: `04f4c53a75856f430c053b7f1b2ff690165942bf`.
-- Accepted installation/artifact candidate: `e332fb03a00123d2b7a1a82927c1922894d32d05`.
+- Accepted installation/artifact candidate: `96abebe9ff4bf978bbcf9ffb305fe37f4a340daa`.
 - Runtime work root: `/scratch-shared/kprange/omnomtest/release_060_20261016`.
 - Inventory job: `28136339`; constrained dependency-solve job: `28136688`.
   Both completed. Micromamba version: 2.3.3.
@@ -43,12 +43,12 @@ See the [upstream package record](https://bioconductor.org/packages/sva/).
 | Exact dependency solves | Initial job 28136688 and corrected constrained job 28143746 succeeded |
 | New prefixes and fresh package caches | Corrected main and Explorer passed exact inventories, R namespace loads and pip checks in array 28144176; unchanged IDR/SPP verified and executed |
 | Existing analysis environments retained | Creation uses separate scratch prefixes and cache roots; no updates to the established environments |
-| Installed wheel assets and CLI | Passed job 28144271, including byte-for-byte verification of 3,998 bundled workflow assets |
-| Source-distribution installation | Passed job 28144271 in a separate Python venv inheriting only the fresh main dependency environment |
-| R namespaces, helper wrappers and Explorer loading | Passed job 28144271; IDR 2.0.4.2, SPP 1.16.0, main R, Shiny discovery and lightweight Explorer verified |
-| Complete unittest and standalone regression runners | Passed job 28144271: 109 unittest cases, none skipped, and 49 standalone functions with zero failures |
-| Small real-tool workflow checks | Bioinformatics unittest tier passed within job 28144271 |
-| Three full written tutorial routes | Not submitted; all 24 frozen FASTQs restored and checksummed in 28137955; reference installation and command audit in progress |
+| Installed wheel assets and CLI | Passed job 28153260, including byte-for-byte verification of 3,998 bundled workflow assets |
+| Source-distribution installation | Passed job 28153260 in a separate Python venv inheriting only the fresh main dependency environment |
+| R namespaces, helper wrappers and Explorer loading | Passed job 28153260; IDR 2.0.4.2, SPP 1.16.0, main R, Shiny discovery and lightweight Explorer verified |
+| Complete unittest and standalone regression runners | Passed job 28153260: 112 unittest cases, none skipped, and 49 standalone functions with zero failures |
+| Small real-tool workflow checks | Bioinformatics unittest tier passed within job 28153260 |
+| Three full written tutorial routes | All three full controllers and collectors completed on 96abebe; independent output audit passed for RNA, ChIP and ATAC. Retained-input resume checks remain pending |
 | Final release/tag/archive | Not created; depends on successful validation of the final source and locks |
 
 The installed-package smoke check runs outside the checkout, verifies that
@@ -113,10 +113,12 @@ full-pipeline performance measurement.
 
 ## Accepted artifacts and next gate
 
-Corrected artifact/regression job 28144271 completed successfully. Wheel SHA-256:
-`f81eb3707e5e4e871ca0126b0c9f4c49f79b79ca770a9f5ebc314723d2bd6468`. Source-distribution SHA-256:
-`756ebd2011693083865cdbe83d5f438de13507d818a6a18b3cc5487e95e4fd57`. Both artifacts and compact reports
-are archived locally under `MANUSCRIPT/release_validation/20261016/attempt_e332fb0/`.
+Corrected artifact/regression job 28153260 completed successfully on 96abebe. The
+unchanged verified dependency locks were reused; both installed artifacts were
+rebuilt and the complete suites rerun after the GTF compatibility fix. Wheel SHA-256:
+`a12e66540dbcae383d0099a77971b5c12a7ce78ebfe1823414d60c59636f566c`. Source-distribution SHA-256:
+`ca870f6ba3034aecd311864ffd3b5efea8a44c22d2ef450b4a43d1f29f33bd70`. Both artifacts and compact reports
+are archived locally under `MANUSCRIPT/release_validation/20261016/attempt_96abebe/`.
 
 Reference preparation first stopped before any reference download because the
 preparatory tutorial audit treated a normalized contrast mapping as a list.
@@ -139,7 +141,95 @@ The correction accepts gene-associated transcript/exon GTFs and derives gene
 BED bounds from their gene_id spans, separately for each contig and strand.
 Existing explicit gene features take precedence. The original GTF, identifiers
 and chromosome names are retained. Reference-size, primary-contig, coordinate
-and missing-gene-identifier checks remain enforced. This source change requires
-new installed artifacts and the full regression suite before reference retry
-or tutorial execution. The e332fb0 artifact acceptance above does not establish
-acceptance of the corrected candidate.
+and missing-gene-identifier checks remain enforced. This source change passed
+new wheel/sdist installation checks, 112 unittests and 49 standalone regressions
+in job 28153260. Real reference retry 28153327 then successfully produced
+nonempty gene BEDs and all HISAT2 parts; its final acceptance check stopped
+because genomepy has no native mm39 blacklist entry.
+
+## Native mm39 exclusion reference
+
+Genomepy 0.16.3's blacklist plugin covers mm10 but has no mm39 entry; repeating
+its download cannot supply an mm39 blacklist. The release tutorial therefore
+uses the native mm39 exclusion set from
+[Ogata et al., excluderanges](https://doi.org/10.1093/bioinformatics/btad198),
+distributed by Mikhail Dozmorov through immutable
+[Zenodo record 21480958](https://doi.org/10.5281/zenodo.21480958).
+This is a separate reference dataset, not an ENCODE mm10 list or a software
+dependency. No dependency installation or package-code change is required.
+
+The 21,010-byte GRanges RDS has upstream MD5
+`31fb7836575fd41f4f5e213f2fbebf1e` and independently recorded SHA-256
+`ba7c625d422e4930b589cbff7b6a09fd6cd48058e9eea71b310c6031c23eff11`.
+The tutorial helper verifies both before reading, asserts the mm39 assembly and
+3,147 regions, and exports one-based inclusive GRanges as zero-based half-open
+BED3 using start minus one and unchanged end. Existing chromosome harmonization
+then checks the converted coordinates against this FASTA. Full source metadata
+and the conversion rule are frozen in the tutorial reference manifest.
+
+Reference completion reuses the successfully installed genome, annotation and
+index. Earlier failed reference checks and canceled launchers remain recorded;
+none count as completed tutorial runs. Historical SoftwareX blacklist provenance
+is distinct from this newly pinned tutorial resource.
+
+
+Reference completion 28157855 passed: 61 reference contigs, complete inspected
+HISAT2 index, nonempty annotation BEDs, 3,147 normalized exclusion intervals,
+JASPAR2024 motifs and 20 SHA-256 receipts. Lightweight reference reports and
+source-preparation code/checksums are archived locally. No package dependencies
+or pipeline code changed during this reference-data completion.
+
+| Tutorial | Launcher | Controller | Collector | Confirmed public steps |
+|---|---|---|---|---|
+| RNA | 28157969 | 28157972 | 28157973 | 1–12 |
+| Matched-input ChIP | 28157970 | 28158003 | 28158018 | 1–15; 8 libraries and 8 associations |
+| ATAC | 28157971 | 28158005 | 28158017 | 1–15 |
+
+These fresh full tutorial runs and all collectors completed successfully.
+Independent output audit 28178821 accepted all three output sets: 24 source
+FASTQ SHA-256 values remained unchanged, BAM headers/indexes and BigWigs were
+readable against mm39, source protection and pruned retention were correct,
+integer count tables and DE/post-DE outputs were present, and all worker
+accounting records reported successful completion. Filtered peak sets had zero
+remaining overlaps with the pinned exclusion reference. ChIP had eight matched
+associations, four separately documented input-relative tracks and raw IP counts
+for DE without input subtraction or division.
+
+| Route | Full controller duration | Count-table features | Features with adjusted p value | Significant features |
+|---|---|---|---|---|
+| RNA | 00:41:20 | 39,998 | 19,235 | 3,013 |
+| ChIP | 01:28:13 | 104,201 | 54,845 | 18,053 |
+| ATAC | 02:19:52 | 29,701 | 29,701 | 2,847 |
+
+Significance uses adjusted p < 0.05 and absolute log2 fold change >= 1.
+For ChIP, 81,799 features had a p value; independent filtering left adjusted
+p values for 54,845. These categories must not be conflated. Full controller
+durations include scheduler waiting during execution. They are distinct from
+the log's internal elapsed time, CPU time and billed core hours. Actual Slurm
+allocation is retained in compact resource reports, including allocations above
+worker thread counts.
+
+The same audit job then stopped at the RNA 5–12 recovery example: step 5 needs
+unfiltered BAM inputs already removed by successful `pruned` retention. The
+output audit itself passed. A separate dry-run job 28275680 checks RNA 6–12
+from retained filtered BAMs and chromatin 11–15. Actual recovery execution is
+still pending; no selective duration is accepted as full-run performance.
+Compact full-run evidence is archived in
+`MANUSCRIPT/release_validation/20261016/tutorial_acceptance/`.
+
+## Recovery defect found after full output acceptance
+
+Retained-input dry-run job 28275680 completed for all three routes. ChIP/ATAC
+11–15 reused all outputs. RNA 6–12 scheduled four coverage jobs solely because
+step-8 completion markers had been deleted at the end of the full run, despite
+both strand tracks being present. This is a real reuse defect and blocks final
+release acceptance; the earlier full-run output audit remains valid for 96abebe.
+
+The correction makes coverage targets and track-hub dependencies use the real
+BigWig files when no size cap is configured, declares both RNA strand outputs,
+and retains marker-based completion for optional size-capped branches. Recovery
+must reuse intact tracks after marker cleanup and rebuild a missing strand.
+Two real Snakemake regression cases cover RNA and ATAC, including an actual
+small RNA track rebuild. A new exact artifact candidate must pass the complete
+software gates and installed recovery checks before release. Dependencies and
+analysis algorithms are unchanged.

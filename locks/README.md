@@ -17,8 +17,9 @@ serialization: sorting packages alphabetically ran Bioconductor data hooks
 before their dependencies were linked. Corrected locks preserve the solver's
 installation order. An exact Conda inventory alone is insufficient evidence of
 a functional environment; creation also checks R namespaces, helper execution
-and Python dependency consistency. Initial installation reports remain failed
-runtime acceptance until the corrected clean reconstruction passes.
+and Python dependency consistency. Failed initial reports remain preserved. Corrected clean creation and
+installed-artifact acceptance are recorded separately in
+`docs/development/release-0.6.0/README.md`.
 
 Bioconda's annotation packages install separate, versioned Bioconductor data
 payloads through a package hook. `bioconductor-data-payloads.json` records their

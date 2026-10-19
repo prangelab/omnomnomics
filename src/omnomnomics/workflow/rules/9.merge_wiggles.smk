@@ -14,7 +14,7 @@ RNA_MINUS_TRACK_COLOR = "0,0,255"
 
 rule merge_wiggles:
     input:
-        extra_file=expand(f"{experiment_dir}/{master_config['input_folders'][master_config['mergewig_rule_num']-1]}/{{sample}}.extra_8.tmp", sample=samples2) if 8 in themode else [],
+        coverage=[path for sample in samples2 for path in coverage_track_outputs(sample)] if 8 in themode else [],
         input_relative=([chip_input_track_path(sample) for sample in samples2 if chip_control_sets.ids([sample])] if config['THETYPE'] == "CHIP" and chip_track_mode != "none" and 8 in themode and max_project_size_bytes <= 0 else [])
     output:
         f"{experiment_dir}/{master_config['output_folders'][master_config['mergewig_rule_num']-1]}/extra_9.tmp"

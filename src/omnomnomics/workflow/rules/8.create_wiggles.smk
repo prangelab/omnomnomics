@@ -19,6 +19,8 @@ rule create_wiggles:
     output:
         extra=f"{experiment_dir}/{master_config['output_folders'][master_config['wig_rule_num']-1]}/{{sample}}.extra_8.tmp",
         bw=f"{experiment_dir}/{master_config['output_folders'][master_config['wig_rule_num']-1]}/{{sample}}.bw" if config['THETYPE'] != "RNA" and max_project_size_bytes <= 0 else [],
+        plus=f"{experiment_dir}/{master_config['output_folders'][master_config['wig_rule_num']-1]}/{{sample}}.plus.bw" if config['THETYPE'] == "RNA" and max_project_size_bytes <= 0 else [],
+        minus=f"{experiment_dir}/{master_config['output_folders'][master_config['wig_rule_num']-1]}/{{sample}}.minus.bw" if config['THETYPE'] == "RNA" and max_project_size_bytes <= 0 else [],
     params:
         thetype=config['THETYPE'],
         inputfolder=f"{experiment_dir}/{master_config['input_folders'][master_config['wig_rule_num']-1]}",

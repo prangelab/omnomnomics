@@ -1422,6 +1422,14 @@ def check_and_include_rules(logfile, omnom_home, experiment_dir):
         log_it(logfile, "Workflow Snake rules Good!", "WORKLFLOW SNAKE RULES CHECK")
     return valid_smk_files
 
+def coverage_track_outputs(sample):
+    folder = f"{experiment_dir}/{master_config['output_folders'][master_config['wig_rule_num']-1]}"
+    if max_project_size_bytes > 0:
+        return [f"{folder}/{sample}.extra_8.tmp"]
+    suffixes = ("plus.bw", "minus.bw") if config['THETYPE'] == "RNA" else ("bw",)
+    return [f"{folder}/{sample}.{suffix}" for suffix in suffixes]
+
+
 valid_smk_files = check_and_include_rules(logfile, workflow_root, experiment_dir)
 # Include snake rules in the main Snakefile
 include: os.path.join(workflow_root, "chip_analysis.smk")
@@ -1493,13 +1501,11 @@ for rule_num in ([step for step in themode if step > 7] if library_runtime else 
             all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.filtered.bam.qc_summary.pdf", sample = samples2)
             all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.filtered.bam.qc_summary.svg", sample = samples2)
     if rule_num == 8:
-        all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.extra_8.tmp",  sample = samples2)
+        all_outputs.extend(path for sample in samples2 for path in coverage_track_outputs(sample))
         if config['THETYPE'] == "CHIP" and config.get('CHIP_INPUT_TRACKS', 'fold_enrichment') != 'none' and max_project_size_bytes <= 0:
             all_outputs.extend(chip_input_track_path(sample) for sample in samples2 if chip_control_sets.ids([sample]))
         elif config['THETYPE'] == "CHIP" and config.get('CHIP_INPUT_TRACKS', 'fold_enrichment') != 'none' and any(chip_control_sets.ids([sample]) for sample in samples2):
             log_once(logfile, "chip_tracks.size_cap", "Optional input-relative track generation omitted because a project-size cap is configured.", "SIZE GUARD")
-        if config['THETYPE'] != "RNA" and max_project_size_bytes <= 0:
-            all_outputs += expand(f"{experiment_dir}/{output_folder}/{{sample}}.bw", sample=samples2)
     if rule_num == 9:
         all_outputs.append( f"{experiment_dir}/{output_folder}/extra_9.tmp")
     if rule_num == 10:
