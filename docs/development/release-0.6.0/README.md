@@ -8,7 +8,8 @@ not a declaration that 0.6.0 has passed every acceptance check.
 - Established analysis source: `5bffbd83d5c3e979d7ec69edc8637663223c8cd1`.
 - Initial exact-lock commit: `3b84a7b3acccae9ed186c0aa587ded0566b9a722`.
 - Initial artifact-test source: `04f4c53a75856f430c053b7f1b2ff690165942bf`.
-- Accepted installation/artifact candidate: `96abebe9ff4bf978bbcf9ffb305fe37f4a340daa`.
+- Current accepted installation/artifact candidate: `e473f1cacf9ade8db74734ea6ba7ca5ed9d750e1`.
+- Previous accepted candidate: `96abebe9ff4bf978bbcf9ffb305fe37f4a340daa`.
 - Runtime work root: `/scratch-shared/kprange/omnomtest/release_060_20261016`.
 - Inventory job: `28136339`; constrained dependency-solve job: `28136688`.
   Both completed. Micromamba version: 2.3.3.
@@ -43,12 +44,12 @@ See the [upstream package record](https://bioconductor.org/packages/sva/).
 | Exact dependency solves | Initial job 28136688 and corrected constrained job 28143746 succeeded |
 | New prefixes and fresh package caches | Corrected main and Explorer passed exact inventories, R namespace loads and pip checks in array 28144176; unchanged IDR/SPP verified and executed |
 | Existing analysis environments retained | Creation uses separate scratch prefixes and cache roots; no updates to the established environments |
-| Installed wheel assets and CLI | Passed job 28153260, including byte-for-byte verification of 3,998 bundled workflow assets |
-| Source-distribution installation | Passed job 28153260 in a separate Python venv inheriting only the fresh main dependency environment |
-| R namespaces, helper wrappers and Explorer loading | Passed job 28153260; IDR 2.0.4.2, SPP 1.16.0, main R, Shiny discovery and lightweight Explorer verified |
-| Complete unittest and standalone regression runners | Passed job 28153260: 112 unittest cases, none skipped, and 49 standalone functions with zero failures |
-| Small real-tool workflow checks | Bioinformatics unittest tier passed within job 28153260 |
-| Three full written tutorial routes | All three full controllers and collectors completed on 96abebe; independent output audit passed for RNA, ChIP and ATAC. Retained-input resume checks remain pending |
+| Installed wheel assets and CLI | Passed job 28275721, including byte-for-byte verification of 3,998 bundled workflow assets |
+| Source-distribution installation | Passed job 28275721 in a separate Python venv inheriting only the fresh main dependency environment |
+| R namespaces, helper wrappers and Explorer loading | Passed job 28275721; IDR 2.0.4.2, SPP 1.16.0, main R, Shiny discovery and lightweight Explorer verified |
+| Complete unittest and standalone regression runners | Passed job 28275721: 114 unittest cases, none skipped, and 49 standalone functions with zero failures |
+| Small real-tool workflow checks | Bioinformatics unittest tier passed within job 28275721 |
+| Three full written tutorial routes | Fresh e473f1c controllers are running with verified steps and ChIP associations; output audit 28277242 follows all collectors. Previous 96abebe outputs remain archived |
 | Final release/tag/archive | Not created; depends on successful validation of the final source and locks |
 
 The installed-package smoke check runs outside the checkout, verifies that
@@ -233,3 +234,56 @@ Two real Snakemake regression cases cover RNA and ATAC, including an actual
 small RNA track rebuild. A new exact artifact candidate must pass the complete
 software gates and installed recovery checks before release. Dependencies and
 analysis algorithms are unchanged.
+
+
+## Current candidate software acceptance, 19 October
+
+Exact candidate `e473f1cacf9ade8db74734ea6ba7ca5ed9d750e1` passed artifact job
+28275721: installed wheel and sdist outside the checkout, byte verification of
+3,998 workflow assets per installation, CLI/R/helper/Explorer/pip checks,
+114 unittests without skips, 49 standalone regressions without failures and
+Shiny discovery. Both real coverage-recovery regressions also passed separately
+in job 28275719. No dependencies changed.
+
+Wheel SHA-256:
+`ba69be5b0374efa36be513fc9dd078d0cefcab360d6e9ad6522d4137b84279c6`.
+Source-distribution SHA-256:
+`1c3c28aa43f6b1304821b711e809033f788768ad6efcead9a1029d743517f0f7`.
+Both artifacts and compact reports are archived locally at
+`MANUSCRIPT/release_validation/20261016/attempt_e473f1c/`; copied artifacts were
+independently checked against the SHA-256 receipts. Earlier accepted artifacts
+and failures remain separate.
+
+| Fresh tutorial | Launcher | Controller | Collector | Confirmed public steps |
+|---|---|---|---|---|
+| RNA | 28275724 | 28276659 | 28276660 | 1–12 |
+| Matched-input ChIP | 28275725 | 28276662 | 28276663 | 1–15; 8 libraries, 8 associations |
+| ATAC | 28275726 | 28276661 | 28276664 | 1–15 |
+
+All three controllers are running; launch checks and DAGs were inspected.
+Output audit 28277242 waits for all three resource collectors. Actual selective
+recovery is scheduled after audit acceptance, with explicit entry ranges,
+unchanged count/track SHA-256 checks and zero new analysis workers required.
+Neither these pending runs nor recovery duration is accepted as final full-run
+performance. Original 96abebe measurements above remain identified as historical
+candidate evidence. Final release/tag/publication remains open.
+
+
+## Selective retention defect found by actual recovery
+
+All three e473f1c full tutorials and independent output audit 28277242 passed.
+Actual recovery controllers 28280729/28280736/28280741 completed with no analysis
+workers and unchanged raw count tables. Verification 28280742 nevertheless
+failed: pruned retention deleted existing ChIP/ATAC BigWigs and track hubs when
+steps 8–9 were absent from the selective range. Source FASTQs remain intact.
+The original accepted full-run evidence is archived separately before recovery.
+This is a real retention defect; final acceptance remains open.
+
+The correction preserves existing reusable analysis branches under `pruned`,
+independent of the current selection: filtered BAMs, BigWigs, track hubs, peak
+and DE outputs, and HOMER tag directories. Heavy early intermediates remain
+eligible for cleanup. `minimal` retains its explicit requested-terminal-output
+behavior and source protection. Two regressions verify preserved branches with
+pruned intermediate cleanup and unchanged minimal behavior. Exact-candidate
+software and full tutorial/recovery gates will be rerun without dependency
+changes. The failed recovery evidence is retained and no check is suppressed.

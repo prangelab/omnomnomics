@@ -113,6 +113,35 @@ class SourceProtectionTests(unittest.TestCase):
                     finally:
                         self.root = original_root
 
+    def test_pruned_selective_resume_preserves_existing_analysis_branches(self):
+        source = self.put("FASTQ/a.fastq.gz")
+        durable = [self.put(f"{self.config['output_folders'][self.config[key] - 1]}/a.result")
+                   for key in ("touchup_rule_num", "wig_rule_num", "mergewig_rule_num",
+                               "callpeaks_rule_num", "countreads_rule_num", "homer_tagdir_rule_num")]
+        trimmed = self.put("trimmed_FASTQ/a.trimmed.fastq.gz")
+        intermediate = self.put("BAM/a.bam")
+        _, protected = self.capture()
+        ns = self.cleanup_namespace(protected)
+        ns["apply_retention_policy"]("test.log", "pruned", [15, 16], "CHIP")
+        self.assertTrue(source.is_file())
+        for path in durable:
+            self.assertEqual(path.read_bytes(), b"original input\n")
+        self.assertFalse(trimmed.exists())
+        self.assertFalse(intermediate.exists())
+
+    def test_minimal_selective_resume_still_prunes_unrequested_branches(self):
+        source = self.put("FASTQ/a.fastq.gz")
+        tracks = self.put("BigWigs/a.bw")
+        hubs = self.put("merged_hubs/a.hub.txt")
+        results = self.put("DE_calling/a.result")
+        _, protected = self.capture()
+        ns = self.cleanup_namespace(protected)
+        ns["apply_retention_policy"]("test.log", "minimal", [15, 16], "CHIP")
+        self.assertTrue(source.is_file())
+        self.assertTrue(results.is_file())
+        self.assertFalse(tracks.exists())
+        self.assertFalse(hubs.exists())
+
     def test_bam_indexes_and_lane_named_sources_are_protected(self):
         source = self.put("BAM/a_L001.bam")
         _, protected = self.capture()

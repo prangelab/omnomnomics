@@ -930,10 +930,12 @@ def retention_keep_dirs(retention_policy, themode, thetype):
 
     keep_dirs.update(terminal_output_dirs(themode, thetype))
 
-    if retention_policy == "pruned" and any(step in themode for step in (5, 6, 7, 8, 9, 10, 11, 12, 13)):
-        keep_dirs.add(master_config['output_folders'][master_config['touchup_rule_num'] - 1])
-    if retention_policy == "pruned" and any(step in themode for step in (8, 9)):
-        keep_dirs.add(master_config['output_folders'][master_config['wig_rule_num'] - 1])
+    if retention_policy == "pruned":
+        for rule_key in (
+            "touchup_rule_num", "wig_rule_num", "mergewig_rule_num",
+            "callpeaks_rule_num", "countreads_rule_num", "homer_tagdir_rule_num",
+        ):
+            keep_dirs.add(master_config['output_folders'][master_config[rule_key] - 1])
 
     if os.path.isdir(os.path.join(experiment_dir, "MultiQC")):
         keep_dirs.add("MultiQC")
