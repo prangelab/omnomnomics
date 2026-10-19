@@ -37,9 +37,11 @@ The packaged `color_data_for_hubs` directory is intended as a read-only source o
 
 ## Installation
 
-For repeatable Linux x86-64 installations, the 0.6.0 candidate now provides
+For repeatable Linux x86-64 installations, the 0.6.0 release provides
 complete environment locks and scripts that verify the installed packages.
-These locks are undergoing release validation. See the
+Clean installation, full tutorial routes and selective recovery passed on the
+source published as [v0.6.0](https://github.com/prangelab/omnomnomics/releases/tag/v0.6.0).
+See the
 [locked installation instructions](docs/getting-started/installation.md#locked-linux-environments)
 and [lock provenance](locks/README.md). The ordinary YAML route below resolves
 dependencies again and is intended for development rather than exact release

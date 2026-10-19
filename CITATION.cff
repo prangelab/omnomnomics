@@ -3,11 +3,12 @@ message: "If you use omnomnomics, please cite the archived software release and 
 title: "omnomnomics"
 type: software
 version: 0.6.0
+date-released: 2026-10-19
 authors:
   - family-names: Prange
     given-names: Koen H.
 repository-code: "https://github.com/prangelab/omnomnomics"
-url: "https://github.com/prangelab/omnomnomics"
+url: "https://github.com/prangelab/omnomnomics/releases/tag/v0.6.0"
 license: MIT
 keywords:
   - RNA-seq

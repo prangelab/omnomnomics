@@ -2,10 +2,20 @@
 
 ## Locked Linux environments
 
-The 0.6.0 candidate includes complete Linux x86-64 environment locks. These
-locks are undergoing clean-install and release validation; see
-[lock status and provenance](https://github.com/prangelab/omnomnomics/blob/input_dev/locks/README.md).
-Use a reviewed release checkout or immutable commit for installation.
+The [0.6.0 release](https://github.com/prangelab/omnomnomics/releases/tag/v0.6.0)
+includes complete Linux x86-64 environment locks. Clean installation, full
+tutorial routes and actual selective recovery passed on the published source;
+see [validation results](../development/release-0.6.0/README.md).
+Use the release checkout for its matching locks and helper scripts:
+
+```bash
+git checkout v0.6.0
+git rev-parse HEAD
+# Expected: 54eeba92fa4b2417b451307783d4492fc36f4c01
+```
+
+Review [lock provenance](https://github.com/prangelab/omnomnomics/blob/v0.6.0/locks/linux-64/package_provenance.tsv)
+and the separately recorded annotation payloads before installation.
 
 After cloning the repository, choose a new environment root on storage
 appropriate for software installations, then create the isolated components:
@@ -93,7 +103,7 @@ omnomnomics-de-app --project-dir /path/to/project_or_DE_calling
 ```
 
 Use `environment.explorer.yml` from the same release that produced the results.
-The candidate Linux Explorer lock can instead be created with
+The Linux Explorer release lock can instead be created with
 `bash scripts/create_locked_environment.sh explorer /absolute/path/to/new/explorer`.
 Activate that prefix and install the application code as shown above. Explorer
 installation and application startup are checked separately from the pipeline.
