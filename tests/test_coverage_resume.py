@@ -9,6 +9,14 @@ class CoverageResumeTests(fixtures.LibraryFixture):
 
     def prepare(self, assay):
         bam = self.bam('a.sorted.dups_marked.filtered.bam', folder='filtered_BAM')
+        if assay == 'rna':
+            replacement = bam.with_suffix('.stranded.bam')
+            with pysam.AlignmentFile(str(bam)) as source:
+                with pysam.AlignmentFile(str(replacement), 'wb', header=source.header) as dest:
+                    for index, read in enumerate(source):
+                        read.flag = 16 if index % 2 else 0
+                        dest.write(read)
+            replacement.replace(bam)
         pysam.index(str(bam))
         config = self.cli_config([fixtures.row('a', 'chip')], '8-9', assay=assay)
         tracks = self.project / 'BigWigs'
