@@ -137,7 +137,7 @@ The new workflow include is declared in package data.
 
 ## Read-level scientific pilot
 
-The reproducible [pilot script](../../scripts/validation/chip_input_analysis_pilot.py)
+The reproducible [pilot script](https://github.com/prangelab/omnomnomics/blob/v0.6.0/scripts/validation/chip_input_analysis_pilot.py)
 uses the implementation's BEDPE conversion, joint q=0.1 discovery and raw
 featureCounts counting. Each case has 80 seeded sites, 3 WT + 3 KO libraries
 and uniform shared input. Region abundance is rounded gamma noise with simple
