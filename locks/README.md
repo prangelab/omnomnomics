@@ -1,8 +1,12 @@
 # Release environment locks
 
-The `linux-64/` files are **release candidates under validation**, not an
-approved 0.6.0 release. They target Linux x86-64. They do not establish support
-for macOS, Windows, or other processor architectures.
+The `linux-64/` locks passed clean reconstruction and complete candidate
+validation on `54eeba92fa4b2417b451307783d4492fc36f4c01`, including installed
+artifacts, full tutorials and actual selective recovery. The published
+[v0.6.0 release](https://github.com/prangelab/omnomnomics/releases/tag/v0.6.0)
+identifies that exact source; all five downloaded release assets matched their
+prepared checksums on 19 October 2026. These locks target Linux x86-64;
+they do not establish macOS, Windows or other architecture support.
 
 Four environments are kept separate: `omnomnomics` (main pipeline),
 `omnomnomics-idr`, `omnomnomics-spp`, and `omnomnomics-explorer`. The ordinary

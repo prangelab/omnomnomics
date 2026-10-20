@@ -1,6 +1,3 @@
-<p align="center">
-	<img src="https://github.com/prangelab/omnomnomics/assets/157825254/f8f83873-7c53-495e-9c54-33eece99a8db" width="700" alt="DALL·E 2024-06-23 12 04 41 - A futuristic character resembling the Cookie Monster, eating a double-stranded DNA helix  The background is high-tech, with neon lights and circuit pa">
-</p>
 <div align="center">
 
 # <center>***OMNOMNOMICS***</center>
@@ -37,30 +34,53 @@ The packaged `color_data_for_hubs` directory is intended as a read-only source o
 
 ## Installation
 
-For repeatable Linux x86-64 installations, the 0.6.0 candidate now provides
-complete environment locks and scripts that verify the installed packages.
-These locks are undergoing release validation. See the
-[locked installation instructions](docs/getting-started/installation.md#locked-linux-environments)
-and [lock provenance](locks/README.md). The ordinary YAML route below resolves
-dependencies again and is intended for development rather than exact release
-reconstruction.
+### Stable release (recommended)
 
-Clone the repository:
+For reproducible analyses, install a specific stable release with its matching
+environment locks. The 0.6.0 release provides complete Linux x86-64 locks and
+scripts that verify the installed packages.
+Clean installation, full tutorial routes and selective recovery passed on the
+source published as [v0.6.0](https://github.com/prangelab/omnomnomics/releases/tag/v0.6.0).
+
+Clone the release tag:
 
 ```bash
-git clone https://github.com/prangelab/omnomnomics.git path/to/install/omnomnomics
+git clone --branch v0.6.0 https://github.com/prangelab/omnomnomics.git path/to/install/omnomnomics
 cd path/to/install/omnomnomics
+git rev-parse HEAD
+# Expected: 54eeba92fa4b2417b451307783d4492fc36f4c01
 ```
 
-Create the main `omnomnomics` environment and install the package:
+Then follow the
+[locked installation instructions](docs/getting-started/installation.md#locked-linux-environments)
+to create fresh environments and install the package from this checkout.
+Review the release's [lock provenance](https://github.com/prangelab/omnomnomics/blob/v0.6.0/locks/README.md)
+before installation. The full pipeline requires Slurm, site configuration and
+separately installed reference data.
+
+The GitHub **Latest** label identifies a release, not the current contents of
+`main`. Record the exact release tag, commit and environment locks for an
+analysis. Later commits on `main` do not change the published `v0.6.0` source
+or release assets.
+
+### Development version
+
+Use `main` when developing or testing changes since the release. Its contents
+may include changes that have not passed full release validation. This route
+resolves the YAML specification again and does not reproduce the locked release
+environment:
 
 ```bash
+git clone --branch main https://github.com/prangelab/omnomnomics.git path/to/install/omnomnomics-dev
+cd path/to/install/omnomnomics-dev
 micromamba env create -f environment.yml
 micromamba activate omnomnomics
-pip install -e .
+python -m pip install -e .
 ```
 
 The main environment includes Shiny for the Differential Explorer and the MEME Suite tools used by post-DE peak motif analysis. IDR and SPP use small companion environments because their dependency stacks conflict with the main Python/R analysis environment.
+The locked release instructions create and link these companion environments
+explicitly. The named-environment helpers below support the development setup.
 
 ### Lightweight Differential Explorer Environment
 

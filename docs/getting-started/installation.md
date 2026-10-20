@@ -1,11 +1,33 @@
 # Installation
 
+For reproducible analyses, use a specific stable release and its matching Linux
+environment locks. Use `main` for development and testing changes since the
+release. GitHub's **Latest** label points to a release; it does not select the
+latest commit on `main`. Record the exact version, commit and environment locks
+with each analysis. Published release tags and assets are kept unchanged when
+development continues.
+
 ## Locked Linux environments
 
-The 0.6.0 candidate includes complete Linux x86-64 environment locks. These
-locks are undergoing clean-install and release validation; see
-[lock status and provenance](https://github.com/prangelab/omnomnomics/blob/input_dev/locks/README.md).
-Use a reviewed release checkout or immutable commit for installation.
+This is the recommended installation route for the stable release.
+The [0.6.0 release](https://github.com/prangelab/omnomnomics/releases/tag/v0.6.0)
+includes complete Linux x86-64 environment locks. Clean installation, full
+tutorial routes and actual selective recovery passed on the published source;
+see [validation results](../development/release-0.6.0/README.md).
+Clone the release tag to obtain its matching locks and helper scripts:
+
+```bash
+git clone --branch v0.6.0 https://github.com/prangelab/omnomnomics.git
+cd omnomnomics
+git rev-parse HEAD
+# Expected: 54eeba92fa4b2417b451307783d4492fc36f4c01
+```
+
+In an existing checkout, save any local changes before using
+`git fetch origin tag v0.6.0` and `git checkout v0.6.0` instead.
+
+Review [lock provenance](https://github.com/prangelab/omnomnomics/blob/v0.6.0/locks/linux-64/package_provenance.tsv)
+and the separately recorded annotation payloads before installation.
 
 After cloning the repository, choose a new environment root on storage
 appropriate for software installations, then create the isolated components:
@@ -41,13 +63,15 @@ development installation outside the managed environment, select
 `python -m pip install '.[pipeline]'`; this does not supply the external HPC
 tools or replace the supported Conda environment.
 
-## Main environment
+## Development version
 
-Clone the repository, create the managed environment, and install the package:
+The `main` branch can contain changes that have not passed full release
+validation. Clone it explicitly, create the development environment, and install
+the package in editable mode:
 
 ```bash
-git clone https://github.com/prangelab/omnomnomics.git
-cd omnomnomics
+git clone --branch main https://github.com/prangelab/omnomnomics.git omnomnomics-dev
+cd omnomnomics-dev
 micromamba env create -f environment.yml
 micromamba activate omnomnomics
 python -m pip install -e .
@@ -93,7 +117,7 @@ omnomnomics-de-app --project-dir /path/to/project_or_DE_calling
 ```
 
 Use `environment.explorer.yml` from the same release that produced the results.
-The candidate Linux Explorer lock can instead be created with
+The Linux Explorer release lock can instead be created with
 `bash scripts/create_locked_environment.sh explorer /absolute/path/to/new/explorer`.
 Activate that prefix and install the application code as shown above. Explorer
 installation and application startup are checked separately from the pipeline.

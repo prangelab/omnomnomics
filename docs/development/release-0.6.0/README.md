@@ -1,14 +1,19 @@
 # 0.6.0 release validation
 
-Started 16 October 2026 on `input_dev`. This is release-candidate validation,
-not a declaration that 0.6.0 has passed every acceptance check.
+Started 16 October and completed 19 October 2026 on `input_dev`. All planned
+software, reference, full tutorial and actual recovery checks passed on exact
+`54eeba92fa4b2417b451307783d4492fc36f4c01`. The author published
+[v0.6.0](https://github.com/prangelab/omnomnomics/releases/tag/v0.6.0) on
+19 October. Tag identity and all five downloaded release assets were verified
+against the accepted source and prepared checksums. Earlier attempts below
+retain their dated context.
 
 ## Candidate and environment provenance
 
 - Established analysis source: `5bffbd83d5c3e979d7ec69edc8637663223c8cd1`.
 - Initial exact-lock commit: `3b84a7b3acccae9ed186c0aa587ded0566b9a722`.
 - Initial artifact-test source: `04f4c53a75856f430c053b7f1b2ff690165942bf`.
-- Current accepted installation/artifact candidate: `e473f1cacf9ade8db74734ea6ba7ca5ed9d750e1`.
+- Current accepted installation/artifact candidate: `54eeba92fa4b2417b451307783d4492fc36f4c01`.
 - Previous accepted candidate: `96abebe9ff4bf978bbcf9ffb305fe37f4a340daa`.
 - Runtime work root: `/scratch-shared/kprange/omnomtest/release_060_20261016`.
 - Inventory job: `28136339`; constrained dependency-solve job: `28136688`.
@@ -44,13 +49,13 @@ See the [upstream package record](https://bioconductor.org/packages/sva/).
 | Exact dependency solves | Initial job 28136688 and corrected constrained job 28143746 succeeded |
 | New prefixes and fresh package caches | Corrected main and Explorer passed exact inventories, R namespace loads and pip checks in array 28144176; unchanged IDR/SPP verified and executed |
 | Existing analysis environments retained | Creation uses separate scratch prefixes and cache roots; no updates to the established environments |
-| Installed wheel assets and CLI | Passed job 28275721, including byte-for-byte verification of 3,998 bundled workflow assets |
-| Source-distribution installation | Passed job 28275721 in a separate Python venv inheriting only the fresh main dependency environment |
-| R namespaces, helper wrappers and Explorer loading | Passed job 28275721; IDR 2.0.4.2, SPP 1.16.0, main R, Shiny discovery and lightweight Explorer verified |
-| Complete unittest and standalone regression runners | Passed job 28275721: 114 unittest cases, none skipped, and 49 standalone functions with zero failures |
-| Small real-tool workflow checks | Bioinformatics unittest tier passed within job 28275721 |
-| Three full written tutorial routes | Fresh e473f1c controllers are running with verified steps and ChIP associations; output audit 28277242 follows all collectors. Previous 96abebe outputs remain archived |
-| Final release/tag/archive | Not created; depends on successful validation of the final source and locks |
+| Installed wheel assets and CLI | Passed job 28280899, including byte-for-byte verification of 3,998 bundled workflow assets |
+| Source-distribution installation | Passed job 28280899 in a separate Python venv inheriting only the fresh main dependency environment |
+| R namespaces, helper wrappers and Explorer loading | Passed job 28280899; IDR 2.0.4.2, SPP 1.16.0, main R, Shiny discovery and lightweight Explorer verified |
+| Complete unittest and standalone regression runners | Passed job 28280899: 116 unittest cases, none skipped, and 49 standalone functions with zero failures |
+| Small real-tool workflow checks | Bioinformatics unittest tier passed within job 28280899 |
+| Three full written tutorial routes | Passed all three complete runs and output audit 28282108; actual selective recovery and unchanged count/track hashes passed28288688 |
+| Public release/tag/assets | v0.6.0 published 19 October; exact tested tag commit and all five asset hashes verified; separate Zenodo archive/DOI remains open |
 
 The installed-package smoke check runs outside the checkout, verifies that
 Python imports resolve into the new prefix, compares every bundled workflow
@@ -236,7 +241,7 @@ software gates and installed recovery checks before release. Dependencies and
 analysis algorithms are unchanged.
 
 
-## Current candidate software acceptance, 19 October
+## Earlier e473f1c software acceptance, 19 October
 
 Exact candidate `e473f1cacf9ade8db74734ea6ba7ca5ed9d750e1` passed artifact job
 28275721: installed wheel and sdist outside the checkout, byte verification of
@@ -287,3 +292,67 @@ behavior and source protection. Two regressions verify preserved branches with
 pruned intermediate cleanup and unchanged minimal behavior. Exact-candidate
 software and full tutorial/recovery gates will be rerun without dependency
 changes. The failed recovery evidence is retained and no check is suppressed.
+
+
+## Retention-fix software acceptance, 19 October
+
+Exact candidate `54eeba92fa4b2417b451307783d4492fc36f4c01` passed artifact job
+28280899: 116 unittests without skips, 49 standalone regressions without
+failures, wheel/sdist installations outside the checkout, byte verification of
+3,998 workflow assets per installation, CLI/R/helpers/Explorer/pip checks and
+Shiny discovery. All 19 targeted source-protection/retention cases passed in
+28280839. Dependencies and their verified prefixes are unchanged.
+
+Wheel SHA-256:
+`ba5db4c8bb811b2fd100a3da93805dcdd91867d584d9cfd3e6435018f252d837`.
+Source-distribution SHA-256:
+`c1e1862e8d0484783474910f8cf1c77b7e0e5f89e160cd296c363c45f636e280`.
+Copied artifacts and reports under
+`MANUSCRIPT/release_validation/20261016/attempt_54eeba9/` were independently
+verified against their SHA-256 receipts.
+
+| Fresh tutorial | Launcher | Controller | Collector | Confirmed public steps |
+|---|---|---|---|---|
+| RNA | 28280910 | 28281924 | 28281925 | 1–12 |
+| Matched-input ChIP | 28280913 | 28281927 | 28281928 | 1–15; 8 libraries, 8 associations |
+| ATAC | 28280914 | 28281926 | 28281930 | 1–15 |
+
+All three full controllers and collectors completed. Output audit 28282108
+passed every route. Actual recovery controllers 28288656/28288658/28288687 and
+verification 28288688 passed: zero analysis workers, three unchanged raw count
+tables, all 20 unchanged ordinary/input-relative tracks, all 24 source FASTQs and
+existing track hubs retained. Earlier failed evidence and checks remain intact.
+
+| Accepted full tutorial | Controller duration | Significant features |
+|---|---|---|
+| RNA | 00:42:35 | 3,013 |
+| Matched-input ChIP | 01:27:25 | 18,053 |
+| ATAC | 02:14:43 | 2,847 |
+
+These are complete-controller tutorial measurements, distinct from recovery
+and historical SoftwareX performance. Resource reports preserve allocation,
+billing, CPU and memory separately. Compact final evidence is archived locally
+in tutorial_acceptance_54eeba9 and tutorial_recovery_54eeba9, with the complete
+acceptance record at MANUSCRIPT/release_validation/20261016/FINAL_ACCEPTANCE.md.
+Validation completed before publication. The author subsequently published
+v0.6.0; the identity verification is recorded below.
+
+## Published release verification, 19 October
+
+The public [v0.6.0 release](https://github.com/prangelab/omnomnomics/releases/tag/v0.6.0)
+was published at `2026-10-19T15:32:59Z`. Its tag points directly to
+`54eeba92fa4b2417b451307783d4492fc36f4c01`, the exact source accepted above.
+The tag is lightweight and has no cryptographic tag signature; this check
+establishes source and artifact identity, not signed publisher attestation.
+
+All five uploaded assets were downloaded independently. Their sizes and
+SHA-256 values match the prepared upload manifest and GitHub's asset digests:
+the tested wheel and source distribution, exact Linux lock bundle, compact
+validation JSON and SHA256SUMS. The source and artifacts were not rebuilt or
+changed after validation, so no additional analysis run was needed.
+
+The GitHub release is public, with `draft=false` and `prerelease=false`.
+GitHub reports `immutable=false`; the pinned source commit and archived asset
+hashes provide the identity record. A separate Zenodo version DOI is not yet
+recorded. Local publication receipts are under
+`MANUSCRIPT/release_validation/20261016/published_v0.6.0/`.

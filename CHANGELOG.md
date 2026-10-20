@@ -2,9 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
-## 0.6.0 - 2026-08-31
+## 0.6.0 - 2026-10-19
+
+Published as [v0.6.0](https://github.com/prangelab/omnomnomics/releases/tag/v0.6.0)
+from validated commit `54eeba92fa4b2417b451307783d4492fc36f4c01`.
 
 ### Added
+- Metadata-matched ChIP input libraries, input-aware region discovery, descriptive regional enrichment and separate input-relative tracks with provenance; DE retains raw ChIP counts.
+- Exact Linux x86-64 main, IDR, SPP and Explorer environment locks with archive checksums, dependency provenance and clean runtime verification.
 - Complete assay-aware ATAC-seq and ChIP-seq branches with pre-DE, differential, and post-DE analysis stages.
 - ChIP-seq narrow, domain, gene-body, and diffuse modes with feature definitions matched to distinct signal geometries.
 - Replicate-aware IDR consensus for narrow ATAC/ChIP analysis, including ENCODE-style pseudoreplicate diagnostics and configurable replicate pairing.
@@ -35,6 +40,10 @@ All notable changes to this project are documented in this file.
 - Chromatin partial reruns enter peak QC and pre-DE analysis through durable peak and annotation BED files instead of disposable completion markers.
 
 ### Fixed
+- Selective recovery reuses durable coverage targets, including both RNA strands, and pruned retention preserves reusable analysis outputs independently of the selected steps.
+- External BED and blacklist chromosome aliases are mapped to reference-native contigs without globally changing chromosome naming conventions.
+- Genome installation derives gene spans from gene-tagged transcript/exon annotations when explicit gene records are absent.
+- Lock serialization preserves dependency link order for annotation hooks, and clean creation verifies R namespaces and Python dependency consistency.
 - Ensembl-style chromosome names are supported in gene-body and diffuse ChIP feature construction.
 - Gene spans and promoters can be reconstructed from transcript or exon records when annotations lack explicit `gene` features.
 - Chromatin partial reruns preserve valid upstream outputs and schedule missing signal-track dependencies through Snakemake.
