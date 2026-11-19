@@ -37,30 +37,30 @@ The packaged `color_data_for_hubs` directory is intended as a read-only source o
 ### Stable release (recommended)
 
 For reproducible analyses, install a specific stable release with its matching
-environment locks. The 0.6.0 release provides complete Linux x86-64 locks and
-scripts that verify the installed packages.
-Clean installation, full tutorial routes and selective recovery passed on the
-source published as [v0.6.0](https://github.com/prangelab/omnomnomics/releases/tag/v0.6.0).
+environment locks. The [0.6.1 release](https://github.com/prangelab/omnomnomics/releases/tag/0.6.1)
+provides complete Linux x86-64 locks and scripts that verify the installed
+packages. Installed artifacts and regressions passed; see the
+[validation scope](docs/development/release-0.6.1/README.md).
 
 Clone the release tag:
 
 ```bash
-git clone --branch v0.6.0 https://github.com/prangelab/omnomnomics.git path/to/install/omnomnomics
+git clone --branch 0.6.1 https://github.com/prangelab/omnomnomics.git path/to/install/omnomnomics
 cd path/to/install/omnomnomics
 git rev-parse HEAD
-# Expected: 54eeba92fa4b2417b451307783d4492fc36f4c01
+# Expected: 61d47d66b828837747c7e445563db8a54da4b5f9
 ```
 
 Then follow the
 [locked installation instructions](docs/getting-started/installation.md#locked-linux-environments)
 to create fresh environments and install the package from this checkout.
-Review the release's [lock provenance](https://github.com/prangelab/omnomnomics/blob/v0.6.0/locks/README.md)
+Review the release's [lock provenance](https://github.com/prangelab/omnomnomics/blob/0.6.1/locks/README.md)
 before installation. The full pipeline requires Slurm, site configuration and
 separately installed reference data.
 
 The GitHub **Latest** label identifies a release, not the current contents of
 `main`. Record the exact release tag, commit and environment locks for an
-analysis. Later commits on `main` do not change the published `v0.6.0` source
+analysis. Later commits on `main` do not change the published `0.6.1` source
 or release assets.
 
 ### Development version

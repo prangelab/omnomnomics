@@ -2,7 +2,9 @@
 
 All notable changes to this project are documented in this file.
 
-## 0.6.1 - Unreleased
+## 0.6.1 - 2026-11-19
+
+Published as [0.6.1](https://github.com/prangelab/omnomnomics/releases/tag/0.6.1).
 
 ### Fixed
 - Forced chromatin DE reruns also execute the selected post-DE analysis when previous outputs already exist. Ordinary selective reuse remains unchanged.

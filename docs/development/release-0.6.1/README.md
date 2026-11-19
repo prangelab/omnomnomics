@@ -1,8 +1,13 @@
-# 0.6.1 release preparation
+# 0.6.1 release validation
 
 This patch release contains the forced chromatin DE/post-DE dependency repair
 and the Differential Explorer interface, palette and enrichment-plot updates.
-Publication is manual. Do not move the v0.6.0 tag or replace its assets.
+Published manually on 19 November 2026 as
+[0.6.1](https://github.com/prangelab/omnomnomics/releases/tag/0.6.1), pointing
+to `61d47d66b828837747c7e445563db8a54da4b5f9`. The published tag has no `v`
+prefix. Its software and version metadata match tested commit
+`b7f783b3fe0c41bdeb2cc4f2baef5765a79d061c`; the later commit changes only
+release instructions. Published tags and assets remain unchanged.
 
 ## Validation scope
 
@@ -13,9 +18,10 @@ Publication is manual. Do not move the v0.6.0 tag or replace its assets.
 - Explorer layout, filtering, palette controls, larger PCA points, separate
   ORA/GSEA panels and six-page enrichment PDF export were tested locally.
   The optional coloRspacer 0.1.0 integration and base R fallback both passed.
-- Final versioned wheel/sdist installation and full regression acceptance
-  are recorded in the accompanying `omnomnomics-0.6.1-validation.json` asset.
-  Read that record for the exact tested commit, checks and artifact hashes.
+- Final wheel/sdist and standalone Explorer installations passed, with 4,002
+  byte-verified workflow assets per installation. All 122 unittests passed
+  without skips and all 49 standalone regressions passed. The accompanying
+  `omnomnomics-0.6.1-validation.json` records exact identities and scope.
 - The full clean protocol run against the published 0.6.1 assets, including
   Data S1, fresh environments/references, all assay routes, recovery and J14,
   is a separate planned check after publication. Earlier repaired or v0.6.0
@@ -29,20 +35,12 @@ No new mandatory dependency is introduced. coloRspacer is optional; custom
 gradients also work with base R. Existing environments are preserved during
 artifact testing by installing the project into separate validation venvs.
 
-## Manual publication
+## Publication record
 
-1. Publish from the prepared `main` after its checks pass. Do not tag an older
-   main commit. Release preparation is pushed directly to `main`; no pull
-   request is required. The validation asset identifies the tested code and
-   any later documentation-only commit without changing artifact identity.
-2. Create a GitHub release named **Omnomnomics 0.6.1**, with new tag `v0.6.1`
-   targeting the merged `main`. Do not publish it as a prerelease.
-3. Use `RELEASE_NOTES.md` from this directory as the release description.
-4. Attach the prepared wheel, source distribution, Linux lock bundle,
-   validation JSON and `SHA256SUMS`. GitHub supplies its own source archives;
-   these do not replace the tested wheel and source distribution.
-5. Publish manually. Verify the resulting tag and downloaded asset hashes
-   before updating stable-installation instructions or the protocol.
+The author published the release and edited its public notes to retain only
+user-facing changes. `RELEASE_NOTES.md` mirrors that published description.
+Development and validation details remain in this record.
 
-The citation metadata carries the prepared version. Add the actual publication
-date after release; no publication date is asserted during preparation.
+Five uploaded assets contain the wheel, source distribution, Linux lock bundle,
+validation JSON and `SHA256SUMS`. The tag and asset identities are checked
+separately from the planned complete clean protocol run.

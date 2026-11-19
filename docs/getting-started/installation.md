@@ -10,23 +10,23 @@ development continues.
 ## Locked Linux environments
 
 This is the recommended installation route for the stable release.
-The [0.6.0 release](https://github.com/prangelab/omnomnomics/releases/tag/v0.6.0)
-includes complete Linux x86-64 environment locks. Clean installation, full
-tutorial routes and actual selective recovery passed on the published source;
-see [validation results](../development/release-0.6.0/README.md).
+The [0.6.1 release](https://github.com/prangelab/omnomnomics/releases/tag/0.6.1)
+includes complete Linux x86-64 environment locks. Installed artifacts and
+regressions passed; see the
+[validation scope](../development/release-0.6.1/README.md).
 Clone the release tag to obtain its matching locks and helper scripts:
 
 ```bash
-git clone --branch v0.6.0 https://github.com/prangelab/omnomnomics.git
+git clone --branch 0.6.1 https://github.com/prangelab/omnomnomics.git
 cd omnomnomics
 git rev-parse HEAD
-# Expected: 54eeba92fa4b2417b451307783d4492fc36f4c01
+# Expected: 61d47d66b828837747c7e445563db8a54da4b5f9
 ```
 
 In an existing checkout, save any local changes before using
-`git fetch origin tag v0.6.0` and `git checkout v0.6.0` instead.
+`git fetch origin tag 0.6.1` and `git checkout 0.6.1` instead.
 
-Review [lock provenance](https://github.com/prangelab/omnomnomics/blob/v0.6.0/locks/linux-64/package_provenance.tsv)
+Review [lock provenance](https://github.com/prangelab/omnomnomics/blob/0.6.1/locks/linux-64/package_provenance.tsv)
 and the separately recorded annotation payloads before installation.
 
 After cloning the repository, choose a new environment root on storage
