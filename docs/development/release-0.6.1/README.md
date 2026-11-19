@@ -31,9 +31,10 @@ artifact testing by installing the project into separate validation venvs.
 
 ## Manual publication
 
-1. Merge the release PR into `main` after its checks pass. Do not tag an older
-   main commit. The validation asset records the tested source commit; a merge
-   must preserve its code, lockfiles and version metadata.
+1. Publish from the prepared `main` after its checks pass. Do not tag an older
+   main commit. Release preparation is pushed directly to `main`; no pull
+   request is required. The validation asset identifies the tested code and
+   any later documentation-only commit without changing artifact identity.
 2. Create a GitHub release named **Omnomnomics 0.6.1**, with new tag `v0.6.1`
    targeting the merged `main`. Do not publish it as a prerelease.
 3. Use `RELEASE_NOTES.md` from this directory as the release description.
