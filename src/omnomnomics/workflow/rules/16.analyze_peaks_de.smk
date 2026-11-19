@@ -24,14 +24,13 @@ from omnomnomics.peak_annotation import promoter_intervals_by_gene
 def analyze_peaks_de_input(_wildcards):
     input_files = []
     if config["THETYPE"] in {"ATAC", "CHIP"}:
-        input_files.append(
-            ancient(
-                f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num'] - 1]}/{os.path.basename(config['EXPERIMENT_DIR'])}.chrom.results.zip"
-            )
-        )
-        input_files.append(
-            ancient(f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num'] - 1]}/peak_metadata.tsv")
-        )
+        rerun_de = config.get("RERUN_SELECTED_STEPS", False) and master_config["dechrom_rule_num"] in config["THEMODE"]
+        # Snakemake 7 skips downstream forced rules when all connecting inputs are ancient.
+        for path in (
+            f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num'] - 1]}/{os.path.basename(config['EXPERIMENT_DIR'])}.chrom.results.zip",
+            f"{experiment_dir}/{master_config['output_folders'][master_config['dechrom_rule_num'] - 1]}/peak_metadata.tsv",
+        ):
+            input_files.append(path if rerun_de else ancient(path))
         bam_inputfolder = master_config["output_folders"][master_config["touchup_rule_num"] - 1]
         bam_suffix = ".sorted.dups_marked.filtered.bam" if config["THETYPE"] == "ATAC" else ".filtered.bam"
         input_files.extend(
