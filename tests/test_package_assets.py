@@ -12,6 +12,9 @@ class PackageAssetTests(unittest.TestCase):
             "workflow/templates/de_core.R.tmpl",
             "workflow/R/shiny_app/app.R",
             "workflow/R/shiny_app/www/explorer.css",
+            "workflow/R/shiny_app/www/explorer.js",
+            "workflow/R/shiny_app/modules/mod_settings.R",
+            "workflow/R/de_shared/explorer_colors.R",
             "workflow/slurm_profile/config.yaml",
         )
 

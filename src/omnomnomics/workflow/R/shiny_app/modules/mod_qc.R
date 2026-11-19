@@ -32,7 +32,7 @@ mod_qc_ui <- function(id) {
   )
 }
 
-mod_qc_server <- function(id, project_index, metadata) {
+mod_qc_server <- function(id, project_index, metadata, plot_settings = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
     observe_metadata_cols <- shiny::observe({
       md <- metadata()
@@ -46,10 +46,11 @@ mod_qc_server <- function(id, project_index, metadata) {
       choices <- choices[vapply(choices, function(one_col) {
         vals <- as.character(md[[one_col]])
         vals <- vals[!is.na(vals) & nzchar(vals)]
-        length(unique(vals)) >= 2
+        length(unique(vals)) >= 1
       }, logical(1))]
-      selected_color <- if (length(choices) > 0) choices[[1]] else character(0)
-            selected_shape <- if (length(choices) > 1) choices[[2]] else character(0)
+      preferred <- if (is.null(plot_settings)) character(0) else plot_settings$group_by()
+      selected_color <- if (length(preferred) && preferred %in% choices) preferred else if (length(choices) > 0) choices[[1]] else character(0)
+            selected_shape <- ""
             empty_choice <- setNames("", "")
             shiny::updateSelectInput(session, "color_by", choices = c(empty_choice, choices), selected = selected_color)
             shiny::updateSelectInput(session, "shape_by", choices = c(empty_choice, choices), selected = selected_shape)
@@ -77,7 +78,9 @@ mod_qc_server <- function(id, project_index, metadata) {
                 pc_x = input$pc_x,
                 pc_y = input$pc_y,
                 color_by = input$color_by,
-                shape_by = input$shape_by
+                shape_by = input$shape_by,
+                point_size = if (is.null(plot_settings)) 6 else plot_settings$pca_size(),
+                color_palette = if (is.null(plot_settings) || !length(input$color_by) || !nzchar(input$color_by)) NULL else plot_settings$colors_for(md[[input$color_by]], input$color_by)
               ),
               error = function(e) e
             )
@@ -197,6 +200,7 @@ mod_qc_server <- function(id, project_index, metadata) {
       pheatmap::pheatmap(
         row_zscore(top_mat),
         annotation_col = annotation_df,
+        annotation_colors = if (is.null(plot_settings)) NA else plot_settings$annotation_colors(annotation_df),
         cluster_rows = TRUE,
         cluster_cols = TRUE,
         show_colnames = FALSE,

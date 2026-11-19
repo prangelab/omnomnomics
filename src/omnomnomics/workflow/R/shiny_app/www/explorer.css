@@ -185,6 +185,20 @@ pre {
 .shiny-plot-output { max-width: 100%; margin: 16px 0 24px; }
 .shiny-output-error-validation { padding: 14px; border-radius: 7px; background: var(--explorer-soft); color: var(--explorer-muted); }
 
+.explorer-color-grid, .explorer-gradient-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 0 0 18px;
+}
+.explorer-color-row { padding: 14px; border: 1px solid var(--explorer-border); border-radius: 9px; background: var(--explorer-soft); }
+.explorer-color-row label { display: block; overflow-wrap: anywhere; }
+.explorer-color-control { display: flex; align-items: center; gap: 12px; }
+.explorer-color-input { width: 48px; height: 36px; padding: 2px; border: 1px solid #CBD7DF; border-radius: 6px; background: #fff; cursor: pointer; }
+.explorer-color-hex { color: var(--explorer-muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+.explorer-enrichment-plot { margin: 18px 0; padding: 6px 12px 0; border: 1px solid var(--explorer-border); border-radius: 10px; }
+.explorer-enrichment-plot h5 { margin: 15px 8px 0; }
+
 @media (max-width: 1100px) {
   .explorer-shell { padding: 22px; }
   .explorer-workspace { grid-template-columns: 250px minmax(0, 1fr); gap: 18px; }

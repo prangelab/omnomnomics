@@ -95,6 +95,18 @@ omnomnomics-de-app --project-dir /path/to/project_or_DE_calling
 
 The standalone `omnomnomics-de-app` launcher imports only Python standard-library modules and starts the packaged Shiny application. The Explorer environment contains R, Shiny, ggplot2, and pheatmap; it does not contain aligners, peak callers, Snakemake, or Slurm tooling. Recreate it from the `environment.explorer.yml` supplied with the same omnomnomics release as the analyzed project.
 
+Explorer's **Settings** tab controls sample grouping, palette presets, individual
+group colours and PCA point size for the current session. Group colours are
+shared by PCA, boxplots, heatmap annotations and their PDF exports. ORA plots
+are separated by collection and up/down direction. GSEA plots show signed NES
+in separate panels. The clusterProfiler PDF download includes every panel on
+its own page.
+
+Custom gradients use **coloRspacer** when that optional R package is available
+in the active R library. Otherwise, the same gradient controls use R's built-in
+`colorRampPalette`. The built-in presets and group colour pickers work in the
+declared Explorer environment.
+
 ### IDR Companion Environment
 
 Default narrow ATAC/ChIP peak calling uses IDR. Bioconda IDR currently requires an older Python than the main `omnomnomics` environment, so IDR is installed in a small companion environment. If you want to use the default `--narrow-peak-strategy idr` mode for ATAC or narrow ChIP, run this once after creating the main environment:

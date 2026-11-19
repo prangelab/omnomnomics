@@ -3,7 +3,7 @@ mod_enrichment_ui <- function(id) {
   shiny::tagList(
     shiny::h3("Enrichment"),
     shiny::fluidRow(
-      shiny::column(4, shiny::numericInput(ns("cp_top_n"), "Top CP terms", value = 15, min = 5, step = 1)),
+      shiny::column(4, shiny::numericInput(ns("cp_top_n"), "Top terms per plot", value = 10, min = 5, step = 1)),
       shiny::column(4, shiny::numericInput(ns("dc_top_n"), "Top decoupleR regulators", value = 20, min = 5, step = 1)),
       shiny::column(4, shiny::downloadButton(ns("download_cp_plot"), "Download CP Plot PDF"))
     ),
@@ -18,7 +18,7 @@ mod_enrichment_ui <- function(id) {
   )
 }
 
-mod_enrichment_server <- function(id, selected_contrast) {
+mod_enrichment_server <- function(id, selected_contrast, plot_settings = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
     sanitize_id <- function(x) {
       gsub("[^A-Za-z0-9_]+", "_", tolower(as.character(x)))
@@ -30,9 +30,11 @@ mod_enrichment_server <- function(id, selected_contrast) {
         return(tbl)
       }
       out <- tbl
-      base <- sub("\\.tsv$", "", as.character(out$source_file))
+      base <- sub("\\.tsv$", "", basename(as.character(out$source_file)))
       base <- sub(paste0("^", contrast_id, "\\."), "", base)
       if (kind == "cp") {
+        out$method <- ifelse(grepl("\\.GSEA$", base), "GSEA", "ORA")
+        out$direction <- ifelse(grepl("\\.up\\.ORA$", base), "up", ifelse(grepl("\\.down\\.ORA$", base), "down", ifelse(out$method == "GSEA", "ranked", "all")))
         category <- ifelse(
           grepl("\\.(up|down)\\.ORA$", base),
           sub("\\.(up|down)\\.ORA$", "", base),
@@ -65,7 +67,18 @@ mod_enrichment_server <- function(id, selected_contrast) {
       if (is.null(payload) || is.null(payload$clusterprofiler) || !nrow(payload$clusterprofiler)) {
         return(list())
       }
-      split(payload$clusterprofiler, payload$clusterprofiler$category)
+      tbl <- payload$clusterprofiler
+      split(tbl, interaction(tbl$category, tbl$method, tbl$direction, drop = TRUE, sep = "/"))
+    })
+
+    cp_colors <- shiny::reactive({
+      colors <- c(positive = "#14796F", negative = "#D77A63")
+      contrast <- selected_contrast()
+      if (is.null(plot_settings) || is.null(contrast) || !all(c("numerator", "denominator", "factor") %in% colnames(contrast))) return(colors)
+      groups <- c(as.character(contrast$numerator[[1]]), as.character(contrast$denominator[[1]]))
+      selected <- plot_settings$colors_for(groups, as.character(contrast$factor[[1]]))
+      if (all(groups %in% names(selected))) colors[] <- unname(selected[groups])
+      colors
     })
 
     dc_split <- shiny::reactive({
@@ -106,11 +119,12 @@ mod_enrichment_server <- function(id, selected_contrast) {
       if (length(split_list) == 0) {
         return(shiny::tags$em("No clusterProfiler enrichment tables found for this contrast."))
       }
-      ui_items <- lapply(names(split_list), function(cat_name) {
-        plot_id <- paste0("cp_plot_", sanitize_id(cat_name))
-        shiny::tagList(
-          shiny::h5(cat_name),
-          shiny::plotOutput(session$ns(plot_id), height = "420px")
+      ui_items <- lapply(seq_along(split_list), function(index) {
+        plot_id <- paste0("cp_plot_", index)
+        shiny::tags$section(
+          class = "explorer-enrichment-plot",
+          shiny::h5(explorer_enrichment_title(split_list[[index]])),
+          shiny::plotOutput(session$ns(plot_id), height = paste0(max(360, 80 + as.integer(input$cp_top_n) * 38), "px"))
         )
       })
       do.call(shiny::tagList, ui_items)
@@ -121,15 +135,14 @@ mod_enrichment_server <- function(id, selected_contrast) {
       if (length(split_list) == 0) {
         return(invisible(NULL))
       }
-      for (cat_name in names(split_list)) {
+      for (index in seq_along(split_list)) {
         local({
-          one_cat <- cat_name
-          one_df <- split_list[[one_cat]]
-          plot_id <- paste0("cp_plot_", sanitize_id(one_cat))
+          one_df <- split_list[[index]]
+          plot_id <- paste0("cp_plot_", index)
           output[[plot_id]] <- shiny::renderPlot({
-            p <- plot_cp_top_terms(one_df, top_n = input$cp_top_n)
+            p <- plot_cp_top_terms(one_df, top_n = input$cp_top_n, colors = cp_colors())
             shiny::req(p)
-            p + ggplot2::ggtitle(one_cat)
+            p
           })
         })
       }
@@ -199,16 +212,12 @@ mod_enrichment_server <- function(id, selected_contrast) {
           grDevices::dev.off()
           return(invisible(NULL))
         }
-        first_cat <- names(split_list)[[1]]
-        p <- plot_cp_top_terms(split_list[[first_cat]], top_n = input$cp_top_n)
-        if (is.null(p)) {
-          grDevices::pdf(file, width = 8, height = 6)
-          graphics::plot.new()
-          graphics::text(0.5, 0.5, "No clusterProfiler plot available.")
-          grDevices::dev.off()
-          return(invisible(NULL))
+        grDevices::pdf(file, width = 11, height = max(6, 2 + as.integer(input$cp_top_n) * 0.4))
+        on.exit(grDevices::dev.off(), add = TRUE)
+        for (one_df in split_list) {
+          p <- plot_cp_top_terms(one_df, top_n = input$cp_top_n, colors = cp_colors())
+          if (!is.null(p)) print(p + ggplot2::ggtitle(explorer_enrichment_title(one_df)))
         }
-        ggplot2::ggsave(file, p + ggplot2::ggtitle(first_cat), width = 9, height = 6)
         invisible(NULL)
       }
     )

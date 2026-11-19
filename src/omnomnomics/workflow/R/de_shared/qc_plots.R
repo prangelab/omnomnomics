@@ -31,12 +31,12 @@ build_pca_scores <- function(vst_mat, metadata_df, top_n = 1000) {
   out
 }
 
-plot_pca_scores <- function(scores_df, pc_x = "PC1", pc_y = "PC2", color_by = NULL, shape_by = NULL) {
+plot_pca_scores <- function(scores_df, pc_x = "PC1", pc_y = "PC2", color_by = NULL, shape_by = NULL, point_size = 6, color_palette = NULL) {
   if (is.null(scores_df) || !(pc_x %in% colnames(scores_df)) || !(pc_y %in% colnames(scores_df))) {
     return(NULL)
   }
   map_color <- !is.null(color_by) && nzchar(color_by) && color_by %in% colnames(scores_df) &&
-    length(unique(as.character(scores_df[[color_by]]))) > 1
+    any(!is.na(scores_df[[color_by]]) & nzchar(as.character(scores_df[[color_by]])))
   map_shape <- !is.null(shape_by) && nzchar(shape_by) && shape_by %in% colnames(scores_df) &&
     length(unique(as.character(scores_df[[shape_by]]))) > 1
 
@@ -51,22 +51,15 @@ plot_pca_scores <- function(scores_df, pc_x = "PC1", pc_y = "PC2", color_by = NU
     plot_df[[shape_map]] <- as.factor(as.character(plot_df[[shape_map]]))
   }
 
-  p <- tryCatch({
-    if (!is.null(color_map) && !is.null(shape_map)) {
-      ggplot2::ggplot(plot_df, ggplot2::aes_string(x = pc_x, y = pc_y, colour = color_map, shape = shape_map))
-    } else if (!is.null(color_map)) {
-      ggplot2::ggplot(plot_df, ggplot2::aes_string(x = pc_x, y = pc_y, colour = color_map))
-    } else if (!is.null(shape_map)) {
-      ggplot2::ggplot(plot_df, ggplot2::aes_string(x = pc_x, y = pc_y, shape = shape_map))
-    } else {
-      ggplot2::ggplot(plot_df, ggplot2::aes_string(x = pc_x, y = pc_y))
-    }
-  }, error = function(e) {
-    ggplot2::ggplot(plot_df, ggplot2::aes_string(x = pc_x, y = pc_y))
-  })
+  p <- ggplot2::ggplot(plot_df, ggplot2::aes(x = .data[[pc_x]], y = .data[[pc_y]]))
+  if (map_color) p <- p + ggplot2::aes(colour = .data[[color_map]])
+  if (map_shape) p <- p + ggplot2::aes(shape = .data[[shape_map]])
 
+  if (map_color && !is.null(color_palette)) {
+    p <- p + ggplot2::scale_color_manual(values = color_palette)
+  }
   p +
-    ggplot2::geom_point(size = 2.5, alpha = 0.9) +
+    ggplot2::geom_point(size = point_size, alpha = 0.95) +
     ggplot2::theme_light() +
     ggplot2::theme(panel.grid = ggplot2::element_blank()) +
     ggplot2::xlab(pc_x) +

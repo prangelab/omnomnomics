@@ -13,7 +13,7 @@ mod_heatmap_ui <- function(id) {
   )
 }
 
-mod_heatmap_server <- function(id, project_index, selected_contrast, filtered_table, metadata) {
+mod_heatmap_server <- function(id, project_index, selected_contrast, filtered_table, metadata, plot_settings = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
     observe_annotation_choices <- shiny::observe({
       md <- metadata()
@@ -105,6 +105,7 @@ mod_heatmap_server <- function(id, project_index, selected_contrast, filtered_ta
         hmd$mat,
         scale = "none",
         annotation_col = hmd$annotation_df,
+        annotation_colors = if (is.null(plot_settings)) NA else plot_settings$annotation_colors(hmd$annotation_df),
         show_colnames = FALSE,
         show_rownames = TRUE
       )
@@ -130,6 +131,7 @@ mod_heatmap_server <- function(id, project_index, selected_contrast, filtered_ta
               hmd$mat,
               scale = "none",
               annotation_col = hmd$annotation_df,
+              annotation_colors = if (is.null(plot_settings)) NA else plot_settings$annotation_colors(hmd$annotation_df),
               show_colnames = FALSE,
               show_rownames = TRUE
             )

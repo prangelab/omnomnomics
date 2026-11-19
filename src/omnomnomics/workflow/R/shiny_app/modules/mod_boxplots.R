@@ -14,7 +14,7 @@ mod_boxplots_ui <- function(id) {
   )
 }
 
-mod_boxplots_server <- function(id, project_index, selected_contrast, filtered_table, metadata) {
+mod_boxplots_server <- function(id, project_index, selected_contrast, filtered_table, metadata, plot_settings = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
     gene_choices_state <- shiny::reactiveVal(list(key = NULL, selected = NULL))
     observe_group_cols <- shiny::observe({
@@ -29,7 +29,8 @@ mod_boxplots_server <- function(id, project_index, selected_contrast, filtered_t
       if (length(categorical) == 0) {
         categorical <- colnames(md)
       }
-      selected <- input$group_col
+      selected <- if (is.null(plot_settings)) input$group_col else plot_settings$group_by()
+      if (length(selected) && selected %in% colnames(md)) categorical <- unique(c(selected, categorical))
       if (!nzchar(selected) || !(selected %in% categorical)) {
         selected <- categorical[[1]]
       }
@@ -197,7 +198,7 @@ mod_boxplots_server <- function(id, project_index, selected_contrast, filtered_t
     })
 
     make_boxplot <- function(df, gene_label, group_col) {
-      ggplot2::ggplot(df, ggplot2::aes(x = group, y = expression, color = group)) +
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = group, y = expression, color = group)) +
         ggplot2::geom_boxplot(outlier.shape = NA) +
         ggplot2::geom_jitter(width = 0.15, size = 2, alpha = 0.8) +
         ggplot2::xlab(group_col) +
@@ -205,6 +206,10 @@ mod_boxplots_server <- function(id, project_index, selected_contrast, filtered_t
         ggplot2::ggtitle(gene_label) +
         ggplot2::theme_light() +
         ggplot2::theme(panel.grid = ggplot2::element_blank(), legend.position = "none")
+      if (!is.null(plot_settings)) {
+        p <- p + ggplot2::scale_color_manual(values = plot_settings$colors_for(df$group, group_col))
+      }
+      p
     }
 
     output$status <- shiny::renderText({

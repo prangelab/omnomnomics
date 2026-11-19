@@ -12,6 +12,7 @@ BIOINFORMATICS_TEST_MODULES = frozenset(
         "test_coverage_resume.py",
         "test_chip_review_regressions.py",
         "test_post_de_rerun.py",
+        "test_explorer_plot_controls.py",
     }
 )
 

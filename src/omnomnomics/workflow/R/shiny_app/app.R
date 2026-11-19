@@ -3,7 +3,8 @@ source("global.R", local = TRUE)
 app_ui <- shiny::fluidPage(
   title = "omnomnomics Differential Explorer",
   shiny::tags$head(
-    shiny::tags$link(rel = "stylesheet", type = "text/css", href = "explorer.css")
+    shiny::tags$link(rel = "stylesheet", type = "text/css", href = "explorer.css"),
+    shiny::tags$script(src = "explorer.js")
   ),
   shiny::tags$div(
     class = "explorer-shell",
@@ -59,7 +60,8 @@ app_ui <- shiny::fluidPage(
             shiny::tabPanel("Volcano", mod_volcano_ui("volcano")),
             shiny::tabPanel("Heatmap", mod_heatmap_ui("heatmap")),
             shiny::tabPanel("Boxplots", mod_boxplots_ui("boxplots")),
-            shiny::tabPanel("Enrichment", mod_enrichment_ui("enrichment"))
+            shiny::tabPanel("Enrichment", mod_enrichment_ui("enrichment")),
+            shiny::tabPanel("Settings", mod_settings_ui("settings"))
           )
         )
       )
@@ -69,13 +71,14 @@ app_ui <- shiny::fluidPage(
 
 app_server <- function(input, output, session) {
   loader <- mod_project_loader_server("project_loader")
+  plot_settings <- mod_settings_server("settings", loader$metadata)
   selector <- mod_analysis_selector_server("analysis_selector", loader$project_index)
   de_table <- mod_de_table_server("de_table", selector$selected_contrast)
   volcano <- mod_volcano_server("volcano", selector$selected_contrast, de_table$filtered_table)
-  heatmap <- mod_heatmap_server("heatmap", loader$project_index, selector$selected_contrast, de_table$filtered_table, loader$metadata)
-  boxplots <- mod_boxplots_server("boxplots", loader$project_index, selector$selected_contrast, de_table$filtered_table, loader$metadata)
-  qc <- mod_qc_server("qc", loader$project_index, loader$metadata)
-  enrichment <- mod_enrichment_server("enrichment", selector$selected_contrast)
+  heatmap <- mod_heatmap_server("heatmap", loader$project_index, selector$selected_contrast, de_table$filtered_table, loader$metadata, plot_settings)
+  boxplots <- mod_boxplots_server("boxplots", loader$project_index, selector$selected_contrast, de_table$filtered_table, loader$metadata, plot_settings)
+  qc <- mod_qc_server("qc", loader$project_index, loader$metadata, plot_settings)
+  enrichment <- mod_enrichment_server("enrichment", selector$selected_contrast, plot_settings)
 
   output$contrast_heading <- shiny::renderUI({
     contrast_obj <- selector$selected_contrast()
