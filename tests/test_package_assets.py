@@ -11,6 +11,7 @@ class PackageAssetTests(unittest.TestCase):
             "workflow/rules/16.analyze_peaks_de.smk",
             "workflow/templates/de_core.R.tmpl",
             "workflow/R/shiny_app/app.R",
+            "workflow/R/shiny_app/www/explorer.css",
             "workflow/slurm_profile/config.yaml",
         )
 

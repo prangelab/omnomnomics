@@ -7,10 +7,13 @@ mod_project_loader_ui <- function(id) {
   shiny::tagList(
     shiny::h3("Project"),
     shiny::textInput(ns("de_root"), "Project directory or DE_calling directory", value = default_root),
-    shiny::actionButton(ns("load"), "Load Project"),
+    shiny::actionButton(ns("load"), "Load project", class = "btn-primary"),
     shiny::verbatimTextOutput(ns("status")),
-    shiny::h4("Analyses"),
-    shiny::tableOutput(ns("analysis_table"))
+    shiny::tags$details(
+      class = "explorer-details",
+      shiny::tags$summary("Available analyses"),
+      shiny::tableOutput(ns("analysis_table"))
+    )
   )
 }
 

@@ -1,53 +1,66 @@
 source("global.R", local = TRUE)
 
 app_ui <- shiny::fluidPage(
-  shiny::titlePanel("omnomnomics Differential Explorer"),
-  shiny::fluidRow(
-    shiny::column(
-      width = 4,
-      mod_project_loader_ui("project_loader"),
-      shiny::hr(),
-      mod_analysis_selector_ui("analysis_selector")
+  title = "omnomnomics Differential Explorer",
+  shiny::tags$head(
+    shiny::tags$link(rel = "stylesheet", type = "text/css", href = "explorer.css")
+  ),
+  shiny::tags$div(
+    class = "explorer-shell",
+    shiny::tags$header(
+      class = "explorer-header",
+      shiny::tags$div(
+        shiny::tags$div(class = "explorer-brand", "omnomnomics"),
+        shiny::tags$h1("Differential Explorer")
+      )
     ),
-    shiny::column(
-      width = 8,
-      shiny::tabsetPanel(
-        shiny::tabPanel(
-          "Overview",
-          shiny::h3("Overview"),
-          shiny::verbatimTextOutput("overview_text"),
-          shiny::h4("Selected Analysis"),
-          shiny::tableOutput("selected_analysis_tbl"),
-          shiny::h4("Selected Contrast"),
-          shiny::tableOutput("selected_contrast_tbl"),
-          shiny::h4("Metadata Preview"),
-          shiny::tableOutput("metadata_preview"),
-          shiny::h4("QC Files Preview"),
-          shiny::tableOutput("qc_preview")
+    shiny::tags$div(
+      class = "explorer-workspace",
+      shiny::tags$aside(
+        class = "explorer-sidebar",
+        shiny::tags$section(
+          class = "explorer-sidebar-section",
+          mod_project_loader_ui("project_loader")
         ),
-        shiny::tabPanel(
-          "QC",
-          mod_qc_ui("qc")
-        ),
-        shiny::tabPanel(
-          "DE Table",
-          mod_de_table_ui("de_table")
-        ),
-        shiny::tabPanel(
-          "Volcano",
-          mod_volcano_ui("volcano")
-        ),
-        shiny::tabPanel(
-          "Heatmap",
-          mod_heatmap_ui("heatmap")
-        ),
-        shiny::tabPanel(
-          "Boxplots",
-          mod_boxplots_ui("boxplots")
-        ),
-        shiny::tabPanel(
-          "Enrichment",
-          mod_enrichment_ui("enrichment")
+        shiny::tags$section(
+          class = "explorer-sidebar-section",
+          mod_analysis_selector_ui("analysis_selector")
+        )
+      ),
+      shiny::tags$main(
+        class = "explorer-main",
+        shiny::uiOutput("contrast_heading", class = "explorer-contrast"),
+        shiny::uiOutput("project_metrics", class = "explorer-metrics"),
+        shiny::tags$section(
+          class = "explorer-content",
+          shiny::tabsetPanel(
+            id = "explorer_view",
+            shiny::tabPanel(
+              "Overview",
+              shiny::h3("Sample metadata"),
+              shiny::tableOutput("metadata_preview"),
+              shiny::tags$details(
+                class = "explorer-details",
+                shiny::tags$summary("Project and contrast details"),
+                shiny::verbatimTextOutput("overview_text"),
+                shiny::h4("Selected analysis"),
+                shiny::tableOutput("selected_analysis_tbl"),
+                shiny::h4("Selected contrast"),
+                shiny::tableOutput("selected_contrast_tbl")
+              ),
+              shiny::tags$details(
+                class = "explorer-details",
+                shiny::tags$summary("QC files"),
+                shiny::tableOutput("qc_preview")
+              )
+            ),
+            shiny::tabPanel("QC", mod_qc_ui("qc")),
+            shiny::tabPanel("DE Table", mod_de_table_ui("de_table")),
+            shiny::tabPanel("Volcano", mod_volcano_ui("volcano")),
+            shiny::tabPanel("Heatmap", mod_heatmap_ui("heatmap")),
+            shiny::tabPanel("Boxplots", mod_boxplots_ui("boxplots")),
+            shiny::tabPanel("Enrichment", mod_enrichment_ui("enrichment"))
+          )
         )
       )
     )
@@ -63,6 +76,41 @@ app_server <- function(input, output, session) {
   boxplots <- mod_boxplots_server("boxplots", loader$project_index, selector$selected_contrast, de_table$filtered_table, loader$metadata)
   qc <- mod_qc_server("qc", loader$project_index, loader$metadata)
   enrichment <- mod_enrichment_server("enrichment", selector$selected_contrast)
+
+  output$contrast_heading <- shiny::renderUI({
+    contrast_obj <- selector$selected_contrast()
+    if (is.null(contrast_obj) || nrow(contrast_obj) == 0) {
+      return(shiny::tags$h2("Select a project and contrast"))
+    }
+    shiny::tags$h2(as.character(contrast_obj$contrast_id[[1]]))
+  })
+
+  output$project_metrics <- shiny::renderUI({
+    metadata_tbl <- loader$metadata()
+    result_tbl <- de_table$de_table()
+    filtered_tbl <- de_table$filtered_table()
+    shiny::req(!is.null(metadata_tbl), !is.null(result_tbl), !is.null(filtered_tbl))
+    sample_column <- if ("sample_id" %in% colnames(metadata_tbl)) "sample_id" else colnames(metadata_tbl)[[1]]
+    sample_ids <- unique(as.character(metadata_tbl[[sample_column]]))
+    sample_count <- sum(!is.na(sample_ids) & nzchar(sample_ids))
+    shiny::tagList(
+      shiny::tags$div(
+        class = "explorer-metric",
+        shiny::tags$span("Samples"),
+        shiny::tags$strong(format(sample_count, big.mark = ",", trim = TRUE))
+      ),
+      shiny::tags$div(
+        class = "explorer-metric",
+        shiny::tags$span("Features in table"),
+        shiny::tags$strong(format(nrow(result_tbl), big.mark = ",", trim = TRUE))
+      ),
+      shiny::tags$div(
+        class = "explorer-metric explorer-metric-accent",
+        shiny::tags$span("After table filters"),
+        shiny::tags$strong(format(nrow(filtered_tbl), big.mark = ",", trim = TRUE))
+      )
+    )
+  })
 
   output$overview_text <- shiny::renderText({
     loaded <- loader$project_index()
