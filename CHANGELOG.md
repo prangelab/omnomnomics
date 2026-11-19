@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.6.1 - Unreleased
+
+### Fixed
+- Forced chromatin DE reruns also execute the selected post-DE analysis when previous outputs already exist. Ordinary selective reuse remains unchanged.
+- PCA grouping accepts metadata column names containing spaces and groups with a single level.
+
+### Changed
+- Differential Explorer uses a responsive sidebar, clearer controls and result counters.
+- PCA uses larger round points with adjustable size.
+- Settings provides sample grouping, palette presets, custom gradients and individual group colours shared across PCA, boxplots, heatmap annotations and their exports.
+- ORA up/down results and GSEA results are plotted separately per collection with their own statistics; enrichment PDF export includes all panels on separate pages.
+- Custom gradients optionally use an existing coloRspacer installation, with a base R fallback. No additional dependency is required and the Linux environment locks are unchanged.
+- Installed-artifact verification compares the application version with the supplied wheel metadata instead of a fixed historical version.
+
 ## 0.6.0 - 2026-10-19
 
 Published as [v0.6.0](https://github.com/prangelab/omnomnomics/releases/tag/v0.6.0)

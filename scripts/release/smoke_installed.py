@@ -2,6 +2,7 @@
 """Exercise an installed wheel and its bundled workflow outside the source tree."""
 
 import argparse
+from email.parser import BytesParser
 import hashlib
 import importlib
 import importlib.metadata
@@ -30,8 +31,12 @@ def main():
     import omnomnomics
     package = Path(omnomnomics.__file__).resolve().parent
     assert package.is_relative_to(Path(sys.prefix).resolve()), package
-    assert importlib.metadata.version("omnomnomics") == omnomnomics.__version__ == "0.6.0"
     with zipfile.ZipFile(args.wheel) as archive:
+        metadata_files = [name for name in archive.namelist() if name.endswith(".dist-info/METADATA")]
+        assert len(metadata_files) == 1, metadata_files
+        metadata = BytesParser().parsebytes(archive.read(metadata_files[0]))
+        assert metadata["Name"] == "omnomnomics", metadata["Name"]
+        assert importlib.metadata.version("omnomnomics") == omnomnomics.__version__ == metadata["Version"]
         assets = [name for name in archive.namelist() if name.startswith("omnomnomics/workflow/") and not name.endswith("/")]
         assert assets
         for name in assets:
