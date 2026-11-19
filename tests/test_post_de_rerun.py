@@ -33,16 +33,16 @@ samples2 = ['sample']
 """ + inputs + """
 
 rule all:
-    input: 'DE_calling/extra_16.tmp'
+    input: f'{experiment_dir}/DE_calling/project.chrom.results.zip', f'{experiment_dir}/DE_calling/extra_16.tmp'
 
 rule call_DE_chrom:
-    input: 'DE_calling/raw_counts.tsv'
-    output: 'DE_calling/project.chrom.results.zip', 'DE_calling/peak_metadata.tsv'
+    input: f'{experiment_dir}/DE_calling/raw_counts.tsv'
+    output: f'{experiment_dir}/DE_calling/project.chrom.results.zip', f'{experiment_dir}/DE_calling/peak_metadata.tsv'
     shell: 'touch {output}; echo DE >> executed.txt'
 
 rule analyze_peaks_de:
     input: analyze_peaks_de_input
-    output: 'DE_calling/extra_16.tmp'
+    output: f'{experiment_dir}/DE_calling/extra_16.tmp'
     shell: 'touch {output}; echo post-DE >> executed.txt'
 """
         (project / "Snakefile").write_text(workflow)
